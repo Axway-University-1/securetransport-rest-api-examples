@@ -1,0 +1,2 @@
+[ { "id": "s1", "account": "alice", "type": "SharedFolder" },
+  { "id": "s2", "account": "bob",   "type": "Basic" } ]

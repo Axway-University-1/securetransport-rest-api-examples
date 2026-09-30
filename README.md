@@ -1,0 +1,312 @@
+# SecureTransport-REST-API-Examples
+
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [Axway University](#axway-university-training)
+3. [Getting Started](#getting-started)
+4. [Repository Layout](#repository-layout)
+5. [Common Terminologies](#common-terminologies)
+6. [OpenAPI](#openapi)
+7. [HTTP Methods](#st-api-20-methods)
+8. [What Is Covered](#what-is-covered)
+9. [License and Support](#license-and-support)
+
+## Introduction
+SecureTransport 5.5, released in June 2020, introduced REST API 2.0. The prior API release is version 1.4. APIs were introduced to SecureTransport in 5.2.1 – though this document will not refer to those as that release (5.2.1) is no longer supported.
+Currently supported APIs are V1.4 and V2.0 – both are available in ST release V5.5.
+
+This github project looks at use cases from a specific viewpoint. Many clients and Axway themselves have implemented mechanisms to on-board clients and file transfer flows in an automated manner using APIs, rather than the alternative method of manual setups via the admin GUI of ST. Automation brings a reduced risk of introducing errors and also assists in adhering to any standards enforced by the owning institution in naming standards, security profiles etc.
+Many other automation tasks such as certificate expiry monitoring, configuration drift from baseline, etc are all possible via API based scripts or programs.
+ 
+The examples here use the `curl` command from bash, the same calls as Windows batch files, and the python scripting language. It should be pointed out that **ANY** language that supports HTTPS Restful APIs can be used. Please also note that the commands shown are not the sole method you might want to use. Feel free to simplify or extend further what is shown as a guideline and starting point.
+
+
+## Axway University Training
+
+Login to Axway University using your Axway ID
+
+https://university.axway.com/
+
+And then you can access the learning plan for the SecureTransport REST API
+
+https://university.axway.com/learn/learning-plans/77/securetransport-apis
+
+## Getting Started
+
+### Start with the knowledge pack
+
+Before reading the tree, look at [.claude/](.claude/). It holds three short
+documents that save you working this out for yourself:
+
+- **[Orientation](.claude/skills/st-api-orientation/SKILL.md)** — what is here,
+  how it is laid out, and which example covers which task.
+- **[Gotchas](.claude/skills/st-api-gotchas/SKILL.md)** — the non-obvious traps in
+  the API and in scripting against it, collected from real debugging. Worth
+  reading before your first call.
+- **[Adding an example](.claude/skills/st-api-add-example/SKILL.md)** — the house
+  style, if you plan to contribute.
+
+They are plain markdown, so they are useful on their own. If you use Claude Code,
+they load automatically and you can just ask your question in the repository.
+
+### Prerequisites
+
+| Tool | Needed for | Notes |
+| ---- | ---------- | ----- |
+| `curl` | every bash and bat example | Included with Windows 10 and later. |
+| `jq` | most bash examples | Used to read and edit JSON responses. |
+| `python3` | the python examples | Plus the `requests` library: `python3 -m pip install requests` |
+| `requests_toolbelt` | `python3/stGetPrivateCert.py` only | `python3 -m pip install requests_toolbelt` |
+| PowerShell | the bat examples | Used in place of `jq` to read JSON. |
+
+### Configuration
+
+None of the examples contain a server address or credentials. Each group of
+examples reads them from a file that you create once and that git ignores, so
+your details are never committed.
+
+The same four names are used everywhere, so there is one set to learn:
+
+| Variable | Meaning |
+| -------- | ------- |
+| `ST_SERVER` | The SecureTransport host, without the protocol or port |
+| `ST_PORT` | The API port. See the table below. |
+| `ST_USER` | The account to authenticate as |
+| `ST_PASSWORD` | That account's password, in plain text |
+
+Copy the example file for the examples you want to run and edit your copy:
+
+| Examples | Copy this | To this |
+| -------- | --------- | ------- |
+| `Admin/API 2.0/bash` | `set_variables.local.example.sh` | `set_variables.local.sh` |
+| `Admin/API 2.0/bat` | `set_variables.local.example.bat` | `set_variables.local.bat` |
+| `Admin/API 2.0/python` | `config.example` | `config` |
+| `EndUser/API 2.0/bash` | `set_variables.local.example.sh` | `set_variables.local.sh` |
+
+For example:
+
+```
+cd "Admin/API 2.0/bash"
+cp set_variables.local.example.sh set_variables.local.sh
+$EDITOR set_variables.local.sh
+```
+
+The scripts then pick your values up on their own. There is nothing to
+configure inside the individual examples, and nothing to edit in the committed
+`set_variables.sh`, `set_variables.bat` or `config.example` files.
+
+The password is always entered in plain text. Where the API expects a base64
+encoded `user:password` pair, the scripts derive it for you, so there is no need
+to run `base64` by hand.
+
+### Which port?
+
+| Examples | Non root install | Root install |
+| -------- | ---------------- | ------------ |
+| Admin | 8444 | 444 |
+| EndUser | 8443 | 443 |
+
+### Running an example
+
+Each example is self contained and can be run directly:
+
+```
+cd "Admin/API 2.0/bash/01.Authentication"
+./01.myself_POST.sh
+```
+
+If the configuration is missing, the scripts stop with a message telling you
+which file to create rather than failing part way through a request.
+
+## Repository Layout
+
+```
+Admin/API 2.0/          Administrator API, on the admin port
+    bash/               curl examples, numbered by topic
+    bat/                the same examples for Windows
+    python/
+        python3/         the python examples
+        utils/           tools that work on an exported configuration XML
+EndUser/API 2.0/
+    bash/               end user API, on the user port
+images/                 screenshots used by this README
+```
+
+The bash and bat examples are numbered by topic and, within a topic, by HTTP
+method, so `04.Applications/02.applications_POST.sh` is the POST example for
+applications. Reading a topic folder in order walks you through the full
+create, read, update and delete cycle for that object.
+
+The python examples are different in character: rather than demonstrating a
+single call, each one is a small complete program for a real task, such as
+baselining the server configuration or bulk updating accounts.
+
+## Common Terminologies
+
+The following table shows a list of terms and acronyms used throughout this project.
+
+| Definition | Description |
+| ---------- | ----------- |
+| API | Application Programming Interface |
+| CRUDL | Create Read Update Delete List |
+| HTTPS | Hypertext Transfer Protocol Secure |
+| JSON | JavaScript Object Notation |
+| MFT | Managed File Transfer |
+| PGP | Pretty Good Privacy |
+| ReST | Representational State Transfer |
+| SaaS | Solution as a Service |
+| SFTP | SSH File Transfer Protocol |
+| ST | SecureTransport |
+| TLS | Transport Layer Security |
+| UI | User Interface |
+| XML | eXtensible Markup Language |
+
+## OpenAPI
+
+SecureTransport provides an Open API (a.k.a. Swagger UI) which allows you to interactively explore its APIs.
+
+In any browser enter as below, substituting your server’s IP and port used for the admin GUI. For example the default for a non root install would be: https://<<SERVER_IP>>:8444/api/v2.0/docs/index.html for version 2.0 or https://<<SERVER_IP>>:8444/api/v1.4/docs/index.html for version 1.4.
+
+The above URLs all provide access to the ADMIN level APIS.  There is a smaller set of user level APIs available at the 8443 or 443 port.
+
+You will be required to authenticate with an administrator username and password. Once authenticated, a screen as below will be seen.
+
+![REST API 2.0 Open API](images/swagger_20.jpg "REST API 2.0 Open API")
+
+Expanding any of the arrows will display the respective APIs along with available methods.
+
+Selecting the GET /accounts for example will then open a window as below indicating all the possible parameters that might be used to select accounts from the system. Be careful of any API that is not a read or GET method.  PUTs, POSTs, DELETEs will all work if you enter the correct parameters and input data.
+
+![GET /accounts](images/swagger_get_account.jpg "GET /accounts")
+
+Note the ‘Try it out’ button. Select the button and you will now be able to use this API live.
+
+The Open API provides a curl command equivalent that it is using to fetch the data. Notice also that a server response will be displayed showing the returned JSON data.
+
+The HTTP success code of 200 is shown next to the response assuming all worked correctly. Finally, if you wish to download the response there is an option to download the output json to your PC.
+
+By default, the system will only return up to (by default) 100 objects. This value can be changed via the Server Configuration Option Webservices.EntriesPerPage.
+
+
+## ST API 2.0 Methods
+
+When designing a RESTful API, it's crucial to use HTTP methods correctly to ensure clarity and consistency in your API's behavior. Here's a brief overview of the commonly used HTTP methods and their appropriate usage:
+
+**GET**: Use GET to retrieve resource representations without modifying the server's state. It's safe and idempotent, meaning repeated requests should yield the same result.
+
+**POST**: Employ POST to create new resources. The server assigns a unique identifier to the newly created resource. POST is not idempotent, as multiple identical requests may result in multiple resource creations.
+
+**PUT**: Use PUT to update existing resources by replacing their entire content. It's idempotent, as repeated requests should have the same effect as a single request.
+
+**PATCH**: Apply PATCH for partial updates to existing resources. It's more efficient than PUT when only a few fields need to be updated in a large resource.
+
+**DELETE**: Utilize DELETE to remove resources from the server. It's idempotent, as the result remains the same whether you delete a resource once or multiple times. 
+*Note*: The DELETE method is considered idempotent despite potentially returning different responses because idempotency in REST APIs focuses on the server-side effect rather than the client-side response.
+
+**HEAD**: Similar to GET, but only retrieves headers without the response body. Use it to check resource metadata or determine the size of a potential GET response.
+
+
+## What Is Covered
+
+This project is a work in progress. The tables below describe what is in the
+repository today, so that you can see at a glance whether the example you need
+already exists.
+
+### Admin API
+
+| Topic | Endpoints | bash | bat |
+| ----- | --------- | :--: | :-: |
+| 01. Authentication | `/myself`, basic auth and cookie jar | 2 | 2 |
+| 02. Introduction | `/version`, `/myself` | 6 | 6 |
+| 03. Connect | `/daemons`, `/servers`, and their operations | 13 | 13 |
+| 04. Applications | `/applications`, flow and maintenance types | 7 | 7 |
+| 05. Accounts | `/accounts`, including PATCH from a file | 8 | 8 |
+| 06. Transfer Sites | `/sites` | 1 | 1 |
+| 08. Route Templates | `/routes`, template type | 1 | 1 |
+| 09. Composite Routes | `/routes`, composite type | 1 | 1 |
+| 12. Business Units | `/businessUnits` | 1 | 1 |
+| 13. Configurations | `/configurations/options` | 2 | 2 |
+| 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
+
+Every bash example has a bat equivalent, so Windows users can follow the same
+path through the material. Where the bash examples use `jq`, the bat examples
+use PowerShell to do the same job.
+
+### EndUser API
+
+| Topic | Endpoints | bash |
+| ----- | --------- | :--: |
+| 01. Authenticate | `/myself`, login and logout | 2 |
+| 02. Files | `/files`, list, upload, download and delete | 6 |
+
+### Python
+
+The python examples are whole programs for real maintenance tasks, rather than
+single calls. They are CSRF aware, as required from the 20230525 release onwards.
+
+| Script | What it does |
+| ------ | ------------ |
+| `stBuildFullTestAccount.py` | Onboards one account end to end: account, certificate, transfer site, routes and subscription. The best place to start if you are automating onboarding. |
+| `stBuildTestAccounts.py` | Creates accounts in bulk, using multiprocessing. |
+| `stDeleteTestAccounts.py` | Deletes accounts in bulk. |
+| `stGetAccountsAfterDate.py` | Lists accounts created after a given date. |
+| `stUpdateAllAccounts.py` | Scans every template account and updates a field. Uses certificate based authentication rather than basic auth. |
+| `stUpdateAllRoutes.py` | Scans every simple route and patches a field on the route, or a field inside one of its steps. |
+| `stUpdateRouteWithPut.py` | Reads a route, changes it and writes the whole object back. Inserts steps, links a simple route into a composite, or attaches a route to a subscription. |
+| `stUpdateAllSubscriptions.py` | Scans every subscription and patches a set of fields. |
+| `stUsersPerSharedFolder.py` | Reports which accounts have access to each shared folder, by joining applications and subscriptions. Read only. |
+| `stReplaceSites.py` | Scans SSH transfer sites and updates their cipher suites. |
+| `stCertificateExpiry.py` | Counts the certificates and reports the ones that have expired or are about to. Read only. |
+| `stGetPrivateCert.py` | Exports a certificate by ID. Needs `requests_toolbelt`. |
+| `stAddLoginRestrictionRule.py` | Adds a rule to an existing login restriction policy. |
+| `stConfigScan.py` | Baselines the server configuration and reports drift from the baseline on later runs. Useful after a patch. |
+| `stGraceful.py` | Gracefully drains and shuts down a core and edge pair. |
+
+The three scripts that change many objects at once — `stUpdateAllRoutes.py`,
+`stUpdateAllSubscriptions.py` and `stUpdateRouteWithPut.py` — have a `dryRun`
+setting in their configuration section, which is on by default. Run them that
+way first and read the output before letting them write.
+
+`utils` holds two tools whose input is an exported `systemConfiguration.xml`
+rather than the live API:
+
+| Script | What it does |
+| ------ | ------------ |
+| `stCompareExportedConfigurations.py` | Compares two exported configurations and reports the options whose value differs, and the options present in only one of them. Useful when you have the exports but no access to the system. |
+| `processSystemConfig.py` | Extracts the user classes from an export and converts their membership expressions from the 5.2.1 format to the 5.5 format. Writes the result as XML, and can create the user classes on a target server through the API when `createOnTarget` is set. |
+
+Export the configuration from the GUI, then take the XML out of the zip it
+produces:
+
+```
+unzip -j export_configuration.zip systemConfiguration.xml -d /home/axway/api
+```
+
+### Not yet covered
+
+These areas of the API do not have examples yet. Contributions are welcome, and
+the list doubles as a rough roadmap.
+
+- Transfers, Sessions, Events and Statistics Summary
+- Transfer Profiles, Route Steps Charsets and Route Steps Metadata
+- Site Templates, Address Book and Account Setup
+- Administrators, Administrative Roles and User Classes
+- Access Policies
+- Cluster Services, ICAP Servers, LDAP Domains and Zones
+- Mail Templates
+
+Some areas are covered by the python examples but not yet by bash or bat:
+routes beyond creation, subscriptions, certificates, login restriction policies
+and the transaction manager. See the python table above.
+
+## License and Support
+
+These examples are published under the Apache License 2.0. See [LICENSE](LICENSE).
+
+The included software is provided AS IS, with no implied or expressed warranty,
+and is not covered by any Axway service level agreement. It is intended to
+illustrate the API rather than to be run unmodified against a production
+system. Take a backup before running anything that writes, and test the result
+afterwards. Note in particular that several examples create, modify or delete
+objects, and that `python3/stDeleteTestAccounts.py` deletes accounts in bulk.

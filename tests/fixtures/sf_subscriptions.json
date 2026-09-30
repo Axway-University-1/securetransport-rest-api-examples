@@ -1,0 +1,4 @@
+[ { "type": "SharedFolder", "application": "SF_Finance", "account": "alice", "folder": "Finance" },
+  { "type": "SharedFolder", "application": "SF_Finance", "account": "bob",   "folder": "Finance" },
+  { "type": "SharedFolder", "application": "SF_Gone",    "account": "carol", "folder": "Legacy" },
+  { "type": "Basic",        "application": "SF_Finance", "account": "dave",  "folder": "Other" } ]

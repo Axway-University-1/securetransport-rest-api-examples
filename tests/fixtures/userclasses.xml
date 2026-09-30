@@ -1,0 +1,13 @@
+<ConfigurationModel>
+ <UserClass><name>ADMINS</name><type>*</type><order>1</order><enabled>true</enabled>
+  <user>*</user><group>*</group><host>*</host>
+  <expression>memberof("CN=ADMINS,DC=example,DC=com",LDAP_DIR_memberOf$collection)</expression>
+  <configurationProfile>Default</configurationProfile></UserClass>
+ <UserClass><name>PlainExpression</name><type>*</type><order>2</order><enabled>true</enabled>
+  <user>*</user><group>*</group><host>*</host>
+  <expression>user == "bob"</expression>
+  <configurationProfile>Default</configurationProfile></UserClass>
+ <UserClass><name>NoExpressionAtAll</name><type>*</type><order>3</order><enabled>false</enabled>
+  <user>*</user><group>*</group><host>*</host>
+  <configurationProfile>Default</configurationProfile></UserClass>
+</ConfigurationModel>

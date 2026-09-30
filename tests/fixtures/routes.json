@@ -1,0 +1,11 @@
+[
+  { "id": "r1", "name": "RouteA", "type": "SIMPLE",
+    "failureEmailName": "keep@example.com,oldteam@example.com",
+    "steps": [ { "type": "Rename" },
+               { "type": "CustomStepTracking",
+                 "customProperties": { "mHostName": "old.example.com", "mPort": "1305" } } ] },
+  { "id": "r2", "name": "RouteB", "type": "SIMPLE",
+    "failureEmailName": "someone@example.com", "steps": [] },
+  { "id": "r3", "name": "RouteC", "type": "SIMPLE", "failureEmailName": null,
+    "steps": [ { "type": "CustomStepTracking", "customProperties": { "unrelated": "x" } } ] }
+]

@@ -1,0 +1,32 @@
+#
+# Configuration for the Admin API 2.0 python examples.
+#
+# Copy this file to 'config' in this same directory and fill in the values for
+# your own environment. The 'config' file is excluded from git so that your
+# credentials are never committed.
+#
+#   cp config.example config
+#
+# The scripts resolve this file relative to their own location, so they can be
+# run from any working directory.
+#
+# These are the same four variable names the bash and bat examples use, in
+# lower case. The scripts build the API URL and the base64 Authorization value
+# from them, so there is nothing to encode by hand.
+#
+
+# The SecureTransport host, without the protocol or port
+st_server="st.example.com"
+
+# The admin port. 8444 for a non root install, 444 for a root install.
+st_port="8444"
+
+# An administrator account and its password, in plain text
+st_user="apiadmin"
+st_password="change_me"
+
+#
+# Optional. Only stGraceful.py uses this, for the edge server in a
+# core plus edge deployment. It defaults to st_server when not set.
+#
+#st_edge_server="edge.example.com"

@@ -1,0 +1,3 @@
+[ { "name": "SF_Finance", "type": "SharedFolder", "sharedFolder": "/data/fin" },
+  { "name": "SF_HR",      "type": "SharedFolder", "sharedFolder": "/data/hr" },
+  { "name": "NotShared",  "type": "Basic" } ]

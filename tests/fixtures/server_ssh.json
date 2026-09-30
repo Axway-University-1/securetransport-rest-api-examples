@@ -1,0 +1,4 @@
+{ "serverName": "SSH_TEST_SERVER_1", "protocol": "ssh", "port": 8022,
+  "isActive": false, "clientPasswordAuth": "required",
+  "advanced": { "port": 9999, "proxyPort": 1080 },
+  "notes": "SSH_TEST_SERVER_1 is the primary" }

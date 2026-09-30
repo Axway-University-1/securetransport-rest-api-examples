@@ -1,0 +1,7 @@
+<ConfigurationModel><options><option>
+ <optionItem><name>AddressBook.Enabled</name><value>false</value></optionItem>
+ <optionItem><name>Webservices.EntriesPerPage</name><value>100</value></optionItem>
+ <optionItem><name>OnlyInB1</name><value>b1</value></optionItem>
+ <optionItem><name>OnlyInB2</name><value>b2</value></optionItem>
+ <optionItem><name>NoValueHere</name></optionItem>
+</option></options></ConfigurationModel>

@@ -1,0 +1,67 @@
+# ==============================================================================
+# Integration test configuration.
+#
+# Copy this to tests/local/integration.conf, which git ignores, and fill in a
+# LAB server. Never point it at production.
+#
+#   mkdir -p tests/local
+#   cp tests/integration/integration.conf.example tests/local/integration.conf
+# ==============================================================================
+
+# The SecureTransport admin API. 8444 on a non root install, 444 on a root one.
+st_server="st-lab.example.com"
+st_port="8444"
+
+# An administrator account. On a lab system, ideally one created for this.
+st_user="apiadmin"
+st_password="change_me"
+
+# ------------------------------------------------------------------------------
+# Safety
+# ------------------------------------------------------------------------------
+# Required. Nothing runs until this says yes. It is your statement that the
+# server above is a lab system and not production.
+st_confirm_lab="no"
+
+# Required for anything that writes, on top of passing --write on the command
+# line. With this set to no, the read only checks still run.
+st_allow_writes="no"
+
+# Every object the tests create starts with this. The tests refuse to delete
+# anything that does not carry it, so keep it distinctive.
+st_object_prefix="ZZTEST_"
+
+# ------------------------------------------------------------------------------
+# Optional
+# ------------------------------------------------------------------------------
+# ST requires a Referer header. The value is arbitrary but must be consistent.
+st_referer="PippinTheCat"
+
+# Seconds
+st_timeout="30"
+
+# Lab servers usually have a self signed certificate, so verification is off by
+# default, matching curl -k in the examples. Set to yes if yours is trusted.
+st_verify_tls="no"
+
+# The EndUser API port, for 11.enduser_scripts.py. This project documents
+# 8444/8443 for a non root install and 444/443 for a root one, but that pairing
+# is not guaranteed - confirmed on one real server that mixed the two (444
+# admin, 8443 end user). Leave blank to try the admin port minus one; set this
+# if that guess does not connect.
+#st_enduser_port=""
+
+# The name 11.enduser_scripts.py gives the throwaway account it creates for
+# itself, runs the EndUser examples as, and deletes afterward. You do not need
+# to create this account or set a password for it - the check does both. Only
+# change this if the default collides with something already on your server.
+#st_enduser_test_account="ZZTEST_enduser"
+
+# This server's own certificate authority password, needed only to GENERATE a
+# brand new certificate through POST /certificates (a different thing from
+# IMPORTING an externally created one - that needs the same secret and is not
+# attempted anywhere in this project). Required only by
+# 26.python_get_private_cert.py, which skips itself when this is blank rather
+# than fail. Confirmed directly: this is a real secret specific to your own
+# server, not a value this project can guess or ship a working default for.
+#st_ca_password=""

@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""
+WRITES TO THE SERVER. Runs stBuildTestAccounts.py and the real, unmodified
+stDeleteTestAccounts.py in Admin/API 2.0/python/python3 against a configured
+server, and independently verifies both.
+
+stBuildTestAccounts.py hardcodes 100 accounts across 3 processes and an
+unconditional business unit named "CatFoodCorporation" - not check-before-
+create the way this repository's own accounts examples are. This check runs
+a name-and-count-substituted copy instead: 3 accounts, 1 process, and the
+business unit renamed to "ZZTEST_CatFoodCorporation" so a real business unit
+of that name is never at risk and cleanup is unambiguous. That is not the
+same as running the real file - see script_runner.substituted_copy. The
+accounts themselves are named "ZZ0".."ZZ2" by the script's own logic
+(unchanged - "ZZ" + an index), which is what stDeleteTestAccounts.py's
+hardcoded namePattern="ZZ" (a substring match) is built to find, so that
+script runs completely unmodified.
+
+Needs tests/local/pyvenv - see 15.python_read_scripts.py's docstring for how
+to create it.
+
+Confirmed and fixed while getting this running the first time - real bugs in
+both shipped scripts, not just a macOS quirk:
+
+  - Both scripts crashed with NameError: name 'base64' is not defined. Their
+    main block never imports base64 at all, despite using base64.b64encode
+    directly - only the per-process worker function's own (separately
+    scoped) import covers that function, not the main block.
+  - Both worker functions (stCreateAccount, stDeleteAccount) call the shared
+    stLogin()/stLogout() helpers, which read stUrl, referer, stTimeout and
+    apiCount as module globals rather than function arguments. Those globals
+    are only ever set inside `if __name__ == "__main__":` in the *parent*
+    process. Confirmed directly: under macOS/Windows multiprocessing, whose
+    default "spawn" start method re-imports the module fresh in the child
+    rather than inheriting the parent's already-executed globals the way a
+    forked child (Linux's default) would, this raised NameError on stUrl the
+    moment a worker process tried to log in. stDeleteAccount separately
+    called stLogin(basicAuth, ...) - the same undefined global, and not even
+    the local `auth` argument it was actually given. Both are fixed by
+    seeding the globals stLogin/stLogout need from each worker's own
+    arguments before calling either. See the gotchas skill.
+
+Safety: refuses to run at all if any of ZZ0, ZZ1, ZZ2 or the throwaway
+business unit already exist, the same as this repository's other accounts
+checks refuse to collide with something already there.
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
+import st_client  # noqa: E402
+import script_runner as runner  # noqa: E402
+
+config = st_client.load_config()
+if not config:
+    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
+
+if "--write" not in sys.argv:
+    st_client.skip("read only run, pass --write to run the build/delete scripts for real")
+
+if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
+    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+
+if not runner.python_available():
+    st_client.skip("no tests/local/pyvenv - see 15.python_read_scripts.py's docstring")
+
+c = st_client.Checker("Python build/delete test accounts, run for real from "
+                       "Admin/API 2.0/python/python3")
+
+PY_TREE = runner.path("Admin", "API 2.0", "python")
+PY_DIR = os.path.join(PY_TREE, "python3")
+NAMES = ["ZZ0", "ZZ1", "ZZ2"]
+BU_NAME = "ZZTEST_CatFoodCorporation"
+
+
+def script(name):
+    return os.path.join(PY_DIR, name)
+
+
+client = st_client.connect(config, c)
+
+if st_client.is_mock(client):
+    c.info("the bundled mock does not implement enough of the admin API for "
+           "these scripts; run this against a real server to exercise it")
+    client.logout()
+    sys.exit(c.done())
+
+created = False
+
+try:
+    pre_existing = [n for n in NAMES if client.exists("accounts/" + n)]
+    if client.exists("businessUnits/" + BU_NAME):
+        pre_existing.append(BU_NAME)
+    if pre_existing:
+        c.check("none of %s already exist on this server" % (NAMES + [BU_NAME]),
+                False, pre_existing)
+        c.info("refusing to run: it would collide with something already "
+               "there. Remove %s by hand, or point this at a cleaner lab."
+               % pre_existing)
+        client.logout()
+        sys.exit(c.done())
+    c.check("none of %s already exist on this server" % (NAMES + [BU_NAME]), True)
+
+    subs = {
+        "numberParallelProcesses = 3": "numberParallelProcesses = 1",
+        "numberAccountsToCreate = 100": "numberAccountsToCreate = 3",
+        "'name': 'CatFoodCorporation',": "'name': '%s'," % BU_NAME,
+        "'baseFolder' : '/usrdata/CatFoodCo'": "'baseFolder' : '/usrdata/ZZTEST_CatFoodCo'",
+    }
+
+    with runner.real_credentials_python(PY_TREE, config):
+        with runner.substituted_copy(script("stBuildTestAccounts.py"), subs) as copy:
+            result = runner.run_python(copy, timeout=60)
+            c.check("stBuildTestAccounts.py runs without a shell level error "
+                    "(name/count-substituted copy)", result.returncode == 0,
+                    result.stderr.strip()[-300:] if result.returncode else "")
+
+        created = client.exists("businessUnits/" + BU_NAME)
+        for n in NAMES:
+            c.check("%s exists after the build script" % n, client.exists("accounts/" + n))
+        c.check("the throwaway business unit exists after the build script", created)
+
+        result = runner.run_python(script("stDeleteTestAccounts.py"), timeout=60)
+        c.check("stDeleteTestAccounts.py runs without a shell level error",
+                result.returncode == 0,
+                result.stderr.strip()[-300:] if result.returncode else "")
+
+        for n in NAMES:
+            c.check("%s is gone after stDeleteTestAccounts.py" % n,
+                    not client.exists("accounts/" + n))
+
+finally:
+    if created:
+        client.delete("businessUnits/" + BU_NAME)
+        c.check("the throwaway business unit was removed",
+                not client.exists("businessUnits/" + BU_NAME))
+    for n in NAMES:
+        if client.exists("accounts/" + n):
+            client.delete("accounts/" + n)
+            c.check("%s was removed in cleanup (stDeleteTestAccounts.py missed it)" % n,
+                    not client.exists("accounts/" + n))
+    client.logout()
+
+c.info("%d API calls issued by the verification client (not counting the scripts' own calls)"
+       % client.calls)
+
+sys.exit(c.done())

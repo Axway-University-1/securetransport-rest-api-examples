@@ -1,0 +1,3 @@
+{ "id": "c1", "name": "Composite1", "type": "COMPOSITE",
+  "steps": [ { "type": "A" }, { "type": "B" } ],
+  "subscriptions": [ "sub-existing" ] }
