@@ -1,0 +1,13 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  offline-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run the offline checks
+        run: ./tests/run_all.sh

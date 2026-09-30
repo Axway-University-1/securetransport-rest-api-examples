@@ -180,6 +180,8 @@ hand to someone else.
       `<BASE64_ENCODED_USERNAME_COLON_PASSWORD>`
 - [ ] no JSON edited by text substitution
 - [ ] temporary files removed by the script, and gitignored as a backstop
+- [ ] a test covers the new or changed script (`tests/checks/`, see CLAUDE.md)
+      and `./tests/run_all.sh` passes
 - [ ] the README coverage table updated — the per-topic counts in it are meant
       to match a live count of the directories
 

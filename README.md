@@ -50,6 +50,16 @@ documents that save you working this out for yourself:
 They are plain markdown, so they are useful on their own. If you use Claude Code,
 they load automatically and you can just ask your question in the repository.
 
+### Check your clone works
+
+```
+./tests/run_all.sh
+```
+
+Takes about 5 seconds, needs no server and no credentials. See the
+[tests Quick Start](tests/README.md) for what it checks and how to add a test
+with your change.
+
 ### Prerequisites
 
 | Tool | Needed for | Notes |
