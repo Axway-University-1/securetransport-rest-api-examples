@@ -16,6 +16,7 @@ making the file look and behave like the ones already here.
 | One end-user API call | `EndUser/API 2.0/bash/NN.Topic/` |
 | A complete job to run against an estate | `Admin/API 2.0/python/python3/` |
 | A tool that reads an exported configuration XML | `Admin/API 2.0/python/utils/` |
+| A complete solution for one product feature, added by a release | `Features/<feature-name>/`, `.sh` and `.bat` side by side. See `Features/README.md`. Every script starts with the `st_feature_check` version check. |
 
 **bash and bat are kept at exact parity.** A new bash example without its bat
 twin breaks that, and the README states the parity as a promise to Windows

@@ -102,6 +102,10 @@ tests/output/
 # the placeholders in the committed set_variables.sh / .bat.
 set_variables.local.sh
 set_variables.local.bat
+Features/**/settings.local.sh
+Features/**/settings.local.bat
+Features/**/state.local.sh
+Features/**/state.local.bat
 
 # The python examples read this config file
 Admin/API 2.0/python/config

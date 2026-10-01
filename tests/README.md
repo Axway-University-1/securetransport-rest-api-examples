@@ -66,6 +66,8 @@ server](#against-a-real-server).
 | `checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
 | `checks/test_python_logic.py` | The python examples doing the wrong thing, by running them against a fake ST that serves paged collections and records what they would write. |
 | `checks/test_utils_xml.sh` | The XML helper scripts in `python/utils` (configuration compare and conversion). |
+| `checks/test_feature_version_check.sh` | The version check at the start of every `Features/` example: it must run the example on a server at or after the introducing version, skip it on an older one, and stop with an error when the version cannot be read. Also fails if a feature example has no version check. |
+| `checks/test_feature_trigger_route_pull.sh` | The `Features/trigger-route-after-completed-pull` examples: the JSON they send is valid (even with awkward characters in the password), the sites use the right folders and port, the push folder is never the subscription folder, an old server gets nothing sent, and a missing password stops them before any call. |
 
 The payload and python checks are the interesting ones. They exercise the real
 scripts without a server, which is how the silent JSON corruption described in

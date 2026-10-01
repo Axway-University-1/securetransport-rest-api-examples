@@ -13,6 +13,9 @@
 # For an example that reads a response and sends it back, point
 # STUB_CURL_GET_BODY at a file. Its contents are written to stdout for GET.
 #
+# STUB_CURL_POST_BODY does the same for POST, for an example that reads an id
+# out of the response to its first call.
+#
 # A request body may contain newlines and quotes, so it is emitted base64
 # encoded on a single line. Decode it with:
 #
@@ -21,16 +24,47 @@
 url=""
 payload=""
 method="GET"
+header_file=""
+write_out=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -d|--data|--data-raw|--data-binary) payload="$2"; shift 2 ;;
     -X|--request)                       method="$2"; shift 2 ;;
+    -H|--header)                        echo "HEADER: $2" >&2; shift 2 ;;
+    -w|--write-out)                     write_out="$2"; shift 2 ;;
+    -D|--dump-header)                   header_file="$2"; shift 2 ;;
     --head|-I)                          method="HEAD"; shift ;;
     https://*|http://*)                 url="$1"; shift ;;
     *)                                  shift ;;
   esac
 done
+
+# An example that wants the response headers (-D file) gets a status line and,
+# when STUB_CURL_LOCATION_ID is set, a Location header ending in that id.
+# STUB_CURL_STATUS overrides the status, 201 by default, and STUB_CURL_STATUS_DELETE
+# does so for DELETE only. STUB_CURL_CSRF adds a
+# csrfToken header, as a login does. Every -H header is echoed as HEADER: ...
+if [[ -n "${header_file}" ]]; then
+    {
+        status="${STUB_CURL_STATUS:-201}"
+        [[ "${method}" == "DELETE" && -n "${STUB_CURL_STATUS_DELETE}" ]] && status="${STUB_CURL_STATUS_DELETE}"
+        printf 'HTTP/1.1 %s Stub\r\n' "${status}"
+        [[ -n "${STUB_CURL_LOCATION_ID}" ]] && printf 'Location: %s/%s\r\n' "${url%%\?*}" "${STUB_CURL_LOCATION_ID}"
+        [[ -n "${STUB_CURL_CSRF}" ]] && printf 'csrfToken: %s\r\n' "${STUB_CURL_CSRF}"
+        printf '\r\n'
+    } > "${header_file}"
+fi
+
+# HEAD with -w "%{http_code}", as an existence check: print STUB_CURL_STATUS (200)
+if [[ "${method}" == "HEAD" && "${write_out}" == *http_code* ]]; then
+    printf '%s' "${STUB_CURL_STATUS:-200}"
+elif [[ -n "${STUB_CURL_PRINT_CODE}" && "${write_out}" == *http_code* ]]; then
+    # Opt in: act on any -w format, as curl does after the response, so a script that
+    # prints "HTTP <code>" shows the status STUB_CURL_STATUS gives (201 by default)
+    code="${STUB_CURL_STATUS:-201}"
+    printf '%b' "${write_out//%\{http_code\}/${code}}"
+fi
 
 echo "METHOD: ${method}" >&2
 echo "URL: ${url}" >&2
@@ -52,6 +86,10 @@ fi
 # Serve a canned body, so a GET, edit, PUT or POST example can run end to end
 if [[ "${method}" == "GET" && -n "${STUB_CURL_GET_BODY}" && -f "${STUB_CURL_GET_BODY}" ]]; then
     cat "${STUB_CURL_GET_BODY}"
+fi
+
+if [[ "${method}" == "POST" && -n "${STUB_CURL_POST_BODY}" && -f "${STUB_CURL_POST_BODY}" ]]; then
+    cat "${STUB_CURL_POST_BODY}"
 fi
 
 exit 0

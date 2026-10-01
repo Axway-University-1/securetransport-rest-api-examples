@@ -156,6 +156,16 @@ else
     diff <(echo "${B}") <(echo "${T}") | sed 's/^/        /'
 fi
 
+# Feature examples: every .sh has a .bat twin beside it, and the other way round
+FB=$(cd Features && git ls-files '*.sh'  | sed 's/\.sh$//'  | sort)
+FT=$(cd Features && git ls-files '*.bat' | sed 's/\.bat$//' | sort)
+if [ "${FB}" = "${FT}" ]; then
+    pass "Features: bash and bat at parity ($(echo "${FB}" | grep -c .) examples each)"
+else
+    fail "Features: bash and bat differ"
+    diff <(echo "${FB}") <(echo "${FT}") | sed 's/^/        /'
+fi
+
 # Script Name header must match the filename
 BADHDR=$(git ls-files -z "*.sh" "*.bat" | tr '\0' '\n' | while IFS= read -r f; do
     name=$(grep -m1 -E "^(#|REM) Script Name:" "$f" 2>/dev/null | sed -E 's/^(#|REM) Script Name:[[:space:]]*//')

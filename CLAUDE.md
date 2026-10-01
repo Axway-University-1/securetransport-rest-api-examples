@@ -19,3 +19,11 @@ No script or behaviour change is done until a test covers it.
 
 CI (`.github/workflows/tests.yml`) runs `tests/run_all.sh` on every push and pull
 request. Also follow `.claude/skills/st-api-add-example` for house style.
+
+## Feature examples
+
+New product-release features go in `Features/<feature-name>/` (by feature, not by
+release). Each script starts with the version check from `Features/lib/`, using
+the release that introduced the feature, and the feature is added to
+`Features/README.md` and the main README under that release. The whole procedure
+is in `Features/README.md` under "Adding a feature".

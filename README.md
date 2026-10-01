@@ -10,7 +10,8 @@
 6. [OpenAPI](#openapi)
 7. [HTTP Methods](#st-api-20-methods)
 8. [What Is Covered](#what-is-covered)
-9. [License and Support](#license-and-support)
+9. [Features by Release](#features-by-release)
+10. [License and Support](#license-and-support)
 
 ## Introduction
 SecureTransport 5.5, released in June 2020, introduced REST API 2.0. The prior API release is version 1.4. APIs were introduced to SecureTransport in 5.2.1 – though this document will not refer to those as that release (5.2.1) is no longer supported.
@@ -140,6 +141,7 @@ Admin/API 2.0/          Administrator API, on the admin port
         utils/           tools that work on an exported configuration XML
 EndUser/API 2.0/
     bash/               end user API, on the user port
+Features/               complete solutions, one folder per feature
 images/                 screenshots used by this README
 ```
 
@@ -309,6 +311,22 @@ the list doubles as a rough roadmap.
 Some areas are covered by the python examples but not yet by bash or bat:
 routes beyond creation, subscriptions, certificates, login restriction policies
 and the transaction manager. See the python table above.
+
+## Features by Release
+
+New SecureTransport releases add features that are easier to learn as a complete
+solution than as a list of API calls. Those live in [Features](Features/), one
+folder per feature, with the same examples in bash and as Windows batch files.
+
+The folders are organised by feature, so that a feature is easy to find. The
+[Features index](Features/README.md) lists them grouped by the release that
+introduced them, so you can see which ones your version supports. Every script
+also checks the server version with `GET /version` before it does anything, and
+skips itself on a release that is too old.
+
+| Release | Feature |
+| ------- | ------- |
+| 5.5-20260924 | [Trigger route execution after a completed pull operation](Features/trigger-route-after-completed-pull/) |
 
 ## License and Support
 
