@@ -197,7 +197,7 @@ def stCreateAccount(accNumQ, referer, stUrl, session, timeout, count, auth):
     url = stUrl + 'accounts'
     
     headers = {
-               'Referer': 'PippinTheCat',
+               'Referer': 'THIS_IS_A_RANDOM_TEXT',
                'csrfToken': csrftoken,
                'Content-Type' :'application/json',
                'Accept': 'application/json'}
@@ -276,7 +276,7 @@ if __name__ == "__main__":
     numberAccountsToCreate = 100
     #logFile = 'updateConfig.log'  # We won't use a logFile for this example
     stTimeout = 60  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
     #
     # Read the configuration file. It is resolved relative to this script, so
     # the script can be run from any working directory.

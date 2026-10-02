@@ -40,4 +40,4 @@ echo "Append to the file" >> "${FILE_NAME}"
 #
 # Curl command to push a file to SecureTransport.
 #
-curl -b "${COOKIE}" -s -k -X POST "${ST_URL}/files" -H "Content-Type: multipart/form-data" -F "file=@${FILE_NAME}" -H "accept: application/json" -H "Referer: Ian"
+curl -b "${COOKIE}" -s -k -X POST "${ST_URL}/files" -H "Content-Type: multipart/form-data" -F "file=@${FILE_NAME}" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT"

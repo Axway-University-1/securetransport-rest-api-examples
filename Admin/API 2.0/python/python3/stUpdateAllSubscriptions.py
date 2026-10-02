@@ -271,7 +271,7 @@ if __name__ == "__main__":
     # Please modify the below to match your environment
 
     stTimeout = 120  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
 
     # Report what would change, without changing anything. Run with this set to
     # True first, and read the output, before you let it write.

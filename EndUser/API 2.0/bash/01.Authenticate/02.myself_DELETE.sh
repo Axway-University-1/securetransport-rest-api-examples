@@ -31,7 +31,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 
-result=$(curl -H "Authorization: Basic ${ST_BASIC_AUTH}" --cookie-jar "${COOKIE}" -w "%{http_code}" -k -s -X DELETE "${ST_URL}/myself" -H "accept: application/json" -H "Referer: Ian")
+result=$(curl -H "Authorization: Basic ${ST_BASIC_AUTH}" --cookie-jar "${COOKIE}" -w "%{http_code}" -k -s -X DELETE "${ST_URL}/myself" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 http_status=${result: -3}
 
 if [[ $http_status -ne 200 ]] ; then

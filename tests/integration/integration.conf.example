@@ -35,7 +35,7 @@ st_object_prefix="ZZTEST_"
 # Optional
 # ------------------------------------------------------------------------------
 # ST requires a Referer header. The value is arbitrary but must be consistent.
-st_referer="PippinTheCat"
+st_referer="THIS_IS_A_RANDOM_TEXT"
 
 # Seconds
 st_timeout="30"

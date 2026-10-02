@@ -65,6 +65,6 @@ declare -a TEMPLATE_NAMES=(
 
 # Loop through TEMPLATE_NAMES array and use each name as is
 for TEMPLATE_NAME in "${TEMPLATE_NAMES[@]}"; do
-        curl -k -u ${ST_USER}:${ST_PASSWORD} -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
+        curl -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
         -d "{\"name\": \"${TEMPLATE_NAME}\", \"description\": \"Random text for ${TEMPLATE_NAME}\", \"type\": \"TEMPLATE\", \"conditionType\":\"MATCH_ALL\"}"
 done

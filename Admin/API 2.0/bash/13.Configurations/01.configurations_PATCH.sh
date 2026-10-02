@@ -35,5 +35,5 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 # Change Server Configuration Options
-curl -k -u ${ST_USER}:${ST_PASSWORD} -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/configurations/options/AddressBook.Enabled" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
+curl -k -u "${ST_USER}:${ST_PASSWORD}" -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/configurations/options/AddressBook.Enabled" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
 -d '[{"op":"replace","path":"/values/0","value":"true"}]'

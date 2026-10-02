@@ -11,11 +11,9 @@ ACK against).
 
 MANUAL ONLY, for reasons distinct from every other check here: jack and john
 are not throwaway objects this project created. They are real, populated,
-actively used accounts already on this shared lab (jack's home folder alone
-has a copy of "Claude.dmg", "Sublime Text.app.zip" and "plugins.zip" -
-someone's real files, not fixtures; there is also unrelated "mcp-test-*"
-configuration on this same server, evidence of other tooling actively using
-it) - and this check briefly changes jack's real password to clean up after
+actively used accounts already on this shared lab (their home folders hold
+someone's real files, not fixtures, and other tooling is actively using this
+same server) - and this check briefly changes jack's real password to clean up after
 itself. Confirmed directly, before writing this:
 
   - `POST /transfers/operations?operation=pull` with no filename specified

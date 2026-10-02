@@ -39,16 +39,16 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 
 # Simple GET to retrieve all available Accounts
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}"
 
 
 # GET only the Accounts of type user
 # You can also try with type=template or type=service
-# curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts?type=user" -H "accept: */*" -H "${REFERER_HEADER}"
+# curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts?type=user" -H "accept: */*" -H "${REFERER_HEADER}"
 
 # GET the User Accounts and receive only the name and home folder in the response
 # Pay attention that the type is also returned no matter that it is not specified in the fields
-# curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts?type=user&fields=name,homeFolder" -H "accept: */*" -H "${REFERER_HEADER}"
+# curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts?type=user&fields=name,homeFolder" -H "accept: */*" -H "${REFERER_HEADER}"
 
 # If the result is still big to analyze, you can use the limit parameter to get the first 5 elements
-# curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts?type=user&fields=name,homeFolder&limit=5" -H "accept: */*" -H "${REFERER_HEADER}"
+# curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts?type=user&fields=name,homeFolder&limit=5" -H "accept: */*" -H "${REFERER_HEADER}"

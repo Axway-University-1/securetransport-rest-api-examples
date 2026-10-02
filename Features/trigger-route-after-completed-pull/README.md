@@ -92,7 +92,7 @@ stops at the first step that fails, and does not clean up, so you can look.
 | 9 | `09.subscriptions_POST` | Creates the subscription with the settings above |
 | 10 | `10.routes_POST_composite` | Creates the composite route: from the template, attached to the subscription, running the simple route |
 | 11 | `11.transfers_pull_POST` | Runs the pull by hand |
-| 12 | `12.files_PUT_triggerfile` | Workaround for a known defect: rewrites the trigger file with the renamed file names, which re-triggers the subscription |
+| 12 | `12.files_PUT_triggerfile` | Rewrites the trigger file with the renamed file names, which re-triggers the subscription |
 | 13 | `13.files_GET_result` | Lists the files in `outbound-drop`, `subscription` and `delivered`, waiting for the push to arrive |
 | 99 | `99.cleanup_DELETE` | Deletes the routes, subscription and application, the two sites, empties and removes `outbound-drop` and `delivered`, then deletes the test account |
 
@@ -125,26 +125,6 @@ stops at the first step that fails, and does not clean up, so you can look.
 - Deleting an account does **not** delete the files in its home folder. After a
   run, `delivered` still holds its files, and a new test account with the same
   home will see them.
-
-### Known defect, and step 12
-
-When the pull site renames the files it receives, the trigger file that
-SecureTransport writes still lists their **original** names, such as
-`pull_test_1.txt`. The route cannot find them, and the first route execution
-fails. Until this is fixed, step 12 finds the newest trigger file in the
-subscription folder, deletes it (the server refuses to write over it, as the
-system created it), and uploads it again under the same name with the current
-names:
-
-```
-pull_test_1.txt_PULLED
-pull_test_2.txt_PULLED
-pull_test_3.txt_PULLED
-```
-
-Uploading into the subscription folder is a new arrival, so the subscription
-triggers again, this time on a correct list. Run step 12 after step 11 has
-finished, and remove it when the defect is fixed.
 
 ### Telling the transfers apart
 

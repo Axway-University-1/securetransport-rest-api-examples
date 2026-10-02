@@ -149,7 +149,7 @@ def load(script_name, directory=None, **overrides):
         "numAPIs": Value("i", 0),
         "apiCounter": Value("i", 0),
         "stUrl": "https://st.example.com:8444/api/v2.0/",
-        "referer": "PippinTheCat",
+        "referer": "THIS_IS_A_RANDOM_TEXT",
         "stTimeout": 10,
         "dryRun": False,
     }

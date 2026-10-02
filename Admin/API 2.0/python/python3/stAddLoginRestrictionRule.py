@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
     logFile = 'updateLoginRestrictions.log'
 
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
     #stUrl = 'https://<SERVER>:8444/api/v2.0/' #read from config
 
     # please modify the json "value" key  here to match your new rule

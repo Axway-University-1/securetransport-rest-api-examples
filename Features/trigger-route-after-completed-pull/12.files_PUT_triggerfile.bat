@@ -6,7 +6,7 @@ REM Created: 2026-10-01
 REM Location: Sofia
 REM ==============================================================================
 REM Description:
-REM Works around a known defect: when the pull renames the files it receives (the
+REM Handles a current limitation: when the pull renames the files it receives (the
 REM _PULLED suffix), the trigger file written to the file system still lists their
 REM ORIGINAL names, so the route cannot find them. This finds the newest trigger
 REM file in the subscription folder and uploads it again with the current names,
@@ -28,8 +28,8 @@ REM
 REM Notes:
 REM - Run it after 11.transfers_pull_POST.bat. It waits up to AR_WAIT_SECONDS for the
 REM   trigger file to appear, because the pull is asynchronous. The first route
-REM   execution, on the wrong names, is expected to fail. This is the workaround for
-REM   that, and it can be removed when the defect is fixed.
+REM   execution, on the wrong names, is expected to fail. This step handles that
+REM   current limitation, and is no longer needed once the limitation is lifted.
 REM - The names come from the settings: AR_SAMPLE_PREFIX, AR_SAMPLE_FILES and
 REM   AR_PULLED_SUFFIX.
 REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.

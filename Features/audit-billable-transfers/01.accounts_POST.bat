@@ -35,7 +35,7 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
 )
 
 SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
-powershell -NoProfile -Command "@{ name=$env:BT_TEST_ACCOUNT; type='user'; homeFolder=$env:BT_HOME_FOLDER; uid='1001'; gid='1001'; transfersWebServiceAllowed=$true; user=@{ name=$env:BT_TEST_ACCOUNT; passwordCredentials=@{ password=$env:BT_ACCOUNT_PASSWORD } } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
+powershell -NoProfile -Command "@{ name=$env:BT_TEST_ACCOUNT; type='user'; homeFolder=$env:BT_HOME_FOLDER; uid='41733'; gid='41733'; transfersWebServiceAllowed=$true; user=@{ name=$env:BT_TEST_ACCOUNT; passwordCredentials=@{ password=$env:BT_ACCOUNT_PASSWORD } } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the account %BT_TEST_ACCOUNT%...
 CALL "%~dp0..\lib\post_admin.bat" accounts "%BODY_FILE%"

@@ -389,7 +389,7 @@ if __name__ == "__main__":
     numberParallelProcs = 10
     stTimeout = 120
     logFile='my.log'
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
 
     #
     # Read the configuration file. It is resolved relative to this script, so

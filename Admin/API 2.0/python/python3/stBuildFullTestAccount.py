@@ -629,7 +629,7 @@ if __name__ == "__main__":
 
     #logFile = 'updateConfig.log'   # We won't use a logFile for this example
     stTimeout = 60                  # in seconds
-    referer = 'PippinTheCat'        # Used for Session Managtement - cab be anything so long as always the same
+    referer = 'THIS_IS_A_RANDOM_TEXT'        # Used for Session Managtement - cab be anything so long as always the same
     #basicAuth = "<BASE64_ENCODED_USERNAME_COLON_PASSWORD>"  # from echo -n user:pass | base64
 
     #

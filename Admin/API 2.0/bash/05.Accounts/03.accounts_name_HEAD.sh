@@ -37,14 +37,14 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 ACCOUNT_TO_CHECK="UserAccount"
-curl -k -u ${ST_USER}:${ST_PASSWORD} --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}" --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
 
 # Or you can achieve the same thing with the '-I' option
 # curl -k -u "${ST_USER}:${ST_PASSWORD}" -I "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
 
 # If you want to parse the response code, here is an example how to do it
 # The ${HTTP_RESPONSE_CODE} variable will contain our HTTP Response code
-HTTP_RESPONSE_CODE=$(curl -k -u ${ST_USER}:${ST_PASSWORD} --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
+HTTP_RESPONSE_CODE=$(curl -k -u "${ST_USER}:${ST_PASSWORD}" --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
 
 # And this is the if statement that we will use to print "Account Exists" if the HTTP Reponse Code is equal to 200
 if [[ ${HTTP_RESPONSE_CODE} == "200" ]]; then

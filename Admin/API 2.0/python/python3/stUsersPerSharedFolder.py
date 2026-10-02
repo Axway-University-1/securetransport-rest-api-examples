@@ -246,7 +246,7 @@ if __name__ == "__main__":
     # Please modify the below to match your environment
 
     stTimeout = 120  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
 
     #
     # Read the configuration file. It is resolved relative to this script, so

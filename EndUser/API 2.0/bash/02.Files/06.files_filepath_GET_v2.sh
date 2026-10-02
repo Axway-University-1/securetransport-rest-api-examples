@@ -55,7 +55,7 @@ mkdir -p "${DOWNLOAD_FOLDER}"
 
 for i in $(seq 1 "${NUMBER_OF_FILES}") ; do
         FILE_NAME="${FILE_NAME_BASE}_${i}"
-        http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o "${DOWNLOAD_FOLDER}/${FILE_NAME}" -X GET "${ST_URL}/files/${FILE_NAME}" -H "accept: application/json" -H "Referer: Ian")
+        http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o "${DOWNLOAD_FOLDER}/${FILE_NAME}" -X GET "${ST_URL}/files/${FILE_NAME}" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 
         if [[ $http_status -ne 200 ]] ; then
                 echo "Get File failure: $http_status"

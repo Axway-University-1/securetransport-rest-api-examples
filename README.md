@@ -1,20 +1,25 @@
 # SecureTransport-REST-API-Examples
 
+> **These are examples, for test environments only.** Some of them change
+> server configuration and stop or restart daemons and servers. Read the
+> [Disclaimer](#disclaimer) before running anything.
+
 ## Table of Contents
 
 1. [Introduction](#introduction)
-2. [Axway University](#axway-university-training)
-3. [Getting Started](#getting-started)
-4. [Repository Layout](#repository-layout)
-5. [Common Terminologies](#common-terminologies)
-6. [OpenAPI](#openapi)
-7. [HTTP Methods](#st-api-20-methods)
-8. [What Is Covered](#what-is-covered)
-9. [Features by Release](#features-by-release)
-10. [License and Support](#license-and-support)
+2. [Disclaimer](#disclaimer)
+3. [Axway University](#axway-university-training)
+4. [Getting Started](#getting-started)
+5. [Repository Layout](#repository-layout)
+6. [Common Terminologies](#common-terminologies)
+7. [OpenAPI](#openapi)
+8. [HTTP Methods](#st-api-20-methods)
+9. [What Is Covered](#what-is-covered)
+10. [Features by Release](#features-by-release)
+11. [License and Support](#license-and-support)
 
 ## Introduction
-SecureTransport 5.5, released in June 2020, introduced REST API 2.0. The prior API release is version 1.4. APIs were introduced to SecureTransport in 5.2.1 – though this document will not refer to those as that release (5.2.1) is no longer supported.
+SecureTransport 5.5, released in June 2020, introduced REST API 2.0. The prior API release is version 1.4.
 Currently supported APIs are V1.4 and V2.0 – both are available in ST release V5.5.
 
 This github project looks at use cases from a specific viewpoint. Many clients and Axway themselves have implemented mechanisms to on-board clients and file transfer flows in an automated manner using APIs, rather than the alternative method of manual setups via the admin GUI of ST. Automation brings a reduced risk of introducing errors and also assists in adhering to any standards enforced by the owning institution in naming standards, security profiles etc.
@@ -22,6 +27,25 @@ Many other automation tasks such as certificate expiry monitoring, configuration
  
 The examples here use the `curl` command from bash, the same calls as Windows batch files, and the python scripting language. It should be pointed out that **ANY** language that supports HTTPS Restful APIs can be used. Please also note that the commands shown are not the sole method you might want to use. Feel free to simplify or extend further what is shown as a guideline and starting point.
 
+
+## Disclaimer
+
+**Everything in this repository is an example, for use on test environments
+only.**
+
+- The scripts show how to call the SecureTransport REST API. They are not
+  production tooling. They are provided AS IS, with no warranty, and are not
+  covered by Axway support or by any Axway service level agreement.
+- Run them only against a test or lab environment. Never run them directly
+  against production.
+- Several examples change the server itself, not only test objects: they
+  modify server configuration options, stop, start and restart daemons and
+  servers, update transfer sites, routes and subscriptions in bulk, and
+  create, change or delete accounts. Read each script, and understand the
+  consequences of every change it makes, before you run it.
+- Before you use any example, or anything you build from one, on a production
+  system, test it yourself on a test environment first, and confirm it does
+  exactly what you expect there.
 
 ## Axway University Training
 
@@ -35,10 +59,9 @@ https://university.axway.com/learn/learning-plans/77/securetransport-apis
 
 ## Getting Started
 
-### Start with the knowledge pack
+### Start with the guides
 
-Before reading the tree, look at [.claude/](.claude/). It holds three short
-documents that save you working this out for yourself:
+Three short guides save you working this out for yourself:
 
 - **[Orientation](.claude/skills/st-api-orientation/SKILL.md)** — what is here,
   how it is laid out, and which example covers which task.
@@ -47,9 +70,6 @@ documents that save you working this out for yourself:
   reading before your first call.
 - **[Adding an example](.claude/skills/st-api-add-example/SKILL.md)** — the house
   style, if you plan to contribute.
-
-They are plain markdown, so they are useful on their own. If you use Claude Code,
-they load automatically and you can just ask your question in the repository.
 
 ### Check your clone works
 

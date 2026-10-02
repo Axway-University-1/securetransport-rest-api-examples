@@ -39,7 +39,7 @@ IF "%AR_ACCOUNT_PASSWORD%"=="" (
 SET REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 
-powershell -NoProfile -Command "@{ name=$env:AR_TEST_ACCOUNT; type='user'; homeFolder=$env:AR_HOME_FOLDER; uid='1001'; gid='1001'; transfersWebServiceAllowed=$true; user=@{ name=$env:AR_TEST_ACCOUNT; passwordCredentials=@{ password=$env:AR_ACCOUNT_PASSWORD } } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
+powershell -NoProfile -Command "@{ name=$env:AR_TEST_ACCOUNT; type='user'; homeFolder=$env:AR_HOME_FOLDER; uid='41733'; gid='41733'; transfersWebServiceAllowed=$true; user=@{ name=$env:AR_TEST_ACCOUNT; passwordCredentials=@{ password=$env:AR_ACCOUNT_PASSWORD } } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the account %AR_TEST_ACCOUNT%...
 curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts" ^

@@ -14,7 +14,7 @@ to bite you.
 
 ST rejects API calls that arrive without a `Referer` header. The value does not
 matter, but it must be **the same on every call in a session**, including login
-and logout. The examples use `PippinTheCat`. If you get an unexplained 403 on a
+and logout. The examples use `THIS_IS_A_RANDOM_TEXT`. If you get an unexplained 403 on a
 call that looks correct, check the header.
 
 That said, one lab server (5.5-20260827) accepted a call with no `Referer` at

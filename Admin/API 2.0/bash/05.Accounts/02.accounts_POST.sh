@@ -38,18 +38,18 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 # Simple POST to create an Account of type User
 printf "Creating an Account of type User...\n\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
--d '{"name":"UserAccount","type":"user","homeFolder":"/home/UserAccount","uid":"1001","gid":"1001","user":{"name":"UserAccount","passwordCredentials":{"password":"1"}}}'
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
+-d '{"name":"UserAccount","type":"user","homeFolder":"/home/UserAccount","uid":"41733","gid":"41733","user":{"name":"UserAccount","passwordCredentials":{"password":"1"}}}'
 
 
 # Simple POST to create an Account of type Service
 printf "Creating an Account of type Service...\n\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
--d '{"name":"ServiceAccount","type":"service","homeFolder":"/home/ServiceAccount","uid":"1001","gid":"1001"}'
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
+-d '{"name":"ServiceAccount","type":"service","homeFolder":"/home/ServiceAccount","uid":"41733","gid":"41733"}'
 
 
 # Simple POST to create an Account of type Template
 # For the User Class we will select "VirtClass", but you can create your own and use it as a value of the templateClass property
 printf "Creating an Account of type Template...\n\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
--d '{"name":"TemplateAccount","type":"template","homeFolder":"/home/TemplateAccount","uid":"1001","gid":"1001","templateClass": "VirtClass"}'
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
+-d '{"name":"TemplateAccount","type":"template","homeFolder":"/home/TemplateAccount","uid":"41733","gid":"41733","templateClass": "VirtClass"}'

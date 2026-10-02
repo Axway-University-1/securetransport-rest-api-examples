@@ -44,12 +44,19 @@ else
     pass "no plaintext credentials in scripts"
 fi
 
-# Customer and lab identifiers that were scrubbed once already
-if scan_files | xargs -0 grep -lniE "gilead|GFTS|citiconnect|\.citi\.|dogco|axway\.university|axway\.int|axway\.cloud" 2>/dev/null | grep -q .; then
-    fail "customer or internal lab identifier found"
-    scan_files | xargs -0 grep -lniE "gilead|GFTS|citiconnect|\.citi\.|dogco|axway\.university|axway\.int|axway\.cloud" | sed 's/^/        /'
+# Internal domains, plus any identifying terms listed one per line in
+# tests/local/blocked_terms.txt. That file is git ignored on purpose: a list of
+# names to keep out of the repository must not itself be in the repository.
+BLOCKED="axway\.university|axway\.int|axway\.cloud"
+if [ -f tests/local/blocked_terms.txt ]; then
+    LOCAL_TERMS=$(grep -vE '^[[:space:]]*(#|$)' tests/local/blocked_terms.txt | paste -sd'|' -)
+    [ -n "${LOCAL_TERMS}" ] && BLOCKED="${BLOCKED}|${LOCAL_TERMS}"
+fi
+if scan_files | xargs -0 grep -lniE "${BLOCKED}" 2>/dev/null | grep -q .; then
+    fail "an identifying or internal term was found"
+    scan_files | xargs -0 grep -lniE "${BLOCKED}" | sed 's/^/        /'
 else
-    pass "no customer or internal lab identifiers"
+    pass "no identifying or internal terms"
 fi
 
 # Routable IP literals. 127.0.0.1 and the placeholders are fine.
@@ -176,6 +183,15 @@ if [ -n "${BADHDR}" ]; then
     echo "${BADHDR}" | sed 's/^/        /'
 else
     pass "every Script Name header matches its filename"
+fi
+
+# Credentials passed to curl -u must be quoted, or a password with a space or a
+# shell character in it is split or expanded before curl ever sees it
+if scan_scripts | xargs -0 grep -nE -- '-u \$' 2>/dev/null | grep -q .; then
+    fail "curl -u with unquoted credentials"
+    scan_scripts | xargs -0 grep -nE -- '-u \$' | sed 's/^/        /'
+else
+    pass "curl -u credentials are always quoted"
 fi
 
 # No in place sed, which is not portable between BSD and GNU

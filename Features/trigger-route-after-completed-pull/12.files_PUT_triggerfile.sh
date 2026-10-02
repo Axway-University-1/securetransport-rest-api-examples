@@ -6,7 +6,7 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Works around a known defect: when the pull renames the files it receives (the
+# Handles a current limitation: when the pull renames the files it receives (the
 # _PULLED suffix), the trigger file written to the file system still lists their
 # ORIGINAL names, so the route cannot find them. This finds the newest trigger
 # file in the subscription folder and uploads it again with the current names,
@@ -28,8 +28,8 @@
 # Notes:
 # - Run it after 11.transfers_pull_POST.sh. It waits up to AR_WAIT_SECONDS for the
 #   trigger file to appear, because the pull is asynchronous. The first route
-#   execution, on the wrong names, is expected to fail. This is the workaround for
-#   that, and it can be removed when the defect is fixed.
+#   execution, on the wrong names, is expected to fail. This step handles that
+#   current limitation, and is no longer needed once the limitation is lifted.
 # - The names come from the settings: AR_SAMPLE_PREFIX, AR_SAMPLE_FILES and
 #   AR_PULLED_SUFFIX.
 # - Needs settings.local.sh with AR_ACCOUNT_PASSWORD. See settings.sh.

@@ -42,30 +42,30 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 
 ACCOUNT_TO_CHECK="UserAccount"
-HTTP_RESPONSE_CODE=$(curl -k -u ${ST_USER}:${ST_PASSWORD} --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
+HTTP_RESPONSE_CODE=$(curl -k -u "${ST_USER}:${ST_PASSWORD}" --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
 
 if [[ ${HTTP_RESPONSE_CODE} == "200" ]]; then
 	printf "Deleting Account: ${ACCOUNT_TO_CHECK}\n\n"
-	curl -k -u ${ST_USER}:${ST_PASSWORD} -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
+	curl -k -u "${ST_USER}:${ST_PASSWORD}" -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
 else
 	echo "Account ${ACCOUNT_TO_CHECK} does not exist."
 fi
 
 ACCOUNT_TO_CHECK="ServiceAccount"
-HTTP_RESPONSE_CODE=$(curl -k -u ${ST_USER}:${ST_PASSWORD} --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
+HTTP_RESPONSE_CODE=$(curl -k -u "${ST_USER}:${ST_PASSWORD}" --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
 
 if [[ ${HTTP_RESPONSE_CODE} == "200" ]]; then
 	printf "Deleting Account: ${ACCOUNT_TO_CHECK}\n\n"
-	curl -k -u ${ST_USER}:${ST_PASSWORD} -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
+	curl -k -u "${ST_USER}:${ST_PASSWORD}" -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
 else
 	echo "Account ${ACCOUNT_TO_CHECK} does not exist."
 fi
 
 ACCOUNT_TO_CHECK="TemplateAccount"
-HTTP_RESPONSE_CODE=$(curl -k -u ${ST_USER}:${ST_PASSWORD} --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
+HTTP_RESPONSE_CODE=$(curl -k -u "${ST_USER}:${ST_PASSWORD}" --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
 if [[ ${HTTP_RESPONSE_CODE} == "200" ]]; then
 	printf "Deleting Account: ${ACCOUNT_TO_CHECK}\n\n"
-	curl -k -u ${ST_USER}:${ST_PASSWORD} -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
+	curl -k -u "${ST_USER}:${ST_PASSWORD}" -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
 else
 	echo "Account ${ACCOUNT_TO_CHECK} does not exist."
 fi

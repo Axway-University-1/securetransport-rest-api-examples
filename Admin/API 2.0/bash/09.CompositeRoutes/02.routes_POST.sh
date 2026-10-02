@@ -66,7 +66,7 @@ printf "Route Template ID for '%s': %s\n\n" "${ROUTE_TEMPLATE_NAME}" "${ROUTE_TE
 # Example 1 without extension.
 # Simple POST to create a package route in SecureTransport
 printf "Creating a composite route without extension...\n\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD} -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "{
+curl -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "{
    \"account\" : \"john\",
    \"name\" : \"CompositeRoute_WithoutExtension\",
    \"type\": \"COMPOSITE\",
@@ -83,7 +83,7 @@ printf "Creating a simple route...\n\n"
 # Create a temporary file to store the response headers
 response_headers=$(mktemp)
 
-curl -s -D "$response_headers" -o /dev/null -k -u ${ST_USER}:${ST_PASSWORD} -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "{
+curl -s -D "$response_headers" -o /dev/null -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "{
   \"name\": \"SimpleRouteName\",
   \"type\": \"SIMPLE\",
   \"conditionType\": \"ALWAYS\",
@@ -112,7 +112,7 @@ rm "$response_headers"
 
 
 printf "Creating a composite route with extension...\n\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD} -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "{
+curl -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes" -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "{
    \"account\" : \"john\",
    \"name\" : \"CompositeRoute_WithExtension\",
    \"type\": \"COMPOSITE\",

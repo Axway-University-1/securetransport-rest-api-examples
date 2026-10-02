@@ -54,7 +54,7 @@ FILE_NAME="download_file.txt"
 # Curl command to pull a file from SecureTransport.
 #
 printf "\n\nPulling file from SecureTransport...\n"
-http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o "${FILE_NAME}" -X GET "${ST_URL}/files/${FILE_NAME}" -H "accept: application/json" -H "Referer: Ian")
+http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o "${FILE_NAME}" -X GET "${ST_URL}/files/${FILE_NAME}" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 
 if [[ $http_status -ne 200 ]] ; then
         echo "Get File failure: $http_status"

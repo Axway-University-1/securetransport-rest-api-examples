@@ -39,7 +39,7 @@ COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 # It is assumed a session login took place prior to this via 01.Authenticate/stLogin.sh
 # Session cookies are read from a file called myCookie.jar
 #
-curl -L -b "${COOKIE}" -k -X GET "${ST_URL}/files" -H "accept: application/json" -H "Referer: Ian"
+curl -L -b "${COOKIE}" -k -X GET "${ST_URL}/files" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT"
 
 printf "Files successfully listed\n"
 

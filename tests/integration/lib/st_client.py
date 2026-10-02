@@ -71,7 +71,7 @@ class STClient:
     """
 
     def __init__(self, server, port, user, password,
-                 referer="PippinTheCat", timeout=30, verify_tls=False):
+                 referer="THIS_IS_A_RANDOM_TEXT", timeout=30, verify_tls=False):
         self.base = "https://%s:%s/api/v2.0/" % (server, port)
         self.referer = referer
         self.timeout = timeout
@@ -257,7 +257,7 @@ def client_from_config(config):
 
     return STClient(config["st_server"], config["st_port"],
                     config["st_user"], config["st_password"],
-                    referer=config.get("st_referer", "PippinTheCat"),
+                    referer=config.get("st_referer", "THIS_IS_A_RANDOM_TEXT"),
                     timeout=int(config.get("st_timeout", "30")),
                     verify_tls=config.get("st_verify_tls", "no").lower() in ("yes", "true", "1"))
 
@@ -354,7 +354,7 @@ class EndUserClient:
     that this is a separate class rather than a subclass.
     """
 
-    def __init__(self, server, port, user, password, referer="Ian",
+    def __init__(self, server, port, user, password, referer="THIS_IS_A_RANDOM_TEXT",
                 timeout=30, verify_tls=False):
         self.base = "https://%s:%s/api/v2.0/" % (server, port)
         self.referer = referer

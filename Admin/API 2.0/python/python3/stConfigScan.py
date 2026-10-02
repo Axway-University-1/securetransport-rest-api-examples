@@ -253,7 +253,7 @@ if __name__ == "__main__":
     baselineFile = '/home/axway/stConfig.baseline'
     logFile = 'checkConfig.log'
 
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
 
     # Read the configuration file. It is resolved relative to this script, so
     # the script can be run from any working directory.

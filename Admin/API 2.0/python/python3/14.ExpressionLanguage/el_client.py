@@ -49,7 +49,7 @@ def load_config():
 class ELClient:
     """A tiny logged in session - just enough for these exercises."""
 
-    def __init__(self, config, referer="PippinTheCat"):
+    def __init__(self, config, referer="THIS_IS_A_RANDOM_TEXT"):
         self.base = "https://%s:%s/api/v2.0/" % (config["st_server"], config["st_port"])
         self.referer = referer
         self.session = requests.Session()

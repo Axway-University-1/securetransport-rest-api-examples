@@ -313,7 +313,7 @@ if __name__ == "__main__":
     # Please modify the below to match your environment
 
     stTimeout = 120  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
 
     # Where this script keeps its output, next to the script itself
     scriptDir = os.path.dirname(os.path.abspath(__file__))

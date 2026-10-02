@@ -313,7 +313,7 @@ if __name__ == "__main__":
     logFile='updateAccounts.log'
 
     apName = 'AnApp'
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
     certificatePath = './ST_API_client.pem' # Note that the private key cannot be encrypted - this is the combined private key + cert  
 
 

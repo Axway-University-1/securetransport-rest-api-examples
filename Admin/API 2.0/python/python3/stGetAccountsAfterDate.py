@@ -198,7 +198,7 @@ if __name__ == "__main__":
 
     #logFile = 'updateConfig.log'  # We won't use a logFile for this example
     stTimeout = 60  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
 
     # Read the configuration file. It is resolved relative to this script, so
     # the script can be run from any working directory.

@@ -45,7 +45,7 @@ BODY=$(jq -n \
   --arg name "${AR_TEST_ACCOUNT}" \
   --arg home "${AR_HOME_FOLDER}" \
   --arg password "${AR_ACCOUNT_PASSWORD}" \
-  '{name: $name, type: "user", homeFolder: $home, uid: "1001", gid: "1001",
+  '{name: $name, type: "user", homeFolder: $home, uid: "41733", gid: "41733",
     transfersWebServiceAllowed: true,
     user: {name: $name, passwordCredentials: {password: $password}}}')
 

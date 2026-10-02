@@ -47,7 +47,7 @@ FILE_NAME="test.txt"
 # Curl command to delete a file on SecureTransport.
 #
 printf "\n\nDeleting file from SecureTransport...\n"
-http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o /dev/null -X DELETE "${ST_URL}/files/${FILE_NAME}" -H "accept: application/json" -H "Referer: Ian")
+http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o /dev/null -X DELETE "${ST_URL}/files/${FILE_NAME}" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 
 if [[ $http_status -ne 204 ]] ; then
         echo "Delete File failure: $http_status"

@@ -238,7 +238,7 @@ if __name__ == "__main__":
 
     #logFile = 'stUpdateSites.log'  # We won't use a logFile for this example
     stTimeout = 120  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
     #basicAuth = "<BASE64_ENCODED_USERNAME_COLON_PASSWORD>"  # from echo -n user:pass | base64
     masterKexAlg = 'diffie-hellman-group14-sha256,diffie-hellman-group-exchange-sha256,curve25519-sha256@libssh.org,diffie-hellman-group15-sha512,diffie-hellman-group17-sha512,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512'
 

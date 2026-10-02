@@ -89,10 +89,10 @@ ACCOUNT="john"
 
 
 printf "Getting the account %s and filtering only the addressBookSettings...\n" "${ACCOUNT}"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}?type=user&fields=addressBookSettings.policy,addressBookSettings.nonAddressBookCollaborationAllowed" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}?type=user&fields=addressBookSettings.policy,addressBookSettings.nonAddressBookCollaborationAllowed" -H "accept: */*" -H "${REFERER_HEADER}"
 
 printf "Changing the policy to custom...\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d '[
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d '[
   {
     "op": "replace",
     "path": "/addressBookSettings/policy",
@@ -102,7 +102,7 @@ curl -k -u ${ST_USER}:${ST_PASSWORD}  -X PATCH "https://${ST_SERVER}:${ST_PORT}/
 
 # Now let's repeat the querry, but this time try to modify two parameters at once.
 printf "Changing two fields at the same time...\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d '[
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d '[
   {
     "op": "replace",
     "path": "/addressBookSettings/policy",
@@ -116,7 +116,7 @@ curl -k -u ${ST_USER}:${ST_PASSWORD}  -X PATCH "https://${ST_SERVER}:${ST_PORT}/
   ]'
 
 printf "Removing the addressBookSettings.nonAddressBookCollaborationAllowed...\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d '[
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d '[
   {
     "op": "remove",
     "path": "/addressBookSettings/nonAddressBookCollaborationAllowed"
@@ -124,7 +124,7 @@ curl -k -u ${ST_USER}:${ST_PASSWORD}  -X PATCH "https://${ST_SERVER}:${ST_PORT}/
   ]'
 
 printf "Checking the result...\n"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}?type=user&fields=addressBookSettings.nonAddressBookCollaborationAllowed" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}?type=user&fields=addressBookSettings.nonAddressBookCollaborationAllowed" -H "accept: */*" -H "${REFERER_HEADER}"
 
 printf "Adding a new contact...\n"
 # "-" appends to the end of the array, whether it is empty or already has

@@ -264,7 +264,7 @@ if __name__ == "__main__":
     # Please modify the below to match your environment
 
     stTimeout = 120  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
 
     # Report certificates expiring within this many days
     warnWithinDays = 90

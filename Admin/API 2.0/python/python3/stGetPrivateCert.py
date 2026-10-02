@@ -257,7 +257,7 @@ if __name__ == "__main__":
     stTimeout = 120
 
     logFile='my.log'
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
     pkeyfile = 'exportedPrivateKey'
 
     # Read the configuration file. It is resolved relative to this script, so

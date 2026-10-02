@@ -37,18 +37,18 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 # Simple GET to retrieve everything about a specific account
 echo "GET /api/v2.0/accounts/UserAccount"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount" -H "accept: */*" -H "${REFERER_HEADER}"
 
 # GET only the name, uid, and gid
 # Pay attention that the type is also returned no matter that it is not specified in the fields
 echo "GET /api/v2.0/accounts/UserAccount?fields=name,uid,gid"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount?fields=name,uid,gid" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount?fields=name,uid,gid" -H "accept: */*" -H "${REFERER_HEADER}"
 
 # If we want to receive fields that are not common to all account types, but are specific to the user one, we have to specify the type
 # Let's try with the addressBookSettings and without the type
 echo "GET /api/v2.0/accounts/UserAccount?fields=addressBookSettings"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount?fields=addressBookSettings" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount?fields=addressBookSettings" -H "accept: */*" -H "${REFERER_HEADER}"
 
 # And now by specifying the type=user
 echo "GET /api/v2.0/accounts/UserAccount?type=user&fields=addressBookSettings"
-curl -k -u ${ST_USER}:${ST_PASSWORD}  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount?type=user&fields=addressBookSettings" -H "accept: */*" -H "${REFERER_HEADER}"
+curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/UserAccount?type=user&fields=addressBookSettings" -H "accept: */*" -H "${REFERER_HEADER}"

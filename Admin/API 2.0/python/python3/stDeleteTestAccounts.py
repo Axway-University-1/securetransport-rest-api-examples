@@ -196,7 +196,7 @@ def stDeleteAccount(accNumQ, referer, stUrl, timeout, count, namePattern, auth):
     # reason.
     csrftoken = stLogin(auth, sessionMgt)
 
-    headers = {'Referer': 'PippinTheCat',       # This must be the same as the /myself use case
+    headers = {'Referer': 'THIS_IS_A_RANDOM_TEXT',       # This must be the same as the /myself use case
                'csrfToken': csrftoken,
                'Accept': 'application/json'}
     while True:
@@ -259,7 +259,7 @@ if __name__ == "__main__":
     numberAccountsToCreate = 1000
     #logFile = 'updateConfig.log'  # We won't use a logFile for this example
     stTimeout = 60  # in seconds
-    referer = 'PippinTheCat'
+    referer = 'THIS_IS_A_RANDOM_TEXT'
     #basicAuth = "<BASE64_ENCODED_USERNAME_COLON_PASSWORD>"  # from echo -n user:pass | base64
     namePattern = 'ZZ'  # if an ST username contains this - then delete it!
 

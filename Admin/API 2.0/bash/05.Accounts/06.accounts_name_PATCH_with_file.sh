@@ -47,7 +47,7 @@ PATCH_FILE="${SCRIPT_DIR}/06.patch_body/stPatchAccount.json"
 ELEMENT_TO_BE_CHANGED=$(jq -r '.[] | .path' "${PATCH_FILE}")
 
 printf "Changing '%s' of account '%s'...\n" "${ELEMENT_TO_BE_CHANGED}" "${ACCOUNT}"
-HTTP_CODE=$(curl -s -o /dev/null -k -u ${ST_USER}:${ST_PASSWORD} -w "%{http_code}\n" -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d "@${PATCH_FILE}")
+HTTP_CODE=$(curl -s -o /dev/null -k -u "${ST_USER}:${ST_PASSWORD}" -w "%{http_code}\n" -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT}" -H "accept: */*" -H "${REFERER_HEADER}" -H 'Content-Type: application/json' -d "@${PATCH_FILE}")
 
 if [[ "${HTTP_CODE}" == "204" ]]; then
   echo "Account '${ACCOUNT}' has been changed successfully."

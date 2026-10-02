@@ -194,7 +194,7 @@ ls "Admin/API 2.0/bash/05.Accounts"/*.sh | wc -l
 
 ## Things that are deliberate, not accidental
 
-- `Referer: PippinTheCat` — an arbitrary but consistent value. ST requires the
+- `Referer: THIS_IS_A_RANDOM_TEXT` — an arbitrary but consistent value. ST requires the
   header; see st-api-gotchas.
 - `-k` / `verify=False` everywhere — these are lab examples. Say so rather than
   quietly dropping it.

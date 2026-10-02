@@ -3,6 +3,10 @@
 Complete, end to end examples for individual SecureTransport features, one
 folder per feature.
 
+> **For test environments only.** These examples create accounts, transfer
+> sites, routes and subscriptions, and run real transfers. Read the
+> [Disclaimer](../README.md#disclaimer) before running anything.
+
 The `Admin` and `EndUser` folders are organised by **object** (accounts,
 applications, servers) and show one API call at a time. This folder is organised
 by **solution**: each feature folder shows everything needed to set that feature
@@ -62,4 +66,4 @@ Each example comes as a `.sh` for bash and a `.bat` for Windows, side by side.
    introduced the feature.
 5. Add the feature to the list in this file, under its release. Create a new
    release heading above the existing ones if needed.
-6. Add tests. See [CLAUDE.md](../CLAUDE.md).
+6. Add tests. See [tests/README.md](../tests/README.md).

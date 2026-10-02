@@ -51,7 +51,7 @@ for i in $(seq 1 "${NUMBER_OF_FILES}") ; do
     cp "${FILE_NAME}" "${FILE_NAME}_${i}"
     
     # Curl command to push a file to SecureTransport.
-    curl -b "${COOKIE}" -s -k -X POST "${ST_URL}/files" -H "Content-Type: multipart/form-data" -F "file=@${FILE_NAME}_${i}" -H "accept: application/json" -H "Referer: Ian"
+    curl -b "${COOKIE}" -s -k -X POST "${ST_URL}/files" -H "Content-Type: multipart/form-data" -F "file=@${FILE_NAME}_${i}" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT"
     
     # Remove the file.
     rm -f "${FILE_NAME}_${i}"

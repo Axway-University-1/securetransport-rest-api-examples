@@ -30,14 +30,14 @@ SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts
 REM Simple POST to create an Account of type User
 echo Creating an Account of type User...
 curl -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
--d "{\"name\":\"UserAccount\",\"type\":\"user\",\"homeFolder\":\"/home/UserAccount\",\"uid\":\"1001\",\"gid\":\"1001\",\"user\":{\"name\":\"UserAccount\",\"passwordCredentials\":{\"password\":\"1\"}}}"
+-d "{\"name\":\"UserAccount\",\"type\":\"user\",\"homeFolder\":\"/home/UserAccount\",\"uid\":\"41733\",\"gid\":\"41733\",\"user\":{\"name\":\"UserAccount\",\"passwordCredentials\":{\"password\":\"1\"}}}"
 
 REM Simple POST to create an Account of type Service
 echo Creating an Account of type Service...
 curl -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
--d "{\"name\":\"ServiceAccount\",\"type\":\"service\",\"homeFolder\":\"/home/ServiceAccount\",\"uid\":\"1001\",\"gid\":\"1001\"}"
+-d "{\"name\":\"ServiceAccount\",\"type\":\"service\",\"homeFolder\":\"/home/ServiceAccount\",\"uid\":\"41733\",\"gid\":\"41733\"}"
 
 REM Simple POST to create an Account of type Template
 echo Creating an Account of type Template...
 curl -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
--d "{\"name\":\"TemplateAccount\",\"type\":\"template\",\"homeFolder\":\"/home/TemplateAccount\",\"uid\":\"1001\",\"gid\":\"1001\",\"templateClass\":\"VirtClass\"}"
+-d "{\"name\":\"TemplateAccount\",\"type\":\"template\",\"homeFolder\":\"/home/TemplateAccount\",\"uid\":\"41733\",\"gid\":\"41733\",\"templateClass\":\"VirtClass\"}"

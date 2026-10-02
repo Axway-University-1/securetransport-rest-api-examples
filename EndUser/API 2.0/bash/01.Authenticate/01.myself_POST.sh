@@ -47,7 +47,7 @@ rm -f "${COOKIE}"
 # Check 02.myself_DELETE.sh for log out.
 # 
 printf "\n\nBasic authentication...\n"
-result=$(curl -H "Authorization: Basic ${ST_BASIC_AUTH}" --cookie-jar "${COOKIE}" -w "%{http_code}" -k -s -X POST "${ST_URL}/myself" -H "accept: application/json" -H "Referer: Ian")
+result=$(curl -H "Authorization: Basic ${ST_BASIC_AUTH}" --cookie-jar "${COOKIE}" -w "%{http_code}" -k -s -X POST "${ST_URL}/myself" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 http_status=${result: -3}
 
 if [[ $http_status -ne 200 ]] ; then
@@ -65,5 +65,5 @@ echo "Successfully Authenticated to SecureTransport"
 # This way, we can make multiple requests without the need to authenticate every time.
 #
 # printf "\n\nBasic authentication with cookie jar to reduce further authentications...\n"
-# REFERER_HEADER="Referer: Ian"
+# REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 # curl -k --cookie "${COOKIE}" -X GET "${ST_URL}/myself" -H "accept: application/json" -H "${REFERER_HEADER}"
