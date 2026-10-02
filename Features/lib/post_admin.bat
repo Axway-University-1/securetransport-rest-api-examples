@@ -6,7 +6,7 @@ REM Created: 2026-10-01
 REM Location: Sofia
 REM ==============================================================================
 REM Description:
-REM Shared by the examples in this folder. POSTs a JSON file to the Admin API and
+REM Shared across Features/. POSTs a JSON file to the Admin API and
 REM prints the response and the HTTP code. On success, the id of the new object
 REM is read from the Location header and saved under STATE_KEY.
 REM
@@ -40,7 +40,7 @@ IF NOT "%PA_CODE:~0,1%"=="2" EXIT /B 1
 
 IF DEFINED PA_LOCATION FOR %%P IN ("%PA_LOCATION%") DO SET PA_ID=%%~nxP
 IF NOT "%~3"=="" IF DEFINED PA_ID (
-    >> "%~dp0state.local.bat" echo SET %~3=%PA_ID%
+    >> "%FEATURE_DIR%state.local.bat" echo SET %~3=%PA_ID%
     echo Saved %~3 = %PA_ID%
 )
 EXIT /B 0

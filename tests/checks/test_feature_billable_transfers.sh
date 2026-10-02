@@ -1,0 +1,337 @@
+#!/bin/bash
+# ==============================================================================
+# Run the Features/audit-billable-transfers examples against a stub curl, and
+# check what they would send.
+#
+# Runs offline. Exit code 0 means clean.
+# ==============================================================================
+cd "$(dirname "$0")/.." || exit 1
+TESTS_DIR="$(pwd)"
+REPO="$(cd .. && pwd)"
+FEATURE="Features/audit-billable-transfers"
+
+WORK="${TESTS_DIR}/output/feature_billable_transfers"
+rm -rf "${WORK}"
+mkdir -p "${WORK}/bin" "${WORK}/Features" "${WORK}/Admin/API 2.0/bash"
+
+FAILED=0
+pass() { printf "  PASS  %s\n" "$1"; }
+fail() { printf "  FAIL  %s\n" "$1"; FAILED=1; }
+
+cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
+cp -R "${REPO}/Features/lib" "${WORK}/Features/lib"
+cp -R "${REPO}/${FEATURE}" "${WORK}/${FEATURE}"
+rm -f "${WORK:?}/${FEATURE:?}/settings.local.sh" "${WORK:?}/${FEATURE:?}/settings.local.bat" \
+      "${WORK:?}/${FEATURE:?}/state.local.sh" "${WORK:?}/${FEATURE:?}/state.local.bat"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.sh"
+RUN="${WORK}/${FEATURE}"
+
+echo "export BT_ACCOUNT_PASSWORD='p@ss w0rd'" > "${RUN}/settings.local.sh"
+echo "export BT_WAIT_SECONDS=0" >> "${RUN}/settings.local.sh"
+echo "export BT_STEP_PAUSE_SECONDS=0" >> "${RUN}/settings.local.sh"
+
+SERVER_NEW="${WORK}/version_new.json"; echo '{"version":"5.5-20260924"}' > "${SERVER_NEW}"
+SERVER_OLD="${WORK}/version_old.json"; echo '{"version":"5.5-20260923"}' > "${SERVER_OLD}"
+
+run() {
+    OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="$2" \
+          STUB_CURL_POST_BODY="${3:-${SERVER_NEW}}" STUB_CURL_LOCATION_ID="${4:-new-id}" \
+          STUB_CURL_STATUS="${5:-201}" STUB_CURL_CSRF="csrf-abc" bash "./$1" "${EXTRA_ARG:-}" 2>&1)
+    RC=$?
+}
+calls() { echo "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL:/ {print m, $2}'; }
+payloads() { echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | while read -r b; do echo "$b" | base64 -d; echo; done; }
+# Only the payloads of POST calls, in order - needed where POST (JSON) and PUT
+# (raw file content) calls are interleaved, since piping raw content through jq
+# would choke on it
+post_payloads() {
+    echo "${OUT}" | awk '/^METHOD:/ {m=$2} /^PAYLOAD_B64:/ {if (m == "POST") print substr($0, 14)}' \
+      | while read -r b; do echo "$b" | base64 -d; echo; done
+}
+# read_into ARRAY_NAME, reading from its own stdin: used as
+#   read_into ARRAY_NAME < <(some command)
+# never as the end of a pipe - each stage of a pipe is its own subshell in this
+# bash (3.2, as macOS ships), so a piped-into function cannot set a variable the
+# rest of the script can see. Portable stand-in for mapfile/readarray, which
+# this bash does not have either.
+read_into() {
+    local __name="$1" __line
+    eval "${__name}=()"
+    while IFS= read -r __line; do
+        eval "${__name}+=(\"\${__line}\")"
+    done
+}
+
+echo "=== 01.accounts_POST.sh ==="
+run 01.accounts_POST.sh "${SERVER_NEW}"
+[ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
+B=$(payloads | jq -s -c '.[0]')
+[ "$(echo "${B}" | jq -r .name)" = "btTestAccount" ] && pass "account name" || fail "account: ${B}"
+[ "$(echo "${B}" | jq -c .transfersWebServiceAllowed)" = "true" ] && pass "web service right is on" || fail "transfersWebServiceAllowed"
+
+echo
+echo "=== 02.sites_POST_pull.sh ==="
+run 02.sites_POST_pull.sh "${SERVER_NEW}"
+[ "$(calls | grep -c '^POST .*/sites$')" -eq 6 ] && pass "creates six pull sites" || fail "site count: $(calls | grep -c sites)"
+read_into SITE_BODIES < <(payloads | jq -c .)
+NAMES=$(printf '%s\n' "${SITE_BODIES[@]}" | jq -r .name | tr '\n' ' ')
+[ "${NAMES}" = "btPullSite1 btPullSite2 btPullSite3 btPullSite4 btPullSite5 btPullSite6 " ] && pass "named btPullSite1 to 6, in order" || fail "names: ${NAMES}"
+PATTERNS=$(printf '%s\n' "${SITE_BODIES[@]}" | jq -r .downloadPattern | tr '\n' '|')
+[ "${PATTERNS}" = "only_inbound.txt|inbound_and_one_outbound.txt|inbound_and_two_outbounds.txt|file_*_for_compress.txt|archive_with_2_files.zip|archive_with_2_files_for_2_partners.zip|" ] \
+    && pass "each site's pattern matches only its own scenario's file(s)" || fail "patterns: ${PATTERNS}"
+echo "${SITE_BODIES[0]}" | jq -e '.type == "ssh" and .protocol == "ssh"' >/dev/null && pass "SSH sites, with protocol set" || fail "type/protocol"
+[ "$(echo "${SITE_BODIES[0]}" | jq -r .port)" = "8022" ] && pass "SSH port 8022" || fail "port"
+[ "$(echo "${SITE_BODIES[0]}" | jq -c .usePassword)" = "true" ] && pass "usePassword is a JSON boolean" || fail "usePassword"
+
+echo
+echo "=== 03.sites_POST_push.sh ==="
+run 03.sites_POST_push.sh "${SERVER_NEW}"
+read_into PUSH_BODIES < <(payloads | jq -c .)
+[ "$(echo "${PUSH_BODIES[0]}" | jq -r .name)" = "btPushSitePartner1" ] && [ "$(echo "${PUSH_BODIES[0]}" | jq -r .uploadFolder)" = "/delivered-1" ] && pass "push site 1 delivers to /delivered-1" || fail "push1: ${PUSH_BODIES[0]}"
+[ "$(echo "${PUSH_BODIES[1]}" | jq -r .name)" = "btPushSitePartner2" ] && [ "$(echo "${PUSH_BODIES[1]}" | jq -r .uploadFolder)" = "/delivered-2" ] && pass "push site 2 delivers to /delivered-2" || fail "push2: ${PUSH_BODIES[1]}"
+
+echo
+echo "=== 04.files_POST_folders.sh ==="
+run 04.files_POST_folders.sh "${SERVER_NEW}"
+# The End User login must actually carry the real account name and password -
+# not rely on a shared-lib variable that was never set for this feature's own
+# prefix, which would silently log in as ":" and fail every call after it.
+# grep -F, not the first BASIC_AUTH line: the version check's own admin-
+# authenticated GET /version always comes first and is a different login.
+echo "${OUT}" | grep -qF "BASIC_AUTH: btTestAccount:p@ss w0rd" \
+    && pass "logs in to the End User API with the real account name and password" \
+    || fail "End User login credentials: $(echo "${OUT}" | grep '^BASIC_AUTH:' | sed -n 2p)"
+FOLDER_CALLS=$(calls | grep '^POST .*files/' | sed 's#.*/files/##')
+EXPECTED_FOLDERS=$'outbound-drop\ndelivered-1\ndelivered-2\nsubscription\nsubscription/s1\nsubscription/s2\nsubscription/s3\nsubscription/s4\nsubscription/s5\nsubscription/s6'
+[ "${FOLDER_CALLS}" = "${EXPECTED_FOLDERS}" ] && pass "creates the four top-level folders, then subscription/s1 to s6, in order" || fail "folders: ${FOLDER_CALLS}"
+FOLDER_BODY=$(payloads | jq -s -c '.[0]')
+[ "$(echo "${FOLDER_BODY}" | jq -c .isDirectory)" = "true" ] && pass "each is created as a directory" || fail "folder body: ${FOLDER_BODY}"
+
+echo
+echo "=== 05.applications_POST.sh ==="
+run 05.applications_POST.sh "${SERVER_NEW}"
+B=$(payloads | jq -s -c '.[0]')
+[ "$(echo "${B}" | jq -r .type)" = "AdvancedRouting" ] && [ "$(echo "${B}" | jq -r .name)" = "btTransferApplication" ] && pass "one AdvancedRouting application" || fail "application: ${B}"
+
+echo
+echo "=== 06.routes_POST_template.sh ==="
+run 06.routes_POST_template.sh "${SERVER_NEW}" "" tmpl-1
+B=$(payloads | jq -s -c '.[0]')
+[ "$(echo "${B}" | jq -r .type)" = "TEMPLATE" ] && pass "a TEMPLATE route" || fail "template: ${B}"
+grep -q 'BT_ID_TEMPLATE=tmpl-1' "${RUN}/state.local.sh" && pass "the new id is saved" || fail "id not saved"
+
+echo
+echo "=== 07.routes_POST_simple.sh ==="
+run 07.routes_POST_simple.sh "${SERVER_NEW}"
+read_into SIMPLE_BODIES < <(payloads | jq -c .)
+[ "${#SIMPLE_BODIES[@]}" -eq 5 ] && pass "creates five simple routes" || fail "count: ${#SIMPLE_BODIES[@]}"
+
+S2="${SIMPLE_BODIES[0]}"; S3="${SIMPLE_BODIES[1]}"; S4="${SIMPLE_BODIES[2]}"; S5="${SIMPLE_BODIES[3]}"; S6="${SIMPLE_BODIES[4]}"
+
+[ "$(echo "${S2}" | jq -r '.name')" = "btSimpleRoute2" ] && [ "$(echo "${S2}" | jq -r '.steps | length')" = "1" ] \
+    && [ "$(echo "${S2}" | jq -r '.steps[0].type')" = "SendToPartner" ] \
+    && [ "$(echo "${S2}" | jq -r '.steps[0].transferSiteExpression')" = "btPushSitePartner1#!#CVD#!#" ] \
+    && pass "2.2: one SendToPartner step, to partner 1" || fail "2.2: ${S2}"
+
+[ "$(echo "${S3}" | jq -r '.steps | length')" = "2" ] \
+    && [ "$(echo "${S3}" | jq -r '[.steps[].type] | unique[0]')" = "SendToPartner" ] \
+    && [ "$(echo "${S3}" | jq -r '[.steps[].usePrecedingStepFiles] | unique | length')" = "1" ] \
+    && [ "$(echo "${S3}" | jq -r '.steps[0].usePrecedingStepFiles')" = "false" ] \
+    && [ "$(echo "${S3}" | jq -r '[.steps[].transferSiteExpression] | unique | length')" = "1" ] \
+    && pass "2.3: two SendToPartner steps, both reading the route's own input, both to partner 1" || fail "2.3: ${S3}"
+
+[ "$(echo "${S4}" | jq -r '.steps[0].type')" = "Compress" ] \
+    && [ "$(echo "${S4}" | jq -r '.steps[0].singleArchiveEnabled')" = "true" ] \
+    && [ "$(echo "${S4}" | jq -r '.steps[0].singleArchiveName')" = "files_1_and_2_compressed.zip" ] \
+    && [ "$(echo "${S4}" | jq -r '.steps[0].compressionType')" = "ZIP" ] \
+    && [ "$(echo "${S4}" | jq -r '.steps[0] | has("postTransformationActionRenameAsExpression")')" = "false" ] \
+    && [ "$(echo "${S4}" | jq -r '.steps[1].type')" = "SendToPartner" ] \
+    && [ "$(echo "${S4}" | jq -r '.steps[1].usePrecedingStepFiles')" = "true" ] \
+    && pass "2.4: Compress into one named archive (not the rename field), then push reading its output" || fail "2.4: ${S4}"
+
+[ "$(echo "${S5}" | jq -r '.steps[0].type')" = "Decompress" ] \
+    && [ "$(echo "${S5}" | jq -r '.steps[0].filenameCollisionResolutionType')" = "OVERWRITE" ] \
+    && [ "$(echo "${S5}" | jq -r '.steps[0] | has("postTransformationActionRenameAsExpression")')" = "false" ] \
+    && [ "$(echo "${S5}" | jq -r '.steps[1].type')" = "SendToPartner" ] \
+    && [ "$(echo "${S5}" | jq -r '.steps[1].usePrecedingStepFiles')" = "true" ] \
+    && [ "$(echo "${S5}" | jq -r '.steps[1].transferSiteExpression')" = "btPushSitePartner1#!#CVD#!#" ] \
+    && pass "2.5: Decompress, no rename field, then push both files to partner 1" || fail "2.5: ${S5}"
+
+[ "$(echo "${S6}" | jq -r '.steps | length')" = "3" ] \
+    && [ "$(echo "${S6}" | jq -r '.steps[0].type')" = "Decompress" ] \
+    && [ "$(echo "${S6}" | jq -r '.steps[1].transferSiteExpression')" = "btPushSitePartner1#!#CVD#!#" ] \
+    && [ "$(echo "${S6}" | jq -r '.steps[2].transferSiteExpression')" = "btPushSitePartner2#!#CVD#!#" ] \
+    && [ "$(echo "${S6}" | jq -r '[.steps[1].usePrecedingStepFiles, .steps[2].usePrecedingStepFiles] | unique[0]')" = "true" ] \
+    && pass "2.6: Decompress, then push to partner 1, then push to partner 2" || fail "2.6: ${S6}"
+
+echo
+echo "=== 08.subscriptions_POST.sh ==="
+run 08.subscriptions_POST.sh "${SERVER_NEW}"
+read_into SUB_BODIES < <(payloads | jq -c .)
+[ "${#SUB_BODIES[@]}" -eq 6 ] && pass "creates six subscriptions" || fail "count: ${#SUB_BODIES[@]}"
+FOLDERS=$(printf '%s\n' "${SUB_BODIES[@]}" | jq -r .folder | tr '\n' ' ')
+[ "${FOLDERS}" = "/subscription/s1 /subscription/s2 /subscription/s3 /subscription/s4 /subscription/s5 /subscription/s6 " ] \
+    && pass "one subscription per scenario folder" || fail "folders: ${FOLDERS}"
+for i in 0 1 2 4 5; do
+    echo "${SUB_BODIES[$i]}" | jq -e 'has("createFilesList") | not' >/dev/null \
+        && pass "scenario s$((i+1)): no batching trigger" || fail "scenario s$((i+1)) unexpectedly has createFilesList"
+done
+S4SUB="${SUB_BODIES[3]}"
+[ "$(echo "${S4SUB}" | jq -r .createFilesList.createFilesListEnabled)" = "true" ] && pass "scenario s4: batches its two files with a trigger file" || fail "s4 createFilesList: ${S4SUB}"
+[ "$(echo "${S4SUB}" | jq -r .postTransmissionActions.submitFilterType)" = "TRIGGER_FILE_CONTENT" ] && pass "s4: submits the files read from the trigger file" || fail "s4 submitFilterType"
+COND=$(echo "${S4SUB}" | jq -r .postTransmissionActions.triggerOnConditionExpression)
+EXPECT_COND="\${stenv['target'].matches('.*\\\\.trigger')?1:0}"
+[ "${COND}" = "${EXPECT_COND}" ] && pass "s4: the trigger condition keeps its two backslashes" || fail "s4 condition: ${COND}"
+
+echo
+echo "=== 09.routes_POST_composite.sh ==="
+# Needs the ids from 06, 07, 08 - already saved in state.local.sh by the runs above
+run 09.routes_POST_composite.sh "${SERVER_NEW}"
+read_into COMP_BODIES < <(payloads | jq -c .)
+[ "${#COMP_BODIES[@]}" -eq 5 ] && pass "creates five composite routes" || fail "count: ${#COMP_BODIES[@]}"
+echo "${COMP_BODIES[0]}" | jq -e '.routeTemplate == "tmpl-1" and (.subscriptions | length) == 1' >/dev/null \
+    && pass "each is built from the template and attached to one subscription" || fail "composite 2: ${COMP_BODIES[0]}"
+echo "${COMP_BODIES[0]}" | jq -e '.steps[0].type == "ExecuteRoute"' >/dev/null \
+    && pass "each runs its own simple route" || fail "composite 2 steps: ${COMP_BODIES[0]}"
+
+echo
+echo "=== 10.files_upload_POST.sh ==="
+echo '{"id":"op-7"}' > "${WORK}/operation.json"
+run 10.files_upload_POST.sh "${SERVER_NEW}" "${WORK}/operation.json"
+[ "$(calls | grep -c '^POST .*fileOperations$')" -eq 7 ] && pass "declares seven uploads: 5 files + 2 archives" || fail "declares: $(calls | grep -c fileOperations)"
+[ "$(calls | grep -c '^PUT .*fileOperations/op-7$')" -eq 7 ] && pass "sends seven contents, with PUT" || fail "puts: $(calls | grep -c PUT)"
+DECLARE_PATHS=$(post_payloads | jq -r 'select(.operation=="Upload") | .filePath' | tr '\n' ' ')
+[ "${DECLARE_PATHS}" = "/outbound-drop/only_inbound.txt /outbound-drop/inbound_and_one_outbound.txt /outbound-drop/inbound_and_two_outbounds.txt /outbound-drop/file_1_for_compress.txt /outbound-drop/file_2_for_compress.txt /outbound-drop/archive_with_2_files.zip /outbound-drop/archive_with_2_files_for_2_partners.zip " ] \
+    && pass "uploads all five files then both archives, into the shared drop folder" || fail "paths: ${DECLARE_PATHS}"
+# The archive content itself: a real zip, with its two member names inside
+ZIP_CONTENT=$(echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | tail -n 1 | base64 -d)
+echo "${ZIP_CONTENT}" | head -c4 | grep -q "PK" && pass "the last upload is a real zip (PK signature)" || fail "not a zip"
+printf '%s' "${ZIP_CONTENT}" | strings | grep -q "file_1_inside_archive_for_2_partners.txt" \
+    && pass "the archive contains its named member file" || fail "member name not found in zip bytes"
+
+echo
+echo "=== 11.transfers_pull_POST.sh ==="
+run 11.transfers_pull_POST.sh "${SERVER_NEW}" "" "" 202
+[ "$(calls | grep -c '^POST .*transfers/operations?operation=pull$')" -eq 6 ] && pass "runs all six pulls" || fail "pulls: $(calls | grep -c pull)"
+read_into PULL_BODIES < <(payloads | jq -c .)
+[ "$(echo "${PULL_BODIES[0]}" | jq -r .site)" = "btPullSite1" ] && [ "$(echo "${PULL_BODIES[0]}" | jq -r .destinationDirectory)" = "/subscription/s1" ] \
+    && pass "each pull uses its own site into its own scenario folder" || fail "pull 1: ${PULL_BODIES[0]}"
+
+echo
+echo "=== billable_GET_report.sh ==="
+# returnCount (1, as if limit=1 capped the page) and totalCount (4, the real
+# total) deliberately differ, so this catches a regression back to reading
+# returnCount - the exact bug confirmed against a real server: every day's
+# count was silently capped at 1 by the page size, not the true total.
+cat > "${WORK}/report.json" <<JSON
+{"version": "5.5-20260924", "resultSet": {"returnCount": 1, "totalCount": 4}}
+JSON
+OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/report.json" STUB_CURL_CSRF="csrf-abc" bash ./billable_GET_report.sh before 2>&1)
+RC=$?
+[ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
+[[ "${OUT}" == *"(before)"* ]] && pass "the label is printed in the heading" || fail "heading: $(echo "${OUT}" | grep Billable)"
+DAY_LINES=$(echo "${OUT}" | grep -cE '^  [0-9]{4}-[0-9]{2}-[0-9]{2}  4 billable')
+[ "${DAY_LINES}" -eq 7 ] && pass "reports seven days, using totalCount (4), not returnCount (1)" || fail "day lines: ${DAY_LINES}"
+echo "${OUT}" | grep -qx "TODAY_COUNT: 4" && pass "prints a machine-readable TODAY_COUNT line, for 00.run_all.sh to diff" || fail "TODAY_COUNT line: $(echo "${OUT}" | grep TODAY_COUNT)"
+# Full lines, not calls() (which splits on whitespace via awk): the stub does
+# not URL-encode the RFC 2822 dates, so the URL itself contains spaces
+REPORT_URLS=$(echo "${OUT}" | grep '^URL: ' | sed 's#^URL: ##; s#.*logs/transfers?##')
+[ "$(echo "${REPORT_URLS}" | grep -c 'isBillable=true')" -eq 7 ] && pass "every day's query filters isBillable=true" || fail "isBillable missing"
+[ "$(echo "${REPORT_URLS}" | grep -c 'accountName=btTestAccount')" -eq 7 ] && pass "every day's query is scoped to the test account" || fail "accountName missing"
+STARTS=$(echo "${REPORT_URLS}" | sed -n 's/.*startTimeAfter=\([A-Za-z]*, [0-9]* [A-Za-z]* [0-9]*\).*/\1/p')
+[ "$(echo "${STARTS}" | wc -l | tr -d ' ')" = "7" ] && pass "seven distinct day boundaries requested" || fail "boundaries: ${STARTS}"
+
+echo
+echo "=== 99.cleanup_DELETE.sh ==="
+cat > "${WORK}/version_and_objects.json" <<JSON
+{
+  "version": "5.5-20260924",
+  "files": [{"fileName": "f1.txt", "isRegularFile": true}],
+  "result": [
+    {"id": "comp2", "name": "btCompositeRoute2", "account": "btTestAccount"},
+    {"id": "simple2", "name": "btSimpleRoute2", "account": "btTestAccount"},
+    {"id": "tmpl1", "name": "btPackageTemplate"},
+    {"id": "sub1", "account": "btTestAccount", "application": "btTransferApplication"},
+    {"id": "sub-else", "account": "someoneElse", "application": "btTransferApplication"},
+    {"id": "app1", "name": "btTransferApplication"},
+    {"id": "site1", "name": "btPullSite1", "account": "btTestAccount"},
+    {"id": "push1", "name": "btPushSitePartner1", "account": "btTestAccount"},
+    {"id": "push2", "name": "btPushSitePartner2", "account": "btTestAccount"},
+    {"id": "other", "name": "unrelatedSite", "account": "btTestAccount"},
+    {"id": "elsewhere", "name": "btPullSite1", "account": "someoneElse"}
+  ]
+}
+JSON
+rm -f "${RUN:?}/state.local.sh"
+run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json"
+D=$(calls | grep '^DELETE' | sed 's#.*/api/v2.0/##' | tr '\n' ' ')
+[ "${D}" = "routes/comp2 routes/simple2 routes/tmpl1 subscriptions/sub1 applications/btTransferApplication sites/site1 sites/push1 sites/push2 files/outbound-drop/f1.txt files/outbound-drop files/delivered-1/f1.txt files/delivered-1 files/delivered-2/f1.txt files/delivered-2 files/subscription/s1/f1.txt files/subscription/s1 files/subscription/s2/f1.txt files/subscription/s2 files/subscription/s3/f1.txt files/subscription/s3 files/subscription/s4/f1.txt files/subscription/s4 files/subscription/s5/f1.txt files/subscription/s5 files/subscription/s6/f1.txt files/subscription/s6 files/subscription/f1.txt files/subscription myself accounts/btTestAccount " ] \
+    && pass "deletes composite, simple, template, subscription, application, sites, folders (emptied first), account, in that order" \
+    || fail "order: ${D}"
+echo "${D}" | grep -qE 'sub-else|other\b|elsewhere' && fail "touched another account's or an unrelated object" || pass "leaves other accounts' objects and unrelated ones alone"
+[ ! -f "${RUN}/state.local.sh" ] && pass "removes the saved ids" || fail "state file left behind"
+
+echo
+echo "=== 00.run_all.sh ==="
+rm -f "${RUN:?}/state.local.sh"
+echo '{"version":"5.5-20260924","id":"op-1","files":[],"result":[],"resultSet":{"returnCount":0,"totalCount":0}}' > "${WORK}/all.json"
+master() {
+    OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/all.json" STUB_CURL_POST_BODY="${WORK}/all.json" \
+          STUB_CURL_LOCATION_ID="new-id" STUB_CURL_STATUS="${STATUS:-201}" STUB_CURL_CSRF="csrf-abc" bash ./00.run_all.sh "$@" 2>&1)
+    RC=$?
+}
+STATUS=201 master
+[ "${RC}" -eq 0 ] && pass "runs the whole thing and exits 0" || fail "exit ${RC}: $(echo "${OUT}" | tail -5)"
+[[ "${OUT}" == *"=== Step 1: billable transfers before this run ==="* ]] && [[ "${OUT}" == *"=== Step 4: analysis ==="* ]] \
+    && pass "runs steps 1 to 4 in order" || fail "missing step headings"
+STEP_COUNT=$(echo "${OUT}" | grep -c '^--- .* of 12:')
+[ "${STEP_COUNT}" -eq 12 ] && pass "runs all 12 numbered setup scripts" || fail "step count: ${STEP_COUNT}"
+[[ "${OUT}" != *"=== Cleanup"* ]] && pass "without --cleanup, nothing is removed" || fail "cleaned up without being asked"
+[[ "${OUT}" == *"This run added 0 billable transfer(s) today."* ]] \
+    && pass "step 4 prints the real measured before/after delta, not a fixed table" || fail "no delta line: $(echo "${OUT}" | grep -A2 'Step 4')"
+[[ "${OUT}" != *"2.1 only inbound"* ]] && pass "the old fixed per-scenario table is gone" || fail "the old static table is still being printed"
+STATUS=201 master --cleanup
+[[ "${OUT}" == *"=== Cleanup: 99.cleanup_DELETE.sh ==="* ]] && pass "--cleanup runs the cleanup at the end" || fail "--cleanup did not clean up"
+STATUS=500 master
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Stopped at step 1 of 12: 01.accounts_POST.sh failed"* ]] && [[ "${OUT}" != *"2 of 12"* ]]; then
+    pass "stops at the first failing step, and runs nothing after it"
+else
+    fail "did not stop cleanly on failure (exit ${RC})"
+fi
+master --bogus
+[ "${RC}" -eq 2 ] && pass "an unknown option is refused" || fail "--bogus exit ${RC}"
+
+echo
+echo "=== Guard rails ==="
+rm -f "${RUN:?}/state.local.sh"
+for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh \
+         10.files_upload_POST.sh 11.transfers_pull_POST.sh 12.files_GET_result.sh billable_GET_report.sh; do
+    run "${s}" "${SERVER_OLD}"
+    if [ "${RC}" -eq 0 ] && [[ "${OUT}" == *SKIPPED* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|DELETE|PUT)'; then
+        pass "${s}: skipped, and sends nothing, on an older server"
+    else
+        fail "${s}: acted on an older server (exit ${RC})"
+    fi
+done
+
+mv "${RUN}/settings.local.sh" "${RUN}/settings.local.sh.off"
+for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh 10.files_upload_POST.sh; do
+    run "${s}" "${SERVER_NEW}"
+    if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *BT_ACCOUNT_PASSWORD* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|PUT)'; then
+        pass "${s}: stops and sends nothing when no password is set"
+    else
+        fail "${s}: ran without a password (exit ${RC})"
+    fi
+done
+mv "${RUN}/settings.local.sh.off" "${RUN}/settings.local.sh"
+
+echo
+echo "=== Pairs ==="
+for f in $(cd "${REPO}" && git ls-files "${FEATURE}/*.sh" 2>/dev/null); do
+    [ -f "${REPO}/${f%.sh}.bat" ] || fail "no bat twin: $(basename "$f")"
+done
+pass "every tracked script has a bat twin"
+
+echo
+if [ "${FAILED}" -eq 0 ]; then echo "test_feature_billable_transfers: PASS"; else echo "test_feature_billable_transfers: FAIL"; fi
+exit "${FAILED}"

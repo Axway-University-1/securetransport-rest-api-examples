@@ -4,8 +4,8 @@ Check that each Features .bat twin carries the same API content as its .sh.
 
 The .bat files cannot be run in this repository's test environment, so this is the
 safety net: every API field name (a camelCase word such as postTransmissionActions)
-and every AR_ setting that a .sh file uses must also appear in its .bat twin, and the
-other way round. Comments are ignored.
+and every SETTING_LIKE_THIS a .sh file uses must also appear in its .bat twin, and
+the other way round. Comments are ignored.
 
 A name that really differs by design (a bash-only helper variable) goes in
 ALLOWED_DIFFERENCES below, with the reason.
@@ -24,8 +24,29 @@ FEATURES = os.path.join(REPO, "Features")
 ALLOWED_DIFFERENCES = {
     "triggerName",   # a jq --arg name in the bash version; PowerShell reads the environment
     "AR_EU_URL", "AR_EU_BODY", "AR_EU_CODE", "AR_EU_CSRF", "AR_EU_JAR",  # bash helper state; bat uses EU_*
+    # bat's own enduser.bat implementation state (EU_JAR, EU_CODE, ...) - the bash side
+    # calls these AR_EU_*, above. Only EU_ACCOUNT, EU_ACCOUNT_PASSWORD and EU_ENDUSER_PORT
+    # (not listed here) are the actual cross-language contract: the neutral names each
+    # feature's settings.sh/.bat alias its own prefix to, before enduser is loaded/called.
+    "EU_JAR", "EU_CODE", "EU_CSRF", "EU_HEADERS", "EU_BODY_FILE",
     "AR_STATE_FILE",  # bash helper path; bat writes state.local.bat directly
 }
+
+
+def setting_prefixes():
+    """Every feature's own settings prefix (AR, BT, ...), found from its settings.sh:
+    whatever comes before the first underscore in an `export WHATEVER_NAME=` line.
+    Generic on purpose, so a new feature's own prefix is picked up without editing
+    this check."""
+    prefixes = set()
+    for root, _dirs, files in os.walk(FEATURES):
+        if "settings.sh" in files:
+            text = open(os.path.join(root, "settings.sh")).read()
+            prefixes |= set(re.findall(r"^export\s+([A-Z][A-Z0-9]*)_[A-Z0-9_]+=", text, re.M))
+    return prefixes
+
+
+PREFIXES = setting_prefixes()
 
 failed = 0
 
@@ -43,7 +64,10 @@ def tokens(path):
     text = open(path).read()
     code = "\n".join(l for l in text.split("\n") if not re.match(r"\s*(#|REM\b)", l))
     words = set(re.findall(r"\b[a-z]+[A-Z][A-Za-z]+\b", code))
-    words |= set(re.findall(r"\bAR_[A-Z_]+\b", code))
+    # A setting from any feature's own prefix (AR_, BT_, ...), not implementation-only
+    # all-caps locals a language forces on itself (PA_HEADERS, EU_CODE, SCRIPT_DIR, ...)
+    if PREFIXES:
+        words |= set(re.findall(r"\b(?:%s)_[A-Z0-9_]+\b" % "|".join(sorted(PREFIXES)), code))
     # An escaped newline in a format string looks like a word: \nHTTP, \nAll
     words = {w for w in words if not re.match(r"^n[A-Z]", w)}
     return words - ALLOWED_DIFFERENCES

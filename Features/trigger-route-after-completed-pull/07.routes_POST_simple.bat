@@ -32,7 +32,7 @@ SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 powershell -NoProfile -Command "@{ type='SIMPLE'; name=$env:AR_SIMPLE_ROUTE; conditionType='ALWAYS'; condition=$true; steps=@(@{ type='SendToPartner'; status='ENABLED'; autostart=$false; transferSiteExpressionType='LIST'; transferSiteExpression=($env:AR_PUSH_SITE + '#!#CVD#!#'); fileFilterExpressionType='GLOB'; fileFilterExpression='*'; actionOnStepFailure='FAIL' }) } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the simple route %AR_SIMPLE_ROUTE%...
-CALL "%~dp0post_admin.bat" routes "%BODY_FILE%" AR_ID_SIMPLE
+CALL "%~dp0..\lib\post_admin.bat" routes "%BODY_FILE%" AR_ID_SIMPLE
 SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B %POST_RESULT%

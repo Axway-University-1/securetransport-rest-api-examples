@@ -16,22 +16,36 @@
 # STUB_CURL_POST_BODY does the same for POST, for an example that reads an id
 # out of the response to its first call.
 #
+# -G turns -d/--data-urlencode into GET query parameters, the same as real curl
+# (used by an example that builds a query with --data-urlencode so curl does the
+# URL-encoding). The stub appends them to the URL it reports, unencoded, since
+# the point here is to let a test read the parameter values back out.
+#
 # A request body may contain newlines and quotes, so it is emitted base64
 # encoded on a single line. Decode it with:
 #
 #   sed -n 's/^PAYLOAD_B64: //p' out.txt | while read -r b; do echo "$b" | base64 -d; done
+#
+# -u/--user is echoed as BASIC_AUTH: user:pass, same as a -H header - this is
+# how a script that logs in with the wrong (for example empty, from a variable
+# that was never set) credentials gets caught: the call shape still looks right.
 # ==============================================================================
 url=""
 payload=""
 method="GET"
 header_file=""
 write_out=""
+use_g=0
+query_params=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -d|--data|--data-raw|--data-binary) payload="$2"; shift 2 ;;
+    --data-urlencode)                   query_params+=("$2"); shift 2 ;;
+    -G)                                 use_g=1; shift ;;
     -X|--request)                       method="$2"; shift 2 ;;
     -H|--header)                        echo "HEADER: $2" >&2; shift 2 ;;
+    -u|--user)                          echo "BASIC_AUTH: $2" >&2; shift 2 ;;
     -w|--write-out)                     write_out="$2"; shift 2 ;;
     -D|--dump-header)                   header_file="$2"; shift 2 ;;
     --head|-I)                          method="HEAD"; shift ;;
@@ -39,6 +53,14 @@ while [[ $# -gt 0 ]]; do
     *)                                  shift ;;
   esac
 done
+
+if [[ "${use_g}" -eq 1 && "${#query_params[@]}" -gt 0 ]]; then
+    sep="?"
+    for p in "${query_params[@]}"; do
+        url="${url}${sep}${p}"
+        sep="&"
+    done
+fi
 
 # An example that wants the response headers (-D file) gets a status line and,
 # when STUB_CURL_LOCATION_ID is set, a Location header ending in that id.

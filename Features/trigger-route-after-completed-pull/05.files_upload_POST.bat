@@ -39,13 +39,13 @@ IF "%AR_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-CALL "%~dp0enduser.bat" login
+CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 
 SET UPLOAD_FAILED=
 FOR /L %%I IN (1,1,%AR_SAMPLE_FILES%) DO CALL :upload_file %%I
 
-CALL "%~dp0enduser.bat" logout
+CALL "%~dp0..\lib\enduser.bat" logout
 IF DEFINED UPLOAD_FAILED EXIT /B 1
 EXIT /B 0
 
@@ -60,7 +60,7 @@ REM 1. Declare the upload, and read the operation id from the response
 powershell -NoProfile -Command "@{ operation='Upload'; filePath=$env:FILE_PATH; customAttributes=@{ transferMode='ASCII' } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Declaring the upload of %FILE_PATH%...
-CALL "%~dp0enduser.bat" call POST fileOperations "application/json" "%BODY_FILE%"
+CALL "%~dp0..\lib\enduser.bat" call POST fileOperations "application/json" "%BODY_FILE%"
 
 FOR /F "delims=" %%O IN ('powershell -NoProfile -Command "try { (Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).id } catch { }"') DO SET OPERATION_ID=%%O
 
@@ -74,7 +74,7 @@ IF NOT DEFINED OPERATION_ID (
 REM 2. Send the content to that operation
 echo Sending the content to operation %OPERATION_ID%...
 > "%CONTENT_FILE%" echo Sample file %1 for the pull test.
-CALL "%~dp0enduser.bat" call PUT "fileOperations/%OPERATION_ID%" "application/octet-stream" "%CONTENT_FILE%"
+CALL "%~dp0..\lib\enduser.bat" call PUT "fileOperations/%OPERATION_ID%" "application/octet-stream" "%CONTENT_FILE%"
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.

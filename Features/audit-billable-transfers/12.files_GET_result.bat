@@ -1,0 +1,69 @@
+@echo off
+REM ==============================================================================
+REM Script Name: 12.files_GET_result.bat
+REM Author: Plamen Milenkov
+REM Created: 2026-10-01
+REM Location: Sofia
+REM ==============================================================================
+REM Description:
+REM Shows what each scenario left behind, using the End User API
+REM `GET /files/{folder}` endpoint: the six subscription/sN folders (what was
+REM pulled) and both delivered folders (what was pushed). Waits for delivered-1 to
+REM have something in it before listing, since the pushes are asynchronous.
+REM
+REM Usage:
+REM 12.files_GET_result.bat
+REM
+REM Notes:
+REM - Run it after 11.transfers_pull_POST.bat.
+REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
+REM - Uses PowerShell to read the listing.
+REM - This only shows files. 00.run_all.bat's own analysis step is about the
+REM   billable counts, not this listing; this is a sanity check along the way.
+REM ==============================================================================
+
+REM Ends this script, without changing anything, on a server that is too old
+CALL "%~dp0..\lib\st_feature_check.bat" 5.5-20260924
+IF ERRORLEVEL 11 EXIT /B 1
+IF ERRORLEVEL 10 EXIT /B 0
+CALL "%~dp0settings.bat"
+
+IF "%BT_ACCOUNT_PASSWORD%"=="" (
+    echo BT_ACCOUNT_PASSWORD is not set. Copy settings.local.example.bat to settings.local.bat and choose one.
+    EXIT /B 1
+)
+
+CALL "%~dp0..\lib\enduser.bat" login
+IF ERRORLEVEL 1 EXIT /B 1
+
+REM The first push (scenarios 2.2 to 2.4) is asynchronous: give it time to arrive
+SET WAITED=0
+:wait_loop
+CALL :count_files "%BT_DELIVERED_1_FOLDER%"
+IF %FILE_COUNT% GTR 0 GOTO :show
+IF %WAITED% GEQ %BT_WAIT_SECONDS% GOTO :show
+echo Nothing in %BT_DELIVERED_1_FOLDER% yet. Waiting...
+ping -n 4 127.0.0.1 >NUL
+SET /A WAITED=%WAITED%+3
+GOTO :wait_loop
+
+:show
+FOR %%N IN (1,2,3,4,5,6) DO CALL :show_folder "%BT_SUBSCRIPTION_FOLDER%/s%%N"
+CALL :show_folder "%BT_DELIVERED_1_FOLDER%"
+CALL :show_folder "%BT_DELIVERED_2_FOLDER%"
+
+CALL "%~dp0..\lib\enduser.bat" logout
+EXIT /B 0
+
+:count_files
+CALL "%~dp0..\lib\enduser.bat" call GET "files%~1" ""
+SET FILE_COUNT=0
+FOR /F %%C IN ('powershell -NoProfile -Command "try { @((Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile }).Count } catch { 0 }"') DO SET FILE_COUNT=%%C
+EXIT /B 0
+
+:show_folder
+CALL :count_files "%~1"
+echo.
+echo %~1: %FILE_COUNT% file^(s^)
+powershell -NoProfile -Command "try { (Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile } | ForEach-Object { '    ' + $_.fileName + '  (' + $_.size + ' bytes)' } } catch { }"
+EXIT /B 0

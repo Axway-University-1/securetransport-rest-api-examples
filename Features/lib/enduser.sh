@@ -6,10 +6,15 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Helpers for the End User API, loaded by settings.sh. Unlike the Admin API, the
+# Helpers for the End User API, shared across Features/, loaded by each feature's
+# settings.sh. Unlike the Admin API, the
 # End User API needs a real login: POST /myself with the account's credentials
 # returns a session cookie and a csrfToken header, and every later call sends
 # both back.
+#
+# Reads EU_ACCOUNT, EU_ACCOUNT_PASSWORD and EU_ENDUSER_PORT - neutral names, not
+# any one feature's own prefix. Each feature's settings.sh sets these as aliases
+# of its own prefixed variables before sourcing this file.
 #
 # - ar_enduser_login                        log in as the test account
 # - ar_enduser_call METHOD PATH TYPE [DATA] make a call in that session. Sets
@@ -18,25 +23,25 @@
 # - ar_enduser_logout                       DELETE /myself and forget the session
 #
 # Notes:
-# - The port is AR_ENDUSER_PORT, not the Admin port.
+# - The port is EU_ENDUSER_PORT, not the Admin port.
 # ==============================================================================
 
-AR_EU_URL() { printf 'https://%s:%s/api/v2.0/%s' "${ST_SERVER}" "${AR_ENDUSER_PORT}" "$1"; }
+AR_EU_URL() { printf 'https://%s:%s/api/v2.0/%s' "${ST_SERVER}" "${EU_ENDUSER_PORT}" "$1"; }
 
 ar_enduser_login() {
     local hdr
     AR_EU_JAR=$(mktemp)
     hdr=$(mktemp)
-    AR_EU_BODY=$(curl -s -k -u "${AR_TEST_ACCOUNT}:${AR_ACCOUNT_PASSWORD}" -X POST "$(AR_EU_URL myself)" \
+    AR_EU_BODY=$(curl -s -k -u "${EU_ACCOUNT}:${EU_ACCOUNT_PASSWORD}" -X POST "$(AR_EU_URL myself)" \
       -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT" \
       --cookie-jar "${AR_EU_JAR}" -D "${hdr}")
     AR_EU_CODE=$(head -n 1 "${hdr}" | awk '{print $2}')
     AR_EU_CSRF=$(grep -i '^csrftoken:' "${hdr}" | tr -d '\r' | awk '{print $2}')
     case "${AR_EU_CODE}" in
-        2*) rm -f "${hdr}"; printf "Logged in to the End User API as %s.\n" "${AR_TEST_ACCOUNT}"; return 0 ;;
+        2*) rm -f "${hdr}"; printf "Logged in to the End User API as %s.\n" "${EU_ACCOUNT}"; return 0 ;;
     esac
     printf "Could not log in to the End User API as %s on port %s (HTTP %s):\n%s\n" \
-      "${AR_TEST_ACCOUNT}" "${AR_ENDUSER_PORT}" "${AR_EU_CODE}" "${AR_EU_BODY}"
+      "${EU_ACCOUNT}" "${EU_ENDUSER_PORT}" "${AR_EU_CODE}" "${AR_EU_BODY}"
     printf "Response headers, which may say why:\n"
     tr -d '\r' < "${hdr}" | grep -v -i '^set-cookie' | sed 's/^/    /'
     rm -f "${hdr}"

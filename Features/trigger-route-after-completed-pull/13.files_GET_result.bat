@@ -35,7 +35,7 @@ IF "%AR_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-CALL "%~dp0enduser.bat" login
+CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 
 FOR %%F IN (%AR_CHECK_FOLDERS%) DO SET LAST_FOLDER=%%F
@@ -55,12 +55,12 @@ GOTO :wait_loop
 SET LAST_COUNT=0
 FOR %%F IN (%AR_CHECK_FOLDERS%) DO CALL :show_folder %%F
 
-CALL "%~dp0enduser.bat" logout
+CALL "%~dp0..\lib\enduser.bat" logout
 IF %LAST_COUNT% GTR 0 EXIT /B 0
 EXIT /B 1
 
 :count_files
-CALL "%~dp0enduser.bat" call GET "files/%1" ""
+CALL "%~dp0..\lib\enduser.bat" call GET "files/%1" ""
 SET FILE_COUNT=0
 FOR /F %%N IN ('powershell -NoProfile -Command "try { @((Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile }).Count } catch { 0 }"') DO SET FILE_COUNT=%%N
 EXIT /B 0

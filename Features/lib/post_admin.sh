@@ -6,7 +6,7 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Two small helpers shared by the examples in this folder, loaded by settings.sh.
+# Two small helpers shared across Features/, loaded by each feature's settings.sh.
 #
 # - ar_admin_post PATH BODY [STATE_KEY]   POST to the Admin API and print the
 #   response and the HTTP code. On success, the id of the new object is read
@@ -14,12 +14,15 @@
 # - ar_state_get STATE_KEY                print a saved id.
 #
 # Notes:
-# - Ids are kept in state.local.sh, next to this file, which git ignores. A later
+# - Ids are kept in state.local.sh, next to the feature's own scripts (not next to
+#   this file), which git ignores. A later
 #   example reads the ids an earlier one saved, and 99.cleanup_DELETE.sh uses
 #   them to delete what was created.
 # ==============================================================================
 
-AR_STATE_FILE="$(dirname "${BASH_SOURCE[0]}")/state.local.sh"
+# FEATURE_DIR is set by the feature's own settings.sh, before this is sourced,
+# so the state file lands next to that feature's scripts, not in this shared lib.
+AR_STATE_FILE="${FEATURE_DIR}/state.local.sh"
 
 ar_state_set() {
     printf 'export %s=%q\n' "$1" "$2" >> "${AR_STATE_FILE}"

@@ -35,12 +35,12 @@ IF "%AR_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-CALL "%~dp0enduser.bat" login
+CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 
 FOR %%F IN (%AR_CREATE_FOLDERS%) DO CALL :create_folder %%F
 
-CALL "%~dp0enduser.bat" logout
+CALL "%~dp0..\lib\enduser.bat" logout
 EXIT /B 0
 
 :create_folder
@@ -50,7 +50,7 @@ REM The folder's name is in the URL. The body describes it as a directory.
 powershell -NoProfile -Command "@{ isDirectory=$true; isRegularFile=$false; isSymbolicLink=$false; isOther=$false; isShared=$false } | ConvertTo-Json -Compress" > "%BODY_FILE%"
 
 echo Creating the folder %FOLDER_NAME%...
-CALL "%~dp0enduser.bat" call POST "files/%FOLDER_NAME%" "application/json" "%BODY_FILE%"
+CALL "%~dp0..\lib\enduser.bat" call POST "files/%FOLDER_NAME%" "application/json" "%BODY_FILE%"
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.

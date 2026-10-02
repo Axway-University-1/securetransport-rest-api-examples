@@ -68,6 +68,8 @@ server](#against-a-real-server).
 | `checks/test_utils_xml.sh` | The XML helper scripts in `python/utils` (configuration compare and conversion). |
 | `checks/test_feature_version_check.sh` | The version check at the start of every `Features/` example: it must run the example on a server at or after the introducing version, skip it on an older one, and stop with an error when the version cannot be read. Also fails if a feature example has no version check. |
 | `checks/test_feature_trigger_route_pull.sh` | The `Features/trigger-route-after-completed-pull` examples: the JSON they send is valid (even with awkward characters in the password), the sites use the right folders and port, the push folder is never the subscription folder, an old server gets nothing sent, and a missing password stops them before any call. |
+| `checks/test_feature_billable_transfers.sh` | The `Features/audit-billable-transfers` examples: each scenario's site, route and subscription bodies (including the Compress/Decompress steps and the two-backslash trigger condition), the archives built and uploaded are real zips, the billable report's per-day date math and query, `00.run_all.sh`'s step ordering and its stop-on-first-failure, and `99.cleanup_DELETE.sh` finding everything by name without touching another account's objects. |
+| `checks/test_feature_bat_twins.py` | A `Features/` `.bat` file drifting out of step with its `.sh` twin: every API field name and every feature's own settings must appear in both, since the `.bat` files cannot be run in this repository to check directly. |
 
 The payload and python checks are the interesting ones. They exercise the real
 scripts without a server, which is how the silent JSON corruption described in

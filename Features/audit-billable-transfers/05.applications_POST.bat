@@ -1,20 +1,20 @@
 @echo off
 REM ==============================================================================
-REM Script Name: 06.routes_POST_template.bat
+REM Script Name: 05.applications_POST.bat
 REM Author: Plamen Milenkov
 REM Created: 2026-10-01
 REM Location: Sofia
 REM ==============================================================================
 REM Description:
-REM Creates the route package template, using the `/routes` endpoint. A composite
-REM route (step 10) is built from a template, so it has to exist first.
+REM Creates the Advanced Routing application every subscription here belongs to,
+REM using the `/applications` endpoint. A subscription has to name an application
+REM that exists.
 REM
 REM Usage:
-REM 06.routes_POST_template.bat
+REM 05.applications_POST.bat
 REM
 REM Notes:
 REM - Uses PowerShell to build the JSON body.
-REM - The id is saved as AR_ID_TEMPLATE for the later steps.
 REM ==============================================================================
 
 REM Ends this script, without changing anything, on a server that is too old
@@ -23,11 +23,11 @@ IF ERRORLEVEL 11 EXIT /B 1
 IF ERRORLEVEL 10 EXIT /B 0
 CALL "%~dp0settings.bat"
 
-SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
-powershell -NoProfile -Command "@{ name=$env:AR_TEMPLATE_ROUTE; description='Package template for ' + $env:AR_TEMPLATE_ROUTE; type='TEMPLATE'; conditionType='MATCH_ALL' } | ConvertTo-Json -Compress" > "%BODY_FILE%"
+SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
+powershell -NoProfile -Command "@{ type='AdvancedRouting'; name=$env:BT_APPLICATION; notes='Application for ' + $env:BT_APPLICATION } | ConvertTo-Json -Compress" > "%BODY_FILE%"
 
-echo Creating the route template %AR_TEMPLATE_ROUTE%...
-CALL "%~dp0..\lib\post_admin.bat" routes "%BODY_FILE%" AR_ID_TEMPLATE
+echo Creating the application %BT_APPLICATION%...
+CALL "%~dp0..\lib\post_admin.bat" applications "%BODY_FILE%"
 SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B %POST_RESULT%

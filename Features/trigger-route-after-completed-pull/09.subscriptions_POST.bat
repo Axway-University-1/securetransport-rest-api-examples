@@ -39,7 +39,7 @@ SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 powershell -NoProfile -Command "@{ type='AdvancedRouting'; application=$env:AR_APPLICATION; account=$env:AR_TEST_ACCOUNT; folder=$env:AR_SUBSCRIPTION_FOLDER; transferConfigurations=@(@{ tag='PARTNER-IN'; outbound=$false; site=$env:AR_PULL_SITE }); createFilesList=@{ createFilesListEnabled=$true; createFilesListFilename=$env:AR_TRIGGER_FILE_NAME }; postTransmissionActions=@{ submitFilterType='TRIGGER_FILE_CONTENT'; triggerFileOption='fail'; triggerOnConditionEnabled=$true; triggerOnConditionExpression=$env:AR_TRIGGER_CONDITION } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the subscription on %AR_SUBSCRIPTION_FOLDER%...
-CALL "%~dp0post_admin.bat" subscriptions "%BODY_FILE%" AR_ID_SUBSCRIPTION
+CALL "%~dp0..\lib\post_admin.bat" subscriptions "%BODY_FILE%" AR_ID_SUBSCRIPTION
 SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B %POST_RESULT%

@@ -83,6 +83,16 @@ SET AR_PULL_FROM_FOLDER=/outbound-drop
 SET AR_SUBSCRIPTION_FOLDER=/subscription
 SET AR_DELIVERED_FOLDER=/delivered
 
+REM This feature's own directory, so the shared lib knows where to keep this
+REM feature's state (state.local.bat), separately from any other feature's.
+SET FEATURE_DIR=%~dp0
+
 IF EXIST "%~dp0settings.local.bat" CALL "%~dp0settings.local.bat"
 REM Ids saved by earlier examples
 IF EXIST "%~dp0state.local.bat" CALL "%~dp0state.local.bat"
+
+REM enduser.bat is shared across Features/ and reads neutral names, not this
+REM feature's own AR_ prefix
+SET EU_ACCOUNT=%AR_TEST_ACCOUNT%
+SET EU_ACCOUNT_PASSWORD=%AR_ACCOUNT_PASSWORD%
+SET EU_ENDUSER_PORT=%AR_ENDUSER_PORT%

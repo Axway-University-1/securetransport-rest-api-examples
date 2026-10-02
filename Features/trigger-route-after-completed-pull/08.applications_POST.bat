@@ -29,7 +29,7 @@ SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 powershell -NoProfile -Command "@{ type='AdvancedRouting'; name=$env:AR_APPLICATION; notes='Application for ' + $env:AR_APPLICATION } | ConvertTo-Json -Compress" > "%BODY_FILE%"
 
 echo Creating the application %AR_APPLICATION%...
-CALL "%~dp0post_admin.bat" applications "%BODY_FILE%" AR_ID_APPLICATION
+CALL "%~dp0..\lib\post_admin.bat" applications "%BODY_FILE%" AR_ID_APPLICATION
 SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B %POST_RESULT%

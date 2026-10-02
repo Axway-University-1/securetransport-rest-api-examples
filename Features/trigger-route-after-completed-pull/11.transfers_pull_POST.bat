@@ -32,7 +32,7 @@ SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 powershell -NoProfile -Command "@{ accountName=$env:AR_TEST_ACCOUNT; site=$env:AR_PULL_SITE; destinationDirectory=$env:AR_SUBSCRIPTION_FOLDER; awaitResult=$false } | ConvertTo-Json -Compress" > "%BODY_FILE%"
 
 echo Pulling from %AR_PULL_SITE% into %AR_SUBSCRIPTION_FOLDER%...
-CALL "%~dp0post_admin.bat" "transfers/operations?operation=pull" "%BODY_FILE%" 
+CALL "%~dp0..\lib\post_admin.bat" "transfers/operations?operation=pull" "%BODY_FILE%" 
 SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B %POST_RESULT%

@@ -327,6 +327,7 @@ skips itself on a release that is too old.
 | Release | Feature |
 | ------- | ------- |
 | 5.5-20260924 | [Trigger route execution after a completed pull operation](Features/trigger-route-after-completed-pull/) |
+| 5.5-20260924 | [Audit and report on billable transfers](Features/audit-billable-transfers/) |
 
 ## License and Support
 

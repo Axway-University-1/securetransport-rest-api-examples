@@ -44,7 +44,7 @@ SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 powershell -NoProfile -Command "@{ type='COMPOSITE'; account=$env:AR_TEST_ACCOUNT; name=$env:AR_COMPOSITE_ROUTE; conditionType='MATCH_ALL'; routeTemplate=$env:AR_ID_TEMPLATE; subscriptions=@($env:AR_ID_SUBSCRIPTION); steps=@(@{ type='ExecuteRoute'; status='ENABLED'; autostart=$false; executeRoute=$env:AR_ID_SIMPLE }) } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the composite route %AR_COMPOSITE_ROUTE%...
-CALL "%~dp0post_admin.bat" routes "%BODY_FILE%" AR_ID_COMPOSITE
+CALL "%~dp0..\lib\post_admin.bat" routes "%BODY_FILE%" AR_ID_COMPOSITE
 SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B %POST_RESULT%

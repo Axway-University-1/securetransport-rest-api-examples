@@ -98,6 +98,14 @@ echo
 echo "=== 04.files_POST_folders.sh ==="
 run 04.files_POST_folders.sh "${SERVER_NEW}"
 [ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
+# The End User login must actually carry the real account name and password -
+# not rely on a shared-lib variable that was never set for this feature's own
+# prefix, which would silently log in as ":" and fail every call after it.
+# grep -F, not the first BASIC_AUTH line: the version check's own admin-
+# authenticated GET /version always comes first and is a different login.
+echo "${OUT}" | grep -qF "BASIC_AUTH: arTestAccount:${TRICKY}" \
+    && pass "logs in to the End User API with the real account name and password" \
+    || fail "End User login credentials: $(echo "${OUT}" | grep '^BASIC_AUTH:' | sed -n 2p)"
 EU=$(calls | grep -v 'version')
 echo "${EU}" | head -n 1 | grep -q '^POST .*:8443/api/v2.0/myself$' && pass "logs in first, on the End User port" || fail "first call: $(echo "${EU}" | head -n 1)"
 [ "$(echo "${EU}" | grep -c '^POST .*:8443/api/v2.0/files/\(outbound-drop\|delivered\)$')" -eq 2 ] && pass "one POST to /files/<name> per folder, on the End User port" || fail "calls: ${EU}"

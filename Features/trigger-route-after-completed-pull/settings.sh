@@ -80,11 +80,21 @@ export AR_PULL_FROM_FOLDER="/outbound-drop"
 export AR_SUBSCRIPTION_FOLDER="/subscription"
 export AR_DELIVERED_FOLDER="/delivered"
 
-LOCAL_SETTINGS="$(dirname "${BASH_SOURCE[0]}")/settings.local.sh"
+# This feature's own directory, so the shared lib knows where to keep this
+# feature's state (state.local.sh), separately from any other feature's.
+export FEATURE_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
+LOCAL_SETTINGS="${FEATURE_DIR}/settings.local.sh"
 if [ -f "${LOCAL_SETTINGS}" ]; then
     # shellcheck source=/dev/null
     source "${LOCAL_SETTINGS}"
 fi
 
-source "$(dirname "${BASH_SOURCE[0]}")/post_admin.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/enduser.sh"
+source "${FEATURE_DIR}/../lib/post_admin.sh"
+
+# enduser.sh is shared across Features/ and reads neutral names, not this
+# feature's own AR_ prefix
+export EU_ACCOUNT="${AR_TEST_ACCOUNT}"
+export EU_ACCOUNT_PASSWORD="${AR_ACCOUNT_PASSWORD}"
+export EU_ENDUSER_PORT="${AR_ENDUSER_PORT}"
+source "${FEATURE_DIR}/../lib/enduser.sh"

@@ -55,14 +55,14 @@ SET CONTENT_FILE=%TEMP%\ar_content_%RANDOM%.txt
 TYPE NUL > "%CONTENT_FILE%"
 FOR /L %%I IN (1,1,%AR_SAMPLE_FILES%) DO >> "%CONTENT_FILE%" echo %AR_SAMPLE_PREFIX%%%I.txt%AR_PULLED_SUFFIX%
 
-CALL "%~dp0enduser.bat" login
+CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 
 REM The newest trigger file in the subscription folder. The pull is asynchronous, so
 REM give the trigger file time to appear.
 SET WAITED=0
 :find_trigger
-CALL "%~dp0enduser.bat" call GET "files%AR_SUBSCRIPTION_FOLDER%" ""
+CALL "%~dp0..\lib\enduser.bat" call GET "files%AR_SUBSCRIPTION_FOLDER%" ""
 SET TRIGGER=
 FOR /F "delims=" %%T IN ('powershell -NoProfile -Command "try { $f = (Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile -and $_.fileName -like '*.trigger' } | Sort-Object lastModifiedTime | Select-Object -Last 1; if ($f) { $f.fileName } } catch { }"') DO SET TRIGGER=%%T
 IF DEFINED TRIGGER GOTO :found_trigger
@@ -75,7 +75,7 @@ GOTO :find_trigger
 
 IF NOT DEFINED TRIGGER (
     echo No trigger file in %AR_SUBSCRIPTION_FOLDER%. Has the pull in step 11 finished?
-    CALL "%~dp0enduser.bat" logout
+    CALL "%~dp0..\lib\enduser.bat" logout
     IF EXIST "%CONTENT_FILE%" DEL "%CONTENT_FILE%"
     EXIT /B 1
 )
@@ -83,7 +83,7 @@ IF NOT DEFINED TRIGGER (
 REM The system owns the trigger file, so it cannot be written over. Delete it first.
 echo Deleting the old trigger file %AR_SUBSCRIPTION_FOLDER%/%TRIGGER%...
 SET TARGET=%TRIGGER%
-CALL "%~dp0enduser.bat" call DELETE "files%AR_SUBSCRIPTION_FOLDER%/%TRIGGER%" ""
+CALL "%~dp0..\lib\enduser.bat" call DELETE "files%AR_SUBSCRIPTION_FOLDER%/%TRIGGER%" ""
 IF ERRORLEVEL 1 (
     SET TARGET=%TRIGGER:.trigger=_fixed.trigger%
     echo It could not be deleted ^(HTTP %EU_CODE%^), so the new one is uploaded as %TRIGGER:.trigger=_fixed.trigger% instead.
@@ -98,26 +98,26 @@ REM 1. Declare the upload, and read the operation id from the response
 SET FILE_PATH=%AR_SUBSCRIPTION_FOLDER%/%TARGET%
 SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 powershell -NoProfile -Command "@{ operation='Upload'; filePath=$env:FILE_PATH; customAttributes=@{ transferMode='ASCII' } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
-CALL "%~dp0enduser.bat" call POST fileOperations "application/json" "%BODY_FILE%"
+CALL "%~dp0..\lib\enduser.bat" call POST fileOperations "application/json" "%BODY_FILE%"
 SET OPERATION_ID=
 FOR /F "delims=" %%O IN ('powershell -NoProfile -Command "try { (Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).id } catch { }"') DO SET OPERATION_ID=%%O
 
 IF NOT DEFINED OPERATION_ID (
     echo No operation id came back ^(HTTP %EU_CODE%^), so nothing was changed. The response was:
     TYPE "%EU_BODY_FILE%"
-    CALL "%~dp0enduser.bat" logout
+    CALL "%~dp0..\lib\enduser.bat" logout
     IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
     IF EXIST "%CONTENT_FILE%" DEL "%CONTENT_FILE%"
     EXIT /B 1
 )
 
 REM 2. Send the new content to that operation
-CALL "%~dp0enduser.bat" call PUT "fileOperations/%OPERATION_ID%" "application/octet-stream" "%CONTENT_FILE%"
+CALL "%~dp0..\lib\enduser.bat" call PUT "fileOperations/%OPERATION_ID%" "application/octet-stream" "%CONTENT_FILE%"
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.
 
-CALL "%~dp0enduser.bat" logout
+CALL "%~dp0..\lib\enduser.bat" logout
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 IF EXIST "%CONTENT_FILE%" DEL "%CONTENT_FILE%"
 EXIT /B 0
