@@ -22,7 +22,7 @@ REM - Run 01.accounts_POST.bat first.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body.
 REM - The SSH port is BT_SSH_PORT, 8022 by default. It is not the REST API port.
-REM - Site N is named btPullSite<N> and its pattern matches the file(s) for
+REM - Site N is named <account>PullSite<N> and its pattern matches the file(s) for
 REM   scenario <N> only: see settings.bat for the mapping from scenario to file.
 REM ==============================================================================
 
@@ -37,8 +37,10 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-CALL :create_pull_site 1 "%BT_FILE_ONLY_INBOUND%"
-CALL :create_pull_site 2 "%BT_FILE_ONE_OUTBOUND%"
+REM Scenarios 2.1 and 2.2 can run several files (BT_INBOUND_ONLY_COUNT,
+REM BT_IN_AND_OUT_COUNT): the pattern matches the plain name and the numbered ones
+CALL :create_pull_site 1 "%BT_FILE_ONLY_INBOUND:.txt=%*.txt"
+CALL :create_pull_site 2 "%BT_FILE_ONE_OUTBOUND:.txt=%*.txt"
 CALL :create_pull_site 3 "%BT_FILE_TWO_OUTBOUNDS%"
 CALL :create_pull_site 4 "file_*_for_compress.txt"
 CALL :create_pull_site 5 "%BT_FILE_ARCHIVE_NAME%"

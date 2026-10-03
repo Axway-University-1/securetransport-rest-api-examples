@@ -15,10 +15,11 @@ REM before anything else and once at the end, to show the before/after change fo
 REM today.
 REM
 REM Usage:
-REM billable_GET_report.bat [LABEL]
+REM billable_GET_report.bat [LABEL [ACCOUNT]]
 REM
 REM LABEL is printed in the heading (for example "before" or "after"); it does not
-REM change what is measured.
+REM change what is measured. ACCOUNT reports on another test account than the
+REM default (the same name given to 00.run_all.bat).
 REM
 REM Notes:
 REM - Scoped to accountName=BT_TEST_ACCOUNT, so an existing account with the same
@@ -37,10 +38,19 @@ REM   day's count at 1 - confirmed directly, a real bug caught by comparing
 REM   against File Tracking's own count for the same account and day.
 REM ==============================================================================
 
+SETLOCAL
+
 REM Ends this script, without changing anything, on a server that is too old
 CALL "%~dp0..\lib\st_feature_check.bat" 5.5-20260924
 IF ERRORLEVEL 11 EXIT /B 1
 IF ERRORLEVEL 10 EXIT /B 0
+IF NOT "%~2"=="" (
+    ECHO %~2| FINDSTR /R /X "[A-Za-z0-9._-]*" >NUL || (
+        echo ACCOUNT may use only letters, digits, '.', '_' and '-': %~2
+        EXIT /B 2
+    )
+    SET BT_RUN_ACCOUNT=%~2
+)
 CALL "%~dp0settings.bat"
 
 SET REPORT_LABEL=%~1

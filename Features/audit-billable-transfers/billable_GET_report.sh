@@ -15,10 +15,11 @@
 # today.
 #
 # Usage:
-# ./billable_GET_report.sh [LABEL]
+# ./billable_GET_report.sh [LABEL [ACCOUNT]]
 #
 # LABEL is printed in the heading (for example "before" or "after"); it does not
-# change what is measured.
+# change what is measured. ACCOUNT reports on another test account than the
+# default (the same name given to 00.run_all.sh).
 #
 # Notes:
 # - Scoped to accountName=BT_TEST_ACCOUNT, so an existing account with the same
@@ -45,6 +46,11 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # Ends this script, without changing anything, on a server that is too old
 source "${SCRIPT_DIR}/../lib/st_feature_check.sh" "5.5-20260924"
+if [ -n "$2" ]; then
+    [[ "$2" =~ ^[A-Za-z0-9._-]+$ ]] \
+        || { printf "ACCOUNT may use only letters, digits, '.', '_' and '-': %s\n" "$2"; exit 2; }
+    export BT_RUN_ACCOUNT="$2"
+fi
 source "${SCRIPT_DIR}/settings.sh"
 
 LABEL="${1:-report}"

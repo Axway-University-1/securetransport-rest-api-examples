@@ -16,6 +16,8 @@
 #
 # Notes:
 # - Run 01.accounts_POST.sh and 04.files_POST_folders.sh first.
+# - Scenarios 2.1 and 2.2 upload BT_INBOUND_ONLY_COUNT and BT_IN_AND_OUT_COUNT
+#   files, numbered when there is more than one. See settings.sh.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, `zip`, which builds the archives, and `mktemp`.
 # - The content call uses PUT, not POST: POST is refused with a 415 (confirmed
@@ -67,10 +69,24 @@ upload_text_file() {
     upload_bytes "${BT_DROP_FOLDER}/${name}" "${local_file}"
 }
 
+# upload_scenario_files NAME COUNT TEXT
+#   One file under NAME when COUNT is 1, otherwise COUNT numbered copies:
+#   only_inbound.txt, or only_inbound_1.txt to only_inbound_<COUNT>.txt
+upload_scenario_files() {
+    local name="$1" count="$2" text="$3" i
+    if [ "${count}" -eq 1 ]; then
+        upload_text_file "${name}" "${text}"
+        return
+    fi
+    for i in $(seq 1 "${count}"); do
+        upload_text_file "${name%.txt}_${i}.txt" "${text} File ${i} of ${count}."
+    done
+}
+
 ar_enduser_login || exit 1
 
-upload_text_file "${BT_FILE_ONLY_INBOUND}" "Scenario 2.1: only inbound, no outbound at all."
-upload_text_file "${BT_FILE_ONE_OUTBOUND}" "Scenario 2.2: inbound, then pushed out once."
+upload_scenario_files "${BT_FILE_ONLY_INBOUND}" "${BT_INBOUND_ONLY_COUNT}" "Scenario 2.1: only inbound, no outbound at all."
+upload_scenario_files "${BT_FILE_ONE_OUTBOUND}" "${BT_IN_AND_OUT_COUNT}" "Scenario 2.2: inbound, then pushed out once."
 upload_text_file "${BT_FILE_TWO_OUTBOUNDS}" "Scenario 2.3: inbound, then pushed out twice."
 upload_text_file "${BT_FILE_COMPRESS_1}" "Scenario 2.4, file 1 of 2, to be compressed together."
 upload_text_file "${BT_FILE_COMPRESS_2}" "Scenario 2.4, file 2 of 2, to be compressed together."

@@ -16,6 +16,8 @@ REM 10.files_upload_POST.bat
 REM
 REM Notes:
 REM - Run 01.accounts_POST.bat and 04.files_POST_folders.bat first.
+REM - Scenarios 2.1 and 2.2 upload BT_INBOUND_ONLY_COUNT and BT_IN_AND_OUT_COUNT
+REM   files, numbered when there is more than one. See settings.bat.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the archives and the JSON bodies.
 REM - The content call uses PUT, not POST: POST is refused with a 415 (confirmed
@@ -42,8 +44,8 @@ IF ERRORLEVEL 1 (
     EXIT /B 1
 )
 
-CALL :upload_text_file "%BT_FILE_ONLY_INBOUND%" "Scenario 2.1: only inbound, no outbound at all."
-CALL :upload_text_file "%BT_FILE_ONE_OUTBOUND%" "Scenario 2.2: inbound, then pushed out once."
+CALL :upload_scenario_files "%BT_FILE_ONLY_INBOUND%" %BT_INBOUND_ONLY_COUNT% "Scenario 2.1: only inbound, no outbound at all."
+CALL :upload_scenario_files "%BT_FILE_ONE_OUTBOUND%" %BT_IN_AND_OUT_COUNT% "Scenario 2.2: inbound, then pushed out once."
 CALL :upload_text_file "%BT_FILE_TWO_OUTBOUNDS%" "Scenario 2.3: inbound, then pushed out twice."
 CALL :upload_text_file "%BT_FILE_COMPRESS_1%" "Scenario 2.4, file 1 of 2, to be compressed together."
 CALL :upload_text_file "%BT_FILE_COMPRESS_2%" "Scenario 2.4, file 2 of 2, to be compressed together."
@@ -53,6 +55,20 @@ CALL :build_archive "%BT_FILE_ARCHIVE2P_NAME%" "%BT_FILE_DECOMPRESS2P_1%" "Scena
 
 CALL "%~dp0..\lib\enduser.bat" logout
 RMDIR /S /Q "%WORK%"
+EXIT /B 0
+
+REM upload_scenario_files NAME COUNT TEXT
+REM   One file under NAME when COUNT is 1, otherwise COUNT numbered copies:
+REM   only_inbound.txt, or only_inbound_1.txt to only_inbound_<COUNT>.txt
+:upload_scenario_files
+SET USF_NAME=%~1
+SET USF_COUNT=%~2
+SET USF_TEXT=%~3
+IF "%USF_COUNT%"=="1" (
+    CALL :upload_text_file "%USF_NAME%" "%USF_TEXT%"
+    EXIT /B 0
+)
+FOR /L %%I IN (1,1,%USF_COUNT%) DO CALL :upload_text_file "%USF_NAME:.txt=%_%%I.txt" "%USF_TEXT% File %%I of %USF_COUNT%."
 EXIT /B 0
 
 :upload_text_file

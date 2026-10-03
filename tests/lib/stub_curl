@@ -34,6 +34,7 @@ url=""
 payload=""
 method="GET"
 header_file=""
+output_file=""
 write_out=""
 use_g=0
 query_params=()
@@ -48,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     -u|--user)                          echo "BASIC_AUTH: $2" >&2; shift 2 ;;
     -w|--write-out)                     write_out="$2"; shift 2 ;;
     -D|--dump-header)                   header_file="$2"; shift 2 ;;
+    -o|--output)                        output_file="$2"; shift 2 ;;
     --head|-I)                          method="HEAD"; shift ;;
     https://*|http://*)                 url="$1"; shift ;;
     *)                                  shift ;;
@@ -64,13 +66,14 @@ fi
 
 # An example that wants the response headers (-D file) gets a status line and,
 # when STUB_CURL_LOCATION_ID is set, a Location header ending in that id.
-# STUB_CURL_STATUS overrides the status, 201 by default, and STUB_CURL_STATUS_DELETE
-# does so for DELETE only. STUB_CURL_CSRF adds a
+# STUB_CURL_STATUS overrides the status, 201 by default; STUB_CURL_STATUS_DELETE
+# and STUB_CURL_STATUS_GET do so for DELETE or GET only. STUB_CURL_CSRF adds a
 # csrfToken header, as a login does. Every -H header is echoed as HEADER: ...
 if [[ -n "${header_file}" ]]; then
     {
         status="${STUB_CURL_STATUS:-201}"
         [[ "${method}" == "DELETE" && -n "${STUB_CURL_STATUS_DELETE}" ]] && status="${STUB_CURL_STATUS_DELETE}"
+        [[ "${method}" == "GET" && -n "${STUB_CURL_STATUS_GET}" ]] && status="${STUB_CURL_STATUS_GET}"
         printf 'HTTP/1.1 %s Stub\r\n' "${status}"
         [[ -n "${STUB_CURL_LOCATION_ID}" ]] && printf 'Location: %s/%s\r\n' "${url%%\?*}" "${STUB_CURL_LOCATION_ID}"
         [[ -n "${STUB_CURL_CSRF}" ]] && printf 'csrfToken: %s\r\n' "${STUB_CURL_CSRF}"
@@ -85,6 +88,7 @@ elif [[ -n "${STUB_CURL_PRINT_CODE}" && "${write_out}" == *http_code* ]]; then
     # Opt in: act on any -w format, as curl does after the response, so a script that
     # prints "HTTP <code>" shows the status STUB_CURL_STATUS gives (201 by default)
     code="${STUB_CURL_STATUS:-201}"
+    [[ "${method}" == "GET" && -n "${STUB_CURL_STATUS_GET}" ]] && code="${STUB_CURL_STATUS_GET}"
     printf '%b' "${write_out//%\{http_code\}/${code}}"
 fi
 
@@ -105,13 +109,17 @@ if [[ -n "${payload}" ]]; then
     echo "PAYLOAD_B64: $(printf '%s' "${payload}" | base64 | tr -d '\n')" >&2
 fi
 
-# Serve a canned body, so a GET, edit, PUT or POST example can run end to end
+# Serve a canned body, so a GET, edit, PUT or POST example can run end to end.
+# Like real curl, -o sends it to that file instead of standard output.
+serve() {
+    if [[ -n "${output_file}" ]]; then cat "$1" > "${output_file}"; else cat "$1"; fi
+}
 if [[ "${method}" == "GET" && -n "${STUB_CURL_GET_BODY}" && -f "${STUB_CURL_GET_BODY}" ]]; then
-    cat "${STUB_CURL_GET_BODY}"
+    serve "${STUB_CURL_GET_BODY}"
 fi
 
 if [[ "${method}" == "POST" && -n "${STUB_CURL_POST_BODY}" && -f "${STUB_CURL_POST_BODY}" ]]; then
-    cat "${STUB_CURL_POST_BODY}"
+    serve "${STUB_CURL_POST_BODY}"
 fi
 
 exit 0

@@ -113,7 +113,8 @@ Unlike that feature, files here are **not** renamed on receive or send: the
 whole point is recognising transfers by their exact file name in File Tracking,
 so the names given above are exactly what reaches the server.
 
-One test account (`btTestAccount`) owns everything:
+One test account (`btTestAccount` unless you name another, see
+[Running the examples](#running-the-examples)) owns everything:
 
 ```
 /home/btTestAccount/
@@ -131,6 +132,12 @@ the file(s) for its own scenario (for example, site 4's pattern is
 copies a file rather than moving it, so one site's pull does not take a file
 another site also needs.
 
+Every other object is named after the account: `<account>PullSite1` to `6`,
+`<account>PushSitePartner1` and `2`, `<account>Application`,
+`<account>PackageTemplate`, `<account>SimpleRoute2` to `6` and
+`<account>CompositeRoute2` to `6`. So two runs under different account names
+never collide on the server, and cleaning up one never touches the other.
+
 ## Running the examples
 
 ```
@@ -140,13 +147,56 @@ $EDITOR settings.local.sh                             # set BT_ACCOUNT_PASSWORD
 ./00.run_all.sh                                       # or --cleanup to remove it all after
 ```
 
-On Windows: `00.run_all.bat`. See
+`00.run_all.sh` takes three optional arguments, in this order:
+
+```
+./00.run_all.sh [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
+
+./00.run_all.sh test_account            a test account named test_account
+./00.run_all.sh test_account 6 12       and scenario 2.1 with 6 files (inbound
+                                        only), scenario 2.2 with 12 (in and out)
+./00.run_all.sh test_account 6 12 --cleanup
+```
+
+- `ACCOUNT` is the test account to create and use, `btTestAccount` by default.
+- `INBOUND_ONLY` and `IN_AND_OUT` are how many files scenarios 2.1 and 2.2 run,
+  1 each by default. With 1 the files keep their plain names
+  (`only_inbound.txt`); with more they are numbered (`only_inbound_1.txt` to
+  `only_inbound_6.txt`). The other four scenarios always run as described above.
+- To clean up or report on a named account by hand, give it the same name:
+  `./99.cleanup_DELETE.sh test_account`, `./billable_GET_report.sh after test_account`.
+
+On Windows: `00.run_all.bat`, with the same arguments. See
 [Configuration](../../README.md#configuration) first if you have not set up the
 Admin connection settings yet.
 
 To run the setup by hand instead, the scripts are numbered 01 to 12 in the
 order to run them, plus `billable_GET_report` (used before and after, not
 part of that numbering) and `99.cleanup_DELETE`.
+
+### Repeated client downloads
+
+`files_GET_download.sh` (and `.bat`) is a separate experiment, not part of
+`00.run_all.sh`. It downloads one file from the test account's home folder,
+as a client would, as many times as you ask, in one End User API session. Each
+download is a transfer of its own, so it shows how quickly repeated downloads
+add up in the usage reporting.
+
+```
+./files_GET_download.sh FILE [COUNT [ACCOUNT]]
+
+./billable_GET_report.sh before
+./files_GET_download.sh outbound-drop/only_inbound.txt 50
+./billable_GET_report.sh after
+```
+
+- `FILE` is relative to the account's home folder, for example
+  `outbound-drop/only_inbound.txt` after a run of `00.run_all.sh`.
+- `COUNT` is how many times to download it, 1 by default.
+- `ACCOUNT` is the account to log in as, `btTestAccount` by default. Its
+  password is `BT_ACCOUNT_PASSWORD`, the same one `00.run_all.sh` creates every
+  account with. For an account named on the command line, pass the same name
+  to the report too: `./billable_GET_report.sh after test_account`.
 
 ## Status
 

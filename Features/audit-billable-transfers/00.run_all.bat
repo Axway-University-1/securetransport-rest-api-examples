@@ -20,8 +20,20 @@ REM      transfers this run actually added - and restates the rule. It does not
 REM      print a fixed per-scenario table: see the Notes below for why.
 REM
 REM Usage:
-REM 00.run_all.bat              steps 1 to 4, leaves everything in place
-REM 00.run_all.bat --cleanup    the same, then removes everything (99)
+REM 00.run_all.bat [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
+REM
+REM   ACCOUNT        the test account to create and use (default btTestAccount).
+REM                  Every other object name is derived from it.
+REM   INBOUND_ONLY   how many files scenario 2.1 (inbound only) runs (default 1)
+REM   IN_AND_OUT     how many files scenario 2.2 (inbound, then one outbound)
+REM                  runs (default 1)
+REM   --cleanup      after step 4, remove everything again (99)
+REM
+REM For example:
+REM 00.run_all.bat                          defaults, leaves everything in place
+REM 00.run_all.bat test_account             a test account named test_account
+REM 00.run_all.bat test_account 6 12        and 6 inbound only, 12 in and out
+REM 00.run_all.bat test_account 6 12 --cleanup
 REM
 REM Notes:
 REM - It stops at the first setup step that fails: a non-zero exit, or a line
@@ -40,18 +52,38 @@ REM   result in File Tracking, grouped by Transfer name, rather than trusting a
 REM   static prediction.
 REM ==============================================================================
 
+REM Everything this sets, including the arguments below, ends with this script,
+REM so a later run in the same console starts from the defaults again
+SETLOCAL
+
 REM Ends this script, without changing anything, on a server that is too old
 CALL "%~dp0..\lib\st_feature_check.bat" 5.5-20260924
 IF ERRORLEVEL 11 EXIT /B 1
 IF ERRORLEVEL 10 EXIT /B 0
-CALL "%~dp0settings.bat"
 
 SET CLEANUP=0
-IF "%~1"=="--cleanup" SET CLEANUP=1
-IF NOT "%~1"=="" IF NOT "%~1"=="--cleanup" (
-    echo Usage: 00.run_all.bat [--cleanup]
+SET BT_RUN_ACCOUNT=
+SET BT_RUN_INBOUND_ONLY=
+SET BT_RUN_IN_AND_OUT=
+SET ARG_N=0
+SET ARG_ERROR=
+:parse_args
+IF "%~1"=="" GOTO :args_done
+CALL :take_arg "%~1"
+REM SHIFT /1 leaves %0 alone, so %~dp0 still points at this script's folder
+SHIFT /1
+GOTO :parse_args
+:args_done
+IF DEFINED ARG_ERROR (
+    echo Usage: 00.run_all.bat [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
     EXIT /B 2
 )
+
+REM Loaded after the arguments, so settings.bat applies them, and every step this
+REM runs inherits them
+CALL "%~dp0settings.bat"
+
+echo Account %BT_TEST_ACCOUNT%: scenario 2.1 with %BT_INBOUND_ONLY_COUNT% file^(s^), scenario 2.2 with %BT_IN_AND_OUT_COUNT% file^(s^).
 
 IF "%BT_ACCOUNT_PASSWORD%"=="" (
     echo BT_ACCOUNT_PASSWORD is not set. Copy settings.local.example.bat to settings.local.bat and choose one.
@@ -111,7 +143,7 @@ IF "%CLEANUP%"=="1" (
     CALL "%~dp099.cleanup_DELETE.bat"
 ) ELSE (
     echo.
-    echo Run 99.cleanup_DELETE.bat to remove everything this created.
+    echo Run 99.cleanup_DELETE.bat %BT_TEST_ACCOUNT% to remove everything this created.
 )
 EXIT /B 0
 
@@ -161,4 +193,41 @@ EXIT /B 0
 echo Today's billable count for %BT_TEST_ACCOUNT%: %BEFORE_TODAY% before this run, %AFTER_TODAY% after.
 SET /A DELTA=%AFTER_TODAY%-%BEFORE_TODAY%
 echo This run added %DELTA% billable transfer^(s^) today.
+EXIT /B 0
+
+REM take_arg VALUE: one command line argument, either --cleanup or the next of
+REM ACCOUNT, INBOUND_ONLY and IN_AND_OUT, in that order
+:take_arg
+IF "%~1"=="--cleanup" (
+    SET CLEANUP=1
+    EXIT /B 0
+)
+SET ARG_VALUE=%~1
+IF "%ARG_VALUE:~0,1%"=="-" (
+    SET ARG_ERROR=1
+    EXIT /B 0
+)
+SET /A ARG_N=%ARG_N%+1
+IF %ARG_N%==1 CALL :check_account "%ARG_VALUE%"
+IF %ARG_N%==2 CALL :check_count "%ARG_VALUE%" BT_RUN_INBOUND_ONLY
+IF %ARG_N%==3 CALL :check_count "%ARG_VALUE%" BT_RUN_IN_AND_OUT
+IF %ARG_N% GTR 3 SET ARG_ERROR=1
+EXIT /B 0
+
+:check_account
+ECHO %~1| FINDSTR /R /X "[A-Za-z0-9._-]*" >NUL || (
+    echo ACCOUNT may use only letters, digits, '.', '_' and '-': %~1
+    SET ARG_ERROR=1
+    EXIT /B 0
+)
+SET BT_RUN_ACCOUNT=%~1
+EXIT /B 0
+
+:check_count
+ECHO %~1| FINDSTR /R /X "[1-9][0-9]*" >NUL || (
+    echo INBOUND_ONLY and IN_AND_OUT must be whole numbers, 1 or more: %~1
+    SET ARG_ERROR=1
+    EXIT /B 0
+)
+SET %~2=%~1
 EXIT /B 0

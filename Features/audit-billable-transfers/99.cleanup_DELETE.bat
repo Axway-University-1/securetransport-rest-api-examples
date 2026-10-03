@@ -11,7 +11,10 @@ REM simple routes, the template, the subscriptions, the application, the eight
 REM sites, the folders in the account's home, then the test account itself.
 REM
 REM Usage:
-REM 99.cleanup_DELETE.bat
+REM 99.cleanup_DELETE.bat [ACCOUNT]
+REM
+REM   ACCOUNT  the test account to remove, with everything derived from its name
+REM            (default btTestAccount). Use the same name given to 00.run_all.bat.
 REM
 REM Notes:
 REM - Deletes the objects named in settings.bat, on the account named there. Check
@@ -25,10 +28,19 @@ REM   in place and only the account is deleted.
 REM - Uses PowerShell to read the JSON.
 REM ==============================================================================
 
+SETLOCAL
+
 REM Ends this script, without changing anything, on a server that is too old
 CALL "%~dp0..\lib\st_feature_check.bat" 5.5-20260924
 IF ERRORLEVEL 11 EXIT /B 1
 IF ERRORLEVEL 10 EXIT /B 0
+IF NOT "%~1"=="" (
+    ECHO %~1| FINDSTR /R /X "[A-Za-z0-9._-]*" >NUL || (
+        echo ACCOUNT may use only letters, digits, '.', '_' and '-': %~1
+        EXIT /B 2
+    )
+    SET BT_RUN_ACCOUNT=%~1
+)
 CALL "%~dp0settings.bat"
 
 SET REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT

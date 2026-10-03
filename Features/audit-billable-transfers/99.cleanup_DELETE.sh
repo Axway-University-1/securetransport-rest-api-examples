@@ -11,7 +11,10 @@
 # sites, the folders in the account's home, then the test account itself.
 #
 # Usage:
-# ./99.cleanup_DELETE.sh
+# ./99.cleanup_DELETE.sh [ACCOUNT]
+#
+#   ACCOUNT  the test account to remove, with everything derived from its name
+#            (default btTestAccount). Use the same name given to 00.run_all.sh.
 #
 # Notes:
 # - Deletes the objects named in settings.sh, on the account named there. Check
@@ -32,6 +35,11 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # Ends this script, without changing anything, on a server that is too old
 source "${SCRIPT_DIR}/../lib/st_feature_check.sh" "5.5-20260924"
+if [ -n "$1" ]; then
+    [[ "$1" =~ ^[A-Za-z0-9._-]+$ ]] \
+        || { printf "ACCOUNT may use only letters, digits, '.', '_' and '-': %s\n" "$1"; exit 2; }
+    export BT_RUN_ACCOUNT="$1"
+fi
 source "${SCRIPT_DIR}/settings.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"

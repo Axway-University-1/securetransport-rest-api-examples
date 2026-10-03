@@ -21,11 +21,22 @@
 #   the names stay exactly as given.
 # ==============================================================================
 
+# The test account. 00.run_all.sh and 99.cleanup_DELETE.sh take another name on
+# the command line (BT_RUN_ACCOUNT, applied below, after settings.local.sh).
 export BT_TEST_ACCOUNT="btTestAccount"
 export BT_ACCOUNT_PASSWORD=""
 
-# Must be a home folder your server accepts. /home/<name> is the usual one.
-export BT_HOME_FOLDER="/home/${BT_TEST_ACCOUNT}"
+# The account's home folder is <BT_HOME_ROOT>/<account>. It must be a folder your
+# server accepts; /home is the usual one.
+export BT_HOME_ROOT="/home"
+
+# How many files scenario 2.1 (inbound only) and scenario 2.2 (inbound, then one
+# outbound) each run. 1 keeps the plain names only_inbound.txt and
+# inbound_and_one_outbound.txt; more numbers them, only_inbound_1.txt and so on.
+# 00.run_all.sh takes both on the command line (BT_RUN_INBOUND_ONLY and
+# BT_RUN_IN_AND_OUT, applied below).
+export BT_INBOUND_ONLY_COUNT="1"
+export BT_IN_AND_OUT_COUNT="1"
 
 # The folders below are relative to the account's home: a login to this server,
 # whether by a site, a subscription or the End User API, starts in the home
@@ -43,15 +54,6 @@ export BT_SSH_PORT="8022"
 # The End User API, used to put the sample files and archives in place. It has
 # its own port, and the account logs in as itself.
 export BT_ENDUSER_PORT="8443"
-
-# The names of the objects the examples create
-export BT_PULL_SITE_PREFIX="btPullSite"      # btPullSite1 .. btPullSite6
-export BT_PUSH_SITE_1="btPushSitePartner1"
-export BT_PUSH_SITE_2="btPushSitePartner2"
-export BT_APPLICATION="btTransferApplication"
-export BT_TEMPLATE_ROUTE="btPackageTemplate"
-export BT_SIMPLE_ROUTE_PREFIX="btSimpleRoute"      # btSimpleRoute2 .. btSimpleRoute6
-export BT_COMPOSITE_ROUTE_PREFIX="btCompositeRoute" # btCompositeRoute2 .. btCompositeRoute6
 
 # The file names the scenarios use, exactly as given, so they are easy to
 # recognise in File Tracking by name alone
@@ -87,6 +89,24 @@ if [ -f "${LOCAL_SETTINGS}" ]; then
     # shellcheck source=/dev/null
     source "${LOCAL_SETTINGS}"
 fi
+
+# Values given on the command line of 00.run_all.sh (or 99.cleanup_DELETE.sh)
+# win over both the defaults above and settings.local.sh
+[ -n "${BT_RUN_ACCOUNT}" ] && export BT_TEST_ACCOUNT="${BT_RUN_ACCOUNT}"
+[ -n "${BT_RUN_INBOUND_ONLY}" ] && export BT_INBOUND_ONLY_COUNT="${BT_RUN_INBOUND_ONLY}"
+[ -n "${BT_RUN_IN_AND_OUT}" ] && export BT_IN_AND_OUT_COUNT="${BT_RUN_IN_AND_OUT}"
+
+# Everything below is derived from the account name, so two runs with different
+# account names never collide on the server, and the cleanup of one never
+# touches the other's objects
+export BT_HOME_FOLDER="${BT_HOME_ROOT}/${BT_TEST_ACCOUNT}"
+export BT_PULL_SITE_PREFIX="${BT_TEST_ACCOUNT}PullSite"              # ...PullSite1 to 6
+export BT_PUSH_SITE_1="${BT_TEST_ACCOUNT}PushSitePartner1"
+export BT_PUSH_SITE_2="${BT_TEST_ACCOUNT}PushSitePartner2"
+export BT_APPLICATION="${BT_TEST_ACCOUNT}Application"
+export BT_TEMPLATE_ROUTE="${BT_TEST_ACCOUNT}PackageTemplate"
+export BT_SIMPLE_ROUTE_PREFIX="${BT_TEST_ACCOUNT}SimpleRoute"        # ...SimpleRoute2 to 6
+export BT_COMPOSITE_ROUTE_PREFIX="${BT_TEST_ACCOUNT}CompositeRoute"  # ...CompositeRoute2 to 6
 
 source "${FEATURE_DIR}/../lib/post_admin.sh"
 

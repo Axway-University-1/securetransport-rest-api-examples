@@ -20,8 +20,20 @@
 #      print a fixed per-scenario table: see the Notes below for why.
 #
 # Usage:
-# ./00.run_all.sh              steps 1 to 4, leaves everything in place
-# ./00.run_all.sh --cleanup    the same, then removes everything (99)
+# ./00.run_all.sh [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
+#
+#   ACCOUNT        the test account to create and use (default btTestAccount).
+#                  Every other object name is derived from it.
+#   INBOUND_ONLY   how many files scenario 2.1 (inbound only) runs (default 1)
+#   IN_AND_OUT     how many files scenario 2.2 (inbound, then one outbound)
+#                  runs (default 1)
+#   --cleanup      after step 4, remove everything again (99)
+#
+# For example:
+# ./00.run_all.sh                          defaults, leaves everything in place
+# ./00.run_all.sh test_account             a test account named test_account
+# ./00.run_all.sh test_account 6 12        and 6 inbound only, 12 in and out
+# ./00.run_all.sh test_account 6 12 --cleanup
 #
 # Notes:
 # - It stops at the first setup step that fails: a non-zero exit, or a line
@@ -47,14 +59,41 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # Ends this script, without changing anything, on a server that is too old
 source "${SCRIPT_DIR}/../lib/st_feature_check.sh" "5.5-20260924"
-source "${SCRIPT_DIR}/settings.sh"
+usage() {
+    printf "Usage: ./00.run_all.sh [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]\n"
+    exit 2
+}
 
 CLEANUP=0
-case "$1" in
-    "")        ;;
-    --cleanup) CLEANUP=1 ;;
-    *)         printf "Usage: ./00.run_all.sh [--cleanup]\n"; exit 2 ;;
-esac
+POSITIONAL=()
+for arg in "$@"; do
+    case "${arg}" in
+        --cleanup) CLEANUP=1 ;;
+        -*)        usage ;;
+        *)         POSITIONAL+=("${arg}") ;;
+    esac
+done
+[ "${#POSITIONAL[@]}" -gt 3 ] && usage
+
+if [ -n "${POSITIONAL[0]}" ]; then
+    [[ "${POSITIONAL[0]}" =~ ^[A-Za-z0-9._-]+$ ]] \
+        || { printf "ACCOUNT may use only letters, digits, '.', '_' and '-': %s\n" "${POSITIONAL[0]}"; exit 2; }
+    export BT_RUN_ACCOUNT="${POSITIONAL[0]}"
+fi
+for i in 1 2; do
+    [ -z "${POSITIONAL[$i]}" ] && continue
+    [[ "${POSITIONAL[$i]}" =~ ^[1-9][0-9]*$ ]] \
+        || { printf "INBOUND_ONLY and IN_AND_OUT must be whole numbers, 1 or more: %s\n" "${POSITIONAL[$i]}"; exit 2; }
+done
+[ -n "${POSITIONAL[1]}" ] && export BT_RUN_INBOUND_ONLY="${POSITIONAL[1]}"
+[ -n "${POSITIONAL[2]}" ] && export BT_RUN_IN_AND_OUT="${POSITIONAL[2]}"
+
+# Loaded after the arguments, so settings.sh applies them, and every step this
+# runs inherits them
+source "${SCRIPT_DIR}/settings.sh"
+
+printf "Account %s: scenario 2.1 with %s file(s), scenario 2.2 with %s file(s).\n" \
+  "${BT_TEST_ACCOUNT}" "${BT_INBOUND_ONLY_COUNT}" "${BT_IN_AND_OUT_COUNT}"
 
 if [ -z "${BT_ACCOUNT_PASSWORD}" ]; then
     printf "BT_ACCOUNT_PASSWORD is not set. Copy settings.local.example.sh to settings.local.sh and choose one.\n"
@@ -137,5 +176,5 @@ if [ "${CLEANUP}" -eq 1 ]; then
     printf "\n=== Cleanup: 99.cleanup_DELETE.sh ===\n"
     bash "${SCRIPT_DIR}/99.cleanup_DELETE.sh"
 else
-    printf "\nRun ./99.cleanup_DELETE.sh to remove everything this created.\n"
+    printf "\nRun ./99.cleanup_DELETE.sh %s to remove everything this created.\n" "${BT_TEST_ACCOUNT}"
 fi

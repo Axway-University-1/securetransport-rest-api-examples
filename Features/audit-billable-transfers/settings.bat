@@ -22,11 +22,22 @@ REM   from non-billable transfers by their exact file names in File Tracking, so
 REM   the names stay exactly as given.
 REM ==============================================================================
 
+REM The test account. 00.run_all.bat and 99.cleanup_DELETE.bat take another name
+REM on the command line (BT_RUN_ACCOUNT, applied below, after settings.local.bat).
 SET BT_TEST_ACCOUNT=btTestAccount
 SET BT_ACCOUNT_PASSWORD=
 
-REM Must be a home folder your server accepts. /home/<name> is the usual one.
-SET BT_HOME_FOLDER=/home/%BT_TEST_ACCOUNT%
+REM The account's home folder is <BT_HOME_ROOT>/<account>. It must be a folder
+REM your server accepts; /home is the usual one.
+SET BT_HOME_ROOT=/home
+
+REM How many files scenario 2.1 (inbound only) and scenario 2.2 (inbound, then one
+REM outbound) each run. 1 keeps the plain names only_inbound.txt and
+REM inbound_and_one_outbound.txt; more numbers them, only_inbound_1.txt and so on.
+REM 00.run_all.bat takes both on the command line (BT_RUN_INBOUND_ONLY and
+REM BT_RUN_IN_AND_OUT, applied below).
+SET BT_INBOUND_ONLY_COUNT=1
+SET BT_IN_AND_OUT_COUNT=1
 
 REM The folders below are relative to the account's home: a login to this server,
 REM whether by a site, a subscription or the End User API, starts in the home
@@ -44,15 +55,6 @@ SET BT_SSH_PORT=8022
 REM The End User API, used to put the sample files and archives in place. It has
 REM its own port, and the account logs in as itself.
 SET BT_ENDUSER_PORT=8443
-
-REM The names of the objects the examples create
-SET BT_PULL_SITE_PREFIX=btPullSite
-SET BT_PUSH_SITE_1=btPushSitePartner1
-SET BT_PUSH_SITE_2=btPushSitePartner2
-SET BT_APPLICATION=btTransferApplication
-SET BT_TEMPLATE_ROUTE=btPackageTemplate
-SET BT_SIMPLE_ROUTE_PREFIX=btSimpleRoute
-SET BT_COMPOSITE_ROUTE_PREFIX=btCompositeRoute
 
 REM The file names the scenarios use, exactly as given, so they are easy to
 REM recognise in File Tracking by name alone
@@ -84,6 +86,24 @@ REM feature's state (state.local.bat), separately from any other feature's.
 SET FEATURE_DIR=%~dp0
 
 IF EXIST "%~dp0settings.local.bat" CALL "%~dp0settings.local.bat"
+
+REM Values given on the command line of 00.run_all.bat (or 99.cleanup_DELETE.bat)
+REM win over both the defaults above and settings.local.bat
+IF DEFINED BT_RUN_ACCOUNT SET BT_TEST_ACCOUNT=%BT_RUN_ACCOUNT%
+IF DEFINED BT_RUN_INBOUND_ONLY SET BT_INBOUND_ONLY_COUNT=%BT_RUN_INBOUND_ONLY%
+IF DEFINED BT_RUN_IN_AND_OUT SET BT_IN_AND_OUT_COUNT=%BT_RUN_IN_AND_OUT%
+
+REM Everything below is derived from the account name, so two runs with different
+REM account names never collide on the server, and the cleanup of one never
+REM touches the other's objects
+SET BT_HOME_FOLDER=%BT_HOME_ROOT%/%BT_TEST_ACCOUNT%
+SET BT_PULL_SITE_PREFIX=%BT_TEST_ACCOUNT%PullSite
+SET BT_PUSH_SITE_1=%BT_TEST_ACCOUNT%PushSitePartner1
+SET BT_PUSH_SITE_2=%BT_TEST_ACCOUNT%PushSitePartner2
+SET BT_APPLICATION=%BT_TEST_ACCOUNT%Application
+SET BT_TEMPLATE_ROUTE=%BT_TEST_ACCOUNT%PackageTemplate
+SET BT_SIMPLE_ROUTE_PREFIX=%BT_TEST_ACCOUNT%SimpleRoute
+SET BT_COMPOSITE_ROUTE_PREFIX=%BT_TEST_ACCOUNT%CompositeRoute
 REM Ids saved by earlier examples
 IF EXIST "%~dp0state.local.bat" CALL "%~dp0state.local.bat"
 
