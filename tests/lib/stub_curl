@@ -81,17 +81,6 @@ if [[ -n "${header_file}" ]]; then
     } > "${header_file}"
 fi
 
-# HEAD with -w "%{http_code}", as an existence check: print STUB_CURL_STATUS (200)
-if [[ "${method}" == "HEAD" && "${write_out}" == *http_code* ]]; then
-    printf '%s' "${STUB_CURL_STATUS:-200}"
-elif [[ -n "${STUB_CURL_PRINT_CODE}" && "${write_out}" == *http_code* ]]; then
-    # Opt in: act on any -w format, as curl does after the response, so a script that
-    # prints "HTTP <code>" shows the status STUB_CURL_STATUS gives (201 by default)
-    code="${STUB_CURL_STATUS:-201}"
-    [[ "${method}" == "GET" && -n "${STUB_CURL_STATUS_GET}" ]] && code="${STUB_CURL_STATUS_GET}"
-    printf '%b' "${write_out//%\{http_code\}/${code}}"
-fi
-
 echo "METHOD: ${method}" >&2
 echo "URL: ${url}" >&2
 
@@ -114,12 +103,38 @@ fi
 serve() {
     if [[ -n "${output_file}" ]]; then cat "$1" > "${output_file}"; else cat "$1"; fi
 }
-if [[ "${method}" == "GET" && -n "${STUB_CURL_GET_BODY}" && -f "${STUB_CURL_GET_BODY}" ]]; then
-    serve "${STUB_CURL_GET_BODY}"
+# STUB_CURL_GET_RULES points at a file of "TEXT<tab>BODY_FILE" lines, for an
+# example whose GETs need different answers: the first line whose TEXT is in the
+# URL picks the body. A URL no line matches falls back to STUB_CURL_GET_BODY.
+get_body="${STUB_CURL_GET_BODY}"
+if [[ "${method}" == "GET" && -n "${STUB_CURL_GET_RULES}" && -f "${STUB_CURL_GET_RULES}" ]]; then
+    while IFS=$'\t' read -r text file; do
+        if [[ -n "${text}" && "${url}" == *"${text}"* ]]; then
+            get_body="${file}"
+            break
+        fi
+    done < "${STUB_CURL_GET_RULES}"
+fi
+if [[ "${method}" == "GET" && -n "${get_body}" && -f "${get_body}" ]]; then
+    serve "${get_body}"
 fi
 
 if [[ "${method}" == "POST" && -n "${STUB_CURL_POST_BODY}" && -f "${STUB_CURL_POST_BODY}" ]]; then
     serve "${STUB_CURL_POST_BODY}"
 fi
+
+# Like real curl, the -w text comes after the response body.
+#
+# HEAD with -w "%{http_code}", as an existence check: print STUB_CURL_STATUS (200)
+if [[ "${method}" == "HEAD" && "${write_out}" == *http_code* ]]; then
+    printf '%s' "${STUB_CURL_STATUS:-200}"
+elif [[ -n "${STUB_CURL_PRINT_CODE}" && "${write_out}" == *http_code* ]]; then
+    # Opt in: act on any -w format, as curl does after the response, so a script that
+    # prints "HTTP <code>" shows the status STUB_CURL_STATUS gives (201 by default)
+    code="${STUB_CURL_STATUS:-201}"
+    [[ "${method}" == "GET" && -n "${STUB_CURL_STATUS_GET}" ]] && code="${STUB_CURL_STATUS_GET}"
+    printf '%b' "${write_out//%\{http_code\}/${code}}"
+fi
+
 
 exit 0

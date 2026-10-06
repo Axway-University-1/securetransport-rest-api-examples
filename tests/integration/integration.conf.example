@@ -51,6 +51,22 @@ st_verify_tls="no"
 # if that guess does not connect.
 #st_enduser_port=""
 
+# 31.subscriptions_routes_transfers_scripts.py creates SSH sites whose partner
+# is this same SecureTransport, so it can pull from and push to itself. The
+# host and SSH port the server reaches itself on. Leave blank for st_server and
+# 8022.
+#st_ssh_host=""
+#st_ssh_port=""
+
+# 32.pesit_acknowledgment_loop_scripts.py makes a PeSIT loop through this
+# server's own PeSIT listener. Leave blank for st_server and 17617.
+#st_pesit_host=""
+#st_pesit_port=""
+
+# How long 31 and 32 wait, in seconds, for a pulled file to be routed and
+# pushed on. 90 if blank.
+#st_chain_wait_seconds=""
+
 # The name 11.enduser_scripts.py gives the throwaway account it creates for
 # itself, runs the EndUser examples as, and deletes afterward. You do not need
 # to create this account or set a password for it - the check does both. Only

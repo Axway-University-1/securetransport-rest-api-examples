@@ -74,7 +74,7 @@ SET OPTION=%~1
 SET VALUE=%~2
 
 echo Updating %OPTION% to '%VALUE%'...
-curl -s -o nul -w "%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "%MAIN_URL%/%OPTION%" ^
+curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "%MAIN_URL%/%OPTION%" ^
 -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
 -d "[{\"op\": \"replace\", \"path\": \"/values\", \"value\": [\"%VALUE%\"]}]"
 EXIT /B

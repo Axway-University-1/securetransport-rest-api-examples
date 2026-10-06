@@ -141,7 +141,9 @@ FAILED=0
 SKIPPED=0
 FAILED_NAMES=()
 
-for check in $(find checks -name '[0-9]*' -type f | sort); do
+# Only the numbered .py files directly in checks/. Python leaves compiled
+# copies in checks/__pycache__, whose names also start with the number.
+for check in $(find checks -maxdepth 1 -name '[0-9]*.py' -type f | sort); do
     name=$(basename "${check}")
     echo "----------------------------------------------------------------------"
     out=$(python3 "${check}" ${WRITE} 2>&1)

@@ -22,7 +22,7 @@ feature works on that release and on every later one.
 | Feature | What it does |
 | ------- | ------------ |
 | [Trigger route execution after a completed pull operation](trigger-route-after-completed-pull/) | Process all files from one pull as a single batch, in one route execution. |
-| [Audit and report on billable transfers](audit-billable-transfers/) | Tell billable transfers from non-billable ones, with `GET /logs/transfers?isBillable=`, across six scenarios covering the billing rule. |
+| [Audit and report on billable transfers](audit-billable-transfers/) | Tell billable transfers from non-billable ones, with `GET /logs/transfers?isBillable=`, across six scenarios covering the billing rule, measured account by account: a partner to pull from, the test account, a partner to push to. |
 
 ## Version check
 

@@ -169,13 +169,24 @@ finally:
                 response.status == 200, response.text[:200])
         wait_until(lambda: daemon_statuses(client)["as2"] == "Not running")
 
-    final_daemons = daemon_statuses(client)
-    final_servers = server_states(client)
+    # The daemons and servers come back asynchronously, after the last
+    # request: give them time to settle before comparing, rather than compare
+    # the first snapshot
+    wait_until(lambda: daemon_statuses(client) == original_daemons
+               and server_states(client) == original_servers)
+    try:
+        final_daemons = daemon_statuses(client)
+        final_servers = server_states(client)
+    except st_client.STError as e:
+        final_daemons = final_servers = "no answer: %s" % e
     c.check("every daemon matches its original status", final_daemons == original_daemons,
             (original_daemons, final_daemons))
     c.check("every server matches its original active state",
             final_servers == original_servers, (original_servers, final_servers))
-    client.logout()
+    try:
+        client.logout()
+    except st_client.STError:
+        pass
 
 c.info("%d API calls issued by the verification client (not counting the scripts' own curl calls)"
        % client.calls)

@@ -7,8 +7,9 @@ REM Location: Sofia
 REM ==============================================================================
 REM Description:
 REM Creates the six pull sites these examples use, using the `/sites` endpoint.
-REM Each is an SSH site pointing at this server's own SSH listener, reading from
-REM the same shared drop folder, but each with a download pattern matching only
+REM Each is an SSH site of the test account, logging in to this server's own SSH
+REM listener as partner_to_pull_from and reading from the test account's drop
+REM folder there (<account>/outbound-drop), each with a download pattern matching only
 REM the file (or files) for its own scenario. A file is copied, not moved, by a
 REM pull (storeAndForwardMode PRESERVE is not set here, which is the server's
 REM default), so the six sites can share one drop folder without one site's pull
@@ -52,7 +53,7 @@ SET SITE_N=%1
 SET SITE_PATTERN=%~2
 SET SITE_NAME=%BT_PULL_SITE_PREFIX%%SITE_N%
 SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
-powershell -NoProfile -Command "@{ type='ssh'; protocol='ssh'; name=$env:SITE_NAME; host=$env:BT_SSH_HOST; port=$env:BT_SSH_PORT; userName=$env:BT_TEST_ACCOUNT; usePassword=$true; password=$env:BT_ACCOUNT_PASSWORD; account=$env:BT_TEST_ACCOUNT; transferType='partner'; downloadFolder=$env:BT_DROP_FOLDER; downloadPatternType='glob'; downloadPattern=$env:SITE_PATTERN } | ConvertTo-Json -Compress" > "%BODY_FILE%"
+powershell -NoProfile -Command "@{ type='ssh'; protocol='ssh'; name=$env:SITE_NAME; host=$env:BT_SSH_HOST; port=$env:BT_SSH_PORT; userName=$env:BT_PULL_PARTNER; usePassword=$true; password=$env:BT_ACCOUNT_PASSWORD; account=$env:BT_TEST_ACCOUNT; transferType='partner'; downloadFolder=$env:BT_DROP_FOLDER; downloadPatternType='glob'; downloadPattern=$env:SITE_PATTERN } | ConvertTo-Json -Compress" > "%BODY_FILE%"
 
 echo Creating the pull site %SITE_NAME%, matching %SITE_PATTERN%...
 CALL "%~dp0..\lib\post_admin.bat" sites "%BODY_FILE%"

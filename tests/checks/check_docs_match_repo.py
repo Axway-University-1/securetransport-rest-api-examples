@@ -54,10 +54,13 @@ rows = [("01. Authentication", "01.Authentication"),
         ("04. Applications", "04.Applications"),
         ("05. Accounts", "05.Accounts"),
         ("06. Transfer Sites", "06.TransferSites"),
+        ("07. Subscriptions", "07.Subscriptions"),
         ("08. Route Templates", "08.RouteTemplates"),
         ("09. Composite Routes", "09.CompositeRoutes"),
         ("12. Business Units", "12.BusinessUnits"),
         ("13. Configurations", "13.Configurations"),
+        ("15. Transfers", "15.Transfers"),
+        ("16. Transfer Logs", "16.TransferLogs"),
         ("90. End To End Acknowledgment", "90.EndToEndAcknowledgment")]
 
 for label, folder in rows:

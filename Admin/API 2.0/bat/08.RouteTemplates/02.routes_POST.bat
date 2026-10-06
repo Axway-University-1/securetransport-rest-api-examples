@@ -60,7 +60,7 @@ REM ----------------------------------------------------------------------------
 :create_route
 SET TEMPLATE_NAME=%1
 
-curl -s -o nul -w "%{http_code}  %TEMPLATE_NAME%\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%" ^
+curl -s -o nul -w "%%{http_code}  %TEMPLATE_NAME%\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%" ^
 -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
 -d "{\"name\": \"%TEMPLATE_NAME%\", \"description\": \"Random text for %TEMPLATE_NAME%\", \"type\": \"TEMPLATE\", \"conditionType\":\"MATCH_ALL\"}"
 EXIT /B

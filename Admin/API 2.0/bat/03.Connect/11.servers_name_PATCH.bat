@@ -26,7 +26,7 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET NAME=SSH_TEST_SERVER_1
 
 echo Patching the server port...
-curl -s -o nul -w "%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "https://%ST_SERVER%:%ST_PORT%/api/v2.0/servers/%NAME%" ^
+curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "https://%ST_SERVER%:%ST_PORT%/api/v2.0/servers/%NAME%" ^
 -H "accept: application/json" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
 -d "[{ \"op\": \"replace\", \"path\": \"/port\", \"value\": 8026 }]"
 

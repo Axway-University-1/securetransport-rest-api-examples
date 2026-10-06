@@ -18,7 +18,7 @@ Ubuntu: `sudo apt install jq`.
 **2. Read the result.** A good run ends with:
 
 ```
-# ALL CHECKS PASSED  (5)
+# ALL CHECKS PASSED  (12)
 ```
 
 If something fails, scroll up. Each line starts with `PASS` or `FAIL`, and a
@@ -61,14 +61,17 @@ server](#against-a-real-server).
 
 | Check | What it catches |
 | ----- | --------------- |
-| `checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. |
+| `checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. In a `.bat` file: a single `%` before `{http_code}`, which cmd eats; a `%VAR: =%%20%` substitution, which does not URL-encode; and an RFC 2822 date with a `+03:00` offset or day names in the Windows language. |
 | `checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: README coverage tables whose counts differ from the directories, and `.claude` skills that describe a layout, file or variable that no longer exists. |
 | `checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
+| `checks/test_bash_reads_and_deletes.sh` | The examples that look up, read and delete, and the EndUser examples that open their own session: a DELETE going to an id the lookup did not find, or to anything when the lookup found nothing; composite routes not deleted before the simple routes they run; a count read from `returnCount` instead of `totalCount`; an EndUser call without the `csrfToken` its login returned. |
 | `checks/test_python_logic.py` | The python examples doing the wrong thing, by running them against a fake ST that serves paged collections and records what they would write. |
+| `checks/test_integration_helpers.py` | The real-server check `31` acting on a real object: every Admin example it runs must have every real name (`john`, the application, the routes) substituted with a throwaway one. Also the release comparison that decides whether the 5.5-20260924 checks run, and that every example in the newer folders is run by a real-server check. |
 | `checks/test_utils_xml.sh` | The XML helper scripts in `python/utils` (configuration compare and conversion). |
 | `checks/test_feature_version_check.sh` | The version check at the start of every `Features/` example: it must run the example on a server at or after the introducing version, skip it on an older one, and stop with an error when the version cannot be read. Also fails if a feature example has no version check. |
 | `checks/test_feature_trigger_route_pull.sh` | The `Features/trigger-route-after-completed-pull` examples: the JSON they send is valid (even with awkward characters in the password), the sites use the right folders and port, the push folder is never the subscription folder, an old server gets nothing sent, and a missing password stops them before any call. |
-| `checks/test_feature_billable_transfers.sh` | The `Features/audit-billable-transfers` examples: each scenario's site, route and subscription bodies (including the Compress/Decompress steps and the two-backslash trigger condition), the archives built and uploaded are real zips, the billable report's per-day date math and query, `00.run_all.sh`'s step ordering and its stop-on-first-failure, and `99.cleanup_DELETE.sh` finding everything by name without touching another account's objects. |
+| `checks/test_feature_billable_transfers.sh` | The `Features/audit-billable-transfers` examples: the three accounts (a partner reused when it is there), each site logging in as the right partner, each account's folders made logged in as that account, each scenario's site, route and subscription bodies (including the Compress/Decompress steps and the two-backslash trigger condition), the archives built and uploaded are real zips, the billable report's per-day date math and its `account=` query per account (never `accountName=`, which the endpoint ignores), `00.run_all.sh`'s step ordering, stop-on-first-failure and per-account predictions, and `99.cleanup_DELETE.sh` finding everything by name, without touching another account's objects, and keeping a partner another test account still uses. |
+| `checks/test_bash_pesit_ack.sh` | `90.EndToEndAcknowledgment`: `Acknowledgment.sh` sending an ACK when the outbound transfer is there, a NACK or nothing (exit 2) when it is not, only changing `operation=ack` in the link, and logging an ACK answered 200 as sent; `IteratePesitInbounds.sh` running from another folder, carrying on past a transfer that is not ready, and passing its log folder on. The bat twins are read as text for the same bugs. |
 | `checks/test_feature_bat_twins.py` | A `Features/` `.bat` file drifting out of step with its `.sh` twin: every API field name and every feature's own settings must appear in both, since the `.bat` files cannot be run in this repository to check directly. |
 
 The payload and python checks are the interesting ones. They exercise the real

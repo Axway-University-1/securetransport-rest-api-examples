@@ -6,10 +6,13 @@ REM Created: 2026-10-01
 REM Location: Sofia
 REM ==============================================================================
 REM Description:
-REM Creates the test account that owns every site, subscription and route these
-REM examples use, using the `/accounts` endpoint. It is a user account with its
-REM own password, so the sites can log in to this server's SSH listener as it, and
-REM the account can log in to the End User API to upload the sample files.
+REM Creates the three accounts these examples use, using the `/accounts` endpoint:
+REM   - the test account, which owns every site, subscription and route
+REM   - partner_to_pull_from, which holds the sample files the test account pulls
+REM   - partner_to_push_to, which receives what the test account pushes
+REM Each is a user account with its own password, so the test account's sites can
+REM log in to this server's SSH listener as a partner, and each account can log in
+REM to the End User API.
 REM
 REM Usage:
 REM 01.accounts_POST.bat
@@ -19,8 +22,10 @@ REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body.
 REM - transfersWebServiceAllowed is on. Without it the account cannot log in to the
 REM   End User API, and that login fails with a 401.
-REM - The account is created with a home folder of BT_HOME_FOLDER. 99.cleanup_DELETE
-REM   removes the account again.
+REM - The partners are shared by every test account. One that already exists, from
+REM   another test account's run, is reused and not created again.
+REM   99.cleanup_DELETE removes a partner only when no other test account's site
+REM   still logs in as it.
 REM ==============================================================================
 
 REM Ends this script, without changing anything, on a server that is too old
@@ -34,11 +39,30 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
-powershell -NoProfile -Command "@{ name=$env:BT_TEST_ACCOUNT; type='user'; homeFolder=$env:BT_HOME_FOLDER; uid='41733'; gid='41733'; transfersWebServiceAllowed=$true; user=@{ name=$env:BT_TEST_ACCOUNT; passwordCredentials=@{ password=$env:BT_ACCOUNT_PASSWORD } } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
+CALL :create_account "%BT_TEST_ACCOUNT%" "%BT_HOME_FOLDER%" || EXIT /B 1
+CALL :create_partner "%BT_PULL_PARTNER%" "%BT_PULL_PARTNER_HOME%" || EXIT /B 1
+CALL :create_partner "%BT_PUSH_PARTNER%" "%BT_PUSH_PARTNER_HOME%" || EXIT /B 1
+EXIT /B 0
 
-echo Creating the account %BT_TEST_ACCOUNT%...
+:create_account
+SET ACCOUNT_NAME=%~1
+SET ACCOUNT_HOME=%~2
+SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
+powershell -NoProfile -Command "@{ name=$env:ACCOUNT_NAME; type='user'; homeFolder=$env:ACCOUNT_HOME; uid='41733'; gid='41733'; transfersWebServiceAllowed=$true; user=@{ name=$env:ACCOUNT_NAME; passwordCredentials=@{ password=$env:BT_ACCOUNT_PASSWORD } } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
+
+echo Creating the account %ACCOUNT_NAME%...
 CALL "%~dp0..\lib\post_admin.bat" accounts "%BODY_FILE%"
 SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B %POST_RESULT%
+
+REM create_partner NAME HOME: creates a partner, or reuses it when it is there
+:create_partner
+SET PARTNER_CODE=
+FOR /F %%C IN ('curl -s -k -o nul -w "%%{http_code}" -u "%ST_USER%:%ST_PASSWORD%" --head "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts/%~1" -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT"') DO SET PARTNER_CODE=%%C
+IF "%PARTNER_CODE%"=="200" (
+    echo The account %~1 is already there, from another test account's run. Reused.
+    EXIT /B 0
+)
+CALL :create_account "%~1" "%~2"
+EXIT /B %ERRORLEVEL%

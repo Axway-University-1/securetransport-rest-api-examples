@@ -19,30 +19,30 @@ SET EXIT_CODE_ERROR=1
 SET EXIT_CODE_RETRY=2
 
 REM Parse Input Parameters
-SET CORE_ID=%1
-SET HOST=%2
+SET CORE_ID=%~1
+SET HOST=%~2
 IF "%HOST%"=="" SET HOST=%ST_SERVER%
 IF "%HOST%"=="" SET HOST=localhost
 
-SET TYPE_OF_OUTBOUND_TRANSFER=%3
+SET TYPE_OF_OUTBOUND_TRANSFER=%~3
 IF "%TYPE_OF_OUTBOUND_TRANSFER%"=="" SET TYPE_OF_OUTBOUND_TRANSFER=MIX
 
-SET NUMBER_OF_EXPECTED_OUTBOUND_TRANSFERS=%4
+SET NUMBER_OF_EXPECTED_OUTBOUND_TRANSFERS=%~4
 IF "%NUMBER_OF_EXPECTED_OUTBOUND_TRANSFERS%"=="" SET NUMBER_OF_EXPECTED_OUTBOUND_TRANSFERS=1
 
-SET SEND_NACK_IF_NOT_FOUND=%5
+SET SEND_NACK_IF_NOT_FOUND=%~5
 IF "%SEND_NACK_IF_NOT_FOUND%"=="" SET SEND_NACK_IF_NOT_FOUND=TRUE
 
-SET ROOT_FOLDER=%6
+SET ROOT_FOLDER=%~6
 IF "%ROOT_FOLDER%"=="" SET ROOT_FOLDER=C:\Temp
 
-SET CLEAR_API_OUTPUT_FILES=%7
+SET CLEAR_API_OUTPUT_FILES=%~7
 IF "%CLEAR_API_OUTPUT_FILES%"=="" SET CLEAR_API_OUTPUT_FILES=FALSE
 
-SET NUMBER_OF_RETRIES=%8
+SET NUMBER_OF_RETRIES=%~8
 IF "%NUMBER_OF_RETRIES%"=="" SET NUMBER_OF_RETRIES=1
 
-SET SLEEP_BETWEEN_RETRIES=%9
+SET SLEEP_BETWEEN_RETRIES=%~9
 IF "%SLEEP_BETWEEN_RETRIES%"=="" SET SLEEP_BETWEEN_RETRIES=1
 
 IF "%CORE_ID%"=="" (
@@ -134,14 +134,16 @@ IF %RETURN_COUNT% LSS %NUMBER_OF_EXPECTED_OUTBOUND_TRANSFERS% (
 
 REM --- Build ACK/NACK link ---
 CALL :log_message INFO "Building the Acknowledgment link..."
-FOR /F "tokens=2 delims=:" %%A IN ('findstr "self" "%GET_PROCESSED_INBOUND_TRANSFER%"') DO SET ACK_LINK=%%A
-SET ACK_LINK=%ACK_LINK:"=%
-SET ACK_LINK=%ACK_LINK:/operations.*=%
-SET ACK_LINK=%ACK_LINK%/operations?operation=ack
+REM The inbound transfer's own link, its "self" value. Read with a regular
+REM expression: the link holds colons itself (https://host:port), and the file
+REM ends with the HTTPC= line, so it is not plain JSON. [char]34 is a double quote.
+SET ACK_LINK=
+FOR /F "delims=" %%A IN ('powershell -NoProfile -Command "$q=[char]34; if ((Get-Content -Raw $env:GET_PROCESSED_INBOUND_TRANSFER) -match ($q+'self'+$q+'\s*:\s*'+$q+'([^'+$q+']+)')) { $Matches[1] }"') DO SET ACK_LINK=%%A
+REM Only the operation differs between an ACK and a NACK
 IF "%ACK_TYPE%"=="NACK" (
-    SET ACK_NACK_LINK=%ACK_LINK:ack=nack%
+    SET ACK_NACK_LINK=%ACK_LINK%/operations?operation=nack
 ) ELSE (
-    SET ACK_NACK_LINK=%ACK_LINK%
+    SET ACK_NACK_LINK=%ACK_LINK%/operations?operation=ack
 )
 
 CALL :log_message INFO "ACK_TYPE: %ACK_TYPE%"

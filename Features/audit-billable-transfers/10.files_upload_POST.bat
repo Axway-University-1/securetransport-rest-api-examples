@@ -7,7 +7,8 @@ REM Location: Sofia
 REM ==============================================================================
 REM Description:
 REM Creates and uploads every sample file these scenarios pull, using the End User
-REM API `/fileOperations` endpoint, into the shared drop folder (BT_DROP_FOLDER).
+REM API `/fileOperations` endpoint, logged in as partner_to_pull_from, into the
+REM test account's drop folder there (BT_DROP_FOLDER, <account>/outbound-drop).
 REM The two archives (for scenarios 2.5 and 2.6) are built locally with
 REM PowerShell's Compress-Archive first, then uploaded as ordinary binary content.
 REM
@@ -38,6 +39,7 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
 SET WORK=%TEMP%\bt_upload_%RANDOM%
 MKDIR "%WORK%"
 
+SET EU_ACCOUNT=%BT_PULL_PARTNER%
 CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 (
     RMDIR /S /Q "%WORK%"

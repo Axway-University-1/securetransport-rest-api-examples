@@ -10,6 +10,7 @@ broken jq filter - is what this catches that a reimplemented client cannot.
 """
 import contextlib
 import os
+import re
 import subprocess
 
 REPO_ROOT = os.path.abspath(
@@ -151,6 +152,48 @@ def run_python(script_path, args=None, timeout=60):
                           timeout=timeout)
 
 
+def chain_substitutions(prefix, ssh_host, ssh_port):
+    """
+    The substitutions 31.subscriptions_routes_transfers_scripts.py applies to
+    the Admin examples it runs: every fixed name they use, mapped to a
+    throwaway name carrying prefix, and the partner's host and SSH port mapped
+    to the configured ones. Kept here, rather than in the check, so the offline
+    suite can confirm each one still applies to the scripts as they are.
+    """
+    return {
+        '"john"': '"%schain"' % prefix,
+        "${1:-john}": "${1:-%schain}" % prefix,
+        "AdvancedRoutingApplication": prefix + "ARApplication",
+        "SimpleRoute_Compress": prefix + "SimpleRoute_Compress",
+        "SimpleRoute_Decompress": prefix + "SimpleRoute_Decompress",
+        '"SimpleRouteName"': '"%sSimpleRouteName"' % prefix,
+        "RouteFromPartner": prefix + "RouteTemplate",
+        'PARTNER_HOST="${ST_SERVER}"': 'PARTNER_HOST="%s"' % ssh_host,
+        'PARTNER_SSH_PORT="8022"': 'PARTNER_SSH_PORT="%s"' % ssh_port,
+    }
+
+
+def substitute(text, substitutions):
+    """text with each (old, new) pair applied, the way substituted_copy() does."""
+    for old, new in substitutions.items():
+        text = text.replace(old, new)
+    return text
+
+
+def unsubstituted(text, substitutions):
+    """
+    The original names still in text, as whole names, after substitution. A
+    name with the throwaway prefix in front of it does not count, so
+    ZZTEST_SimpleRoute_Compress is not mistaken for SimpleRoute_Compress.
+
+    A substitution that changes nothing is not counted: with the default SSH
+    port, PARTNER_SSH_PORT="8022" is replaced by itself, and finding it
+    afterward does not mean a real name was left behind.
+    """
+    return [old for old, new in substitutions.items()
+            if old != new and re.search(r"(?<![A-Za-z0-9_])" + re.escape(old), text)]
+
+
 @contextlib.contextmanager
 def substituted_copy(script_path, substitutions):
     """
@@ -175,9 +218,7 @@ def substituted_copy(script_path, substitutions):
             run(copy_path)
     """
     with open(script_path) as f:
-        content = f.read()
-    for old, new in substitutions.items():
-        content = content.replace(old, new)
+        content = substitute(f.read(), substitutions)
 
     script_dir = os.path.dirname(script_path)
     copy_path = os.path.join(script_dir, ".zztest_" + os.path.basename(script_path))

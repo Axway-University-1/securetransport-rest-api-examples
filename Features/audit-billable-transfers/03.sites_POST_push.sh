@@ -7,8 +7,9 @@
 # ==============================================================================
 # Description:
 # Creates the two push sites these examples use as "the remote partners", using
-# the `/sites` endpoint. Both are SSH sites pointing at this server's own SSH
-# listener, each uploading into its own delivered folder.
+# the `/sites` endpoint. Both are SSH sites of the test account, logging in to
+# this server's own SSH listener as partner_to_push_to, each uploading into its
+# own delivered folder there (<account>/delivered-1 and <account>/delivered-2).
 #
 # Usage:
 # ./03.sites_POST_push.sh
@@ -43,10 +44,11 @@ create_push_site() {
       --arg host "${BT_SSH_HOST}" \
       --arg port "${BT_SSH_PORT}" \
       --arg account "${BT_TEST_ACCOUNT}" \
+      --arg partner "${BT_PUSH_PARTNER}" \
       --arg password "${BT_ACCOUNT_PASSWORD}" \
       --arg folder "${folder}" \
       '{type: "ssh", protocol: "ssh", name: $name, host: $host, port: $port,
-        userName: $account, usePassword: true, password: $password, account: $account,
+        userName: $partner, usePassword: true, password: $password, account: $account,
         transferType: "partner", uploadFolder: $folder}')
 
     printf "Creating the push site %s, delivering to %s...\n" "${name}" "${folder}"

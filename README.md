@@ -254,11 +254,14 @@ already exists.
 | 03. Connect | `/daemons`, `/servers`, and their operations | 13 | 13 |
 | 04. Applications | `/applications`, flow and maintenance types | 7 | 7 |
 | 05. Accounts | `/accounts`, including PATCH from a file | 8 | 8 |
-| 06. Transfer Sites | `/sites` | 1 | 1 |
+| 06. Transfer Sites | `/sites`, HTTP and SSH pull and push sites, list, delete by id | 4 | 4 |
+| 07. Subscriptions | `/subscriptions`, Advanced Routing, with and without a trigger file, delete by id | 4 | 4 |
 | 08. Route Templates | `/routes`, template type | 1 | 1 |
-| 09. Composite Routes | `/routes`, composite type | 1 | 1 |
+| 09. Composite Routes | `/routes`, composite and simple types, Compress and Decompress steps, linked to a subscription, list, delete by id | 6 | 6 |
 | 12. Business Units | `/businessUnits` | 1 | 1 |
 | 13. Configurations | `/configurations/options` | 2 | 2 |
+| 15. Transfers | `/transfers/operations`, a pull on demand | 1 | 1 |
+| 16. Transfer Logs | `/logs/transfers`, by account and status, billable transfers per day | 2 | 2 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same
@@ -270,7 +273,7 @@ use PowerShell to do the same job.
 | Topic | Endpoints | bash |
 | ----- | --------- | :--: |
 | 01. Authenticate | `/myself`, login and logout | 2 |
-| 02. Files | `/files`, list, upload, download and delete | 6 |
+| 02. Files | `/files` and `/fileOperations`, list, create a folder, upload, download and delete | 8 |
 
 ### Python
 
@@ -290,6 +293,7 @@ single calls. They are CSRF aware, as required from the 20230525 release onwards
 | `stUsersPerSharedFolder.py` | Reports which accounts have access to each shared folder, by joining applications and subscriptions. Read only. |
 | `stReplaceSites.py` | Scans SSH transfer sites and updates their cipher suites. |
 | `stCertificateExpiry.py` | Counts the certificates and reports the ones that have expired or are about to. Read only. |
+| `stBillableTransfers.py` | Counts the billable transfers per day, for every account or for one. Needs 5.5-20260924 or later. Read only. |
 | `stGetPrivateCert.py` | Exports a certificate by ID. Needs `requests_toolbelt`. |
 | `stAddLoginRestrictionRule.py` | Adds a rule to an existing login restriction policy. |
 | `stConfigScan.py` | Baselines the server configuration and reports drift from the baseline on later runs. Useful after a patch. |
@@ -320,7 +324,7 @@ unzip -j export_configuration.zip systemConfiguration.xml -d /home/axway/api
 These areas of the API do not have examples yet. Contributions are welcome, and
 the list doubles as a rough roadmap.
 
-- Transfers, Sessions, Events and Statistics Summary
+- Transfer operations other than a pull, Sessions, Events and Statistics Summary
 - Transfer Profiles, Route Steps Charsets and Route Steps Metadata
 - Site Templates, Address Book and Account Setup
 - Administrators, Administrative Roles and User Classes
@@ -329,8 +333,8 @@ the list doubles as a rough roadmap.
 - Mail Templates
 
 Some areas are covered by the python examples but not yet by bash or bat:
-routes beyond creation, subscriptions, certificates, login restriction policies
-and the transaction manager. See the python table above.
+changing routes and subscriptions that already exist, certificates, login
+restriction policies and the transaction manager. See the python table above.
 
 ## Features by Release
 

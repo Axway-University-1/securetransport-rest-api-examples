@@ -6,10 +6,14 @@ REM Created: 2026-10-01
 REM Location: Sofia
 REM ==============================================================================
 REM Description:
-REM Creates the folders these examples need in the account's home, using the End
-REM User API `POST /files/{name}` endpoint: the shared drop folder, the two
-REM delivered folders, the subscription folder, and six subfolders inside it, one
-REM per scenario (subscription/s1 to subscription/s6).
+REM Creates the folders these examples need, using the End User API
+REM `POST /files/{name}` endpoint, logged in as each account in turn:
+REM   - the test account: the subscription folder, and six subfolders inside it,
+REM     one per scenario (subscription/s1 to subscription/s6)
+REM   - partner_to_pull_from: a folder named after the test account, and the drop
+REM     folder inside it, where the sample files wait to be pulled
+REM   - partner_to_push_to: a folder named after the test account, and the two
+REM     delivered folders inside it, where the pushes arrive
 REM
 REM Usage:
 REM 04.files_POST_folders.bat
@@ -21,9 +25,7 @@ REM - Uses PowerShell to build the JSON body.
 REM - The folder's name goes in the URL, and the body says it is a directory. POST
 REM   /files with the name in the body is refused with a 409, whatever the body
 REM   (confirmed on Features/trigger-route-after-completed-pull).
-REM - UNVERIFIED: the subscription/sN subfolders are created with a second POST,
-REM   after the subscription folder itself exists, on the assumption that creating
-REM   a nested folder needs its parent to exist first, like a plain mkdir.
+REM - A nested folder is created after its parent, like a plain mkdir.
 REM - The port is BT_ENDUSER_PORT, 8443 by default. It is not the Admin port.
 REM ==============================================================================
 
@@ -38,22 +40,36 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
+REM The folder names without their leading /
+SET SUBSCRIPTION_NAME=%BT_SUBSCRIPTION_FOLDER:~1%
+SET RUN_NAME=%BT_RUN_FOLDER:~1%
+SET DROP_NAME=%BT_DROP_FOLDER:~1%
+SET DELIVERED1_NAME=%BT_DELIVERED_1_FOLDER:~1%
+SET DELIVERED2_NAME=%BT_DELIVERED_2_FOLDER:~1%
+
+REM The test account: the subscription folder, then one subfolder per scenario
+SET EU_ACCOUNT=%BT_TEST_ACCOUNT%
 CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
+CALL :create_folder %SUBSCRIPTION_NAME%
+FOR %%N IN (1,2,3,4,5,6) DO CALL :create_folder %SUBSCRIPTION_NAME%/s%%N
+CALL "%~dp0..\lib\enduser.bat" logout
 
-REM Top level first: outbound-drop, delivered-1, delivered-2, subscription
-SET DROP_NAME=%BT_DROP_FOLDER:/=%
-SET DELIVERED1_NAME=%BT_DELIVERED_1_FOLDER:/=%
-SET DELIVERED2_NAME=%BT_DELIVERED_2_FOLDER:/=%
-SET SUBSCRIPTION_NAME=%BT_SUBSCRIPTION_FOLDER:/=%
+REM partner_to_pull_from: the test account's folder, then its drop folder
+SET EU_ACCOUNT=%BT_PULL_PARTNER%
+CALL "%~dp0..\lib\enduser.bat" login
+IF ERRORLEVEL 1 EXIT /B 1
+CALL :create_folder %RUN_NAME%
 CALL :create_folder %DROP_NAME%
+CALL "%~dp0..\lib\enduser.bat" logout
+
+REM partner_to_push_to: the test account's folder, then the two delivered folders
+SET EU_ACCOUNT=%BT_PUSH_PARTNER%
+CALL "%~dp0..\lib\enduser.bat" login
+IF ERRORLEVEL 1 EXIT /B 1
+CALL :create_folder %RUN_NAME%
 CALL :create_folder %DELIVERED1_NAME%
 CALL :create_folder %DELIVERED2_NAME%
-CALL :create_folder %SUBSCRIPTION_NAME%
-
-REM Then one subfolder of subscription per scenario
-FOR %%N IN (1,2,3,4,5,6) DO CALL :create_folder %SUBSCRIPTION_NAME%/s%%N
-
 CALL "%~dp0..\lib\enduser.bat" logout
 EXIT /B 0
 

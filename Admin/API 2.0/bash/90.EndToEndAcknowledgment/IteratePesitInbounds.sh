@@ -186,8 +186,17 @@ rm -f "$tmpfile"
 log_message "INFO" "Found ${#ids[@]} PeSIT inbound transfers."
 for CORE_ID in "${ids[@]}"; do
     log_message "INFO" "Processing Core ID: $CORE_ID"
-    # Call the Acknowledgment script for each Core ID
-    ./Acknowledgment.sh "$CORE_ID" "$HOST" "MIX" 1 FALSE
+    # Call the Acknowledgment script for each Core ID, from this script's own
+    # folder, so it runs from anywhere, with the same log folder. Exit 2 means
+    # the outbound transfer is not there yet: leave it for a later run and carry
+    # on with the rest, rather than let set -e end the loop.
+    ACK_RC=0
+    "${SCRIPT_DIR}/Acknowledgment.sh" "$CORE_ID" "$HOST" "MIX" 1 FALSE "$ROOT_FOLDER" || ACK_RC=$?
+    case "${ACK_RC}" in
+        0) ;;
+        2) log_message "INFO" "No outbound transfer yet for Core ID ${CORE_ID}. Left for a later run." ;;
+        *) log_message "ERROR" "Acknowledgment.sh failed for Core ID ${CORE_ID} (exit ${ACK_RC})." ;;
+    esac
 done
 
 if [[ "${CLEAR_API_OUTPUT_FILES}" == "TRUE" && -d "$API_OUTPUTS_DIR" ]]; then

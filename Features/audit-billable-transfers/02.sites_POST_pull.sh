@@ -7,8 +7,9 @@
 # ==============================================================================
 # Description:
 # Creates the six pull sites these examples use, using the `/sites` endpoint.
-# Each is an SSH site pointing at this server's own SSH listener, reading from
-# the same shared drop folder, but each with a download pattern matching only
+# Each is an SSH site of the test account, logging in to this server's own SSH
+# listener as partner_to_pull_from and reading from the test account's drop
+# folder there (<account>/outbound-drop), each with a download pattern matching only
 # the file (or files) for its own scenario. A file is copied, not moved, by a
 # pull (storeAndForwardMode PRESERVE is not set here, which is the server's
 # default), so the six sites can share one drop folder without one site's pull
@@ -49,11 +50,12 @@ create_pull_site() {
       --arg host "${BT_SSH_HOST}" \
       --arg port "${BT_SSH_PORT}" \
       --arg account "${BT_TEST_ACCOUNT}" \
+      --arg partner "${BT_PULL_PARTNER}" \
       --arg password "${BT_ACCOUNT_PASSWORD}" \
       --arg folder "${BT_DROP_FOLDER}" \
       --arg pattern "${pattern}" \
       '{type: "ssh", protocol: "ssh", name: $name, host: $host, port: $port,
-        userName: $account, usePassword: true, password: $password, account: $account,
+        userName: $partner, usePassword: true, password: $password, account: $account,
         transferType: "partner", downloadFolder: $folder,
         downloadPatternType: "glob", downloadPattern: $pattern}')
 

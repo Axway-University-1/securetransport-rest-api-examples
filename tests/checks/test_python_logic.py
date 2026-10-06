@@ -184,6 +184,59 @@ c.check("returns None when no candidate is present", find({"name": "c"}) is None
 failures += 0 if c.summary() else 1
 
 
+# ------------------------------------------------------- billable transfers
+print()
+c = fake_st.Checker("stBillableTransfers.py")
+import datetime  # noqa: E402
+import email.utils  # noqa: E402
+import urllib.parse  # noqa: E402
+
+ns = fake_st.load("stBillableTransfers.py", email=email, urllib=urllib)
+
+windows = ns["dayWindows"](3, today=datetime.date(2026, 10, 5))
+c.check("one window per day", len(windows) == 3, len(windows))
+c.check("oldest first, today last",
+        [w[0] for w in windows] == ["2026-10-03", "2026-10-04", "2026-10-05"],
+        [w[0] for w in windows])
+c.check("each window starts at midnight",
+        all(w[1].hour == 0 and w[1].minute == 0 for w in windows))
+c.check("each window ends where the next starts",
+        windows[0][2] == windows[1][1] and windows[1][2] == windows[2][1])
+c.check("the times carry a time zone", all(w[1].tzinfo is not None for w in windows))
+
+# Each day answers a different count, 4 for 2026-10-03 and so on, as totalCount
+seen = []
+
+
+def billable(params):
+    seen.append(params)
+    day = email.utils.parsedate_to_datetime(params["startTimeAfter"]).day
+    return {3: 4, 4: 0, 5: 9}.get(day, 0)
+
+
+s = fake_st.FakeSession(totals={"logs/transfers": billable})
+start, end = windows[0][1], windows[0][2]
+c.check("reads totalCount, not returnCount, which limit=1 caps",
+        ns["stCountBillable"](s, "T", start, end, "") == 4)
+p = seen[-1]
+c.check("asks for billable transfers only", p.get("isBillable") == "true", p)
+c.check("keeps the response small", p.get("limit") == "1" and p.get("fields") == "id", p)
+c.check("sends the window in RFC 2822",
+        email.utils.parsedate_to_datetime(p["startTimeAfter"]) == start
+        and email.utils.parsedate_to_datetime(p["endTimeBefore"]) == end, p)
+c.check("no account filter when none is given", "account" not in p, p)
+
+ns["stCountBillable"](s, "T", start, end, "john")
+c.check("filters by account when one is given", seen[-1].get("account") == "john", seen[-1])
+
+ns["dayWindows"] = lambda days: windows
+s = fake_st.FakeSession(totals={"logs/transfers": billable})
+c.check("the report adds up the days", ns["stReportBillable"](s, "T", 3, "") == 13)
+c.check("one call per day", len(s.reads) == 3, len(s.reads))
+c.check("it only reads", s.writes == [], s.writes)
+failures += 0 if c.summary() else 1
+
+
 print()
 if failures:
     print("test_python_logic: FAIL (%d group(s))" % failures)

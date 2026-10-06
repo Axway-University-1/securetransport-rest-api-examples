@@ -20,14 +20,17 @@
 # ./files_GET_download.sh FILE [COUNT [ACCOUNT]]
 #
 #   FILE     the file to download, relative to the account's home folder, for
-#            example outbound-drop/only_inbound.txt or delivered-1/files_1_and_2_compressed.zip
+#            example subscription/s1/only_inbound.txt, where scenario 2.1 lands in
+#            the test account, or btTestAccount/delivered-1/inbound_and_one_outbound.txt
+#            as partner_to_push_to
 #   COUNT    how many times to download it (default 1)
-#   ACCOUNT  the account to log in as (default btTestAccount). Its password is
-#            BT_ACCOUNT_PASSWORD, the one 00.run_all.sh creates every account with.
+#   ACCOUNT  the account to log in as: the test account (default btTestAccount)
+#            or a partner. Its password is BT_ACCOUNT_PASSWORD, the one
+#            00.run_all.sh creates all three accounts with.
 #
 # For example:
-# ./files_GET_download.sh outbound-drop/only_inbound.txt 50
-# ./files_GET_download.sh outbound-drop/only_inbound.txt 50 test_account
+# ./files_GET_download.sh subscription/s1/only_inbound.txt 50
+# ./files_GET_download.sh btTestAccount/delivered-1/inbound_and_one_outbound.txt 50 partner_to_push_to
 #
 # Notes:
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.

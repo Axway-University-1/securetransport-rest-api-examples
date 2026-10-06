@@ -29,13 +29,13 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     52 curl examples, numbered by topic
-    bat/      44 of them, for Windows
+    bash/     67 curl examples, numbered by topic
+    bat/      59 of them, for Windows
     python/
-        python3/   15 complete programs for real maintenance tasks
+        python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
 EndUser/API 2.0/
-    bash/     8 examples: login, logout, list, upload, download, delete
+    bash/     10 examples: login, logout, list, create a folder, upload, download, delete
 ```
 
 `bash` and `bat` are kept at **exact parity** — every bash example has a bat
@@ -59,17 +59,23 @@ create, read, update, delete cycle for that object.
 | Create flow or maintenance applications | `bash/04.Applications/` |
 | Create, read, update, delete accounts | `bash/05.Accounts/` |
 | Send a PATCH body from a file | `bash/05.Accounts/06.accounts_name_PATCH_with_file.sh` |
-| Create a transfer site | `bash/06.TransferSites/` |
+| Create, list or delete a transfer site, including SSH pull and push sites that rename | `bash/06.TransferSites/` |
+| Subscribe a folder to Advanced Routing, with or without a trigger file | `bash/07.Subscriptions/` |
 | Create route templates in bulk | `bash/08.RouteTemplates/` |
 | Create a composite route, with or without an extension | `bash/09.CompositeRoutes/` |
+| Compress or decompress in a route, then send to a partner | `bash/09.CompositeRoutes/03.routes_POST_simple_compress.sh`, `04.routes_POST_simple_decompress.sh` |
+| Link a composite route to a subscription, so it runs on what arrives | `bash/09.CompositeRoutes/05.routes_POST_composite_subscription.sh` |
 | Create a business unit | `bash/12.BusinessUnits/` |
 | Change a Server Configuration Option | `bash/13.Configurations/` |
 | Set up usage reporting to the Axway Platform | `bash/13.Configurations/02.configurations_PATCH_UsageReporting.sh` |
+| Start a pull from a partner on demand | `bash/15.Transfers/` |
+| Read the transfer log, or count billable transfers per day | `bash/16.TransferLogs/` |
 | Correlate PeSIT transfers and send ACK or NACK | `bash/90.EndToEndAcknowledgment/` |
 | Use SecureTransport's Expression Language in a route condition, a file filter, a rename pattern or a login restriction rule | `bash/14.ExpressionLanguage/` (also in `python/python3/14.ExpressionLanguage/`) |
 | Upload or download files as an end user | `EndUser/API 2.0/bash/02.Files/` |
+| Create a folder, or upload to a chosen path, as an end user, with the csrfToken | `EndUser/API 2.0/bash/02.Files/02.files_name_POST_folder.sh`, `08.fileOperations_POST_upload.sh` |
 
-The numbering has gaps (07, 10, 11 are absent). Those topics have no examples yet.
+The numbering has gaps (10 and 11 are absent). Those topics have no examples yet.
 
 ## The python examples are a different kind of thing
 
@@ -88,6 +94,7 @@ whole programs for jobs you would actually run against an estate:
 | `stUsersPerSharedFolder.py` | Report which accounts can reach each shared folder |
 | `stReplaceSites.py` | Update the cipher suites on SSH transfer sites |
 | `stCertificateExpiry.py` | Count certificates and report expired and expiring ones |
+| `stBillableTransfers.py` | Count billable transfers per day, for every account or one. Needs 5.5-20260924 or later |
 | `stGetPrivateCert.py` | Export a certificate by ID. Needs `requests_toolbelt` |
 | `stAddLoginRestrictionRule.py` | Add a rule to a login restriction policy |
 | `stConfigScan.py` | Baseline the server config, then report drift. Useful after a patch |
@@ -140,20 +147,21 @@ Every script resolves its own directory, so it runs from anywhere:
 | Tool | Needed for |
 | ---- | ---------- |
 | `curl` | every bash and bat example |
-| `jq` | 10 of the bash examples, wherever JSON is read or edited |
+| `jq` | the bash examples that read, build or edit JSON. Each one says so in its header |
 | PowerShell | the bat examples, in place of `jq` |
 | `python3` plus `requests` | the python examples |
 | `requests_toolbelt` | `stGetPrivateCert.py` only |
 
 ## What is not covered
 
-Transfers, sessions, events and statistics summary; transfer profiles and route
-step charsets or metadata; site templates, address book, account setup;
-administrators, administrative roles, user classes; access policies; cluster
-services, ICAP servers, LDAP domains, zones; mail templates.
+Transfer operations other than a pull, sessions, events and statistics summary;
+transfer profiles and route step charsets or metadata; site templates, address
+book, account setup; administrators, administrative roles, user classes; access
+policies; cluster services, ICAP servers, LDAP domains, zones; mail templates.
 
-Routes beyond creation, subscriptions, certificates and the transaction manager
-are covered by the **python** examples but not yet by bash or bat.
+Changing routes and subscriptions that already exist, certificates and the
+transaction manager are covered by the **python** examples but not yet by bash
+or bat.
 Login restriction policies and EL route conditions are the exception - both
 are covered in bash too, in `14.ExpressionLanguage` (see the table above),
 alongside the python3 twin of the same folder.

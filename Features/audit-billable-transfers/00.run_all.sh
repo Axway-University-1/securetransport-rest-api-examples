@@ -8,16 +8,15 @@
 # Description:
 # Runs the whole test, start to finish:
 #
-#   1. Prints today's billable transfer count, and the six days before it
-#      (billable_GET_report.sh "before").
-#   2. Sets up the account, the sites, the folders, the application, the
+#   1. Prints the billable transfer count per day of the three accounts, today
+#      and the six days before it (billable_GET_report.sh "before").
+#   2. Sets up the three accounts, the sites, the folders, the application, the
 #      routes and the subscriptions (01 to 09), uploads the sample files and
-#      the two archives (10), and runs the six pulls (11).
-#   3. Prints the same report again (billable_GET_report.sh "after"), so
-#      today's count can be compared against step 1.
-#   4. Prints the real before/after delta for today - how many billable
-#      transfers this run actually added - and restates the rule. It does not
-#      print a fixed per-scenario table: see the Notes below for why.
+#      the two archives to partner_to_pull_from (10), and runs the six pulls
+#      (11).
+#   3. Prints the same report again (billable_GET_report.sh "after").
+#   4. For each account, prints how many billable transfers this run added
+#      today, next to what the rule predicts for it, and whether they match.
 #
 # Usage:
 # ./00.run_all.sh [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
@@ -40,16 +39,8 @@
 #   starting HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing
 #   is cleaned up, so you can look.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
-# - Step 4 used to print a fixed table of the billable count the rule predicts
-#   per scenario. That table was wrong, and is gone: billing here is tracked
-#   per transfer chain (coreId), not per filename, and step 10's own upload (a
-#   real, billable Inbound in its own right) and the pull that empties the drop
-#   folder (that chain's own free first outbound) are each a SEPARATE chain from
-#   the scenario's intended pull/push, adding billable transfers the rule's
-#   plain six-scenario description never counted. Confirmed directly, by
-#   comparing this run's own File Tracking entries by coreId. Read the actual
-#   result in File Tracking, grouped by Transfer name, rather than trusting a
-#   static prediction.
+# - The partners are shared by every test account. A run of another test
+#   account on the same day, at the same time, adds to their counts too.
 # ==============================================================================
 
 #
@@ -100,10 +91,15 @@ if [ -z "${BT_ACCOUNT_PASSWORD}" ]; then
     exit 1
 fi
 
+# today_count LOG ACCOUNT: the TODAY_COUNT the report printed for an account
+today_count() { sed -n "s/^TODAY_COUNT $2: //p" "$1"; }
+
 printf "\n=== Step 1: billable transfers before this run ===\n"
 REPORT_LOG=$(mktemp)
 bash "${SCRIPT_DIR}/billable_GET_report.sh" "before" | tee "${REPORT_LOG}"
-BEFORE_TODAY=$(sed -n 's/^TODAY_COUNT: //p' "${REPORT_LOG}")
+BEFORE_PULL=$(today_count "${REPORT_LOG}" "${BT_PULL_PARTNER}")
+BEFORE_TEST=$(today_count "${REPORT_LOG}" "${BT_TEST_ACCOUNT}")
+BEFORE_PUSH=$(today_count "${REPORT_LOG}" "${BT_PUSH_PARTNER}")
 rm -f "${REPORT_LOG}"
 
 # Every numbered setup step, except this script and the cleanup
@@ -150,27 +146,57 @@ bash "${SCRIPT_DIR}/12.files_GET_result.sh"
 printf "\n=== Step 3: billable transfers after this run ===\n"
 REPORT_LOG=$(mktemp)
 bash "${SCRIPT_DIR}/billable_GET_report.sh" "after" | tee "${REPORT_LOG}"
-AFTER_TODAY=$(sed -n 's/^TODAY_COUNT: //p' "${REPORT_LOG}")
+AFTER_PULL=$(today_count "${REPORT_LOG}" "${BT_PULL_PARTNER}")
+AFTER_TEST=$(today_count "${REPORT_LOG}" "${BT_TEST_ACCOUNT}")
+AFTER_PUSH=$(today_count "${REPORT_LOG}" "${BT_PUSH_PARTNER}")
 rm -f "${REPORT_LOG}"
 
+# What the rule predicts each account adds. FILES is every file pulled: the
+# inbound-only and in-and-out files, 1 for 2.3, 2 for 2.4, and one archive each
+# for 2.5 and 2.6.
+FILES=$((BT_INBOUND_ONLY_COUNT + BT_IN_AND_OUT_COUNT + 5))
+#   partner_to_pull_from: each upload in is billable; each pull out is the
+#     file's first outbound, so free
+PREDICT_PULL=${FILES}
+#   the test account: each pull in is billable; of the pushes out, the first in
+#     each transfer chain (coreId) is free and the rest are billable. Decompress
+#     keeps the archive's chain and Compress starts a new one (confirmed on a
+#     real run), so: 2.3 one billable push, 2.5 one, 2.6 three of its four
+PREDICT_TEST=$((FILES + 5))
+#   partner_to_push_to: each push arriving is billable. 2.2 one per file, 2.3
+#     two, 2.4 one archive, 2.5 two files, 2.6 two files to each of two folders
+PREDICT_PUSH=$((BT_IN_AND_OUT_COUNT + 9))
+
 printf "\n=== Step 4: analysis ===\n"
-if [ -n "${BEFORE_TODAY}" ] && [ -n "${AFTER_TODAY}" ]; then
-    DELTA=$((AFTER_TODAY - BEFORE_TODAY))
-    printf "Today's billable count for %s: %s before this run, %s after.\n" \
-      "${BT_TEST_ACCOUNT}" "${BEFORE_TODAY}" "${AFTER_TODAY}"
-    printf "This run added %s billable transfer(s) today.\n" "${DELTA}"
-else
-    printf "Could not read today's count from step 1 or step 3 above; see those for the raw response.\n"
-fi
-printf "\nThe rule, from the Admin Guide: every inbound transfer is billable. For a\n"
+printf "The rule, from the Admin Guide: every inbound transfer is billable. For a\n"
 printf "given file, the first outbound transfer that follows it is not billable;\n"
-printf "every outbound transfer after that first one is.\n"
-printf "\nThat rule is tracked per transfer chain (coreId), not per filename. Step 10's\n"
-printf "own upload into outbound-drop is a real, billable Inbound transfer in its own\n"
-printf "right, and the pull that later empties outbound-drop is THAT chain's own free\n"
-printf "first outbound - both separate from, and in addition to, the scenario's\n"
-printf "intended pull into subscription/sN and push to a partner. For the exact\n"
-printf "breakdown, read File Tracking for %s, grouped by Transfer name.\n" "${BT_TEST_ACCOUNT}"
+printf "every outbound transfer after that first one is.\n\n"
+printf "Billable transfers this run added today, by account:\n\n"
+printf "  %-24s %8s %8s %8s  %s\n" "account" "before" "after" "added" "the rule predicts"
+MATCHED=1
+analysis_row() {
+    local account="$1" before="$2" after="$3" predicted="$4" added
+    if [ -z "${before}" ] || [ -z "${after}" ]; then
+        printf "  %-24s %8s %8s %8s  %s\n" "${account}" "${before:-?}" "${after:-?}" "?" "${predicted}"
+        MATCHED=0
+        return
+    fi
+    added=$((after - before))
+    [ "${added}" -eq "${predicted}" ] || MATCHED=0
+    printf "  %-24s %8s %8s %8s  %s%s\n" "${account}" "${before}" "${after}" "${added}" "${predicted}" \
+      "$([ "${added}" -eq "${predicted}" ] && printf '' || printf '   differs')"
+}
+analysis_row "${BT_PULL_PARTNER}" "${BEFORE_PULL}" "${AFTER_PULL}" "${PREDICT_PULL}"
+analysis_row "${BT_TEST_ACCOUNT}" "${BEFORE_TEST}" "${AFTER_TEST}" "${PREDICT_TEST}"
+analysis_row "${BT_PUSH_PARTNER}" "${BEFORE_PUSH}" "${AFTER_PUSH}" "${PREDICT_PUSH}"
+
+if [ "${MATCHED}" -eq 1 ]; then
+    printf "\nEvery account added what the rule predicts.\n"
+else
+    printf "\nAn account did not add what the rule predicts, or its count could not be\n"
+    printf "read. Read File Tracking for that account, grouped by Transfer name. A push\n"
+    printf "still under way when step 3 ran shows up there, and in a later report.\n"
+fi
 
 if [ "${CLEANUP}" -eq 1 ]; then
     printf "\n=== Cleanup: 99.cleanup_DELETE.sh ===\n"

@@ -7,12 +7,16 @@ REM Location: Sofia
 REM ==============================================================================
 REM Description:
 REM Prints the number of billable transfers per day, for the last BT_REPORT_DAYS
-REM days (today included), for this feature's test account, using the
-REM `/logs/transfers` endpoint and its `isBillable` filter.
+REM days (today included), for each of the three accounts of this feature, side by
+REM side, using the `/logs/transfers` endpoint and its `isBillable` filter:
+REM
+REM   partner_to_pull_from   the uploads of the sample files, and their pulls out
+REM   the test account       the pulls in, and the pushes out
+REM   partner_to_push_to     the pushes arriving
 REM
 REM Not numbered like the setup steps: 00.run_all.bat runs this one twice, once
 REM before anything else and once at the end, to show the before/after change for
-REM today.
+REM today, account by account.
 REM
 REM Usage:
 REM billable_GET_report.bat [LABEL [ACCOUNT]]
@@ -22,20 +26,18 @@ REM change what is measured. ACCOUNT reports on another test account than the
 REM default (the same name given to 00.run_all.bat).
 REM
 REM Notes:
-REM - Scoped to accountName=BT_TEST_ACCOUNT, so an existing account with the same
-REM   name on your server does not throw the count off. Run this against a server
-REM   that does not already have that account, for a clean baseline.
+REM - Each account is filtered with account=, an exact match. Not accountName=:
+REM   /logs/transfers ignores that without a word and counts every account on the
+REM   server (confirmed directly). An earlier version of this script used it.
+REM - The partners are shared by every test account, so their counts include any
+REM   other test account's runs on the same day.
 REM - Each day is a full calendar day, midnight to midnight, in RFC 2822, built
-REM   with PowerShell's own date formatting.
+REM   with PowerShell, with English day names and a +0300 style offset.
+REM - The count is resultSet.totalCount. resultSet.returnCount is capped by limit,
+REM   which is 1 here to keep the response small.
+REM - The last lines are TODAY_COUNT <account>: <count>, one per account, for
+REM   00.run_all.bat to read.
 REM - Uses PowerShell for the date arithmetic and to read the response.
-REM - Confirmed directly: /logs/transfers' resultSet carries TWO counts, not one -
-REM   returnCount (how many rows are in THIS page, capped by limit) and
-REM   totalCount (the true total matching the filter, independent of limit). Most
-REM   other list endpoints in this API only need returnCount, since their
-REM   returnCount already ignores limit; this one does not. Reading returnCount
-REM   here, with limit=1 set to keep the response small, silently capped every
-REM   day's count at 1 - confirmed directly, a real bug caught by comparing
-REM   against File Tracking's own count for the same account and day.
 REM ==============================================================================
 
 SETLOCAL
@@ -55,43 +57,61 @@ CALL "%~dp0settings.bat"
 
 SET REPORT_LABEL=%~1
 IF "%REPORT_LABEL%"=="" SET REPORT_LABEL=report
+SET RESPONSE_FILE=%TEMP%\bt_report_%RANDOM%.json
 
-echo Billable transfers per day, last %BT_REPORT_DAYS% day(s), for %BT_TEST_ACCOUNT% (%REPORT_LABEL%)
+echo Billable transfers per day, last %BT_REPORT_DAYS% day(s) (%REPORT_LABEL%)
+echo.
+echo   day         %BT_PULL_PARTNER%  %BT_TEST_ACCOUNT%  %BT_PUSH_PARTNER%
 
 SET /A LAST_OFFSET=%BT_REPORT_DAYS%-1
-SET TODAY_COUNT=
+SET TODAY_1=
+SET TODAY_2=
+SET TODAY_3=
 FOR /L %%D IN (%LAST_OFFSET%,-1,0) DO CALL :report_day %%D
 
-REM A machine-readable line, so 00.run_all.bat can diff today's count before and
-REM after, without re-parsing the printed table above
-echo TODAY_COUNT: %TODAY_COUNT%
+REM Machine-readable lines, so 00.run_all.bat can diff today's counts before and
+REM after, without re-parsing the table above
+echo.
+echo TODAY_COUNT %BT_PULL_PARTNER%: %TODAY_1%
+echo TODAY_COUNT %BT_TEST_ACCOUNT%: %TODAY_2%
+echo TODAY_COUNT %BT_PUSH_PARTNER%: %TODAY_3%
+IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
 EXIT /B 0
 
 :report_day
 SET DAY_OFFSET=%1
-SET RESPONSE_FILE=%TEMP%\bt_report_%RANDOM%.json
 
-FOR /F "tokens=1,2,3 delims=|" %%A IN ('powershell -NoProfile -Command "$s=(Get-Date).Date.AddDays(-%DAY_OFFSET%); $e=$s.AddDays(1); '('{0}|{1}|{2}' -f $s.ToString('yyyy-MM-dd'), $s.ToString('ddd, dd MMM yyyy HH:mm:ss zzz'), $e.ToString('ddd, dd MMM yyyy HH:mm:ss zzz'))"') DO (
+REM English day and month names whatever the Windows language, and the offset
+REM as +0300, not the +03:00 .NET writes by default
+FOR /F "tokens=1,2,3 delims=|" %%A IN ('powershell -NoProfile -Command "$c=[Globalization.CultureInfo]::InvariantCulture; $s=(Get-Date).Date.AddDays(-%DAY_OFFSET%); $e=$s.AddDays(1); '{0}|{1}|{2}' -f $s.ToString('yyyy-MM-dd'), ($s.ToString('ddd, dd MMM yyyy HH:mm:ss ', $c) + $s.ToString('zzz').Replace(':','')), ($e.ToString('ddd, dd MMM yyyy HH:mm:ss ', $c) + $e.ToString('zzz').Replace(':',''))"') DO (
     SET DAY_LABEL=%%A
     SET START_RFC=%%B
     SET END_RFC=%%C
 )
 
+CALL :billable_count "%BT_PULL_PARTNER%"
+SET COUNT_1=%DAY_COUNT%
+CALL :billable_count "%BT_TEST_ACCOUNT%"
+SET COUNT_2=%DAY_COUNT%
+CALL :billable_count "%BT_PUSH_PARTNER%"
+SET COUNT_3=%DAY_COUNT%
+
+echo   %DAY_LABEL%  %COUNT_1%  %COUNT_2%  %COUNT_3%
+IF "%DAY_OFFSET%"=="0" (
+    SET TODAY_1=%COUNT_1%
+    SET TODAY_2=%COUNT_2%
+    SET TODAY_3=%COUNT_3%
+)
+EXIT /B 0
+
+REM billable_count ACCOUNT: sets DAY_COUNT, or ? when none could be read
+:billable_count
 curl -s -k -G -u "%ST_USER%:%ST_PASSWORD%" "https://%ST_SERVER%:%ST_PORT%/api/v2.0/logs/transfers" ^
-  --data-urlencode "isBillable=true" --data-urlencode "accountName=%BT_TEST_ACCOUNT%" ^
+  --data-urlencode "isBillable=true" --data-urlencode "account=%~1" ^
   --data-urlencode "startTimeAfter=%START_RFC%" --data-urlencode "endTimeBefore=%END_RFC%" ^
   --data-urlencode "limit=1" --data-urlencode "fields=id" ^
   -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT" > "%RESPONSE_FILE%"
-
 SET DAY_COUNT=
 FOR /F "delims=" %%N IN ('powershell -NoProfile -Command "try { (Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).resultSet.totalCount } catch { }"') DO SET DAY_COUNT=%%N
-
-IF NOT DEFINED DAY_COUNT (
-    echo   %DAY_LABEL%  could not read a count. The response was:
-    TYPE "%RESPONSE_FILE%"
-) ELSE (
-    echo   %DAY_LABEL%  %DAY_COUNT% billable transfer^(s^)
-    IF "%DAY_OFFSET%"=="0" SET TODAY_COUNT=%DAY_COUNT%
-)
-IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+IF "%DAY_COUNT%"=="" SET DAY_COUNT=?
 EXIT /B 0

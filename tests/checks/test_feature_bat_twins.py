@@ -30,6 +30,9 @@ ALLOWED_DIFFERENCES = {
     # feature's settings.sh/.bat alias its own prefix to, before enduser is loaded/called.
     "EU_JAR", "EU_CODE", "EU_CSRF", "EU_HEADERS", "EU_BODY_FILE",
     "AR_STATE_FILE",  # bash helper path; bat writes state.local.bat directly
+    # A bat file SETs EU_ACCOUNT before it CALLs enduser.bat login, to log in as a
+    # partner; bash calls bt_login_as ACCOUNT (settings.sh), which sets it
+    "EU_ACCOUNT",
 }
 
 

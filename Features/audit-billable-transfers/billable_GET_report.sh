@@ -7,12 +7,16 @@
 # ==============================================================================
 # Description:
 # Prints the number of billable transfers per day, for the last BT_REPORT_DAYS
-# days (today included), for this feature's test account, using the
-# `/logs/transfers` endpoint and its `isBillable` filter.
+# days (today included), for each of the three accounts of this feature, side by
+# side, using the `/logs/transfers` endpoint and its `isBillable` filter:
+#
+#   partner_to_pull_from   the uploads of the sample files, and their pulls out
+#   the test account       the pulls in, and the pushes out
+#   partner_to_push_to     the pushes arriving
 #
 # Not numbered like the setup steps: 00.run_all.sh runs this one twice, once
 # before anything else and once at the end, to show the before/after change for
-# today.
+# today, account by account.
 #
 # Usage:
 # ./billable_GET_report.sh [LABEL [ACCOUNT]]
@@ -22,21 +26,18 @@
 # default (the same name given to 00.run_all.sh).
 #
 # Notes:
-# - Scoped to accountName=BT_TEST_ACCOUNT, so an existing account with the same
-#   name on your server does not throw the count off. Run this against a server
-#   that does not already have that account, for a clean baseline.
-# - Each day is a full calendar day in the server's own local time, midnight to
-#   midnight, in RFC 2822 (the format curl's --data-urlencode produces from
-#   `date -R`, same as the Admin Guide's own export example).
+# - Each account is filtered with account=, an exact match. Not accountName=:
+#   /logs/transfers ignores that without a word and counts every account on the
+#   server (confirmed directly). An earlier version of this script used it.
+# - The partners are shared by every test account, so their counts include any
+#   other test account's runs on the same day.
+# - Each day is a full calendar day, midnight to midnight, in RFC 2822. macOS
+#   (BSD date) and Linux (GNU date) differ here; both are handled below.
+# - The count is resultSet.totalCount. resultSet.returnCount is capped by limit,
+#   which is 1 here to keep the response small.
+# - The last lines are TODAY_COUNT <account>: <count>, one per account, for
+#   00.run_all.sh to read.
 # - Requires `jq`.
-# - Confirmed directly: /logs/transfers' resultSet carries TWO counts, not one -
-#   returnCount (how many rows are in THIS page, capped by limit) and
-#   totalCount (the true total matching the filter, independent of limit). Most
-#   other list endpoints in this API only need returnCount, since their
-#   returnCount already ignores limit; this one does not. Reading returnCount
-#   here, with limit=1 set to keep the response small, silently capped every
-#   day's count at 1 - confirmed directly, a real bug caught by comparing
-#   against File Tracking's own count for the same account and day.
 # ==============================================================================
 
 #
@@ -55,6 +56,7 @@ source "${SCRIPT_DIR}/settings.sh"
 
 LABEL="${1:-report}"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
+ACCOUNTS=("${BT_PULL_PARTNER}" "${BT_TEST_ACCOUNT}" "${BT_PUSH_PARTNER}")
 
 # Midnight today, as an epoch second count - the one place BSD and GNU date
 # differ, same split as the Admin Guide's own export example
@@ -68,35 +70,49 @@ else
     to_day_label() { date -d "@$1" +%Y-%m-%d; }
 fi
 
-printf "Billable transfers per day, last %s day(s), for %s (%s)\n" \
-  "${BT_REPORT_DAYS}" "${BT_TEST_ACCOUNT}" "${LABEL}"
+# billable_count ACCOUNT START END: the count, or nothing when none could be read
+billable_count() {
+    curl -s -k -G -u "${ST_USER}:${ST_PASSWORD}" \
+      "https://${ST_SERVER}:${ST_PORT}/api/v2.0/logs/transfers" \
+      --data-urlencode "isBillable=true" \
+      --data-urlencode "account=$1" \
+      --data-urlencode "startTimeAfter=$2" \
+      --data-urlencode "endTimeBefore=$3" \
+      --data-urlencode "limit=1" --data-urlencode "fields=id" \
+      -H "accept: application/json" -H "${REFERER_HEADER}" \
+      | jq -r '.resultSet.totalCount // empty' 2>/dev/null
+}
 
-TODAY_COUNT=""
+printf "Billable transfers per day, last %s day(s) (%s)\n\n" "${BT_REPORT_DAYS}" "${LABEL}"
+printf "  %-10s" "day"
+for account in "${ACCOUNTS[@]}"; do printf "  %22s" "${account}"; done
+printf "\n"
+
+TODAY_COUNTS=()
 for day_offset in $(seq $((BT_REPORT_DAYS - 1)) -1 0); do
     start_epoch=$((TODAY_MIDNIGHT - day_offset * 86400))
     end_epoch=$((start_epoch + 86400))
     start_rfc=$(to_rfc2822 "${start_epoch}")
     end_rfc=$(to_rfc2822 "${end_epoch}")
-    day_label=$(to_day_label "${start_epoch}")
 
-    response=$(curl -s -k -G -u "${ST_USER}:${ST_PASSWORD}" \
-      "https://${ST_SERVER}:${ST_PORT}/api/v2.0/logs/transfers" \
-      --data-urlencode "isBillable=true" \
-      --data-urlencode "accountName=${BT_TEST_ACCOUNT}" \
-      --data-urlencode "startTimeAfter=${start_rfc}" \
-      --data-urlencode "endTimeBefore=${end_rfc}" \
-      --data-urlencode "limit=1" --data-urlencode "fields=id" \
-      -H "accept: application/json" -H "${REFERER_HEADER}")
-
-    count=$(printf '%s' "${response}" | jq -r '.resultSet.totalCount // empty' 2>/dev/null)
-    if [ -z "${count}" ]; then
-        printf "  %s  could not read a count. The response was:\n%s\n" "${day_label}" "${response}"
-        continue
-    fi
-    printf "  %s  %s billable transfer(s)\n" "${day_label}" "${count}"
-    [ "${day_offset}" -eq 0 ] && TODAY_COUNT="${count}"
+    # The whole row is built first, then printed at once
+    row=$(printf "  %-10s" "$(to_day_label "${start_epoch}")")
+    i=0
+    for account in "${ACCOUNTS[@]}"; do
+        count=$(billable_count "${account}" "${start_rfc}" "${end_rfc}")
+        row="${row}$(printf "  %22s" "${count:-?}")"
+        [ "${day_offset}" -eq 0 ] && TODAY_COUNTS[i]="${count}"
+        i=$((i + 1))
+    done
+    printf "%s\n" "${row}"
 done
 
-# A machine-readable line, so 00.run_all.sh can diff today's count before and
-# after, without re-parsing the printed table above
-printf "TODAY_COUNT: %s\n" "${TODAY_COUNT}"
+# Machine-readable lines, so 00.run_all.sh can diff today's counts before and
+# after, without re-parsing the table above. A count that could not be read is
+# left empty, and the table shows it as ?.
+printf "\n"
+i=0
+for account in "${ACCOUNTS[@]}"; do
+    printf "TODAY_COUNT %s: %s\n" "${account}" "${TODAY_COUNTS[i]}"
+    i=$((i + 1))
+done

@@ -28,11 +28,11 @@ SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/applications
 SET NAME=AccountFilePurge%%20Application
 
 echo Patching the application '%NAME%' to change the notes...
-curl -s -o nul -w "%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "%MAIN_URL%/%NAME%" ^
+curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "%MAIN_URL%/%NAME%" ^
 -H "accept: application/json" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
 -d "[{ \"op\": \"replace\", \"path\": \"/notes\", \"value\": \"Patched note\" }]"
 
 echo Patching the application '%NAME%' to change the startDate...
-curl -s -o nul -w "%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "%MAIN_URL%/%NAME%" ^
+curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X PATCH "%MAIN_URL%/%NAME%" ^
 -H "accept: application/json" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
 -d "[{ \"op\": \"replace\", \"path\": \"/schedules/0/startDate\", \"value\": \"2025-02-21T02:30:00Z\" }]"

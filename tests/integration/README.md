@@ -107,6 +107,18 @@ assumption about the API.
 | `18.python_replace_sites.py` | **yes** | The real, completely unmodified `stReplaceSites.py`, against every real SSH-protocol site on the server - there is no disposable stand-in, since the script has no name or prefix filter at all. Reads every site's full object first, runs the script, verifies each site's `keyExchangeAlgorithms`, then restores every site to its original object and verifies the restore, including that each site's already-encrypted password field survives unchanged. This needed an explicit, informed decision before it was added - this server had real-looking partner sites in scope. See "What is not covered yet". |
 | `19.bash_expression_language.py` | **yes** | The real, unmodified Expression Language exercises in `Admin/API 2.0/bash/14.ExpressionLanguage` (8 scripts) - a login restriction rule, an EL route condition, a route step's GLOB and REGEXP file filters, the nested EL-plus-JSON backslash doubling case, a rename expression, and a transfer site's `downloadPattern` and dynamic-property fields. Each script is self-contained (creates, shows, deletes its own throwaway objects); this check verifies each script's own printed output shows the exact expression text expected, then independently confirms nothing named `ZZTEST_EL_*` is left in routes, sites or loginRestrictionPolicies. |
 | `20.python_expression_language.py` | **yes** | The same eight exercises, run through their python3 twins in `Admin/API 2.0/python/python3/14.ExpressionLanguage`. Same verification approach as `19`. |
+| `21.configurations_write_scripts.py` | **yes** | The real `01.configurations_PATCH.sh` and `02.configurations_PATCH_UsageReporting.sh` in `13.Configurations`. A Server Configuration Option is a real, server-wide setting, so this reads every option's value first, runs both scripts, verifies each new value, then restores every option and verifies the restore. Found that an option GET reports as `readOnly` can still be patched. |
+| `22.routetemplates_compositeroutes_scripts.py` | **yes** | `08.RouteTemplates/02.routes_POST.sh`, trimmed from its 163 template names to 3 (keeping `RouteFromAccountant`, which the next script needs), then the real, unmodified `09.CompositeRoutes/02.routes_POST.sh`. Refuses to run if any of the names it creates already exist, and deletes every route it made. |
+| `23.connect_operations_scripts.py` | **yes** | The real `05.daemons_operations_POST.sh` and `13.servers_operations_POST.sh` in `03.Connect`, which stop and start real daemons and servers. Records every daemon and server state first, runs both, verifies the stop and the start, then restores AS2 to stopped and waits for every daemon and server to match its original state. `13` only starts what is not running, so on its own it is a safe no-op. Needed an explicit decision before it was added. |
+| `24.python_read_reports.py` | no | The real `stUsersPerSharedFolder.py` and `stCertificateExpiry.py`. Both only read, so this needs no `--write`, just the venv above. Each count they report is checked against an independent GET. |
+| `25.python_update_route_with_put.py` | **yes** | The real `stUpdateRouteWithPut.py` in its default `insert` mode, on a throwaway route it creates: reads the route, inserts a step at offset 0, PUTs the whole object back. Runs as a copy with `dryRun` off; verifies the step landed, then deletes the route. |
+| `26.python_get_private_cert.py` | **yes** | The real `stGetPrivateCert.py`, exporting a private certificate this check generates for a throwaway account through `POST /certificates`. Needs this server's CA password in `st_ca_password`, and skips itself when that is blank. Verifies a real private key was exported, then removes the certificate, the account and the files written. |
+| `27.python_update_all_routes.py` | **yes** | The real `stUpdateAllRoutes.py` (its first example) over every SIMPLE route on the server, plus a throwaway one built to match its condition. Verifies only the throwaway route is patched and the real ones are left alone - confirmed beforehand that no real route matches. |
+| `28.python_build_full_test_account.py` | **yes** | The real `stBuildFullTestAccount.py` end to end: account, an imported SSH key, a folder-monitor site, an SFTP site using that key, a subscription and two routes. Creates `ZZTEST_` stand-ins for the template and application the script expects, generates the key with `ssh-keygen`, and needs `st_ca_password`. Verifies all seven objects, then deletes them. Found and fixed two hardcoded account names in the script. |
+| `29.python_update_all_subscriptions.py` | **yes** | The real `stUpdateAllSubscriptions.py` over every real subscription on the server - the one check approved to change objects it does not own. Captures the four fields it patches on every subscription first, runs the script, then restores each field to its exact original value and verifies the restore. |
+| `30.lookups_and_transfer_logs_read.py` | no | The query filters the newer examples look objects up with - `/sites?account=&name=`, `/subscriptions?account=`, `/routes?type=` and `?name=`, `/logs/transfers?status=Failed` - each checked against every object it returns, using objects already on the server. That `/logs/transfers` carries `totalCount` while `returnCount` is capped by `limit`. Then the real `16.TransferLogs` scripts and `stBillableTransfers.py` (with the venv), each printed count compared with the API's own count for the same account and day. The billable parts need 5.5-20260924 or later. |
+| `31.subscriptions_routes_transfers_scripts.py` | **yes** | The newer examples as one Advanced Routing flow, on a throwaway `ZZTEST_chain` account: the EndUser folder and upload scripts, the SSH sites, both subscriptions, the Compress and Decompress routes, the composite route linked to the subscription, a pull, the transfer log, and then the clean-up examples in reverse. Each step is checked through the API, and the flow is proved end to end by the uploaded file arriving, pulled, compressed and pushed, in the account's `/delivered` folder. The Admin examples run as name-substituted copies (`john` and every fixed name made throwaway, which `test_integration_helpers.py` checks offline); the EndUser examples run unmodified. The trigger-file subscription and the billable count need 5.5-20260924 or later. Set `st_ssh_host`, `st_ssh_port` and `st_enduser_port` if the defaults do not fit your server. |
+| `32.pesit_acknowledgment_loop_scripts.py` | **yes** | A PeSIT loop between two throwaway accounts on the one server (each with a PeSIT site named after the other, and a transfer profile), and the real `Acknowledgment.sh` and `IteratePesitInbounds.sh` run on the transfers it makes: a NACK for a file nothing forwards, an ACK for one a subscription and route push on under the same `coreId`, and the iterator ACKing the forwarded one while leaving the other for later. The iterator acts on every unacknowledged PeSIT inbound on the server in its window, so it only runs when all of them belong to throwaway accounts. Set `st_pesit_host` and `st_pesit_port` if your PeSIT listener is not `st_server`:17617. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -165,7 +177,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `29` cover: the admin API's session and read behaviour (both as
+`01` through `32` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -180,11 +192,12 @@ that scans every real `SIMPLE` route on the server and safely patches only a
 throwaway one, one that builds a full onboarding chain (account, imported
 SSH key, two sites, a subscription, two routes) end to end, and one that
 patches and restores every real subscription on the server, by explicit
-decision - and all eight Expression Language exercises, in both bash and
-python3. `manual.graceful_scripts.py` covers a fourteenth python3 example, and
-`manual.pesit_acknowledgment_scripts.py` covers the last untested bash
-example, `90.EndToEndAcknowledgment/Acknowledgment.sh` - both by hand, for
-reasons of their own documented below.
+decision - all eight Expression Language exercises, in both bash and
+python3 - and the sites, subscriptions, routes, pull and transfer log
+examples as one working flow, with the lookups they rely on (`30`, `31`), and
+both acknowledgment scripts on a PeSIT loop of their own (`32`).
+`manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
+reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a
 mismatched Applications cleanup target, both EndUser download scripts
 corrupting every file they wrote, a PATCH that added a contact at a fixed
@@ -378,42 +391,19 @@ before anything else was written.
 
 The rewritten check - `tests/integration/checks/manual.graceful_scripts.py` -
 is not part of `run_integration.sh --write` on purpose: it has no leading
-number, so this project's own check-discovery (`find checks -name
-'[0-9]*'`) never finds it, and it additionally requires a third command line
+number, so this project's own check-discovery (`find checks -maxdepth 1
+-name '[0-9]*.py'`) never finds it, and it additionally requires a third command line
 flag beyond `--write`/`st_allow_writes` before it does anything. Read its
 own docstring - the full incident account above lives there - before ever
 running it by hand.
 
-**`EndToEndAcknowledgment` needed a live PeSIT transfer to exist, and this
-lab already has one buildable for real** - two real, pre-existing accounts,
-`jack` and `john`, are already wired together as a self-referential PeSIT
-partner pair (each has a site pointing at the other, both actually
-addressing this same server's own PeSIT port). `POST
-/transfers/operations?operation=pull` (confirmed directly - this is also
-where the `customProperties` field EL documentation references actually
-lives) triggers a real inbound PeSIT transfer between them, giving
-`90.EndToEndAcknowledgment/Acknowledgment.sh` a real `coreId` to run
-against.
-
-That same investigation is also why this is manual only, not part of
-`--write`: `jack` and `john` are real, populated, actively used accounts on
-this shared lab - not fixtures this project created - and confirmed
-directly, a pull with no filename specified does not fetch anything
-disposable. It grabs an arbitrary real file out of the partner's whole home
-folder (a real training document, the one time this was tried), copying it
-in under a filename that - separately confirmed - *is* deterministic (`TP`,
-every time), which is what lets `tests/integration/checks/manual.pesit_acknowledgment_scripts.py`
-find and delete it afterward without needing to browse the account's whole
-folder. Deleting it at all needs a real EndUser login, which needs a real
-password - so this check temporarily resets `jack`'s password (capturing
-and restoring the exact original password hash through the account's own
-`passwordDigest` field, confirmed to round-trip byte for byte), logs in
-once, deletes the one file it created, and restores the password before
-anything else. It only exercises `Acknowledgment.sh`'s NACK branch - the ACK
-branch would need a real auto-relay route built on this same shared account
-pair, deliberately not attempted. Needs `--write`, `st_allow_writes`, AND
-`--i-understand-this-touches-real-shared-accounts` - read its own docstring,
-which has the full account of what this touches and why, before running it.
+**`EndToEndAcknowledgment` needs live PeSIT transfers**, and
+`32.pesit_acknowledgment_loop_scripts.py` makes its own: two throwaway
+accounts, each with a PeSIT site named after the other, pointing at this
+server's own PeSIT listener. An earlier manual check borrowed two real accounts
+already wired that way on the lab, reset one's password to clean up, and only
+reached the NACK branch. It was removed once `32` covered both branches, and
+`IteratePesitInbounds.sh`, without touching a real account.
 
 Deliberately still not covered, and why:
 

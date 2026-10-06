@@ -25,13 +25,13 @@ CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 
-SET NAME=AccountFilePurge Application
-SET NAME=%NAME: =%%20%
+REM The space in the name is URL-encoded. A batch file writes one % as %%
+SET NAME=AccountFilePurge%%20Application
 echo Check if application with the name '%NAME%' exists...
 curl -k -u "%ST_USER%:%ST_PASSWORD%" --head "https://%ST_SERVER%:%ST_PORT%/api/v2.0/applications/%NAME%" -H "accept: */*" -H "%REFERER_HEADER%"
 
-SET NAME=HumanSystem Application
-SET NAME=%NAME: =%%20%
+REM The space in the name is URL-encoded. A batch file writes one % as %%
+SET NAME=HumanSystem%%20Application
 echo.
 echo Check if application with the name '%NAME%' exists...
 FOR /F %%C IN ('curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" --head "https://%ST_SERVER%:%ST_PORT%/api/v2.0/applications/%NAME%" -H "accept: */*" -H "%REFERER_HEADER%"') DO SET RESPONSE_CODE=%%C

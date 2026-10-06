@@ -6,10 +6,14 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Creates the folders these examples need in the account's home, using the End
-# User API `POST /files/{name}` endpoint: the shared drop folder, the two
-# delivered folders, the subscription folder, and six subfolders inside it, one
-# per scenario (subscription/s1 to subscription/s6).
+# Creates the folders these examples need, using the End User API
+# `POST /files/{name}` endpoint, logged in as each account in turn:
+#   - the test account: the subscription folder, and six subfolders inside it,
+#     one per scenario (subscription/s1 to subscription/s6)
+#   - partner_to_pull_from: a folder named after the test account, and the drop
+#     folder inside it, where the sample files wait to be pulled
+#   - partner_to_push_to: a folder named after the test account, and the two
+#     delivered folders inside it, where the pushes arrive
 #
 # Usage:
 # ./04.files_POST_folders.sh
@@ -21,9 +25,7 @@
 # - The folder's name goes in the URL, and the body says it is a directory. POST
 #   /files with the name in the body is refused with a 409, whatever the body
 #   (confirmed on Features/trigger-route-after-completed-pull).
-# - UNVERIFIED: the subscription/sN subfolders are created with a second POST,
-#   after the subscription folder itself exists, on the assumption that creating
-#   a nested folder needs its parent to exist first, like a plain mkdir.
+# - A nested folder is created after its parent, like a plain mkdir.
 # - The port is BT_ENDUSER_PORT, 8443 by default. It is not the Admin port.
 # ==============================================================================
 
@@ -51,16 +53,23 @@ create_folder() {
     printf "%s\nHTTP %s\n" "${AR_EU_BODY}" "${AR_EU_CODE}"
 }
 
-ar_enduser_login || exit 1
-
-# Top level first: outbound-drop, delivered-1, delivered-2, subscription
-for folder in "${BT_DROP_FOLDER#/}" "${BT_DELIVERED_1_FOLDER#/}" "${BT_DELIVERED_2_FOLDER#/}" "${BT_SUBSCRIPTION_FOLDER#/}"; do
-    create_folder "${folder}"
-done
-
-# Then one subfolder of subscription per scenario
+# The test account: the subscription folder, then one subfolder per scenario
+bt_login_as "${BT_TEST_ACCOUNT}" || exit 1
+create_folder "${BT_SUBSCRIPTION_FOLDER#/}"
 for n in 1 2 3 4 5 6; do
     create_folder "${BT_SUBSCRIPTION_FOLDER#/}/s${n}"
 done
+ar_enduser_logout
 
+# partner_to_pull_from: the test account's folder, then its drop folder
+bt_login_as "${BT_PULL_PARTNER}" || exit 1
+create_folder "${BT_RUN_FOLDER#/}"
+create_folder "${BT_DROP_FOLDER#/}"
+ar_enduser_logout
+
+# partner_to_push_to: the test account's folder, then the two delivered folders
+bt_login_as "${BT_PUSH_PARTNER}" || exit 1
+create_folder "${BT_RUN_FOLDER#/}"
+create_folder "${BT_DELIVERED_1_FOLDER#/}"
+create_folder "${BT_DELIVERED_2_FOLDER#/}"
 ar_enduser_logout

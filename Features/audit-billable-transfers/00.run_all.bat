@@ -8,16 +8,15 @@ REM ============================================================================
 REM Description:
 REM Runs the whole test, start to finish:
 REM
-REM   1. Prints today's billable transfer count, and the six days before it
-REM      (billable_GET_report.bat "before").
-REM   2. Sets up the account, the sites, the folders, the application, the
+REM   1. Prints the billable transfer count per day of the three accounts, today
+REM      and the six days before it (billable_GET_report.bat "before").
+REM   2. Sets up the three accounts, the sites, the folders, the application, the
 REM      routes and the subscriptions (01 to 09), uploads the sample files and
-REM      the two archives (10), and runs the six pulls (11).
-REM   3. Prints the same report again (billable_GET_report.bat "after"), so
-REM      today's count can be compared against step 1.
-REM   4. Prints the real before/after delta for today - how many billable
-REM      transfers this run actually added - and restates the rule. It does not
-REM      print a fixed per-scenario table: see the Notes below for why.
+REM      the two archives to partner_to_pull_from (10), and runs the six pulls
+REM      (11).
+REM   3. Prints the same report again (billable_GET_report.bat "after").
+REM   4. For each account, prints how many billable transfers this run added
+REM      today, next to what the rule predicts for it, and whether they match.
 REM
 REM Usage:
 REM 00.run_all.bat [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
@@ -40,16 +39,8 @@ REM - It stops at the first setup step that fails: a non-zero exit, or a line
 REM   starting HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing
 REM   is cleaned up, so you can look.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
-REM - Step 4 used to print a fixed table of the billable count the rule predicts
-REM   per scenario. That table was wrong, and is gone: billing here is tracked
-REM   per transfer chain (coreId), not per filename, and step 10's own upload (a
-REM   real, billable Inbound in its own right) and the pull that empties the drop
-REM   folder (that chain's own free first outbound) are each a SEPARATE chain from
-REM   the scenario's intended pull/push, adding billable transfers the rule's
-REM   plain six-scenario description never counted. Confirmed directly, by
-REM   comparing this run's own File Tracking entries by coreId. Read the actual
-REM   result in File Tracking, grouped by Transfer name, rather than trusting a
-REM   static prediction.
+REM - The partners are shared by every test account. A run of another test
+REM   account on the same day, at the same time, adds to their counts too.
 REM ==============================================================================
 
 REM Everything this sets, including the arguments below, ends with this script,
@@ -95,8 +86,9 @@ echo === Step 1: billable transfers before this run ===
 SET REPORT_LOG=%TEMP%\bt_report_%RANDOM%.log
 CALL "%~dp0billable_GET_report.bat" before > "%REPORT_LOG%"
 TYPE "%REPORT_LOG%"
-SET BEFORE_TODAY=
-FOR /F "tokens=2 delims=: " %%T IN ('FINDSTR /B "TODAY_COUNT:" "%REPORT_LOG%"') DO SET BEFORE_TODAY=%%T
+CALL :today_count "%BT_PULL_PARTNER%" BEFORE_PULL
+CALL :today_count "%BT_TEST_ACCOUNT%" BEFORE_TEST
+CALL :today_count "%BT_PUSH_PARTNER%" BEFORE_PUSH
 IF EXIST "%REPORT_LOG%" DEL "%REPORT_LOG%"
 
 REM Every numbered setup step, except this script and the cleanup
@@ -116,26 +108,48 @@ echo === Step 3: billable transfers after this run ===
 SET REPORT_LOG=%TEMP%\bt_report_%RANDOM%.log
 CALL "%~dp0billable_GET_report.bat" after > "%REPORT_LOG%"
 TYPE "%REPORT_LOG%"
-SET AFTER_TODAY=
-FOR /F "tokens=2 delims=: " %%T IN ('FINDSTR /B "TODAY_COUNT:" "%REPORT_LOG%"') DO SET AFTER_TODAY=%%T
+CALL :today_count "%BT_PULL_PARTNER%" AFTER_PULL
+CALL :today_count "%BT_TEST_ACCOUNT%" AFTER_TEST
+CALL :today_count "%BT_PUSH_PARTNER%" AFTER_PUSH
 IF EXIST "%REPORT_LOG%" DEL "%REPORT_LOG%"
+
+REM What the rule predicts each account adds. FILES is every file pulled: the
+REM inbound-only and in-and-out files, 1 for 2.3, 2 for 2.4, and one archive each
+REM for 2.5 and 2.6.
+REM   partner_to_pull_from: each upload in is billable; each pull out is the
+REM     file's first outbound, so free
+REM   the test account: each pull in is billable; of the pushes out, the first in
+REM     each transfer chain (coreId) is free and the rest are billable. Decompress
+REM     keeps the archive's chain and Compress starts a new one (confirmed on a
+REM     real run), so: 2.3 one billable push, 2.5 one, 2.6 three of its four
+REM   partner_to_push_to: each push arriving is billable. 2.2 one per file, 2.3
+REM     two, 2.4 one archive, 2.5 two files, 2.6 two files to each of two folders
+SET /A FILES=%BT_INBOUND_ONLY_COUNT%+%BT_IN_AND_OUT_COUNT%+5
+SET /A PREDICT_PULL=%FILES%
+SET /A PREDICT_TEST=%FILES%+5
+SET /A PREDICT_PUSH=%BT_IN_AND_OUT_COUNT%+9
 
 echo.
 echo === Step 4: analysis ===
-IF DEFINED BEFORE_TODAY IF DEFINED AFTER_TODAY CALL :print_delta
-IF NOT DEFINED BEFORE_TODAY echo Could not read today's count from step 1 above; see it for the raw response.
-IF NOT DEFINED AFTER_TODAY echo Could not read today's count from step 3 above; see it for the raw response.
-echo.
 echo The rule, from the Admin Guide: every inbound transfer is billable. For a
 echo given file, the first outbound transfer that follows it is not billable;
 echo every outbound transfer after that first one is.
 echo.
-echo That rule is tracked per transfer chain (coreId), not per filename. Step 10's
-echo own upload into outbound-drop is a real, billable Inbound transfer in its own
-echo right, and the pull that later empties outbound-drop is THAT chain's own free
-echo first outbound - both separate from, and in addition to, the scenario's
-echo intended pull into subscription/sN and push to a partner. For the exact
-echo breakdown, read File Tracking for %BT_TEST_ACCOUNT%, grouped by Transfer name.
+echo Billable transfers this run added today, by account:
+echo.
+echo   account  before  after  added  the rule predicts
+SET MATCHED=1
+CALL :analysis_row "%BT_PULL_PARTNER%" "%BEFORE_PULL%" "%AFTER_PULL%" %PREDICT_PULL%
+CALL :analysis_row "%BT_TEST_ACCOUNT%" "%BEFORE_TEST%" "%AFTER_TEST%" %PREDICT_TEST%
+CALL :analysis_row "%BT_PUSH_PARTNER%" "%BEFORE_PUSH%" "%AFTER_PUSH%" %PREDICT_PUSH%
+echo.
+IF "%MATCHED%"=="1" (
+    echo Every account added what the rule predicts.
+) ELSE (
+    echo An account did not add what the rule predicts, or its count could not be
+    echo read. Read File Tracking for that account, grouped by Transfer name. A push
+    echo still under way when step 3 ran shows up there, and in a later report.
+)
 
 IF "%CLEANUP%"=="1" (
     echo.
@@ -189,14 +203,33 @@ echo Pausing %BT_STEP_PAUSE_SECONDS% seconds...
 ping -n %PING_COUNT% 127.0.0.1 >NUL
 EXIT /B 0
 
-:print_delta
-echo Today's billable count for %BT_TEST_ACCOUNT%: %BEFORE_TODAY% before this run, %AFTER_TODAY% after.
-SET /A DELTA=%AFTER_TODAY%-%BEFORE_TODAY%
-echo This run added %DELTA% billable transfer^(s^) today.
+REM today_count ACCOUNT VARIABLE: the TODAY_COUNT the report printed for an account
+:today_count
+SET %2=
+FOR /F "tokens=3 delims=: " %%T IN ('FINDSTR /B /C:"TODAY_COUNT %~1:" "%REPORT_LOG%"') DO SET %2=%%T
 EXIT /B 0
 
-REM take_arg VALUE: one command line argument, either --cleanup or the next of
-REM ACCOUNT, INBOUND_ONLY and IN_AND_OUT, in that order
+REM analysis_row ACCOUNT BEFORE AFTER PREDICTED
+:analysis_row
+SET ROW_BEFORE=%~2
+SET ROW_AFTER=%~3
+IF "%ROW_BEFORE%"=="" SET ROW_BEFORE=?
+IF "%ROW_AFTER%"=="" SET ROW_AFTER=?
+IF "%ROW_BEFORE%"=="?" GOTO :analysis_unknown
+IF "%ROW_AFTER%"=="?" GOTO :analysis_unknown
+SET /A ROW_ADDED=%ROW_AFTER%-%ROW_BEFORE%
+SET ROW_NOTE=
+IF NOT "%ROW_ADDED%"=="%4" (
+    SET ROW_NOTE=   differs
+    SET MATCHED=0
+)
+echo   %~1  %ROW_BEFORE%  %ROW_AFTER%  %ROW_ADDED%  %4%ROW_NOTE%
+EXIT /B 0
+:analysis_unknown
+SET MATCHED=0
+echo   %~1  %ROW_BEFORE%  %ROW_AFTER%  ?  %4
+EXIT /B 0
+
 :take_arg
 IF "%~1"=="--cleanup" (
     SET CLEANUP=1

@@ -63,11 +63,17 @@ read_into() {
 }
 
 echo "=== 01.accounts_POST.sh ==="
+# The stub answers HEAD with STUB_CURL_STATUS: 201 here, so no partner exists yet
 run 01.accounts_POST.sh "${SERVER_NEW}"
 [ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
-B=$(payloads | jq -s -c '.[0]')
-[ "$(echo "${B}" | jq -r .name)" = "btTestAccount" ] && pass "account name" || fail "account: ${B}"
-[ "$(echo "${B}" | jq -c .transfersWebServiceAllowed)" = "true" ] && pass "web service right is on" || fail "transfersWebServiceAllowed"
+ACCOUNTS=$(payloads | jq -r '.name + " " + .homeFolder' | tr '\n' '|')
+[ "${ACCOUNTS}" = "btTestAccount /home/btTestAccount|partner_to_pull_from /home/partner_to_pull_from|partner_to_push_to /home/partner_to_push_to|" ] \
+    && pass "creates the test account and the two partners, each with its own home folder" || fail "accounts: ${ACCOUNTS}"
+[ "$(payloads | jq -s -c '[.[].transfersWebServiceAllowed] | unique')" = "[true]" ] && pass "web service right is on for all three" || fail "transfersWebServiceAllowed"
+# 200 to the HEAD: the partners are there already, from another test account's run
+run 01.accounts_POST.sh "${SERVER_NEW}" "" "" 200
+[ "$(payloads | jq -r .name | tr '\n' ' ')" = "btTestAccount " ] && [ "$(echo "${OUT}" | grep -c 'Reused.')" -eq 2 ] \
+    && pass "reuses partners that are already there, and creates only the test account" || fail "with partners: $(payloads | jq -r .name)"
 
 echo
 echo "=== 02.sites_POST_pull.sh ==="
@@ -82,13 +88,17 @@ PATTERNS=$(printf '%s\n' "${SITE_BODIES[@]}" | jq -r .downloadPattern | tr '\n' 
 echo "${SITE_BODIES[0]}" | jq -e '.type == "ssh" and .protocol == "ssh"' >/dev/null && pass "SSH sites, with protocol set" || fail "type/protocol"
 [ "$(echo "${SITE_BODIES[0]}" | jq -r .port)" = "8022" ] && pass "SSH port 8022" || fail "port"
 [ "$(echo "${SITE_BODIES[0]}" | jq -c .usePassword)" = "true" ] && pass "usePassword is a JSON boolean" || fail "usePassword"
+[ "$(printf '%s\n' "${SITE_BODIES[@]}" | jq -r '[.account, .userName, .downloadFolder] | join(" ")' | sort -u)" = "btTestAccount partner_to_pull_from /btTestAccount/outbound-drop" ] \
+    && pass "the test account's sites log in as partner_to_pull_from, to the test account's drop folder there" || fail "pull sites: ${SITE_BODIES[0]}"
 
 echo
 echo "=== 03.sites_POST_push.sh ==="
 run 03.sites_POST_push.sh "${SERVER_NEW}"
 read_into PUSH_BODIES < <(payloads | jq -c .)
-[ "$(echo "${PUSH_BODIES[0]}" | jq -r .name)" = "btTestAccountPushSitePartner1" ] && [ "$(echo "${PUSH_BODIES[0]}" | jq -r .uploadFolder)" = "/delivered-1" ] && pass "push site 1 delivers to /delivered-1" || fail "push1: ${PUSH_BODIES[0]}"
-[ "$(echo "${PUSH_BODIES[1]}" | jq -r .name)" = "btTestAccountPushSitePartner2" ] && [ "$(echo "${PUSH_BODIES[1]}" | jq -r .uploadFolder)" = "/delivered-2" ] && pass "push site 2 delivers to /delivered-2" || fail "push2: ${PUSH_BODIES[1]}"
+[ "$(echo "${PUSH_BODIES[0]}" | jq -r '[.name, .account, .userName, .uploadFolder] | join(" ")')" = "btTestAccountPushSitePartner1 btTestAccount partner_to_push_to /btTestAccount/delivered-1" ] \
+    && pass "push site 1 logs in as partner_to_push_to, delivering to btTestAccount/delivered-1" || fail "push1: ${PUSH_BODIES[0]}"
+[ "$(echo "${PUSH_BODIES[1]}" | jq -r '[.name, .account, .userName, .uploadFolder] | join(" ")')" = "btTestAccountPushSitePartner2 btTestAccount partner_to_push_to /btTestAccount/delivered-2" ] \
+    && pass "push site 2 logs in as partner_to_push_to, delivering to btTestAccount/delivered-2" || fail "push2: ${PUSH_BODIES[1]}"
 
 echo
 echo "=== 04.files_POST_folders.sh ==="
@@ -98,12 +108,14 @@ run 04.files_POST_folders.sh "${SERVER_NEW}"
 # prefix, which would silently log in as ":" and fail every call after it.
 # grep -F, not the first BASIC_AUTH line: the version check's own admin-
 # authenticated GET /version always comes first and is a different login.
-echo "${OUT}" | grep -qF "BASIC_AUTH: btTestAccount:p@ss w0rd" \
-    && pass "logs in to the End User API with the real account name and password" \
-    || fail "End User login credentials: $(echo "${OUT}" | grep '^BASIC_AUTH:' | sed -n 2p)"
-FOLDER_CALLS=$(calls | grep '^POST .*files/' | sed 's#.*/files/##')
-EXPECTED_FOLDERS=$'outbound-drop\ndelivered-1\ndelivered-2\nsubscription\nsubscription/s1\nsubscription/s2\nsubscription/s3\nsubscription/s4\nsubscription/s5\nsubscription/s6'
-[ "${FOLDER_CALLS}" = "${EXPECTED_FOLDERS}" ] && pass "creates the four top-level folders, then subscription/s1 to s6, in order" || fail "folders: ${FOLDER_CALLS}"
+LOGINS=$(echo "${OUT}" | grep '^BASIC_AUTH:' | sed -n '2,$p' | sed 's/^BASIC_AUTH: //' | tr '\n' '|')
+[ "${LOGINS}" = "btTestAccount:p@ss w0rd|partner_to_pull_from:p@ss w0rd|partner_to_push_to:p@ss w0rd|" ] \
+    && pass "logs in to the End User API as each of the three accounts in turn, with the real password" \
+    || fail "End User logins: ${LOGINS}"
+FOLDER_CALLS=$(calls | grep '^POST .*files/' | sed 's#.*/files/##' | tr '\n' ' ')
+[ "${FOLDER_CALLS}" = "subscription subscription/s1 subscription/s2 subscription/s3 subscription/s4 subscription/s5 subscription/s6 btTestAccount btTestAccount/outbound-drop btTestAccount btTestAccount/delivered-1 btTestAccount/delivered-2 " ] \
+    && pass "the test account's subscription folders, then its folder and drop folder in partner_to_pull_from, then its folder and delivered folders in partner_to_push_to" \
+    || fail "folders: ${FOLDER_CALLS}"
 FOLDER_BODY=$(payloads | jq -s -c '.[0]')
 [ "$(echo "${FOLDER_BODY}" | jq -c .isDirectory)" = "true" ] && pass "each is created as a directory" || fail "folder body: ${FOLDER_BODY}"
 
@@ -201,8 +213,10 @@ run 10.files_upload_POST.sh "${SERVER_NEW}" "${WORK}/operation.json"
 [ "$(calls | grep -c '^POST .*fileOperations$')" -eq 7 ] && pass "declares seven uploads: 5 files + 2 archives" || fail "declares: $(calls | grep -c fileOperations)"
 [ "$(calls | grep -c '^PUT .*fileOperations/op-7$')" -eq 7 ] && pass "sends seven contents, with PUT" || fail "puts: $(calls | grep -c PUT)"
 DECLARE_PATHS=$(post_payloads | jq -r 'select(.operation=="Upload") | .filePath' | tr '\n' ' ')
-[ "${DECLARE_PATHS}" = "/outbound-drop/only_inbound.txt /outbound-drop/inbound_and_one_outbound.txt /outbound-drop/inbound_and_two_outbounds.txt /outbound-drop/file_1_for_compress.txt /outbound-drop/file_2_for_compress.txt /outbound-drop/archive_with_2_files.zip /outbound-drop/archive_with_2_files_for_2_partners.zip " ] \
-    && pass "uploads all five files then both archives, into the shared drop folder" || fail "paths: ${DECLARE_PATHS}"
+[ "${DECLARE_PATHS}" = "/btTestAccount/outbound-drop/only_inbound.txt /btTestAccount/outbound-drop/inbound_and_one_outbound.txt /btTestAccount/outbound-drop/inbound_and_two_outbounds.txt /btTestAccount/outbound-drop/file_1_for_compress.txt /btTestAccount/outbound-drop/file_2_for_compress.txt /btTestAccount/outbound-drop/archive_with_2_files.zip /btTestAccount/outbound-drop/archive_with_2_files_for_2_partners.zip " ] \
+    && pass "uploads all five files then both archives, into the test account's drop folder" || fail "paths: ${DECLARE_PATHS}"
+[ "$(echo "${OUT}" | grep '^BASIC_AUTH:' | sed -n 2p)" = "BASIC_AUTH: partner_to_pull_from:p@ss w0rd" ] \
+    && pass "uploads as partner_to_pull_from, so the uploads count against it, not the test account" || fail "upload login: $(echo "${OUT}" | grep '^BASIC_AUTH:' | sed -n 2p)"
 # The archive content itself: a real zip, with its two member names inside
 ZIP_CONTENT=$(echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | tail -n 1 | base64 -d)
 echo "${ZIP_CONTENT}" | head -c4 | grep -q "PK" && pass "the last upload is a real zip (PK signature)" || fail "not a zip"
@@ -230,15 +244,21 @@ OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/repo
 RC=$?
 [ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
 [[ "${OUT}" == *"(before)"* ]] && pass "the label is printed in the heading" || fail "heading: $(echo "${OUT}" | grep Billable)"
-DAY_LINES=$(echo "${OUT}" | grep -cE '^  [0-9]{4}-[0-9]{2}-[0-9]{2}  4 billable')
-[ "${DAY_LINES}" -eq 7 ] && pass "reports seven days, using totalCount (4), not returnCount (1)" || fail "day lines: ${DAY_LINES}"
-echo "${OUT}" | grep -qx "TODAY_COUNT: 4" && pass "prints a machine-readable TODAY_COUNT line, for 00.run_all.sh to diff" || fail "TODAY_COUNT line: $(echo "${OUT}" | grep TODAY_COUNT)"
+DAY_LINES=$(echo "${OUT}" | grep -cE '^  [0-9]{4}-[0-9]{2}-[0-9]{2} +4 +4 +4$')
+[ "${DAY_LINES}" -eq 7 ] && pass "reports seven days, one column per account, using totalCount (4), not returnCount (1)" || fail "day lines: ${DAY_LINES}"
+[ "$(echo "${OUT}" | grep '^TODAY_COUNT' | tr '\n' '|')" = "TODAY_COUNT partner_to_pull_from: 4|TODAY_COUNT btTestAccount: 4|TODAY_COUNT partner_to_push_to: 4|" ] \
+    && pass "prints a machine-readable TODAY_COUNT line per account, for 00.run_all.sh to diff" || fail "TODAY_COUNT lines: $(echo "${OUT}" | grep TODAY_COUNT)"
 # Full lines, not calls() (which splits on whitespace via awk): the stub does
 # not URL-encode the RFC 2822 dates, so the URL itself contains spaces
 REPORT_URLS=$(echo "${OUT}" | grep '^URL: ' | sed 's#^URL: ##; s#.*logs/transfers?##')
-[ "$(echo "${REPORT_URLS}" | grep -c 'isBillable=true')" -eq 7 ] && pass "every day's query filters isBillable=true" || fail "isBillable missing"
-[ "$(echo "${REPORT_URLS}" | grep -c 'accountName=btTestAccount')" -eq 7 ] && pass "every day's query is scoped to the test account" || fail "accountName missing"
-STARTS=$(echo "${REPORT_URLS}" | sed -n 's/.*startTimeAfter=\([A-Za-z]*, [0-9]* [A-Za-z]* [0-9]*\).*/\1/p')
+[ "$(echo "${REPORT_URLS}" | grep -c 'isBillable=true')" -eq 21 ] && pass "every query filters isBillable=true: 7 days, 3 accounts" || fail "isBillable missing"
+for a in partner_to_pull_from btTestAccount partner_to_push_to; do
+    [ "$(echo "${REPORT_URLS}" | grep -c "&account=${a}&")" -eq 7 ] && pass "seven days scoped to ${a}, with account=" || fail "account=${a}: $(echo "${REPORT_URLS}" | grep -c "account=${a}")"
+done
+# accountName= is ignored by /logs/transfers, which then counts every account:
+# the bug this report once had
+echo "${REPORT_URLS}" | grep -q 'accountName=' && fail "a query uses accountName=, which the endpoint ignores" || pass "no query uses accountName=, which the endpoint ignores"
+STARTS=$(echo "${REPORT_URLS}" | sed -n 's/.*startTimeAfter=\([A-Za-z]*, [0-9]* [A-Za-z]* [0-9]*\).*/\1/p' | sort -u)
 [ "$(echo "${STARTS}" | wc -l | tr -d ' ')" = "7" ] && pass "seven distinct day boundaries requested" || fail "boundaries: ${STARTS}"
 
 echo
@@ -258,16 +278,22 @@ cat > "${WORK}/version_and_objects.json" <<JSON
     {"id": "push1", "name": "btTestAccountPushSitePartner1", "account": "btTestAccount"},
     {"id": "push2", "name": "btTestAccountPushSitePartner2", "account": "btTestAccount"},
     {"id": "other", "name": "unrelatedSite", "account": "btTestAccount"},
-    {"id": "elsewhere", "name": "btTestAccountPullSite1", "account": "someoneElse"}
+    {"id": "elsewhere", "name": "btTestAccountPullSite1", "account": "someoneElse", "userName": "partner_to_pull_from"}
   ]
 }
 JSON
 rm -f "${RUN:?}/state.local.sh"
-run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json"
+# 200 to every HEAD: all three accounts exist. The site "elsewhere", of another
+# account, still logs in as partner_to_pull_from, so that partner must stay.
+run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json" "" "" 200
 D=$(calls | grep '^DELETE' | sed 's#.*/api/v2.0/##' | tr '\n' ' ')
-[ "${D}" = "routes/comp2 routes/simple2 routes/tmpl1 subscriptions/sub1 applications/btTestAccountApplication sites/site1 sites/push1 sites/push2 files/outbound-drop/f1.txt files/outbound-drop files/delivered-1/f1.txt files/delivered-1 files/delivered-2/f1.txt files/delivered-2 files/subscription/s1/f1.txt files/subscription/s1 files/subscription/s2/f1.txt files/subscription/s2 files/subscription/s3/f1.txt files/subscription/s3 files/subscription/s4/f1.txt files/subscription/s4 files/subscription/s5/f1.txt files/subscription/s5 files/subscription/s6/f1.txt files/subscription/s6 files/subscription/f1.txt files/subscription myself accounts/btTestAccount " ] \
-    && pass "deletes composite, simple, template, subscription, application, sites, folders (emptied first), account, in that order" \
+[ "${D}" = "routes/comp2 routes/simple2 routes/tmpl1 subscriptions/sub1 applications/btTestAccountApplication sites/site1 sites/push1 sites/push2 files/subscription/s1/f1.txt files/subscription/s1 files/subscription/s2/f1.txt files/subscription/s2 files/subscription/s3/f1.txt files/subscription/s3 files/subscription/s4/f1.txt files/subscription/s4 files/subscription/s5/f1.txt files/subscription/s5 files/subscription/s6/f1.txt files/subscription/s6 files/subscription/f1.txt files/subscription myself accounts/btTestAccount files/btTestAccount/outbound-drop/f1.txt files/btTestAccount/outbound-drop files/btTestAccount/f1.txt files/btTestAccount myself files/btTestAccount/delivered-1/f1.txt files/btTestAccount/delivered-1 files/btTestAccount/delivered-2/f1.txt files/btTestAccount/delivered-2 files/btTestAccount/f1.txt files/btTestAccount myself accounts/partner_to_push_to " ] \
+    && pass "deletes the test account's objects, its folders and the account, then its folder in each partner, then a partner no site uses" \
     || fail "order: ${D}"
+[[ "${OUT}" == *"The account partner_to_pull_from is kept: 1 site(s) of another test account still log in as it."* ]] \
+    && pass "keeps a partner that another test account's site still logs in as" || fail "partner_to_pull_from was not kept"
+LOGINS=$(echo "${OUT}" | grep '^BASIC_AUTH:' | grep -v apiadmin | sed 's/^BASIC_AUTH: //;s/:.*//' | tr '\n' ' ')
+[ "${LOGINS}" = "btTestAccount partner_to_pull_from partner_to_push_to " ] && pass "removes each account's folders logged in as that account" || fail "folder logins: ${LOGINS}"
 echo "${D}" | grep -qE 'sub-else|other\b|elsewhere' && fail "touched another account's or an unrelated object" || pass "leaves other accounts' objects and unrelated ones alone"
 [ ! -f "${RUN}/state.local.sh" ] && pass "removes the saved ids" || fail "state file left behind"
 
@@ -287,8 +313,11 @@ STATUS=201 master
 STEP_COUNT=$(echo "${OUT}" | grep -c '^--- .* of 12:')
 [ "${STEP_COUNT}" -eq 12 ] && pass "runs all 12 numbered setup scripts" || fail "step count: ${STEP_COUNT}"
 [[ "${OUT}" != *"=== Cleanup"* ]] && pass "without --cleanup, nothing is removed" || fail "cleaned up without being asked"
-[[ "${OUT}" == *"This run added 0 billable transfer(s) today."* ]] \
-    && pass "step 4 prints the real measured before/after delta, not a fixed table" || fail "no delta line: $(echo "${OUT}" | grep -A2 'Step 4')"
+ROWS=$(echo "${OUT}" | sed -n '/=== Step 4/,$p' | grep -E '^  (partner_to_pull_from|btTestAccount|partner_to_push_to) ' | awk '{print $1, $2, $3, $4, $5}' | tr '\n' '|')
+[ "${ROWS}" = "partner_to_pull_from 0 0 0 7|btTestAccount 0 0 0 12|partner_to_push_to 0 0 0 10|" ] \
+    && pass "step 4: per account, before, after, added, and what the rule predicts (7, 12, 10 for one file each)" || fail "step 4 rows: ${ROWS}"
+[[ "${OUT}" == *"An account did not add what the rule predicts"* ]] && [ "$(echo "${OUT}" | grep -c '   differs$')" -eq 3 ] \
+    && pass "step 4 says when an account did not add what the rule predicts" || fail "no mismatch note: $(echo "${OUT}" | sed -n '/Step 4/,$p' | tail -5)"
 [[ "${OUT}" != *"2.1 only inbound"* ]] && pass "the old fixed per-scenario table is gone" || fail "the old static table is still being printed"
 STATUS=201 master --cleanup
 [[ "${OUT}" == *"=== Cleanup: 99.cleanup_DELETE.sh ==="* ]] && pass "--cleanup runs the cleanup at the end" || fail "--cleanup did not clean up"
@@ -315,6 +344,8 @@ run 02.sites_POST_pull.sh "${SERVER_NEW}"
 NAMES=$(payloads | jq -r .name | tr '\n' ' ')
 [ "${NAMES}" = "test_accountPullSite1 test_accountPullSite2 test_accountPullSite3 test_accountPullSite4 test_accountPullSite5 test_accountPullSite6 " ] \
     && pass "the pull site names are derived from the account name" || fail "site names: ${NAMES}"
+[ "$(payloads | jq -r .downloadFolder | sort -u)" = "/test_account/outbound-drop" ] \
+    && pass "so is its folder in partner_to_pull_from, so two test accounts' files never mix" || fail "drop folder: $(payloads | jq -r .downloadFolder | sort -u)"
 run 05.applications_POST.sh "${SERVER_NEW}"
 [ "$(payloads | jq -s -r '.[0].name')" = "test_accountApplication" ] && pass "so is the application name, so two accounts never collide" || fail "application: $(payloads)"
 unset BT_RUN_ACCOUNT
@@ -322,7 +353,7 @@ unset BT_RUN_ACCOUNT
 export BT_RUN_INBOUND_ONLY=3 BT_RUN_IN_AND_OUT=2
 run 10.files_upload_POST.sh "${SERVER_NEW}" "${WORK}/operation.json"
 PATHS=$(post_payloads | jq -r 'select(.operation=="Upload") | .filePath' | tr '\n' ' ')
-[ "${PATHS}" = "/outbound-drop/only_inbound_1.txt /outbound-drop/only_inbound_2.txt /outbound-drop/only_inbound_3.txt /outbound-drop/inbound_and_one_outbound_1.txt /outbound-drop/inbound_and_one_outbound_2.txt /outbound-drop/inbound_and_two_outbounds.txt /outbound-drop/file_1_for_compress.txt /outbound-drop/file_2_for_compress.txt /outbound-drop/archive_with_2_files.zip /outbound-drop/archive_with_2_files_for_2_partners.zip " ] \
+[ "${PATHS}" = "/btTestAccount/outbound-drop/only_inbound_1.txt /btTestAccount/outbound-drop/only_inbound_2.txt /btTestAccount/outbound-drop/only_inbound_3.txt /btTestAccount/outbound-drop/inbound_and_one_outbound_1.txt /btTestAccount/outbound-drop/inbound_and_one_outbound_2.txt /btTestAccount/outbound-drop/inbound_and_two_outbounds.txt /btTestAccount/outbound-drop/file_1_for_compress.txt /btTestAccount/outbound-drop/file_2_for_compress.txt /btTestAccount/outbound-drop/archive_with_2_files.zip /btTestAccount/outbound-drop/archive_with_2_files_for_2_partners.zip " ] \
     && pass "3 inbound only and 2 in and out: numbered files, every other scenario unchanged" || fail "uploads: ${PATHS}"
 unset BT_RUN_INBOUND_ONLY BT_RUN_IN_AND_OUT
 
@@ -332,6 +363,8 @@ STATUS=201 master test_account 6 12
 [ "${RC}" -eq 0 ] && pass "./00.run_all.sh test_account 6 12 runs and exits 0" || fail "exit ${RC}: $(echo "${OUT}" | tail -5)"
 [[ "${OUT}" == *"Account test_account: scenario 2.1 with 6 file(s), scenario 2.2 with 12 file(s)."* ]] \
     && pass "it says which account and how many files it runs" || fail "no run summary line"
+PREDICTED=$(echo "${OUT}" | sed -n '/=== Step 4/,$p' | grep -E '^  (partner_to_pull_from|test_account|partner_to_push_to) ' | awk '{print $5}' | tr '\n' ' ')
+[ "${PREDICTED}" = "23 28 21 " ] && pass "the rule's predictions follow the counts: 6+12+5 pulled, plus 5 repeat pushes in a chain, 12+9 arrivals" || fail "predictions: ${PREDICTED}"
 [ "$(post_payloads | jq -r 'select(.type=="user") | .name' | head -n 1)" = "test_account" ] \
     && pass "the account it creates is test_account" || fail "account created: $(post_payloads | jq -r 'select(.type=="user") | .name')"
 [ "$(post_payloads | jq -r 'select(.operation=="Upload") | .filePath' | grep -c 'only_inbound_')" -eq 6 ] \
@@ -350,7 +383,7 @@ done
 EXTRA_ARG="test_account" run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json"
 calls | grep -q '^HEAD .*/accounts/test_account$' && pass "./99.cleanup_DELETE.sh test_account cleans up that account" || fail "99 with an account"
 OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/report.json" bash ./billable_GET_report.sh after test_account 2>&1)
-[ "$(echo "${OUT}" | grep -c 'accountName=test_account')" -eq 7 ] && pass "./billable_GET_report.sh after test_account reports on that account" || fail "report account"
+[ "$(echo "${OUT}" | grep -c '&account=test_account&')" -eq 7 ] && pass "./billable_GET_report.sh after test_account reports on that account" || fail "report account"
 
 echo
 echo "=== files_GET_download.sh ==="

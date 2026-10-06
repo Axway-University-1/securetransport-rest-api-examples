@@ -23,6 +23,38 @@ Treat "no Referer means rejected" as the documented and safest assumption to
 code against, not as something every server enforces - a script that omits the
 header may still work on some servers and fail hard on others.
 
+## /logs/transfers ignores accountName= - filter with account=
+
+Confirmed directly, on 5.5-20260924: `GET /logs/transfers?accountName=X`
+answers 200 with **every** account's transfers, whatever X is, even an account
+that does not exist. No error, no warning: a count read that way is the whole
+server's. The filter that works is `account=X`, an exact, case-insensitive
+match, with `*` as a wildcard (`account=john*`).
+
+This silently made the billable report, `16.TransferLogs` and
+`stBillableTransfers.py` count the whole server until it was found. Do not
+confuse it with the `accountName` field in the body of
+`POST /transfers/operations?operation=pull`, which is correct there.
+`tests/integration/checks/30.lookups_and_transfer_logs_read.py` checks that
+`account=` really filters, and reports whether `accountName=` is ignored.
+
+## Billing: "the first outbound of a file" means of a transfer chain
+
+The Admin Guide's rule - every inbound is billable, the first outbound after
+it is not, every later one is - is applied per transfer chain: the transfers
+sharing one `coreId`. Confirmed directly by
+`Features/audit-billable-transfers`, reading each transfer's `coreId`:
+
+- A **Decompress** step keeps the archive's chain: two files unpacked from one
+  archive and pushed out are two outbounds of one chain, so the second is
+  billable. Pushed to two partners each, that is one free and three billable.
+- A **Compress** step starts a new chain: the archive's one push is free.
+- A **pull** out of a partner account shares the chain of the upload into it
+  (its free first outbound); the pull landing in the receiving account starts
+  a new chain, billable as an inbound.
+- A file **deleted through the End User API** is logged as an outgoing
+  transfer under its `coreId`, and is not billable.
+
 **This was not theoretical - it was a real, confirmed gap, now fixed.** As of
 this project's own history, 49 of the 52 `Admin/API 2.0/bash/*.sh` examples
 (and the 40 `.bat` twins of the ones that have one) never sent a `Referer`
@@ -510,6 +542,15 @@ daemon/server restart needs to catch a transient connection error the same
 way it treats "not true yet" - one bad attempt should not end the retry
 loop early.
 
+The window has more than one shape. Confirmed directly, later in the same
+check: the server can also accept the connection and then not answer, and
+`urllib` raises that as a plain `TimeoutError` (an `OSError`), not as
+`URLError` - so a client that only wraps `URLError` lets it escape a loop
+written to survive exactly this. `st_client.py` now turns any `OSError` from a
+request into `STError`. And the final "is everything back as it was?"
+comparison needs the same patience: the servers come back asynchronously
+after the last request, so wait for the state to match, then compare.
+
 ## A graceful stop with a timeout keeps running server-side after the client that issued it is gone
 
 This is the most safety-critical finding of this whole project, from a real
@@ -552,11 +593,14 @@ schema description. A successful call returns 202 (accepted, asynchronous),
 with a `link` back to `/logs/transfers?operationIndex=...` to poll for the
 result - not the transfer record itself.
 
-**With no filename specified, a pull is not deterministic about WHAT it
-fetches, only about where it lands.** Confirmed directly, against a real
-pair of PeSIT sites whose transfer profiles both use a wildcard
-`sendMapping: "/*"`: the pull fetched an arbitrary real file out of the
-sending account's entire home folder, not something the caller chose. The
+**With no filename specified, what a PeSIT pull fetches comes from the
+sender's transfer profile, `sendMapping`.** Two different results were seen
+with `sendMapping: "/*"`. On a long-standing pair of accounts, the pull fetched
+an arbitrary real file out of the sending account's home folder. On a pair
+created through the API, the sender looked for a file literally named `*`
+and answered "File not found" (`realFile /home/<account>/*`). Name the file
+in `sendMapping` (`/pesit_loop.txt`) when the test needs to know what it
+sends. The
 *local filename* it lands under, by contrast, was completely deterministic
 - the receiving transfer profile's `receiveMapping: "/${pesit.fileName}"`
 evaluated to the literal string `"TP"` (the transfer profile's own name)
@@ -578,6 +622,38 @@ coreId-filtered `GET /logs/transfers?coreId=...` query returns the ordinary
 `{"result": [...]}` shape every other `/logs/transfers` listing does -
 `"pullEntries"` is specific to the `operationIndex`-tracking query used to
 watch one just-submitted pull, not a general property of this endpoint.
+
+## A PeSIT loop on one server, built through the API
+
+Confirmed directly, building `32.pesit_acknowledgment_loop_scripts.py`. Two
+accounts can send each other files over PeSIT on one server: each has a PeSIT
+site named after the **other** account (the account name is its PeSIT
+partner identifier, so keep it short and alphanumeric), pointing at the
+server's own PeSIT listener (17617), and each has a default transfer profile.
+
+- **A PeSIT site created through the API leaves ten fields empty** that a site
+  made in the admin UI fills in: `dmz` ("none"), `pesitId` (""),
+  `ptcpConnections` (1), `socketSendReceiveBuffersize` (65536),
+  `receiveMessage` and `sendMessage` (""), and the four `use...PasswordExpr`
+  flags (false). With them empty, the pull is accepted (202) and never
+  connects - no transfer is logged at all. Set them.
+- **`awaitResult: "true"`** turns any failure into an immediate 400
+  "Transfer triggered from admin pull event failed." with no detail. Pull
+  with `awaitResult: false` and read the `pullEntries` of its
+  `operationIndex`; a failed entry's own record (`GET` its `self` link) has
+  the PeSIT exchange and the error.
+- **A relative `receiveMapping`** (`${pesit.fileName}`) lands the file in the
+  pull's `destinationDirectory`. An absolute one (`/${pesit.fileName}`) lands
+  it in the home folder, whatever the pull asked for.
+- **The sender's outbound and the receiver's inbound have different
+  `coreId`s.** So a plain pull has no outbound under the receiver's `coreId`,
+  and `Acknowledgment.sh` sends a NACK. For an ACK, something must push the
+  received file on - a subscription on the landing folder and a route.
+- **Deleting the received file counts as that outbound.** An End User API
+  delete is logged as an outgoing transfer under the file's `coreId`, and
+  `Acknowledgment.sh` then sends an ACK. Acknowledge before cleaning up.
+- **An ACK or NACK sent after the account is deleted** is answered 200 and not
+  recorded: the transfer stays unacknowledged in the log.
 
 ## Resetting a real account's password without losing the original
 
@@ -650,6 +726,16 @@ http_status=$(curl -w "%{http_code}" -s -o downloaded_file ...)
 `-o` writes the body straight to its destination - a file or `/dev/null` -
 and stdout then holds only what `-w` prints, so nothing needs to be split
 back apart.
+
+What `-w` writes has no newline at the end unless the format adds one. Read
+line by line, `while IFS= read -r line` silently skips that last line.
+Confirmed as a shipped bug: `Acknowledgment.sh` never saw its `HTTPC=200`
+line, and logged every ACK and NACK it sent as failed. Keep the last line
+with:
+
+```bash
+while IFS= read -r line || [[ -n "$line" ]]; do
+```
 
 ## Single-quoted shell payloads do not expand variables
 

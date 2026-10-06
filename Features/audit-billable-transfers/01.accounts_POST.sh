@@ -6,10 +6,13 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Creates the test account that owns every site, subscription and route these
-# examples use, using the `/accounts` endpoint. It is a user account with its
-# own password, so the sites can log in to this server's SSH listener as it, and
-# the account can log in to the End User API to upload the sample files.
+# Creates the three accounts these examples use, using the `/accounts` endpoint:
+#   - the test account, which owns every site, subscription and route
+#   - partner_to_pull_from, which holds the sample files the test account pulls
+#   - partner_to_push_to, which receives what the test account pushes
+# Each is a user account with its own password, so the test account's sites can
+# log in to this server's SSH listener as a partner, and each account can log in
+# to the End User API.
 #
 # Usage:
 # ./01.accounts_POST.sh
@@ -19,8 +22,10 @@
 # - Requires `jq`, which builds the JSON body.
 # - transfersWebServiceAllowed is on. Without it the account cannot log in to the
 #   End User API, and that login fails with a 401.
-# - The account is created with a home folder of BT_HOME_FOLDER. 99.cleanup_DELETE
-#   removes the account again.
+# - The partners are shared by every test account. One that already exists, from
+#   another test account's run, is reused and not created again.
+#   99.cleanup_DELETE removes a partner only when no other test account's site
+#   still logs in as it.
 # ==============================================================================
 
 #
@@ -37,13 +42,28 @@ if [ -z "${BT_ACCOUNT_PASSWORD}" ]; then
     exit 1
 fi
 
-BODY=$(jq -n \
-  --arg name "${BT_TEST_ACCOUNT}" \
-  --arg home "${BT_HOME_FOLDER}" \
-  --arg password "${BT_ACCOUNT_PASSWORD}" \
-  '{name: $name, type: "user", homeFolder: $home, uid: "41733", gid: "41733",
-    transfersWebServiceAllowed: true,
-    user: {name: $name, passwordCredentials: {password: $password}}}')
+create_account() {
+    local name="$1" home="$2" body
+    body=$(jq -n --arg name "${name}" --arg home "${home}" --arg password "${BT_ACCOUNT_PASSWORD}" \
+      '{name: $name, type: "user", homeFolder: $home, uid: "41733", gid: "41733",
+        transfersWebServiceAllowed: true,
+        user: {name: $name, passwordCredentials: {password: $password}}}')
+    printf "Creating the account %s...\n" "${name}"
+    ar_admin_post "accounts" "${body}"
+}
 
-printf "Creating the account %s...\n" "${BT_TEST_ACCOUNT}"
-ar_admin_post "accounts" "${BODY}"
+# create_partner NAME HOME: creates a partner, or reuses it when it is there
+create_partner() {
+    local code
+    code=$(curl -s -k -o /dev/null -w "%{http_code}" -u "${ST_USER}:${ST_PASSWORD}" --head \
+      "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/$1" -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT")
+    if [ "${code}" = "200" ]; then
+        printf "The account %s is already there, from another test account's run. Reused.\n" "$1"
+        return 0
+    fi
+    create_account "$1" "$2"
+}
+
+create_account "${BT_TEST_ACCOUNT}" "${BT_HOME_FOLDER}" || exit 1
+create_partner "${BT_PULL_PARTNER}" "${BT_PULL_PARTNER_HOME}" || exit 1
+create_partner "${BT_PUSH_PARTNER}" "${BT_PUSH_PARTNER_HOME}" || exit 1

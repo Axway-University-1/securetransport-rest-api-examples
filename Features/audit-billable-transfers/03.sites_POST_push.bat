@@ -7,8 +7,9 @@ REM Location: Sofia
 REM ==============================================================================
 REM Description:
 REM Creates the two push sites these examples use as "the remote partners", using
-REM the `/sites` endpoint. Both are SSH sites pointing at this server's own SSH
-REM listener, each uploading into its own delivered folder.
+REM the `/sites` endpoint. Both are SSH sites of the test account, logging in to
+REM this server's own SSH listener as partner_to_push_to, each uploading into its
+REM own delivered folder there (<account>/delivered-1 and <account>/delivered-2).
 REM
 REM Usage:
 REM 03.sites_POST_push.bat
@@ -40,7 +41,7 @@ EXIT /B 0
 SET SITE_NAME=%~1
 SET SITE_FOLDER=%~2
 SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
-powershell -NoProfile -Command "@{ type='ssh'; protocol='ssh'; name=$env:SITE_NAME; host=$env:BT_SSH_HOST; port=$env:BT_SSH_PORT; userName=$env:BT_TEST_ACCOUNT; usePassword=$true; password=$env:BT_ACCOUNT_PASSWORD; account=$env:BT_TEST_ACCOUNT; transferType='partner'; uploadFolder=$env:SITE_FOLDER } | ConvertTo-Json -Compress" > "%BODY_FILE%"
+powershell -NoProfile -Command "@{ type='ssh'; protocol='ssh'; name=$env:SITE_NAME; host=$env:BT_SSH_HOST; port=$env:BT_SSH_PORT; userName=$env:BT_PUSH_PARTNER; usePassword=$true; password=$env:BT_ACCOUNT_PASSWORD; account=$env:BT_TEST_ACCOUNT; transferType='partner'; uploadFolder=$env:SITE_FOLDER } | ConvertTo-Json -Compress" > "%BODY_FILE%"
 
 echo Creating the push site %SITE_NAME%, delivering to %SITE_FOLDER%...
 CALL "%~dp0..\lib\post_admin.bat" sites "%BODY_FILE%"

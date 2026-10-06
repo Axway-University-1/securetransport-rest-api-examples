@@ -38,8 +38,8 @@ Rules learned the hard way:
 - a dot after the number, then underscores inside the name
 - the `Script Name:` line in the header must match the actual filename
 
-A new topic folder uses the next free number. The existing gaps (07, 10, 11) are
-reserved for Subscriptions, Transfer Profiles and Certificates.
+A new topic folder uses the next free number. The existing gaps (10, 11) are
+reserved for Transfer Profiles and Certificates.
 
 ## The file header
 

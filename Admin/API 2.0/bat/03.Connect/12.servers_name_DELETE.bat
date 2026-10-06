@@ -25,7 +25,7 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 
 SET NAME=SSH_TEST_SERVER_1
 echo Deleting server '%NAME%'...
-curl -s -o nul -w "%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X DELETE "https://%ST_SERVER%:%ST_PORT%/api/v2.0/servers/%NAME%" ^
+curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X DELETE "https://%ST_SERVER%:%ST_PORT%/api/v2.0/servers/%NAME%" ^
 -H "accept: application/json" -H "%REFERER_HEADER%" -H "Content-Type: application/json"
 echo Done
 
@@ -35,7 +35,7 @@ FOR /F %%C IN ('curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWOR
 
 IF "%RESPONSE_CODE%"=="200" (
     echo Server exists. Deleting server '%NAME%'...
-    curl -s -o nul -w "%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X DELETE "https://%ST_SERVER%:%ST_PORT%/api/v2.0/servers/%NAME%" ^
+    curl -s -o nul -w "%%{http_code}\n" -k -u "%ST_USER%:%ST_PASSWORD%" -X DELETE "https://%ST_SERVER%:%ST_PORT%/api/v2.0/servers/%NAME%" ^
     -H "accept: application/json" -H "%REFERER_HEADER%" -H "Content-Type: application/json"
     echo.
     echo Done

@@ -20,14 +20,17 @@ REM Usage:
 REM files_GET_download.bat FILE [COUNT [ACCOUNT]]
 REM
 REM   FILE     the file to download, relative to the account's home folder, for
-REM            example outbound-drop/only_inbound.txt or delivered-1/files_1_and_2_compressed.zip
+REM            example subscription/s1/only_inbound.txt, where scenario 2.1 lands in
+REM            the test account, or btTestAccount/delivered-1/inbound_and_one_outbound.txt
+REM            as partner_to_push_to
 REM   COUNT    how many times to download it (default 1)
-REM   ACCOUNT  the account to log in as (default btTestAccount). Its password is
-REM            BT_ACCOUNT_PASSWORD, the one 00.run_all.bat creates every account with.
+REM   ACCOUNT  the account to log in as: the test account (default btTestAccount)
+REM            or a partner. Its password is BT_ACCOUNT_PASSWORD, the one
+REM            00.run_all.bat creates all three accounts with.
 REM
 REM For example:
-REM files_GET_download.bat outbound-drop/only_inbound.txt 50
-REM files_GET_download.bat outbound-drop/only_inbound.txt 50 test_account
+REM files_GET_download.bat subscription/s1/only_inbound.txt 50
+REM files_GET_download.bat btTestAccount/delivered-1/inbound_and_one_outbound.txt 50 partner_to_push_to
 REM
 REM Notes:
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.

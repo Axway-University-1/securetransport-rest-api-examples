@@ -7,7 +7,8 @@
 # ==============================================================================
 # Description:
 # Creates and uploads every sample file these scenarios pull, using the End User
-# API `/fileOperations` endpoint, into the shared drop folder (BT_DROP_FOLDER).
+# API `/fileOperations` endpoint, logged in as partner_to_pull_from, into the
+# test account's drop folder there (BT_DROP_FOLDER, <account>/outbound-drop).
 # The two archives (for scenarios 2.5 and 2.6) are built locally with `zip`
 # first, then uploaded as ordinary binary content.
 #
@@ -83,7 +84,7 @@ upload_scenario_files() {
     done
 }
 
-ar_enduser_login || exit 1
+bt_login_as "${BT_PULL_PARTNER}" || exit 1
 
 upload_scenario_files "${BT_FILE_ONLY_INBOUND}" "${BT_INBOUND_ONLY_COUNT}" "Scenario 2.1: only inbound, no outbound at all."
 upload_scenario_files "${BT_FILE_ONE_OUTBOUND}" "${BT_IN_AND_OUT_COUNT}" "Scenario 2.2: inbound, then pushed out once."

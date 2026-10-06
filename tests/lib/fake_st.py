@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import types
+import urllib.parse
 from multiprocessing import Value
 
 PYTHON3_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -67,20 +68,37 @@ class FakeSession:
 
     After a run, `writes` holds (verb, url, body) for each PATCH, PUT and POST,
     so a test can assert on exactly what would have been sent.
+
+    totals maps a path that answers with a count, such as "logs/transfers", to
+    a function of the decoded query parameters that returns the count:
+
+        FakeSession(totals={"logs/transfers": lambda params: 7})
+
+    The answer carries it as resultSet.totalCount, with returnCount capped by
+    limit as the real endpoint does, so reading the wrong one shows.
     """
 
-    def __init__(self, pages=None, login_ok=True):
+    def __init__(self, pages=None, login_ok=True, totals=None):
         self.pages = pages or {}
         self.writes = []
         self.reads = []
         self.login_ok = login_ok
+        self.totals = totals or {}
 
     # -- helpers ----------------------------------------------------------
     def _split(self, url):
         tail = url.split("/api/v2.0/", 1)[1]
         path, _, query = tail.partition("?")
         params = dict(kv.split("=", 1) for kv in query.split("&") if "=" in kv)
+        params = {k: urllib.parse.unquote_plus(v) for k, v in params.items()}
         return path, params
+
+    def _total(self, path, params):
+        total = self.totals[path](params)
+        limit = int(params.get("limit", 200))
+        return Response(200, {"resultSet": {"returnCount": min(total, limit),
+                                            "totalCount": total},
+                              "result": []})
 
     def _collection_page(self, collection, params):
         offset = int(params.get("offset", 0))
@@ -93,7 +111,9 @@ class FakeSession:
     def get(self, url, **kwargs):
         self.reads.append(url)
         path, params = self._split(url)
-        if "/" in path:                       # a single object by id
+        if path in self.totals:
+            return self._total(path, params)
+        if "/" in path:                     # a single object by id
             collection, ident = path.split("/", 1)
             for item in self.pages.get(collection, []):
                 if str(item.get("id")) == ident:

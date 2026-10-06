@@ -1,0 +1,21 @@
+{
+  "steps": [{"type": "Compress", "status": "ENABLED"}, {"type": "SendToPartner", "status": "ENABLED"}],
+  "resultSet": {"returnCount": 1, "totalCount": 42},
+  "result": [
+    {
+      "id": "obj-1",
+      "name": "SSH_PULL",
+      "account": "john",
+      "type": "COMPOSITE",
+      "protocol": "ssh",
+      "host": "st.example.com",
+      "port": "8022",
+      "downloadFolder": "/outbound-drop",
+      "folder": "/inbox",
+      "application": "AdvancedRoutingApplication",
+      "routeTemplate": "tpl-1",
+      "subscriptions": ["sub-1"],
+      "steps": [{"type": "Compress", "status": "ENABLED"}, {"type": "SendToPartner", "status": "ENABLED"}]
+    }
+  ]
+}

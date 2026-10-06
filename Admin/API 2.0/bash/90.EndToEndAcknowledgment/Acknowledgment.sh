@@ -194,7 +194,8 @@ fi
 log_message "INFO" "Building the Acknowledgment link..."
 ACK_LINK=$(grep "self" "$GET_PROCESSED_INBOUND_TRANSFER" | head -1 | awk -F '"' '{print $4}')
 ACK_LINK="${ACK_LINK}/operations?operation=ack"
-ACK_NACK_LINK="${ACK_LINK/ack/nack}" # Replace 'ack' with 'nack' if ACK_TYPE is NACK
+# Only the operation changes for a NACK, not an "ack" elsewhere in the link
+ACK_NACK_LINK="${ACK_LINK%operation=ack}operation=nack"
 
 [[ "${ACK_TYPE}" == "ACK" ]] && ACK_NACK_LINK="$ACK_LINK"
 
@@ -216,7 +217,9 @@ for ((i=1; i<=NUMBER_OF_RETRIES; i++)); do
     curl -k -s -u "$ADMIN_USER:$ADMIN_PWD" -w "\nHTTPC=%{http_code}" -X "POST" "$ACK_NACK_LINK" \
       -H "accept: application/json" -H "Referer: ${API_URL}" > "$ACK_NACK_OUTPUT"
 
-    while IFS= read -r line; do
+    # || [[ -n "$line" ]] keeps the last line, HTTPC=..., which curl's -w writes
+    # without a newline after it
+    while IFS= read -r line || [[ -n "$line" ]]; do
         [[ "$line" == HTTPC=* ]] && HTTP_CODE="${line//[$'\r']}"
         [[ "$line" == *"message"* ]] && RESPONSE_MESSAGE=$(echo "$line" | awk -F ':' '{gsub(/[",]/, "", $0); print $2 $3}')
     done < "$ACK_NACK_OUTPUT"

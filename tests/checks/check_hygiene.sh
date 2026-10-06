@@ -194,6 +194,44 @@ else
     pass "curl -u credentials are always quoted"
 fi
 
+# In a batch file, cmd reads a single % as the start of a variable, so
+# -w "%{http_code}" loses everything up to the next %, the credentials with it.
+# It must be written %%{http_code}, which cmd turns back into %{http_code}.
+if git ls-files -z '*.bat' | xargs -0 grep -nE '(^|[^%])%\{http_code\}' 2>/dev/null | grep -q .; then
+    fail "bat: curl -w with a single %, which cmd eats"
+    git ls-files -z '*.bat' | xargs -0 grep -nE '(^|[^%])%\{http_code\}' | sed 's/^/        /'
+else
+    pass "bat: curl -w always uses %%{http_code}"
+fi
+
+# %NAME: =%%20% does not give %20: the replacement ends at the next %, so the
+# space is dropped and a stray 0 is left behind. Write the encoded name instead.
+if git ls-files -z '*.bat' | xargs -0 grep -nE '=%%20%' 2>/dev/null | grep -q .; then
+    fail "bat: a %VAR: =%%20% substitution, which does not URL-encode"
+    git ls-files -z '*.bat' | xargs -0 grep -nE '=%%20%' | sed 's/^/        /'
+else
+    pass "bat: no %VAR: =%%20% substitutions"
+fi
+
+# An RFC 2822 date built in PowerShell: zzz writes the offset as +03:00, which
+# RFC 2822 does not allow, and ddd/MMM follow the Windows language unless the
+# culture is fixed. Each zzz must be stripped of its colon, and a line that
+# formats day names must use the invariant culture.
+BADDATE=$(git ls-files -z '*.bat' | xargs -0 grep -nE 'zzz|ddd, dd MMM' 2>/dev/null | python3 -c '
+import re, sys
+for line in sys.stdin:
+    zzz = line.count("zzz")
+    stripped = line.count("ToString(\x27zzz\x27).Replace(\x27:\x27,\x27\x27)")
+    if zzz != stripped or ("ddd," in line and "InvariantCulture" not in line):
+        print(line.rstrip()[:160])
+')
+if [ -n "${BADDATE}" ]; then
+    fail "bat: an RFC 2822 date with a +03:00 offset or local day names"
+    echo "${BADDATE}" | sed 's/^/        /'
+else
+    pass "bat: RFC 2822 dates use +0300 offsets and English day names"
+fi
+
 # No in place sed, which is not portable between BSD and GNU
 if scan_scripts | xargs -0 grep -l "sed -i" 2>/dev/null | grep -q .; then
     fail "sed -i used, which differs between macOS and Linux"

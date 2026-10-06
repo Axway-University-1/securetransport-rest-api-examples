@@ -7,9 +7,10 @@ REM Location: Sofia
 REM ==============================================================================
 REM Description:
 REM Shows what each scenario left behind, using the End User API
-REM `GET /files/{folder}` endpoint: the six subscription/sN folders (what was
-REM pulled) and both delivered folders (what was pushed). Waits for delivered-1 to
-REM have something in it before listing, since the pushes are asynchronous.
+REM `GET /files/{folder}` endpoint: the test account's six subscription/sN folders
+REM (what was pulled), then partner_to_push_to's two delivered folders (what was
+REM pushed). The pushes are asynchronous, so it first waits for delivered-2 to hold
+REM both files of scenario 2.6, the last pushes to arrive.
 REM
 REM Usage:
 REM 12.files_GET_result.bat
@@ -33,13 +34,35 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
+REM partner_to_push_to: scenario 2.6 pushes its two files to delivered-2 last
+SET EU_ACCOUNT=%BT_PUSH_PARTNER%
 CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 
-REM The first push (scenarios 2.2 to 2.4) is asynchronous: give it time to arrive
 SET WAITED=0
 :wait_loop
-CALL :count_files "%BT_DELIVERED_1_FOLDER%"
+CALL :count_files "%BT_DELIVERED_2_FOLDER%"
+IF %FILE_COUNT% GEQ 2 GOTO :show
+IF %WAITED% GEQ %BT_WAIT_SECONDS% GOTO :show
+echo %BT_DELIVERED_2_FOLDER% holds %FILE_COUNT% of 2 files yet. Waiting...
+ping -n 4 127.0.0.1 >NUL
+SET /A WAITED=%WAITED%+3
+GOTO :wait_loop
+
+:show
+CALL :show_folder "%BT_DELIVERED_1_FOLDER%"
+CALL :show_folder "%BT_DELIVERED_2_FOLDER%"
+CALL "%~dp0..\lib\enduser.bat" logout
+
+REM The test account: what each scenario pulled in
+SET EU_ACCOUNT=%BT_TEST_ACCOUNT%
+CALL "%~dp0..\lib\enduser.bat" login
+IF ERRORLEVEL 1 EXIT /B 1
+FOR %%N IN (1,2,3,4,5,6) DO CALL :show_folder "%BT_SUBSCRIPTION_FOLDER%/s%%N"
+CALL "%~dp0..\lib\enduser.bat" logout
+EXIT /B 0
+
+:count_files "%BT_DELIVERED_1_FOLDER%"
 IF %FILE_COUNT% GTR 0 GOTO :show
 IF %WAITED% GEQ %BT_WAIT_SECONDS% GOTO :show
 echo Nothing in %BT_DELIVERED_1_FOLDER% yet. Waiting...
@@ -64,6 +87,6 @@ EXIT /B 0
 :show_folder
 CALL :count_files "%~1"
 echo.
-echo %~1: %FILE_COUNT% file^(s^)
+echo %EU_ACCOUNT% %~1: %FILE_COUNT% file^(s^)
 powershell -NoProfile -Command "try { (Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile } | ForEach-Object { '    ' + $_.fileName + '  (' + $_.size + ' bytes)' } } catch { }"
 EXIT /B 0

@@ -115,13 +115,13 @@ REM
 REM Build the time window. The API expects RFC 2822, URL encoded.
 REM PowerShell does both, so there is no need for a hand written encoder.
 REM
-FOR /F "tokens=*" %%S IN ('powershell -Command "[System.Web.HttpUtility]::UrlEncode((Get-Date).ToUniversalTime().AddHours(-%START_HOURS_AGO%).ToString(''ddd, dd MMM yyyy HH:mm:ss +0000''))" 2^>nul') DO SET START_TIME_ENCODED=%%S
-FOR /F "tokens=*" %%E IN ('powershell -Command "[System.Web.HttpUtility]::UrlEncode((Get-Date).ToUniversalTime().AddHours(-%END_HOURS_AGO%).ToString(''ddd, dd MMM yyyy HH:mm:ss +0000''))" 2^>nul') DO SET END_TIME_ENCODED=%%E
+FOR /F "tokens=*" %%S IN ('powershell -Command "[System.Web.HttpUtility]::UrlEncode((Get-Date).ToUniversalTime().AddHours(-%START_HOURS_AGO%).ToString('ddd, dd MMM yyyy HH:mm:ss +0000', [Globalization.CultureInfo]::InvariantCulture))" 2^>nul') DO SET START_TIME_ENCODED=%%S
+FOR /F "tokens=*" %%E IN ('powershell -Command "[System.Web.HttpUtility]::UrlEncode((Get-Date).ToUniversalTime().AddHours(-%END_HOURS_AGO%).ToString('ddd, dd MMM yyyy HH:mm:ss +0000', [Globalization.CultureInfo]::InvariantCulture))" 2^>nul') DO SET END_TIME_ENCODED=%%E
 
 IF "%START_TIME_ENCODED%"=="" (
     REM System.Web is not loaded by default on every PowerShell version. Fall back to Uri.
-    FOR /F "tokens=*" %%S IN ('powershell -Command "[System.Uri]::EscapeDataString((Get-Date).ToUniversalTime().AddHours(-%START_HOURS_AGO%).ToString(''ddd, dd MMM yyyy HH:mm:ss +0000''))"') DO SET START_TIME_ENCODED=%%S
-    FOR /F "tokens=*" %%E IN ('powershell -Command "[System.Uri]::EscapeDataString((Get-Date).ToUniversalTime().AddHours(-%END_HOURS_AGO%).ToString(''ddd, dd MMM yyyy HH:mm:ss +0000''))"') DO SET END_TIME_ENCODED=%%E
+    FOR /F "tokens=*" %%S IN ('powershell -Command "[System.Uri]::EscapeDataString((Get-Date).ToUniversalTime().AddHours(-%START_HOURS_AGO%).ToString('ddd, dd MMM yyyy HH:mm:ss +0000', [Globalization.CultureInfo]::InvariantCulture))"') DO SET START_TIME_ENCODED=%%S
+    FOR /F "tokens=*" %%E IN ('powershell -Command "[System.Uri]::EscapeDataString((Get-Date).ToUniversalTime().AddHours(-%END_HOURS_AGO%).ToString('ddd, dd MMM yyyy HH:mm:ss +0000', [Globalization.CultureInfo]::InvariantCulture))"') DO SET END_TIME_ENCODED=%%E
 )
 
 CALL :log_message INFO "Start time (%START_HOURS_AGO% hours ago), encoded: %START_TIME_ENCODED%"
@@ -144,7 +144,7 @@ CALL :log_message INFO "Found %FOUND% PeSIT inbound transfers."
 FOR /F "usebackq tokens=*" %%C IN ("%CORE_ID_LIST%") DO (
     CALL :log_message INFO "Processing Core ID: %%C"
     REM Call the Acknowledgment script for each Core ID
-    CALL "%~dp0Acknowledgment.bat" %%C "%HOST%" MIX 1 FALSE
+    CALL "%~dp0Acknowledgment.bat" %%C "%HOST%" MIX 1 FALSE "%ROOT_FOLDER%"
 )
 
 IF /I "%CLEAR_API_OUTPUT_FILES%"=="TRUE" (

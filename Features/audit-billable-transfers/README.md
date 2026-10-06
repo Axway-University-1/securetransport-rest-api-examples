@@ -15,18 +15,46 @@ assistant reading the same endpoint.
   billable.
 - Every outbound transfer after that first one **is** billable.
 
+"A given file" is a transfer chain: the transfers that share one `coreId` in
+File Tracking. See [What a real run shows](#what-a-real-run-shows) for what
+that means once a route compresses or unpacks a file.
+
 **Note:** only transfers processed after the upgrade to 5.5-20260924 carry this
 classification. A transfer from before the upgrade has no billable status, and
 if the server is ever reverted to an earlier release, new transfers stop being
 classified until it is upgraded again.
 
+## The design: three accounts on one server
+
+Every part of a transfer's journey happens in its own account, so each
+account's billable count tells one part of the story, and can be checked
+against the rule on its own. No other server is needed: the partners are
+accounts on the same server, reached through its own SSH listener.
+
+| Account | Its part | Its folders |
+| ------- | -------- | ----------- |
+| `partner_to_pull_from` | holds the sample files, which are uploaded to it | `<account>/outbound-drop` |
+| the test account (`btTestAccount` by default) | pulls the files in, routes them, pushes them out: what is being measured | `subscription/s1` to `s6` |
+| `partner_to_push_to` | receives the pushes, as two "remote partners" | `<account>/delivered-1`, `<account>/delivered-2` |
+
+The test account owns everything else: the six pull sites (logging in as
+`partner_to_pull_from`), the two push sites (logging in as
+`partner_to_push_to`), the application, the subscriptions and the routes, all
+named after it: `<account>PullSite1` to `6`, `<account>PushSitePartner1` and
+`2`, `<account>Application`, `<account>PackageTemplate`,
+`<account>SimpleRoute2` to `6` and `<account>CompositeRoute2` to `6`.
+
+The partners are shared by every test account. Each test account keeps its
+files in its own folder inside them, named after it, so two test accounts never
+mix files, and the cleanup of one never touches the other's.
+
+Files are **not** renamed on receive or send: the point is recognising
+transfers by their exact file name in File Tracking.
+
 ## What the examples here do
 
-A test that puts the rule above through six scenarios, measures the billable
-count before and after, and prints what it found:
-
-1. **`billable_GET_report`** - today's billable count, and the six days before
-   it, before anything runs.
+1. **`billable_GET_report`**: the billable count per day of the three
+   accounts, side by side, today and the six days before it.
 2. **Six scenarios**, run as one pull each:
 
    | Scenario | File(s) | What happens |
@@ -35,108 +63,62 @@ count before and after, and prints what it found:
    | 2.2 | `inbound_and_one_outbound.txt` | pulled in, pushed out once |
    | 2.3 | `inbound_and_two_outbounds.txt` | pulled in, pushed out twice, same partner |
    | 2.4 | `file_1_for_compress.txt`, `file_2_for_compress.txt` | pulled in together, compressed into `files_1_and_2_compressed.zip`, pushed out once |
-   | 2.5 | `archive_with_2_files.zip` (containing `file_1_inside_archive.txt`, `file_2_inside_archive.txt`) | pulled in, decompressed, both files pushed out to one partner |
-   | 2.6 | `archive_with_2_files_for_2_partners.zip` (containing `file_1_inside_archive_for_2_partners.txt`, `file_2_inside_archive_for_2_partners.txt`) | pulled in, decompressed, both files pushed to **two** partners |
+   | 2.5 | `archive_with_2_files.zip` (containing `file_1_inside_archive.txt`, `file_2_inside_archive.txt`) | pulled in, unpacked, both files pushed out to one partner |
+   | 2.6 | `archive_with_2_files_for_2_partners.zip` (containing `file_1_inside_archive_for_2_partners.txt`, `file_2_inside_archive_for_2_partners.txt`) | pulled in, unpacked, both files pushed to **two** partners |
 
-3. **`billable_GET_report`** again - today's count should now be higher.
-4. **Analysis** - the real measured delta for today (before vs after), printed
-   alongside the rule above. It does **not** print a fixed per-scenario table:
-   see [A complication specific to this test](#a-complication-specific-to-this-test-the-loopback-bills-twice)
-   below for why one would be misleading.
+3. **`billable_GET_report`** again.
+4. **Analysis**: for each account, how many billable transfers the run added
+   today, next to what the rule predicts, and whether they match.
 
-### What the rule alone predicts for each scenario's pull and push
+## What the rule predicts, account by account
 
-This is the billable count the rule above predicts for *just* each scenario's
-own pull-into-`subscription/sN` and push-to-a-partner. It is **not** the full
-picture - see the next section for what else this test's own setup adds.
+With one file each for scenarios 2.1 and 2.2:
 
-| Scenario | Inbound | Outbound | Billable |
-| -------- | ------: | -------: | -------: |
-| 2.1 | 1 | 0 | 1 |
-| 2.2 | 1 | 1 | 1 |
-| 2.3 | 1 | 2 | 2 |
-| 2.4 | 2 | 1 | 2 |
-| 2.5 | 1 | 2 | 1 |
-| 2.6 | 1 | 4 | 3 |
-| **Total** | **7** | **10** | **10** |
+| Scenario | `partner_to_pull_from`: uploads in | test account: pulls in | test account: billable pushes out | `partner_to_push_to`: arrivals |
+| -------- | ---: | ---: | ---: | ---: |
+| 2.1 | 1 | 1 | 0 | 0 |
+| 2.2 | 1 | 1 | 0 of 1 | 1 |
+| 2.3 | 1 | 1 | 1 of 2 | 2 |
+| 2.4 | 2 | 2 | 0 of 1 | 1 |
+| 2.5 | 1 | 1 | 1 of 2 | 2 |
+| 2.6 | 1 | 1 | 3 of 4 | 4 |
+| **Billable** | **7** | **7** | **5** | **10** |
 
-Scenario 2.4's one outbound (the new archive) is its own first outbound, so it
-is not billable even though both inputs were. Scenario 2.6's four outbounds are
-two files to two partners each: the first arrival at either partner is free,
-the second is billable, regardless of which partner it went to.
+So the run adds 7 billable transfers to `partner_to_pull_from`, 12 (7 + 5) to
+the test account, and 10 to `partner_to_push_to`. More files for 2.1 and 2.2
+add one to each column they pass through, which `00.run_all.sh` works out for
+itself.
 
-### A complication specific to this test: the loopback bills twice
+- `partner_to_pull_from`: each upload in is billable. Each pull out is that
+  file's first outbound, so it is free.
+- The test account: each pull in is billable. Of the pushes out, the first in
+  each chain is free and the rest are billable.
+- `partner_to_push_to`: each push arriving is an inbound transfer, so each is
+  billable.
 
-**Confirmed directly, by reading this run's own File Tracking entries:**
-billing is tracked **per transfer chain (`coreId`), not per filename.** Every
-distinct `coreId` gets its own "first outbound is free" allowance. That matters
-here because step 10's upload and step 11's pull are **two separate chains**
-for the same file, not one:
+## What a real run shows
 
-1. **The upload** (step 10, over the End User API, into `/outbound-drop`) is
-   itself a real, billable Inbound transfer. Nothing in the rule's plain
-   six-scenario description accounts for it, because it is this test's own
-   setup step, not one of the six scenarios.
-2. **The pull removing that file from `/outbound-drop`** shares the upload's
-   `coreId` - confirmed directly, the two entries carry the identical `coreId`
-   - and is *that* chain's own free first outbound. Not billable.
-3. **The pull landing in `/subscription/sN`** is a *different*, new `coreId`.
-   Billable, same as every inbound.
-4. **The push to the partner** shares *that* chain's `coreId`, and is *its*
-   free first outbound. Not billable (for scenarios 2.2, 2.4 and the first
-   partner of 2.6; billable for the genuinely repeated pushes in 2.3 and the
-   second partner of 2.6, same as the table above).
+**Confirmed on a real 5.5-20260924 server** (one file each for 2.1 and 2.2):
+the run added exactly 7, 12 and 10 billable transfers to the three accounts.
+Reading the test account's File Tracking entries by `coreId` showed what
+"a given file" means once a route changes the files:
 
-So a file like `inbound_and_one_outbound.txt` is actually **2** billable
-transfers once this test runs it (the upload, and the pull-landing), not the 1
-the table above predicts for its pull/push alone - the table was never wrong
-about the pull/push, it just never claimed to cover the upload.
+- **Decompress keeps the archive's chain.** Both files unpacked from
+  `archive_with_2_files.zip` carry the archive's `coreId`: the first push is
+  free, the second is billable. In 2.6, the four pushes of the two unpacked
+  files are one chain: one free, three billable.
+- **Compress starts a new chain.** `files_1_and_2_compressed.zip` has a
+  `coreId` of its own, so its one push is that chain's first outbound, and
+  free.
+- **The pull out of `partner_to_pull_from`** shares the upload's `coreId` and is
+  that chain's free first outbound. **The pull into the test account** starts
+  a new chain, billable as an inbound.
+- **A file deleted through the End User API** is logged as an outgoing
+  transfer under its `coreId`, and is never billable.
 
-This is a property of testing with a **loopback** (the "remote partner" is the
-same account doing the uploading), not of the billing feature itself. A real
-inbound file arriving from an actual external partner, with no prior upload
-step by this same account, would not have this extra chain. Keep this in mind
-when reading the per-day report: it will run ahead of the plain "6 scenarios,
-10 billable transfers" arithmetic by roughly one extra billable transfer per
-uploaded file.
-
-To see the real, final numbers for a run, read **Operations > File Tracking**
-for the test account, grouped by **Transfer** name, rather than trusting any
-fixed prediction - which is exactly why step 4 prints the measured delta
-instead of one.
-
-## The design: one account, a loopback, no renaming
-
-Like [Features/trigger-route-after-completed-pull](../trigger-route-after-completed-pull/),
-the SecureTransport server is its own partner, so no other server is needed.
-Unlike that feature, files here are **not** renamed on receive or send: the
-whole point is recognising transfers by their exact file name in File Tracking,
-so the names given above are exactly what reaches the server.
-
-One test account (`btTestAccount` unless you name another, see
-[Running the examples](#running-the-examples)) owns everything:
-
-```
-/home/btTestAccount/
-    outbound-drop/       every sample file and archive lands here
-    subscription/
-        s1/ .. s6/       one landing folder per scenario
-    delivered-1/          the first "remote partner"
-    delivered-2/          the second, used only by scenario 2.6
-```
-
-All six sample files sit in the **same** `outbound-drop` folder. Each scenario
-has its own pull **site**, and each site's own download pattern matches only
-the file(s) for its own scenario (for example, site 4's pattern is
-`file_*_for_compress.txt`), so six sites can safely share one folder: a pull
-copies a file rather than moving it, so one site's pull does not take a file
-another site also needs.
-
-Every other object is named after the account: `<account>PullSite1` to `6`,
-`<account>PushSitePartner1` and `2`, `<account>Application`,
-`<account>PackageTemplate`, `<account>SimpleRoute2` to `6` and
-`<account>CompositeRoute2` to `6`. So two runs under different account names
-never collide on the server, and cleaning up one never touches the other.
+If a count differs from the prediction, `00.run_all.sh` says so. Read File
+Tracking for that account, grouped by **Transfer** name. A push that was still
+under way when the second report ran shows up there, and in a later report.
 
 ## Running the examples
 
@@ -146,6 +128,8 @@ cp settings.local.example.sh settings.local.sh      # Windows: settings.local.ex
 $EDITOR settings.local.sh                             # set BT_ACCOUNT_PASSWORD
 ./00.run_all.sh                                       # or --cleanup to remove it all after
 ```
+
+`BT_ACCOUNT_PASSWORD` is the password of all three accounts.
 
 `00.run_all.sh` takes three optional arguments, in this order:
 
@@ -159,12 +143,19 @@ $EDITOR settings.local.sh                             # set BT_ACCOUNT_PASSWORD
 ```
 
 - `ACCOUNT` is the test account to create and use, `btTestAccount` by default.
+  The partners keep their names: they are shared.
 - `INBOUND_ONLY` and `IN_AND_OUT` are how many files scenarios 2.1 and 2.2 run,
   1 each by default. With 1 the files keep their plain names
   (`only_inbound.txt`); with more they are numbered (`only_inbound_1.txt` to
   `only_inbound_6.txt`). The other four scenarios always run as described above.
 - To clean up or report on a named account by hand, give it the same name:
   `./99.cleanup_DELETE.sh test_account`, `./billable_GET_report.sh after test_account`.
+- A partner that already exists, from another test account's run, is reused.
+  `99.cleanup_DELETE.sh` removes only this test account's folder in each
+  partner, and deletes a partner only when no other test account's site still
+  logs in as it.
+- The partners' counts include every test account's runs on the same day. Run
+  one test account at a time to read them cleanly.
 
 On Windows: `00.run_all.bat`, with the same arguments. See
 [Configuration](../../README.md#configuration) first if you have not set up the
@@ -177,47 +168,48 @@ part of that numbering) and `99.cleanup_DELETE`.
 ### Repeated client downloads
 
 `files_GET_download.sh` (and `.bat`) is a separate experiment, not part of
-`00.run_all.sh`. It downloads one file from the test account's home folder,
-as a client would, as many times as you ask, in one End User API session. Each
-download is a transfer of its own, so it shows how quickly repeated downloads
-add up in the usage reporting.
+`00.run_all.sh`. It downloads one file, as a client would, as many times as you
+ask, in one End User API session. Each download is a transfer of its own, so it
+shows how quickly repeated downloads add up in the usage reporting.
 
 ```
 ./files_GET_download.sh FILE [COUNT [ACCOUNT]]
 
 ./billable_GET_report.sh before
-./files_GET_download.sh outbound-drop/only_inbound.txt 50
+./files_GET_download.sh subscription/s1/only_inbound.txt 50
 ./billable_GET_report.sh after
 ```
 
 - `FILE` is relative to the account's home folder, for example
-  `outbound-drop/only_inbound.txt` after a run of `00.run_all.sh`.
+  `subscription/s1/only_inbound.txt` in the test account after a run of
+  `00.run_all.sh`, or `btTestAccount/delivered-1/inbound_and_one_outbound.txt`
+  as `partner_to_push_to`.
 - `COUNT` is how many times to download it, 1 by default.
-- `ACCOUNT` is the account to log in as, `btTestAccount` by default. Its
-  password is `BT_ACCOUNT_PASSWORD`, the same one `00.run_all.sh` creates every
-  account with. For an account named on the command line, pass the same name
-  to the report too: `./billable_GET_report.sh after test_account`.
+- `ACCOUNT` is the account to log in as: the test account, `btTestAccount` by
+  default, or a partner. Its password is `BT_ACCOUNT_PASSWORD`.
 
 ## Status
 
 **Confirmed end to end against a real server**, including the full 00 to 12
-flow, folder creation (top level and nested), the account, the eight sites,
-the uploads (including both archives, built locally with `zip`), the
-application, the `Compress` and `Decompress` route steps, and the billable
-report.
+flow with the three accounts, the cleanup, and the per-account counts above.
 
-Two things were wrong on the first real run, and are now fixed:
+Three things were wrong in earlier versions, and are now fixed:
 
 - `Compress` and `Decompress` ran correctly once `singleArchiveEnabled`,
   `singleArchiveName`, `compressionType`, `compressionLevel` and
   `filenameCollisionResolutionType` were set from the real schema - see
   `07.routes_POST_simple.sh`.
-- `billable_GET_report` was reading `resultSet.returnCount`, which this
-  endpoint (unlike `GET /accounts`, `GET /sites`, ...) caps at the request's
-  own `limit`. With `limit=1` set to keep the response small, every day's
-  count was silently capped at 1. Confirmed directly, by comparing against
-  File Tracking's own count for the same account and day: the field that
-  ignores `limit` is `resultSet.totalCount`, and that is what the script reads
-  now.
+- `billable_GET_report` read `resultSet.returnCount`, which `/logs/transfers`
+  caps at the request's own `limit`. With `limit=1`, every day's count was
+  capped at 1. It reads `resultSet.totalCount` now.
+- `billable_GET_report` filtered with `accountName=`, which `/logs/transfers`
+  ignores without a word: every count was the whole server's, not the test
+  account's. It filters with `account=` now, an exact match. An earlier version
+  of this README called the report's numbers confirmed against File Tracking;
+  they were not the account's own.
+
+The earlier design used one account for everything, the server pulling from
+and pushing to itself as that same account. Its counts mixed the uploads, the
+pulls and the arrivals together, which is what the three accounts separate.
 
 [Back to all features](../README.md)

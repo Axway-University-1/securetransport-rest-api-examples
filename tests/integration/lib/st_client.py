@@ -27,6 +27,7 @@ import base64
 import http.cookiejar
 import json
 import os
+import re
 import ssl
 import sys
 import urllib.error
@@ -129,6 +130,11 @@ class STClient:
             return Response(e.code, dict(e.headers), e.read())
         except urllib.error.URLError as e:
             raise STError("cannot reach %s: %s" % (url, e.reason)) from e
+        except OSError as e:
+            # A timeout or reset after the connection was made, such as while
+            # the server restarts its daemons: urllib raises these as they are,
+            # not as URLError. As an STError, every check handles them alike.
+            raise STError("no answer from %s: %s" % (url, e)) from e
 
     # -- session ----------------------------------------------------------
     def login(self):
@@ -385,6 +391,11 @@ class EndUserClient:
             return Response(e.code, dict(e.headers), e.read())
         except urllib.error.URLError as e:
             raise STError("cannot reach %s: %s" % (url, e.reason)) from e
+        except OSError as e:
+            # A timeout or reset after the connection was made, such as while
+            # the server restarts its daemons: urllib raises these as they are,
+            # not as URLError. As an STError, every check handles them alike.
+            raise STError("no answer from %s: %s" % (url, e)) from e
 
     def login(self):
         response = self._request("POST", "myself",
@@ -404,6 +415,28 @@ class EndUserClient:
 
     def download(self, filepath):
         return self._request("GET", "files/" + filepath)
+
+    def create_folder(self, folder):
+        """
+        POST /files/{folder}: the name goes in the URL, and the body only says it
+        is a directory. A name in the body is answered with 409.
+        """
+        body = json.dumps({"isDirectory": True, "isRegularFile": False, "isSymbolicLink": False,
+                           "isOther": False, "isShared": False}).encode()
+        return self._request("POST", "files/" + urllib.parse.quote(folder.strip("/")),
+                             headers={"Content-Type": "application/json"}, data=body)
+
+    def list_folder(self, folder):
+        """
+        The names of the regular files in a folder of the home folder, or
+        None when the folder cannot be read. GET /files/{folder} answers with
+        {"files": [{"fileName": ..., "isRegularFile": ...}, ...]}.
+        """
+        response = self._request("GET", "files/" + urllib.parse.quote(folder.strip("/")))
+        if response.status != 200:
+            return None
+        return [f.get("fileName") for f in (response.json() or {}).get("files", [])
+                if f.get("isRegularFile")]
 
     def delete_file(self, filepath):
         """
@@ -453,6 +486,33 @@ def is_mock(client):
     response = client.get("version")
     body = response.json() or {}
     return body.get("serverType") == "mock"
+
+
+def release_at_least(version, release):
+    """
+    True when a version string from GET /version, such as "5.5-20260924", is
+    the given release or later. A release is a product version and a build
+    date; a newer product version counts as later whatever its date. An
+    unreadable version is treated as older, so a feature check skips rather
+    than fails.
+    """
+    def parse(text):
+        match = re.search(r"(\d+(?:\.\d+)*)-(\d{8})", str(text or ""))
+        if not match:
+            return None
+        return tuple(int(p) for p in match.group(1).split(".")), match.group(2)
+
+    have, want = parse(version), parse(release)
+    if not have or not want:
+        return False
+    if have[0] != want[0]:
+        return have[0] > want[0]
+    return have[1] >= want[1]
+
+
+def server_release_at_least(client, release):
+    """release_at_least() for the server client is connected to."""
+    return release_at_least((client.get("version").json() or {}).get("version"), release)
 
 
 def skip(reason):
