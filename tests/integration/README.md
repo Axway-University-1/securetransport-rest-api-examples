@@ -119,6 +119,7 @@ assumption about the API.
 | `30.lookups_and_transfer_logs_read.py` | no | The query filters the newer examples look objects up with - `/sites?account=&name=`, `/subscriptions?account=`, `/routes?type=` and `?name=`, `/logs/transfers?status=Failed` - each checked against every object it returns, using objects already on the server. That `/logs/transfers` carries `totalCount` while `returnCount` is capped by `limit`. Then the real `16.TransferLogs` scripts and `stBillableTransfers.py` (with the venv), each printed count compared with the API's own count for the same account and day. The billable parts need 5.5-20260924 or later. |
 | `31.subscriptions_routes_transfers_scripts.py` | **yes** | The newer examples as one Advanced Routing flow, on a throwaway `ZZTEST_chain` account: the EndUser folder and upload scripts, the SSH sites, both subscriptions, the Compress and Decompress routes, the composite route linked to the subscription, a pull, the transfer log, and then the clean-up examples in reverse. Each step is checked through the API, and the flow is proved end to end by the uploaded file arriving, pulled, compressed and pushed, in the account's `/delivered` folder. The Admin examples run as name-substituted copies (`john` and every fixed name made throwaway, which `test_integration_helpers.py` checks offline); the EndUser examples run unmodified. The trigger-file subscription and the billable count need 5.5-20260924 or later. Set `st_ssh_host`, `st_ssh_port` and `st_enduser_port` if the defaults do not fit your server. |
 | `32.pesit_acknowledgment_loop_scripts.py` | **yes** | A PeSIT loop between two throwaway accounts on the one server (each with a PeSIT site named after the other, and a transfer profile), and the real `Acknowledgment.sh` and `IteratePesitInbounds.sh` run on the transfers it makes: a NACK for a file nothing forwards, an ACK for one a subscription and route push on under the same `coreId`, and the iterator ACKing the forwarded one while leaving the other for later. The iterator acts on every unacknowledged PeSIT inbound on the server in its window, so it only runs when all of them belong to throwaway accounts. Set `st_pesit_host` and `st_pesit_port` if your PeSIT listener is not `st_server`:17617. |
+| `33.enduser_api_scripts.py` | **yes** | The EndUser examples added from the API reference, run as a throwaway end user with a throwaway partner: the account, a password change and back, the secret questions (or a clean "service not enabled"), the address book; an upload with `Content-MD5`, metadata, listing parameters, rename by PUT and PATCH, share and unshare; MD5Calc, a chunked and a multipart upload, a cancel; a pull and its summary, a push and a folder monitor run through SSH sites the admin API gives the user; the transfer log; the server time. Each effect is checked through the API. Not run: the password reset pair (needs a real email) and `verifymdn` (needs AS2). Puts back your own `myCookie.jar` and `set_variables.local.sh`. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -177,7 +178,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `32` cover: the admin API's session and read behaviour (both as
+`01` through `33` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -195,7 +196,8 @@ patches and restores every real subscription on the server, by explicit
 decision - all eight Expression Language exercises, in both bash and
 python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
-both acknowledgment scripts on a PeSIT loop of their own (`32`).
+both acknowledgment scripts on a PeSIT loop of their own (`32`), and the
+EndUser examples for every resource of its API reference (`33`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a

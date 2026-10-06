@@ -35,7 +35,9 @@ Admin/API 2.0/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
 EndUser/API 2.0/
-    bash/     10 examples: login, logout, list, create a folder, upload, download, delete
+    bash/     40 examples: every resource of the EndUser API reference - files,
+              file operations, the account and password, the address book,
+              the user's own transfers, the server time
 ```
 
 `bash` and `bat` are kept at **exact parity** — every bash example has a bat
@@ -74,6 +76,10 @@ create, read, update, delete cycle for that object.
 | Use SecureTransport's Expression Language in a route condition, a file filter, a rename pattern or a login restriction rule | `bash/14.ExpressionLanguage/` (also in `python/python3/14.ExpressionLanguage/`) |
 | Upload or download files as an end user | `EndUser/API 2.0/bash/02.Files/` |
 | Create a folder, or upload to a chosen path, as an end user, with the csrfToken | `EndUser/API 2.0/bash/02.Files/02.files_name_POST_folder.sh`, `08.fileOperations_POST_upload.sh` |
+| List files with paging, sorting, metadata or a glob; rename; share a folder | `EndUser/API 2.0/bash/02.Files/` 09 to 15 |
+| Read the account, change or reset the password, use the address book, as an end user | `EndUser/API 2.0/bash/03.Myself/` |
+| Checksum a file on the server, upload in chunks, cancel an upload | `EndUser/API 2.0/bash/04.FileOperations/` |
+| Pull, push or run a folder monitor as an end user, and read the user's own transfer log | `EndUser/API 2.0/bash/05.Transfers/` |
 
 The numbering has gaps (10 and 11 are absent). Those topics have no examples yet.
 

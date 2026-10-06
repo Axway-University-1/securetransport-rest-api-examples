@@ -18,7 +18,7 @@ Ubuntu: `sudo apt install jq`.
 **2. Read the result.** A good run ends with:
 
 ```
-# ALL CHECKS PASSED  (12)
+# ALL CHECKS PASSED  (13)
 ```
 
 If something fails, scroll up. Each line starts with `PASS` or `FAIL`, and a
@@ -71,6 +71,7 @@ server](#against-a-real-server).
 | `checks/test_feature_version_check.sh` | The version check at the start of every `Features/` example: it must run the example on a server at or after the introducing version, skip it on an older one, and stop with an error when the version cannot be read. Also fails if a feature example has no version check. |
 | `checks/test_feature_trigger_route_pull.sh` | The `Features/trigger-route-after-completed-pull` examples: the JSON they send is valid (even with awkward characters in the password), the sites use the right folders and port, the push folder is never the subscription folder, an old server gets nothing sent, and a missing password stops them before any call. |
 | `checks/test_feature_billable_transfers.sh` | The `Features/audit-billable-transfers` examples: the three accounts (a partner reused when it is there), each site logging in as the right partner, each account's folders made logged in as that account, each scenario's site, route and subscription bodies (including the Compress/Decompress steps and the two-backslash trigger condition), the archives built and uploaded are real zips, the billable report's per-day date math and its `account=` query per account (never `accountName=`, which the endpoint ignores), `00.run_all.sh`'s step ordering, stop-on-first-failure and per-account predictions, and `99.cleanup_DELETE.sh` finding everything by name, without touching another account's objects, and keeping a partner another test account still uses. |
+| `checks/test_bash_enduser_api.sh` | The EndUser examples added from the API reference (`03.Myself`, `04.FileOperations`, `05.Transfers`, `06.ServerTime`, `02.Files` 09 to 15): each one's method, URL and query, body and headers (`Content-MD5`, `Content-Range`), the answers it acts on (an MD5Calc followed until DONE, a 503 from a disabled service, a pull summary still in retry) and its exit code. |
 | `checks/test_bash_pesit_ack.sh` | `90.EndToEndAcknowledgment`: `Acknowledgment.sh` sending an ACK when the outbound transfer is there, a NACK or nothing (exit 2) when it is not, only changing `operation=ack` in the link, and logging an ACK answered 200 as sent; `IteratePesitInbounds.sh` running from another folder, carrying on past a transfer that is not ready, and passing its log folder on. The bat twins are read as text for the same bugs. |
 | `checks/test_feature_bat_twins.py` | A `Features/` `.bat` file drifting out of step with its `.sh` twin: every API field name and every feature's own settings must appear in both, since the `.bat` files cannot be run in this repository to check directly. |
 

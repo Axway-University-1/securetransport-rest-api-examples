@@ -273,7 +273,34 @@ use PowerShell to do the same job.
 | Topic | Endpoints | bash |
 | ----- | --------- | :--: |
 | 01. Authenticate | `/myself`, login and logout | 2 |
-| 02. Files | `/files` and `/fileOperations`, list, create a folder, upload, download and delete | 8 |
+| 02. Files | `/files` and `/fileOperations`: list, with paging, sorting, metadata and glob patterns; create a folder; upload, with an MD5 check; download; rename; share and unshare; delete | 15 |
+| 03. Myself | `/myself`, `/myself/password`, `/myself/passwordExpired`, `/myself/secretQuestion`, `/secretQuestions`, `/myself/addressBook`: the account, password change and reset, secret questions, the address book | 10 |
+| 04. File Operations | `/fileOperations`: MD5 checksum, an operation's state, chunked and multipart uploads, cancel | 5 |
+| 05. Transfers | `/transfers`, `/transfers/operations`, `/transfers/pullSummary`: the user's transfer log, pull, push, folder monitor, pull summary, AS2 receipt check | 7 |
+| 06. Server Time | `/serverTime` | 1 |
+
+Every resource of the EndUser API 2.0 reference has an example. All of them
+were run against a real server except three, which say so in their own header:
+the password reset pair (`03.Myself/04` and `05`), which need a real reset
+email, and `05.Transfers/07`, which needs an AS2 transfer.
+
+Where the EndUser API behaves differently from what you might expect,
+confirmed against a real server:
+
+- **Writes do not need the `csrfToken`.** The login answers with one, but a
+  POST, PUT, PATCH or DELETE succeeds without it: the session cookie is enough.
+- **Changing the password ends the session.** The next call with the same
+  cookie answers 401. Log in again with the new password, as
+  `03.Myself/03.myself_password_POST_change.sh` does.
+- **`/transfers` returns a plain list**, not the `{resultSet, result}` envelope
+  the Admin API uses. So do `/myself/addressBook` and `/secretQuestions`.
+- **A wrong `Content-MD5` gives a bare 500**, "Error while uploading file", with
+  no word about the checksum. File Tracking logs the upload as Failed.
+- **A file operation's status describes the operation, not the file.** An
+  Upload stays `IN_PROGRESS` after its last chunk, though the file is whole.
+  Check the file itself, with `02.Files/10.files_filepath_GET_metadata.sh`.
+- **`/serverTime` writes the offset as `+0300`**, not with the `Z` the API
+  reference shows. Parse the offset, as `06.ServerTime/01.serverTime_GET.sh` does.
 
 ### Python
 

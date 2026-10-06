@@ -428,6 +428,39 @@ request body is a safe stand-in for another's.
   now demonstrates it (no `.bat` twin - the EndUser tree has no `bat/` folder
   at all, unlike Admin).
 
+## The EndUser API, against its own reference
+
+Confirmed directly on 5.5-20260924, while adding an example for every
+resource of the EndUser API reference (`tests/integration/checks/33.enduser_api_scripts.py`):
+
+- **No csrfToken is needed.** The login answers with one, but a POST, PUT,
+  PATCH or DELETE without it succeeds. The session cookie is enough.
+- **Changing the password ends the session.** The next call with the same
+  cookie answers 401: log in again with the new password.
+- **Lists are plain arrays** for `/transfers`, `/myself/addressBook` and
+  `/secretQuestions` - not the Admin API's `{resultSet, result}` envelope.
+- **An address book id holds a `:`**; URL-encode it in `/myself/addressBook/{id}`.
+- **A folder can only be shared with a user the server knows**: an unknown
+  email answers 400 "Unable to share folder ... with user ...". The admin API
+  does not take `sharingAllowed` on an account, though the end user's
+  `GET /myself` shows it.
+- **A wrong `Content-MD5`** answers a bare 500, "Error while uploading file",
+  and File Tracking logs a Failed upload. A right one answers 201.
+- **A file operation's status is the operation's, not the file's.** MD5Calc
+  answers IN_PROGRESS, then DONE with a base64 checksum. An Upload stays
+  IN_PROGRESS after its last chunk, though the file is whole. A cancelled
+  operation answers 404 afterwards.
+- **The content of an Upload** goes in with PUT as octet-stream (in chunks with
+  `Content-Range`, if wanted), or with POST as a multipart form. POST as
+  octet-stream answers 415.
+- **A folder monitor run needs no transfer site**: it moves the files between
+  two folders of the user's home, logged as Incoming, protocol `folder`.
+- **A pull summary for an unknown operationIndex** answers 200 with every
+  count 0, not 404.
+- **`/serverTime`** writes the offset as `+0300`, not the `Z` the reference shows.
+- **The secret question service** answers 503,
+  `error.secretQuestion.serviceDisabled`, when it is not enabled.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

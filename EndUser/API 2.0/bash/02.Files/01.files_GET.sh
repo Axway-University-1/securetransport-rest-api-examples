@@ -8,9 +8,9 @@
 # Description:
 # This script lists the files in the user's home folder using the `/files`
 # endpoint.
-# It demonstrates:
-# - Reusing the session from the cookie jar
-# - The query parameters available for paging, sorting and filtering
+# It demonstrates reusing the session from the cookie jar. For the query
+# parameters - paging, sorting, metadata, hidden files, glob patterns - see
+# 09.files_GET_query.sh.
 #
 # Usage:
 # ./01.files_GET.sh
