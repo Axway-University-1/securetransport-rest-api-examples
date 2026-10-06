@@ -115,6 +115,16 @@ if [[ "${method}" == "GET" && -n "${STUB_CURL_GET_RULES}" && -f "${STUB_CURL_GET
         fi
     done < "${STUB_CURL_GET_RULES}"
 fi
+# STUB_CURL_GET_SEQUENCE points at a folder of 1.json, 2.json, ...: each GET is
+# answered with the next one, the last one repeating. For an example that lists,
+# acts and lists again, and expects the answer to have changed.
+if [[ "${method}" == "GET" && -n "${STUB_CURL_GET_SEQUENCE}" && -d "${STUB_CURL_GET_SEQUENCE}" ]]; then
+    counter="${STUB_CURL_GET_SEQUENCE}/.served"
+    n=$(( $(cat "${counter}" 2>/dev/null || echo 0) + 1 ))
+    [[ -f "${STUB_CURL_GET_SEQUENCE}/${n}.json" ]] || n=$(( n - 1 ))
+    echo "${n}" > "${counter}"
+    get_body="${STUB_CURL_GET_SEQUENCE}/${n}.json"
+fi
 if [[ "${method}" == "GET" && -n "${get_body}" && -f "${get_body}" ]]; then
     serve "${get_body}"
 fi

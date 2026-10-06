@@ -262,6 +262,11 @@ already exists.
 | 13. Configurations | `/configurations/options` | 2 | 2 |
 | 15. Transfers | `/transfers/operations`, a pull on demand | 1 | 1 |
 | 16. Transfer Logs | `/logs/transfers`, by account and status, billable transfers per day | 2 | 2 |
+| 17. Access Policies | `/accessPolicies`, the embedded database's pg_hba.conf rules | 6 | 6 |
+| 18. Account Setup | `/accountSetup`, an account with its sites, profiles and subscriptions in one call | 4 | 4 |
+| 19. Address Book | `/addressBook/sources`, where end users' address books look people up | 5 | 5 |
+| 20. Administrative Roles | `/administrativeRoles`, the roles and the menus they open | 7 | 7 |
+| 21. Administrators | `/administrators`, administrators, locking them, and their API keys | 10 | 10 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same
