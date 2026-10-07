@@ -41,7 +41,7 @@ SET RESPONSE_FILE=%TEMP%\logs_%RANDOM%.json
 
 echo The 10 latest transfers of '%ACCOUNT%'...
 curl -s -k -G -u "%ST_USER%:%ST_PASSWORD%" "https://%ST_SERVER%:%ST_PORT%/api/v2.0/logs/transfers" ^
-  --data-urlencode "account=%ACCOUNT%" --data-urlencode "limit=10" ^
+  --data-urlencode "account=%ACCOUNT%" --data-urlencode "sortByStartTime=descending" --data-urlencode "limit=10" ^
   -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
 powershell -NoProfile -Command "$j = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; $j.result | ConvertTo-Json -Depth 10; '{0} transfer(s) of ''{1}'' in the log, in all.' -f $j.resultSet.totalCount, $env:ACCOUNT"
 

@@ -42,7 +42,7 @@ ACCOUNT="${1:-john}"
 
 printf "The 10 latest transfers of '%s'...\n" "${ACCOUNT}"
 RESPONSE=$(curl -s -k -G -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/logs/transfers" \
-  --data-urlencode "account=${ACCOUNT}" --data-urlencode "limit=10" \
+  --data-urlencode "account=${ACCOUNT}" --data-urlencode "sortByStartTime=descending" --data-urlencode "limit=10" \
   -H "accept: application/json" -H "${REFERER_HEADER}")
 printf '%s\n' "${RESPONSE}" | jq '.result'
 printf "%s transfer(s) of '%s' in the log, in all.\n" \

@@ -117,9 +117,14 @@ check("a prefixed name is not mistaken for the real one",
 # Every example in the folders the newer examples added is run by 31 or 30
 NEW = ("06.TransferSites", "07.Subscriptions", "09.CompositeRoutes", "15.Transfers", "16.TransferLogs")
 OLDER = {"06.TransferSites/01.sites_POST.sh", "09.CompositeRoutes/02.routes_POST.sh"}  # 08 and 22 run these
+BY_47 = {"16.TransferLogs/03.logs_transfers_id_GET.sh", "16.TransferLogs/04.logs_transfers_id_operations_POST.sh",
+         "16.TransferLogs/05.logs_transfers_pullSummary_GET.sh"}  # 47.logs_scripts.py runs these
 missing = sorted(os.path.join(folder, f) for folder in NEW for f in os.listdir(os.path.join(BASH, folder))
-                 if f.endswith(".sh") and os.path.join(folder, f) not in set(scripts) | OLDER)
+                 if f.endswith(".sh") and os.path.join(folder, f) not in set(scripts) | OLDER | BY_47)
 check("every example in %s is run against a real server" % ", ".join(NEW), not missing, missing)
+text_47 = open(os.path.join(REPO, "tests", "integration", "checks", "47.logs_scripts.py")).read()
+check("and 47.logs_scripts.py names each one it is said to run", all(os.path.basename(f) in text_47 for f in BY_47),
+      [f for f in BY_47 if os.path.basename(f) not in text_47])
 
 print()
 if failed:

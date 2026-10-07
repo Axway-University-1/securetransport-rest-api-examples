@@ -133,6 +133,8 @@ assumption about the API.
 | `44.ldap_domains_scripts.py` | **yes** | The real `25.LdapDomains` examples: add, list and filter, check, read, replace (the bind password's ciphertext kept, the name not changed), change and delete throwaway domains, a name with a space among them, and every refused argument. Then the connection test against a silent TcpSink on this machine: a domain gets two servers, one with the sink behind it and one with nothing listening; each server's number gives "Successful Connection." (and the sink sees ST connect, with nothing sent) or "Connection failed.", and the first fails too once the sink is gone. Needs `st_callback_host` for that second part. Never turns LDAP login on. |
 | `45.login_restriction_policies_scripts.py` | **yes** | The real `26.LoginRestrictionPolicies` examples against throwaway policies and a throwaway business unit, each effect checked through the API: create (a name with a space among them), list and filter, check, read, replace (rules, their ids and the business units kept), add a rule (a replacement when the name exists, an address checked, a condition not), enable, disable and remove a rule, assign and take away a business unit, delete, and every refused argument. It makes no claim about what a policy does to a login, and never makes a policy the default. |
 | `46.login_restriction_enforcement.py` | **yes** | **Fails by design on the lab the examples were written against, until policy enforcement works there.** Two throwaway end user accounts, one in a throwaway business unit and one in none, both log in over the EndUser API and FTP. The real `26` examples then create a policy that denies every address and assign it to the unit; the account in the unit must be refused over both protocols and the other must still get in, and with the unit taken away the first logs in again. On that lab the refusal never happens (the two "THE POLICY ENFORCES" checks fail, everything else passes); it turns green by itself once enforcement works, and whatever switches it on belongs in its set up. |
+| `47.logs_scripts.py` | **yes** | The real log examples (`16.TransferLogs` 03 to 05, `27.AuditLogs`, `28.ServerLogs`), in three independent parts, each making something happen and finding it in the log. The audit trail: a throwaway business unit is created, changed and deleted, and the examples find its three entries by the exact name with the user and the address the server saw, the CSV export holds them, and an edit of an entry's description is answered 204 and changes nothing. The server log: a throwaway account logs in over FTP and fails once, and the examples find the login and the failed-login warning by message, component, level and date, read one by id, and export them (the `accountName=` filter is shown to be ignored). The transfer log: an upload and a pull from ST's own SSH server; the pull summary counts the file, the pull is read by its id, and each operation answers as documented (resubmit works; cancel, verify, ack and nack are refused for a finished HTTP transfer). Cancelling is the job of check 48. The log entries of the throwaway objects stay; the objects are removed. The FTP part needs the FTP daemon. |
+| `48.cancel_transfer.py` | **yes** | The real `16.TransferLogs/04` and `03` examples against cancelling. Part A: three running 10 MB transfers (an FTP upload with a throttled client, an EndUser API upload with curl limited to 250 KB a second, a pull over SSH from ST's own SSH server through a `SlowProxy`) are In Progress in the log, the server says they are not cancelable, and a cancel is refused ("not eligible for cancellation") while they carry on. Part B: a PeSIT pull of a file that does not exist fails and waits for a retry; the server calls it cancelable, the cancel is accepted (HTTP 200), the pull summary moves it from "to retry" to "failed", and a second cancel is refused. Objects are removed, log entries stay. The FTP part needs the FTP daemon, the SSH pull needs `st_callback_host`, part B needs the PeSIT port. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -190,6 +192,7 @@ each in a thread, on a port the system picks:
 - `FakeVault` - a HashiCorp Vault: an AppRole login, then KV version 2 reads.
 - `FakeS3` - an S3 service, path style, any credentials, objects in memory.
 - `TcpSink` - accepts connections and keeps what arrives, for Sentinel.
+- `SlowProxy` - a TCP proxy that passes bytes at a limited rate in both directions, so a transfer through it lasts; `close()` cuts it.
 - `FakeIcap` - an ICAP server (OPTIONS, then REQMOD with a preview): lets a file through with 204, or blocks one that holds the marker text with a 403, and records each scan.
 
 The server must be able to connect back to this machine: set `st_callback_host`
@@ -210,7 +213,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `46` cover: the admin API's session and read behaviour (both as
+`01` through `48` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -230,7 +233,7 @@ python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
 both acknowledgment scripts on a PeSIT loop of their own (`32`), the
 EndUser examples for every resource of its API reference (`33`), and the Admin
-examples added resource by resource from its reference (`34` to `46`).
+examples added resource by resource from its reference (`34` to `48`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a

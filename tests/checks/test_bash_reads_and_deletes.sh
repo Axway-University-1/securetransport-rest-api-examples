@@ -122,7 +122,7 @@ echo
 echo "=== 16.TransferLogs ==="
 
 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/01.logs_transfers_GET.sh"
-expect "logs GET: the latest 10 of the account, then its failures" "$(calls)" "GET ${BASE}/logs/transfers?account=john&limit=10
+expect "logs GET: the latest 10 of the account, then its failures" "$(calls)" "GET ${BASE}/logs/transfers?account=john&sortByStartTime=descending&limit=10
 GET ${BASE}/logs/transfers?account=john&status=Failed&limit=1&fields=id"
 has "logs GET: the count is totalCount, not returnCount" "42 transfer(s) of 'john' in the log, in all."
 has "logs GET: the failed count too" "42 failed transfer(s)."

@@ -9,6 +9,9 @@ real HashiCorp Vault, S3 bucket or Axway Sentinel:
 - FakeS3     answers path-style S3 requests with any credentials, keeping
              objects in memory - enough for an S3 storage profile's test.
 - TcpSink    accepts connections and keeps what it receives, for Sentinel.
+- SlowProxy  a TCP proxy that passes the bytes through at a limited rate, in both
+             directions, so a transfer through it lasts as long as you need; close()
+             cuts every connection, which aborts the transfer.
 - FakeIcap   an ICAP server: answers OPTIONS, reads a REQMOD or RESPMOD request
              with its preview, and either lets the file through (204) or blocks
              it with a 403 when it holds the marker text. Records each request.
@@ -251,6 +254,81 @@ class TcpSink:
         self.thread.join(5)
 
 
+class SlowProxy:
+    """
+    Forwards each connection to target_host:target_port, passing at most `rate` bytes
+    a second each way. Counts the connections in `connections`. close() stops
+    listening and cuts the ones that are open.
+    """
+
+    def __init__(self, target_host, target_port, rate=200 * 1024, port=0):
+        self.target = (target_host, target_port)
+        self.rate = rate
+        self.connections = 0
+        self._open = []
+        self.sock = socket.socket()
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("0.0.0.0", port))
+        self.sock.listen()
+        self.port = self.sock.getsockname()[1]
+        self.thread = threading.Thread(target=self._accept, daemon=True)
+
+    def _accept(self):
+        while True:
+            try:
+                client, _ = self.sock.accept()
+            except OSError:
+                return
+            self.connections += 1
+            try:
+                upstream = socket.create_connection(self.target, timeout=15)
+                upstream.settimeout(None)
+            except OSError:
+                client.close()
+                continue
+            self._open += [client, upstream]
+            for source, sink in ((client, upstream), (upstream, client)):
+                threading.Thread(target=self._pump, args=(source, sink), daemon=True).start()
+
+    def _pump(self, source, sink):
+        try:
+            while True:
+                data = source.recv(8192)
+                if not data:
+                    break
+                sink.sendall(data)
+                time.sleep(len(data) / float(self.rate))
+        except OSError:
+            pass
+        for end in (source, sink):
+            try:
+                end.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+    def close(self):
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self.sock.close()
+        for end in self._open:
+            try:
+                end.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            end.close()
+        self._open = []
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        self.thread.join(5)
+
+
 class FakeIcap:
     """
     An ICAP server (RFC 3507), enough for SecureTransport's scan: OPTIONS, then
@@ -382,7 +460,7 @@ class FakeIcap:
 
 
 if __name__ == "__main__":
-    kinds = {"vault": FakeVault, "s3": FakeS3, "sink": TcpSink, "icap": FakeIcap}
+    kinds = {"vault": FakeVault, "s3": FakeS3, "sink": TcpSink, "icap": FakeIcap}  # SlowProxy needs a target: use it from code
     if len(sys.argv) < 2 or sys.argv[1] not in kinds:
         sys.exit("usage: dummy_servers.py vault|s3|sink|icap [PORT]")
     with kinds[sys.argv[1]](int(sys.argv[2]) if len(sys.argv) > 2 else 0) as dummy:

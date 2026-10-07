@@ -76,6 +76,42 @@ with dummy_servers.TcpSink() as sink:
     check("it records the connection", len(sink.connections) == 1 and sink.connections[0]["client"] == "127.0.0.1")
     check("wait_for gives up on what never comes", not sink.wait_for(b"NEVER", 1))
 
+print("=== SlowProxy ===")
+with dummy_servers.TcpSink() as target:
+    with dummy_servers.SlowProxy("127.0.0.1", target.port, rate=100 * 1024) as proxy:
+        data = b"x" * (200 * 1024)
+        started = time.time()
+        with socket.create_connection(("127.0.0.1", proxy.port), timeout=10) as conn:
+            conn.sendall(data)
+            deadline = time.time() + 15
+            while len(target.received()) < len(data) and time.time() < deadline:
+                time.sleep(0.1)
+        elapsed = time.time() - started
+        check("every byte reaches the target", target.received() == data, len(target.received()))
+        check("at about the rate asked for: 200 KB at 100 KB a second takes about two seconds", 1.3 < elapsed < 6, elapsed)
+        check("it counts the connections", proxy.connections == 1, proxy.connections)
+    stopped = False
+    try:
+        socket.create_connection(("127.0.0.1", proxy.port), timeout=2).close()
+    except OSError:
+        stopped = True
+    check("it stops listening when the with block ends", stopped)
+with dummy_servers.TcpSink() as target2:
+    proxy2 = dummy_servers.SlowProxy("127.0.0.1", target2.port, rate=50 * 1024)
+    proxy2.thread.start()
+    conn = socket.create_connection(("127.0.0.1", proxy2.port), timeout=10)
+    conn.sendall(b"y" * (500 * 1024))
+    time.sleep(1)
+    proxy2.close()
+    conn.settimeout(5)
+    try:
+        cut = conn.recv(1) == b""
+    except OSError:
+        cut = True
+    time.sleep(0.5)
+    check("close() cuts a connection in the middle of a transfer", cut and len(target2.received()) < 500 * 1024, len(target2.received()))
+    conn.close()
+
 print("=== FakeIcap ===")
 HTTP_HEAD = b"POST /f.txt HTTP/1.1\r\nHost: sthost\r\n\r\n"
 

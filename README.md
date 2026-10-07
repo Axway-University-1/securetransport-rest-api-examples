@@ -262,7 +262,7 @@ already exists.
 | 12. Business Units | `/businessUnits`, units, their nesting, and why a delete is refused | 7 | 7 |
 | 13. Configurations | `/configurations`: options, logging, database, Sentinel, login, archiving, external stores, S3 storage profiles | 47 | 47 |
 | 15. Transfers | `/transfers/operations`, a pull on demand | 1 | 1 |
-| 16. Transfer Logs | `/logs/transfers`, by account and status, billable transfers per day | 2 | 2 |
+| 16. Transfer Logs | `/logs/transfers`, by account and status, billable transfers per day | 5 | 5 |
 | 17. Access Policies | `/accessPolicies`, the embedded database's pg_hba.conf rules | 6 | 6 |
 | 18. Account Setup | `/accountSetup`, an account with its sites, profiles and subscriptions in one call | 4 | 4 |
 | 19. Address Book | `/addressBook/sources`, where end users' address books look people up | 5 | 5 |
@@ -273,6 +273,8 @@ already exists.
 | 24. ICAP Servers | `/icapServers`, antivirus and DLP scan servers: add, change, switch on and off, and what a scan does to a transfer | 7 | 7 |
 | 25. LDAP Domains | `/ldapDomains`, directories users can be looked up in: add, change, remove, and test a connection | 8 | 8 |
 | 26. Login Restriction Policies | `/loginRestrictionPolicies`, rules that allow or deny logins by address: policies, rules, business units | 9 | 9 |
+| 27. Audit Logs | `/logs/audit`, who changed what, and when: list, read, a refused edit, CSV export | 4 | 4 |
+| 28. Server Logs | `/logs/server`, what the servers wrote: search, read, CSV export | 3 | 3 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same

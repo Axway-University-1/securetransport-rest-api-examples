@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     194 curl examples, numbered by topic
-    bat/      186 of them, for Windows
+    bash/     204 curl examples, numbered by topic
+    bat/      196 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -76,7 +76,10 @@ create, read, update, delete cycle for that object.
 | Add and test an S3 storage profile | `bash/13.Configurations/` 45 to 47 |
 | Set up usage reporting to the Axway Platform | `bash/13.Configurations/02.configurations_PATCH_UsageReporting.sh` |
 | Start a pull from a partner on demand | `bash/15.Transfers/` |
-| Read the transfer log, or count billable transfers per day | `bash/16.TransferLogs/` |
+| Read the transfer log, or count billable transfers per day | `bash/16.TransferLogs/` 01 and 02 |
+| Read one transfer, resubmit or acknowledge it, or count what a pull transferred | `bash/16.TransferLogs/` 03 to 05 |
+| See who changed what on the server, when and from where, or export the audit log | `bash/27.AuditLogs/` |
+| Search what the protocol servers logged (a login, a failure), or export the server log | `bash/28.ServerLogs/` |
 | Manage the embedded database's access rules (pg_hba.conf) | `bash/17.AccessPolicies/` |
 | Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
 | Change an address book source | `bash/19.AddressBook/` |

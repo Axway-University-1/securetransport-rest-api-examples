@@ -1209,6 +1209,178 @@ nothing_sent "09 PATCH: add or remove only, nothing sent"
 GET_BODY=
 
 echo
+echo "=== 16.TransferLogs (03 to 05), 27.AuditLogs, 28.ServerLogs ==="
+T="${BASE}/logs/transfers"
+LIST_ONE='{"result":[{"id":{"mTransferStatusId":"t1","urlrepresentation":"QWJj"}}]}'
+TRANSFER='{"status":"Processed","file":"a.txt","transferType":"User upload","duration":"81 ms","account":"example_user","login":"example_user","serverName":"Http Default","transferSite":"(none)","startTime":"Wed, 07 Oct 2026 10:33:12 +0300","isCancelable":false,"isResubmittable":true}'
+STATUS=200 run "16.TransferLogs/03.logs_transfers_id_GET.sh" "QWJj"
+expect "03 GET: the transfer given" "${RC}:$(calls)" "0:GET ${T}/QWJj"
+SEQUENCE=$(sequence tl_newest "${LIST_ONE}" "${TRANSFER}")
+run "16.TransferLogs/03.logs_transfers_id_GET.sh"
+expect "03 GET: no id, so the newest is looked up, then read" "$(calls)" "GET ${T}?sortByStartTime=descending&limit=1&fields=id
+GET ${T}/QWJj"
+SEQUENCE=
+GET_BODY=$(body tl_one "${TRANSFER}")
+run "16.TransferLogs/03.logs_transfers_id_GET.sh" QWJj
+has "03 GET: the status, file, type and duration" "  Processed: a.txt (User upload), 81 ms"
+has "03 GET: who, where, which site" "  account example_user, login example_user, server Http Default, site (none)"
+has "03 GET: whether the server will allow a cancel or a resubmit" "  cancelable: no, resubmittable: yes"
+GET_BODY=$(body tl_one_cancelable "$(printf '%s' "${TRANSFER}" | jq -c '.isCancelable = true | .isResubmittable = false')")
+run "16.TransferLogs/03.logs_transfers_id_GET.sh" QWJj
+has "03 GET: and the other way round" "  cancelable: yes, resubmittable: no"
+GET_BODY=$(body tl_one "${TRANSFER}")
+GET_BODY=$(body tl_none '{"result":[]}')
+run "16.TransferLogs/03.logs_transfers_id_GET.sh"
+expect "03 GET: no transfers, exit 1, nothing read" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+GET_BODY=
+STATUS_GET=400 run "16.TransferLogs/03.logs_transfers_id_GET.sh" "bad id"
+expect "03 GET: a refused id (400) exits 1" "${RC}" "1"
+
+POST_BODY=$(body tl_resubmitted '{"message":"Transfer with id t1 was successfully resubmitted."}')
+STATUS=200 run "16.TransferLogs/04.logs_transfers_id_operations_POST.sh" QWJj resubmit
+expect "04 POST: resubmit, with no body" "${RC}:$(calls):$(payload 1)" "0:POST ${T}/QWJj/operations?operation=resubmit:"
+has "04 POST: the answer's message" "Transfer with id t1 was successfully resubmitted."
+STATUS=200 run "16.TransferLogs/04.logs_transfers_id_operations_POST.sh" QWJj ack "all good"
+expect "04 POST: ack, with the message in the body" "$(calls):$(payload 1 | jq -c .)" "POST ${T}/QWJj/operations?operation=ack:{\"userMessage\":\"all good\"}"
+STATUS=200 run "16.TransferLogs/04.logs_transfers_id_operations_POST.sh" QWJj nack
+expect "04 POST: nack with no message sends no body" "$(payload 1)" ""
+STATUS=200 run "16.TransferLogs/04.logs_transfers_id_operations_POST.sh" QWJj cancel "ignored"
+expect "04 POST: a message is sent only with ack and nack" "$(payload 1)" ""
+POST_BODY=$(body tl_refused '{"message":"Transfer with id x is not eligible for cancellation."}')
+STATUS=400 run "16.TransferLogs/04.logs_transfers_id_operations_POST.sh" QWJj cancel
+expect "04 POST: a refusal (400) exits 1, and shows why" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'not eligible for cancellation')" "1:1"
+POST_BODY=
+for ARGS in "" "QWJj" "QWJj explode" "x delete"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    run "16.TransferLogs/04.logs_transfers_id_operations_POST.sh" "$@"
+    nothing_sent "04 POST: refuses '${ARGS}', nothing sent"
+done
+
+GET_BODY=$(body tl_pull '{"totalCount":3,"successful":2,"failed":1,"inRetry":0,"inProgress":0,"onHold":0}')
+run "16.TransferLogs/05.logs_transfers_pullSummary_GET.sh" "9eb3 d677"
+expect "05 GET: the index is URL-encoded once" "${RC}:$(calls)" "0:GET ${T}/pullSummary/9eb3%20d677"
+has "05 GET: the counts" "  3 file(s): 2 pulled, 1 failed, 0 to retry, 0 in progress, 0 on hold"
+STATUS_GET=404 run "16.TransferLogs/05.logs_transfers_pullSummary_GET.sh" nope
+expect "05 GET: a refusal exits 1" "${RC}" "1"
+run "16.TransferLogs/05.logs_transfers_pullSummary_GET.sh"
+nothing_sent "05 GET: the index is required, nothing sent"
+GET_BODY=
+
+A="${BASE}/logs/audit"
+AFIELDS="id,dateModified,operationType,objectType,objectName,userName,remoteAddress"
+AUDITS='{"resultSet":{"returnCount":1,"totalCount":6081},"result":[{"id":"a1","dateModified":"Wed, 07 Oct 2026 10:27:34 +0300","operationType":"CREATE","objectType":"BusinessUnit","objectName":"example_bu","userName":"admin","remoteAddress":"1.2.3.4"}]}'
+GET_BODY=$(body audits "${AUDITS}")
+run "27.AuditLogs/01.logs_audit_GET.sh" 6 BusinessUnit example_bu CREATE
+expect "01 GET: the count, the last hours, the latest 5, then the filtered 10" "${RC}:$(calls)" "0:GET ${A}?limit=1&fields=id
+GET ${A}?duration=6&limit=1&fields=id
+GET ${A}?duration=6&limit=5&fields=${AFIELDS}
+GET ${A}?objectType=BusinessUnit&objectName=example_bu&operationType=CREATE&limit=10&fields=${AFIELDS}"
+has "01 GET: an entry, who, from where" "  Wed, 07 Oct 2026 10:27:34 +0300  CREATE  BusinessUnit example_bu  by admin from 1.2.3.4"
+run "27.AuditLogs/01.logs_audit_GET.sh"
+expect "01 GET: 24 hours and no filter by default, so three calls" "$(calls | sed -n '2p'):$(calls | wc -l | tr -d ' ')" "GET ${A}?duration=24&limit=1&fields=id:3"
+for ARGS in "0" "x" "24 T n EXPLODE"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    run "27.AuditLogs/01.logs_audit_GET.sh" "$@"
+    nothing_sent "01 GET: refuses '${ARGS}', nothing sent"
+done
+ENTRY='{"id":"a1","dateModified":"Wed, 07 Oct 2026 10:27:34 +0300","configurationId":"c1","operationType":"CREATE","objectType":"BusinessUnit","objectName":"example_bu","userName":"admin","remoteAddress":"1.2.3.4","description":"Business unit created","metadata":{"links":{}}}'
+GET_BODY=$(body audit_one "${ENTRY}")
+run "27.AuditLogs/02.logs_audit_id_GET.sh" "a 1"
+expect "02 GET: the id is URL-encoded once" "${RC}:$(calls)" "0:GET ${A}/a%201"
+has "02 GET: the summary" "  CREATE BusinessUnit example_bu, Wed, 07 Oct 2026 10:27:34 +0300"
+has "02 GET: who and from where" "  by admin from 1.2.3.4 (no user agent)"
+GET_BODY=
+SEQUENCE=$(sequence audit_newest '{"result":[{"id":"a1"}]}' "${ENTRY}")
+run "27.AuditLogs/02.logs_audit_id_GET.sh"
+expect "02 GET: no id, so the newest is looked up, then read" "$(calls)" "GET ${A}?limit=1&fields=id
+GET ${A}/a1"
+SEQUENCE=
+STATUS_GET=404 run "27.AuditLogs/02.logs_audit_id_GET.sh" nope
+expect "02 GET: a missing entry (404) exits 1" "${RC}" "1"
+
+SEQUENCE=$(sequence audit_put "${ENTRY}" "${ENTRY}")
+STATUS=204 run "27.AuditLogs/03.logs_audit_id_PUT.sh" a1 "a new text"
+expect "03 PUT: reads, PUTs, reads again" "${RC}:$(calls)" "0:GET ${A}/a1
+PUT ${A}/a1
+GET ${A}/a1"
+expect "03 PUT: the whole entry back, the new description, metadata dropped" "$(payload 1 | jq -c '[.description, .configurationId, .operationType, .dateModified, has("metadata")]')" '["a new text","c1","CREATE","Wed, 07 Oct 2026 10:27:34 +0300",false]'
+has "03 PUT: says the audit log cannot be edited, when the description is as it was" "It did not change: the audit log cannot be edited."
+SEQUENCE=$(sequence audit_put_changed "${ENTRY}" "$(printf '%s' "${ENTRY}" | jq -c '.description = "a new text"')")
+STATUS=204 run "27.AuditLogs/03.logs_audit_id_PUT.sh" a1 "a new text"
+expect "03 PUT: and says nothing of the kind when it did change" "$(printf '%s\n' "${OUT}" | grep -c 'cannot be edited')" "0"
+SEQUENCE=
+run "27.AuditLogs/03.logs_audit_id_PUT.sh"
+nothing_sent "03 PUT: the id is required, nothing sent"
+GET_BODY=$(body audit_none '{"message":"not found"}')
+run "27.AuditLogs/03.logs_audit_id_PUT.sh" nope
+expect "03 PUT: no such entry, exit 1, nothing put" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+GET_BODY=$(body audit_csv 'User Name, Remote Host, Date Modified
+"admin","1.2.3.4","20261007102734"
+"admin","1.2.3.4","20261007102735"')
+STATUS=200 STATUS_GET=200 run "27.AuditLogs/04.logs_audit_GET_csv.sh" out.csv 2
+expect "04 GET: asks for text/csv, the hours, and up to 1000" "${RC}:$(calls):$(has_header 'accept: text/csv')" "0:GET ${A}?duration=2&limit=1000:1"
+has "04 GET: how many lines it wrote" "Wrote out.csv: 3 line(s) including the header."
+has "04 GET: its header" "Its header: User Name, Remote Host, Date Modified"
+STATUS_GET=406 run "27.AuditLogs/04.logs_audit_GET_csv.sh" out.csv
+expect "04 GET: a refusal (406) exits 1 and leaves no file" "${RC}:$([ -f "${WORK}/admin/27.AuditLogs/out.csv" ] && echo file || echo none)" "1:none"
+run "27.AuditLogs/04.logs_audit_GET_csv.sh" out.csv 0
+nothing_sent "04 GET: HOURS must be 1 or more, nothing sent"
+GET_BODY=
+
+V="${BASE}/logs/server"
+norm() { sed 's/fromDate=[^&]*/fromDate=D/'; }
+SERVERS='{"resultSet":{"returnCount":1,"totalCount":44301},"result":[{"time":"Wed, 07 Oct 2026 10:36:18 +0300","level":"INFO","component":"ftpd","message":"[Ftp Default] virtual user example_user logged in from /1.2.3.4:5."}]}'
+GET_BODY=$(body servers "${SERVERS}")
+run "28.ServerLogs/01.logs_server_GET.sh" 120 "logged in" FTPD,HTTPD INFO,WARN
+expect "01 GET: the count since, then the filtered 20, a parameter for each component and level" "${RC}:$(calls | norm)" "0:GET ${V}?fromDate=D&limit=1&fields=id
+GET ${V}?fromDate=D&message=logged in&component=FTPD&component=HTTPD&level=INFO&level=WARN&limit=20&fields=time,level,component,message"
+has "01 GET: an entry" "  Wed, 07 Oct 2026 10:36:18 +0300  INFO  ftpd  [Ftp Default] virtual user example_user logged in from /1.2.3.4:5."
+SINCE_SENT=$(calls | sed -n '1s/.*fromDate=\([^&]*\)&.*/\1/p')
+expect "01 GET: fromDate is an RFC 2822 date in GMT" "$(printf '%s' "${SINCE_SENT}" | grep -cE '^[A-Z][a-z]{2}, [0-9]{2} [A-Z][a-z]{2} [0-9]{4} [0-9]{2}:[0-9]{2}:[0-9]{2} GMT$')" "1"
+AGE=$(python3 -c 'import email.utils, sys, time; print(int(time.time() - email.utils.parsedate_to_datetime(sys.argv[1]).timestamp()))' "${SINCE_SENT}")
+expect "01 GET: and it is MINUTES ago" "$(( AGE >= 7195 && AGE <= 7215 ))" "1"
+run "28.ServerLogs/01.logs_server_GET.sh"
+expect "01 GET: an hour and no filter but the date by default" "$(calls | sed -n '2p' | norm)" "GET ${V}?fromDate=D&limit=20&fields=time,level,component,message"
+for ARGS in "0" "60 x NOPE" "60 x FTPD,NOPE" "60 x FTPD LOUD" "60 x FTPD INFO,LOUD" "60 x ftpd"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    run "28.ServerLogs/01.logs_server_GET.sh" "$@"
+    nothing_sent "01 GET: refuses '${ARGS}', nothing sent"
+done
+GET_BODY=
+SERVER_ENTRY='{"time":"Wed, 07 Oct 2026 10:38:40 +0300","level":"INFO","component":"audit","thread":"https-exec-21","message":"admin Admin Session expired.","className":"AuditLogMessage","method":"append","line":56}'
+GET_BODY=$(body server_one "${SERVER_ENTRY}")
+run "28.ServerLogs/02.logs_server_id_GET.sh" QUJD
+expect "02 GET: the id given" "${RC}:$(calls)" "0:GET ${V}/QUJD"
+has "02 GET: the summary" "  Wed, 07 Oct 2026 10:38:40 +0300  INFO  audit  thread https-exec-21"
+has "02 GET: who wrote it" "  written by AuditLogMessage.append line 56"
+GET_BODY=
+SEQUENCE=$(sequence server_newest '{"resultSet":{"totalCount":5}}' '{"result":[{"id":{"urlrepresentation":"QUJD"}}]}' "${SERVER_ENTRY}")
+run "28.ServerLogs/02.logs_server_id_GET.sh"
+expect "02 GET: no id, so the LAST entry is asked for (the log is oldest first), then read" "$(calls)" "GET ${V}?limit=1&fields=id
+GET ${V}?limit=1&offset=4&fields=id
+GET ${V}/QUJD"
+SEQUENCE=
+STATUS_GET=400 run "28.ServerLogs/02.logs_server_id_GET.sh" "bad id"
+expect "02 GET: a refused id (400) exits 1" "${RC}" "1"
+GET_BODY=$(body server_csv 'Time, Level, Component, Message
+"10/07/2026 00:05:08.313","INFO","FTPD","hello"')
+STATUS=200 STATUS_GET=200 run "28.ServerLogs/03.logs_server_GET_csv.sh" out.csv 30 FTPD
+expect "03 GET: asks for text/csv, with the date and the component" "${RC}:$(calls | norm):$(has_header 'accept: text/csv')" "0:GET ${V}?fromDate=D&component=FTPD&limit=1000:1"
+has "03 GET: how many lines it wrote" "Wrote out.csv: 2 line(s) including the header."
+STATUS=200 STATUS_GET=200 run "28.ServerLogs/03.logs_server_GET_csv.sh" out.csv
+expect "03 GET: 60 minutes and no component by default" "$(calls | norm)" "GET ${V}?fromDate=D&limit=1000"
+for ARGS in "out.csv 0" "out.csv 5 NOPE"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    run "28.ServerLogs/03.logs_server_GET_csv.sh" "$@"
+    nothing_sent "03 GET: refuses '${ARGS}', nothing sent"
+done
+GET_BODY=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

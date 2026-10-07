@@ -628,6 +628,34 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   it sends nothing, so a TcpSink is enough to play the directory. A domain is used for
   logins only when the server's login settings turn LDAP on, a server-wide change.
 
+- **Logs** (`/logs/audit`, `/logs/server`, `/logs/transfers`): the audit log is **newest first**,
+  the server log is **oldest first** (use `fromDate`, or the last `offset`, to see the recent
+  ones). `fromDate` and `endDate` are RFC 2822 dates only (`Wed, 07 Oct 2026 10:00:00 +0300`;
+  `2026-10-07` is 400); the audit log's `duration=` takes hours. Audit `objectName=` and
+  `objectType=` are exact, with case, no `*`; `userName=` is a case sensitive part of the name.
+  Server `component=` and `level=` must be in capitals and are repeated parameters
+  (`component=FTPD&component=HTTPD`); a comma list or lower case finds nothing, and a value that
+  does not exist is not an error. `message=` is a case sensitive part of the message, `*` is
+  not a wildcard. **`accountName=` is ignored on the server log** (any value answers every
+  entry; `account=` is the one the transfer log honours). Both lists answer `text/csv` when
+  asked, with a header row; XML is 406. The audit entry's **PUT answers 204 and changes
+  nothing**, for every kind of entry: the trail is immutable. The ids differ: audit is a plain
+  string, the server and transfer logs use the `urlrepresentation` of an id object (Base64);
+  a malformed one is 400, an unknown well formed one 404. A single transfer has other fields
+  than the list (`incoming` is only in the list). One pull leaves three transfer log entries, the
+  upload, the file served and the pull, and only the pull carries the `operationIndex`;
+  `pullSummary` counts the files found, answers zeros for an unknown index, and adds up two
+  pulls with one index. Transfer operations: `resubmit` works on a finished transfer (200);
+  `cancel` is allowed only when the server says so: a single read carries `isCancelable` (the list
+  calls it `isCancellable`). Finished transfers and running ones (a 10 MB FTP upload, EndUser API
+  upload, SSH pull, a route's send) are never cancelable: "not eligible for cancellation".
+  What is cancelable is a failed PeSIT pull waiting for a retry: cancel answers 200 and the
+  pull's summary moves it from "to retry" to "failed". `tests/integration/checks/48.cancel_transfer.py`
+  covers both. `GET /logs/transfers` has NO default order: pass `sortByStartTime=descending`
+  (newest first; `ascending` oldest first; any value sorts descending) or "latest" is a guess. `verify` needs an AS2 receipt; `ack` and
+  `nack` need a PeSIT transfer; any other operation is 403 with an unhelpful message. Logs are
+  never cleaned up by deleting the account: its entries stay.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root
