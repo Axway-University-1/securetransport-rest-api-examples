@@ -93,6 +93,10 @@ convertedUserClasses.xml
 tests/local/
 tests/output/
 
+# Scratch state for probes and authoring (ids of throwaway lab objects and the like),
+# at the project root. Use scratch_path() from .claude/skills/st-api-cover-resource/scripts.
+/tmp/
+
 # ------------------------------------------------------------------------------
 # Credentials
 # ------------------------------------------------------------------------------

@@ -269,6 +269,7 @@ already exists.
 | 20. Administrative Roles | `/administrativeRoles`, the roles and the menus they open | 7 | 7 |
 | 21. Administrators | `/administrators`, administrators, locking them, and their API keys | 10 | 10 |
 | 22. Denied Users | `/deniedUsers`, login names that may not log in, for good or for hours | 3 | 3 |
+| 23. Events | `/events`, the tasks being processed now: list, read, delete a stuck one | 3 | 3 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same

@@ -36,12 +36,17 @@ Notes as `Confirmed directly: ...`.
 
 `lab.py` needs `tests/local/integration.conf` (copy `tests/integration/integration.conf.example`).
 
+**Scratch files** (the ids of throwaway lab objects, a saved password) go in the
+project's own `tmp/` folder, gitignored, never in the system `/tmp`:
+`from _repo import scratch_path; path = scratch_path("events_probe_ids.json")`.
+Delete them when the probe is done.
+
 ## Where the work stands
 
 Covered, in reference order: accessPolicies, accountSetup, accounts,
 addressBook, administrativeRoles, administrators, applications, businessUnits,
-certificates, configurations, daemons, deniedUsers, myself, servers, transfers,
-version.
+certificates, configurations, daemons, deniedUsers, events, myself, servers,
+transfers, version.
 
 Left out on purpose: **clusterServices** and the cluster-only configuration
 operations (the lab is standalone), the Oracle-only `database/{componentType}`,
@@ -49,7 +54,7 @@ changing the database connection, replication operations. `coverage.py`
 still counts these 13 configurations operations and 2 clusterServices ones as
 missing; that is expected.
 
-**Next, in order:** events, icapServers, ldapDomains,
+**Next, in order:** icapServers, ldapDomains,
 loginRestrictionPolicies (partly in `14.ExpressionLanguage`), logs,
 mailTemplates, routes, routeStepsMetadata, routeStepsCharsets, sessions, sites, siteTemplates, statisticsSummary, subscriptions,
 transactionManager, transferProfiles, userClasses, zones. Run `coverage.py` for
@@ -71,6 +76,11 @@ after the existing ones; never renumber existing files. A new resource gets the
 next free folder number (look at `ls "Admin/API 2.0/bash"`; 10 is free).
 
 ### 2. Probe the lab
+
+Some resources only show something while the server is doing something (events,
+sessions, transfers in flight). Build the situation with a throwaway account,
+subscription and route, and a stand-in that keeps the server waiting; see
+`tests/integration/checks/42.events_scripts.py`.
 
 Write a throwaway script in your scratchpad, never in the repository:
 

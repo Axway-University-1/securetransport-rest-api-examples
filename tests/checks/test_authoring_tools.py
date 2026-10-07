@@ -89,6 +89,14 @@ for folder in ("11.Certificates", "13.Configurations", "20.AdministrativeRoles",
             drift.append(folder + "/" + name)
 check("the committed bat headers match what bat_header() writes from their bash twins", not drift, drift[:5])
 
+print("=== scratch_path ===")
+import _repo  # noqa: E402
+scratch = _repo.scratch_path("example_scratch.json")
+check("scratch_path gives a file in tmp/ at the project root, and creates the folder",
+      scratch == os.path.join(REPO, "tmp", "example_scratch.json") and os.path.isdir(os.path.join(REPO, "tmp")), scratch)
+ignored = subprocess.run(["git", "-C", REPO, "check-ignore", "-q", scratch])
+check("git ignores it, so scratch state is never committed", ignored.returncode == 0)
+
 print("=== sync_docs.py ===")
 result = subprocess.run([sys.executable, os.path.join(TOOLS, "sync_docs.py"), "--check"], capture_output=True, text=True)
 check("--check finds the README, the docs check and the pack in line with the folders", result.returncode == 0,

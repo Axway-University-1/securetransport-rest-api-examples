@@ -558,6 +558,22 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   wrong password, so test with a login that worked just before - and logs in
   again as soon as the entry is removed; other accounts are unaffected.
 
+- **Events** (`/events`) are the tasks being processed now, so the list is usually
+  empty. Confirmed directly: a file uploaded to an Advanced Routing subscription
+  first shows a short-lived `DEFAULT` event for the arrival, then an
+  `ADVANCED_ROUTING` one that is `ready` (queued) and becomes `active`. A send
+  step towards a partner that accepts the connection and never answers (a
+  TcpSink) keeps it active; to make events for a test, use that. An event can stay
+  `active` after its transfer has `Failed`; `POST /events/operations?operation=delete`
+  with `{"ids": [...]}` removes it, answering 200 with `deleted` or `not found` per
+  id. Any other `operation` answers 200 with `{}` and does nothing. `status` is
+  matched exactly (`active`, not `ACTIVE`); an unknown `processorType` finds
+  nothing rather than a 400; `arrivalTime`, `lastHeartbeatAfter` and
+  `lastHeartbeatBefore` are milliseconds, a date answers 400 "For input string".
+  An unknown id is 404. A file that already exists in the folder is not a new
+  arrival, and deleting an account leaves its home folder on disk: give a test
+  upload a name of its own and delete it afterwards.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

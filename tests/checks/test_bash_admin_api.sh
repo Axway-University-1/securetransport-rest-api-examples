@@ -845,6 +845,56 @@ run "${F}/03.deniedUsers_name_DELETE.sh" " "
 nothing_sent "03 DELETE: a blank LOGIN_NAME is refused, nothing sent"
 
 echo
+echo "=== 23.Events ==="
+F=23.Events
+U="${BASE}/events"
+EVENTS='{"resultSet":{"returnCount":1,"totalCount":1},"result":[{"id":"0x000001A114DB4957","status":"active","accountName":"example_user","fullTarget":"/home/example_user/in/a.txt","retryCount":2,"agentType":"advancedRouting","processorType":"ADVANCED_ROUTING"}]}'
+GET_BODY=$(body events "${EVENTS}")
+run "${F}/01.events_GET.sh" "example*" active
+expect "01 GET: the count, the account and status, Advanced Routing only, heartbeat" "${RC}:$(calls | sed 's/lastHeartbeatAfter=[0-9]*/lastHeartbeatAfter=N/')" "0:GET ${U}?limit=1&fields=id
+GET ${U}?accountName=example*&status=active
+GET ${U}?accountName=example*&processorType=ADVANCED_ROUTING
+GET ${U}?accountName=example*&lastHeartbeatAfter=N"
+SINCE=$(calls | sed -n 's/.*lastHeartbeatAfter=\([0-9]*\)$/\1/p')
+AGE=$(( $(date +%s) * 1000 - SINCE ))
+expect "01 GET: the heartbeat limit is an hour ago, in milliseconds" "$(( AGE >= 3600000 && AGE < 3660000 ))" "1"
+has "01 GET: one line per event" "  0x000001A114DB4957  active  example_user  /home/example_user/in/a.txt  retries 2"
+run "${F}/01.events_GET.sh"
+expect "01 GET: every account by default, and no status filter" "$(calls | sed -n '2p')" "GET ${U}?accountName=*"
+GET_BODY=
+
+EVENT_ONE='{"id":"0x000001A114DB4957","status":"active","agentType":"advancedRouting","accountName":"example_user","subscriptionId":"sub1","fullTarget":"/home/example_user/in/a.txt","retryCount":2,"recovered":false,"clusterNode":"10.0.0.1"}'
+GET_BODY=$(body event_one "${EVENT_ONE}")
+run "${F}/02.events_id_GET.sh" 0x000001A114DB4957
+expect "02 GET: the event given" "${RC}:$(calls)" "0:GET ${U}/0x000001A114DB4957"
+has "02 GET: the summary" "  active advancedRouting event for /home/example_user/in/a.txt"
+has "02 GET: account and subscription" "  account example_user, subscription sub1"
+GET_BODY=
+SEQUENCE=$(sequence event_lookup "${EVENTS}" "${EVENT_ONE}")
+run "${F}/02.events_id_GET.sh"
+expect "02 GET: no id, so it looks up the first event, then reads it" "$(calls | sed -n '1p;2p')" "GET ${U}?limit=1&fields=id
+GET ${U}/0x000001A114DB4957"
+SEQUENCE=
+GET_BODY=$(body events_none '{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}')
+run "${F}/02.events_id_GET.sh"
+expect "02 GET: no events, exit 1, nothing read" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+GET_BODY=
+STATUS_GET=404 run "${F}/02.events_id_GET.sh" "a b/c"
+expect "02 GET: the id goes into the path URL-encoded once; a 404 exits 1" "${RC}:$(calls)" "1:GET ${U}/a%20b%2Fc"
+
+POST_BODY=$(body deleted '{"events":[{"id":"e1","status":"deleted"},{"id":"nope","status":"not found"}]}')
+STATUS=200 run "${F}/03.events_operations_POST_delete.sh" e1 nope
+expect "03 POST: operation=delete" "${RC}:$(calls)" "0:POST ${U}/operations?operation=delete"
+expect "03 POST: the ids, in order" "$(payload 1 | jq -c .)" '{"ids":["e1","nope"]}'
+has "03 POST: what became of each" "  e1: deleted"
+has "03 POST: a not found is reported, and does not fail the script" "  nope: not found"
+POST_BODY=
+STATUS=400 run "${F}/03.events_operations_POST_delete.sh" e1
+expect "03 POST: a refusal exits 1" "${RC}" "1"
+run "${F}/03.events_operations_POST_delete.sh"
+nothing_sent "03 POST: no ids, so nothing is deleted and nothing is sent"
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else
