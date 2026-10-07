@@ -593,6 +593,23 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   unit an account's home folder must end with the account name, so a fresh folder per
   test run has to come from the unit's `baseFolder`.
 
+- **LDAP domains** (`/ldapDomains`): `bindDn` and `bindDnPassword` are required, though
+  only `name` is marked. The server **resolves the host when it saves a domain**: a
+  name it cannot resolve answers 400 "Invalid server host", an address always works.
+  The bind password reads back encrypted (`{AES128}...`); sending that text back in a
+  PUT keeps the password, plain text is encrypted anew, and a body with no password is
+  400. The defaults are not the reference's: `referralsAllowed` and
+  `anonymousBindsAllowed` read true. The `Location` of a POST ends with the domain's
+  **id**, but the path takes the **name**. A PUT with another `name`, or a PATCH of
+  `/name`, renames it. `name=` and `bindDn=` are exact (no `*`, case sensitive);
+  `isDefault=` as a filter fails with "unable to comply" for true and false. A PATCH
+  can set `/isDefault` to true but cannot set it back (400 "You cannot set precedence
+  on non default domain"); an added server (`/ldapServers/-`) takes order 1. The
+  `testConnection` operation answers 200 whether or not it worked, reads the message
+  (`Successful Connection.` or `Connection failed.`), and only opens a TCP connection:
+  it sends nothing, so a TcpSink is enough to play the directory. A domain is used for
+  logins only when the server's login settings turn LDAP on, a server-wide change.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

@@ -987,6 +987,112 @@ STATUS=404 run "${F}/07.icapServers_name_DELETE.sh" nope
 expect "07 DELETE: not found (404) exits 1" "${RC}" "1"
 
 echo
+echo "=== 25.LdapDomains ==="
+F=25.LdapDomains
+U="${BASE}/ldapDomains"
+LFIELDS="name,ldapServers,ldapSearches.baseDn,isDefault"
+LDAPS='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"name":"example_ldap","isDefault":false,"ldapServers":[{"host":"10.0.0.1","port":389},{"host":"10.0.0.2","port":636}],"ldapSearches":{"baseDn":"ou=People,dc=example,dc=com"}},{"name":"other ldap","isDefault":true,"ldapServers":[{"host":"h","port":389}],"ldapSearches":{"baseDn":null}}]}'
+GET_BODY=$(body ldaps "${LDAPS}")
+run "${F}/01.ldapDomains_GET.sh" example_ldap 3
+expect "01 GET: the count, all, one by name, one protocol version" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=name
+GET ${U}?fields=${LFIELDS}
+GET ${U}?name=example_ldap&fields=${LFIELDS}
+GET ${U}?protocolVersion=3&fields=${LFIELDS}"
+has "01 GET: a domain with two servers" "  example_ldap  10.0.0.1:389, 10.0.0.2:636  ou=People,dc=example,dc=com  -"
+has "01 GET: the default domain, with no base DN" "  other ldap  h:389  -  default"
+run "${F}/01.ldapDomains_GET.sh"
+expect "01 GET: no name or version, so two calls after the count" "$(calls | wc -l | tr -d ' ')" "2"
+run "${F}/01.ldapDomains_GET.sh" "" 4
+expect "01 GET: PROTOCOL_VERSION is 2 or 3, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=
+
+STATUS=201 LOCATION=8a05id LDAP_BIND_PASSWORD=synthetic-bind run "${F}/02.ldapDomains_POST.sh"
+expect "02 POST: POST /ldapDomains" "${RC}:$(calls)" "0:POST ${U}"
+expect "02 POST: the name, the ST server as the directory, port 389, the bind account and password" \
+  "$(payload 1 | jq -c '[.name, .ldapServers[0].host, .ldapServers[0].port, .bindDn, .bindDnPassword, .protocolVersion]')" \
+  '["example_ldap","st.example.com",389,"cn=reader,dc=example,dc=com","synthetic-bind",3]'
+expect "02 POST: where it searches" "$(payload 1 | jq -c '[.ldapSearches.baseDn, .ldapSearches.searchAttribute]')" '["ou=People,dc=example,dc=com","UID"]'
+has "02 POST: the domain's id, from the end of Location" "Its id: 8a05id"
+STATUS=201 LOCATION=x LDAP_BIND_PASSWORD=synthetic-bind run "${F}/02.ldapDomains_POST.sh" "a name" 10.1.2.3 1389
+expect "02 POST: a name with a space, the host and port given" "$(payload 1 | jq -c '[.name, .ldapServers[0].host, .ldapServers[0].port]')" '["a name","10.1.2.3",1389]'
+STATUS=400 LDAP_BIND_PASSWORD=synthetic-bind run "${F}/02.ldapDomains_POST.sh" example_ldap no.such.host
+expect "02 POST: a refusal (400, host cannot be resolved) exits 1" "${RC}" "1"
+run "${F}/02.ldapDomains_POST.sh"
+nothing_sent "02 POST: no LDAP_BIND_PASSWORD, nothing sent"
+for ARGS in "x h 70000" "x h port" "x h -1"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    LDAP_BIND_PASSWORD=synthetic-bind run "${F}/02.ldapDomains_POST.sh" "$@"
+    nothing_sent "02 POST: refuses '${ARGS}', nothing sent"
+done
+LDAP_BIND_PASSWORD=synthetic-bind run "${F}/02.ldapDomains_POST.sh" " "
+nothing_sent "02 POST: a blank NAME is refused, nothing sent"
+
+run "${F}/03.ldapDomains_name_HEAD.sh"
+expect "03 HEAD: example_ldap by default" "${RC}:$(calls)" "0:HEAD ${U}/example_ldap"
+STATUS=404 run "${F}/03.ldapDomains_name_HEAD.sh" "a name"
+expect "03 HEAD: a name with a space is encoded; 404 exits 1" "${RC}:$(calls)" "1:HEAD ${U}/a%20name"
+
+DOMAIN='{"id":"d1","name":"example_ldap","description":"old description","isDefault":false,"protocolVersion":3,"bindDn":"cn=reader,dc=example,dc=com","bindDnPassword":"{AES128}abc==","ldapServers":[{"id":"s1","host":"10.0.0.1","port":389,"order":1},{"id":"s2","host":"10.0.0.2","port":636,"order":2}],"ldapSearches":{"baseDn":"ou=People,dc=example,dc=com","searchAttribute":"UID"},"sslEnabled":false,"tlsEnabled":false,"referralsAllowed":true,"anonymousBindsAllowed":true,"metadata":{"links":{}}}'
+GET_BODY=$(body ldap_one "${DOMAIN}")
+run "${F}/04.ldapDomains_name_GET.sh"
+expect "04 GET: reads the domain" "${RC}:$(calls)" "0:GET ${U}/example_ldap"
+has "04 GET: the summary" "  example_ldap: LDAP version 3, not the default"
+has "04 GET: each server, with its id" "  server 2: 10.0.0.2:636, id s2"
+has "04 GET: the bind account and where it searches" "  bind as cn=reader,dc=example,dc=com, search ou=People,dc=example,dc=com by UID"
+STATUS_GET=404 run "${F}/04.ldapDomains_name_GET.sh" "a name"
+expect "04 GET: a missing domain (404) exits 1, encoded" "${RC}:$(calls | head -n 1)" "1:GET ${U}/a%20name"
+
+STATUS=204 run "${F}/05.ldapDomains_name_PUT.sh" example_ldap "new text"
+expect "05 PUT: reads, then PUT" "${RC}:$(calls)" "0:GET ${U}/example_ldap
+PUT ${U}/example_ldap"
+expect "05 PUT: the new description, the name, and metadata dropped" "$(payload 1 | jq -c '[.description, .name, has("metadata")]')" '["new text","example_ldap",false]'
+expect "05 PUT: the encrypted password goes back exactly as it was read, with both servers" "$(payload 1 | jq -c '[.bindDnPassword, (.ldapServers | length)]')" '["{AES128}abc==",2]'
+has "05 PUT: prints the description before" "The description of example_ldap is now: old description"
+STATUS=204 run "${F}/05.ldapDomains_name_PUT.sh" "other ldap" x
+expect "05 PUT: the name stays the one in the path, so it cannot rename" "$(payload 1 | jq -r .name)" "other ldap"
+GET_BODY=
+STATUS=400 run "${F}/05.ldapDomains_name_PUT.sh"
+expect "05 PUT: no such domain, exit 1, nothing put" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+
+STATUS=204 run "${F}/06.ldapDomains_name_PATCH.sh" example_ldap "words" 390
+expect "06 PATCH: PATCH the domain" "${RC}:$(calls)" "0:PATCH ${U}/example_ldap"
+expect "06 PATCH: the description and the first server's port" "$(payload 1 | jq -c '[.[] | [.path, .value]]')" '[["/description","words"],["/ldapServers/0/port",390]]'
+STATUS=204 run "${F}/06.ldapDomains_name_PATCH.sh"
+expect "06 PATCH: only the description by default" "$(payload 1 | jq -c '[.[] | .path]')" '["/description"]'
+run "${F}/06.ldapDomains_name_PATCH.sh" example_ldap x 70000
+nothing_sent "06 PATCH: PORT is a number up to 65535, nothing sent"
+STATUS=404 run "${F}/06.ldapDomains_name_PATCH.sh" nope
+expect "06 PATCH: no such domain (404) exits 1" "${RC}" "1"
+
+STATUS=204 run "${F}/07.ldapDomains_name_DELETE.sh"
+expect "07 DELETE: example_ldap by default" "${RC}:$(calls)" "0:DELETE ${U}/example_ldap"
+STATUS=204 run "${F}/07.ldapDomains_name_DELETE.sh" "a name/x"
+expect "07 DELETE: the name is URL-encoded once" "$(calls)" "DELETE ${U}/a%20name%2Fx"
+STATUS=404 run "${F}/07.ldapDomains_name_DELETE.sh" nope
+expect "07 DELETE: not found (404) exits 1" "${RC}" "1"
+
+GET_BODY=$(body ldap_one "${DOMAIN}")
+POST_BODY=$(body tested_ok '{"message":"Successful Connection."}')
+STATUS=200 run "${F}/08.ldapDomains_name_operations_POST_testConnection.sh"
+expect "08 POST: looks the domain up, then testConnection" "${RC}:$(calls)" "0:GET ${U}/example_ldap
+POST ${U}/example_ldap/operations?operation=testConnection"
+expect "08 POST: the id of the first server" "$(payload 1 | jq -c .)" '{"id":"s1"}'
+has "08 POST: the message" "Successful Connection."
+STATUS=200 run "${F}/08.ldapDomains_name_operations_POST_testConnection.sh" example_ldap 2
+expect "08 POST: the second server, by its number" "$(payload 1 | jq -c .)" '{"id":"s2"}'
+POST_BODY=$(body tested_fail '{"message":"Connection failed."}')
+STATUS=200 run "${F}/08.ldapDomains_name_operations_POST_testConnection.sh"
+expect "08 POST: a failed connection, though the answer is 200, exits 1" "${RC}" "1"
+has "08 POST: and says so" "Connection failed."
+run "${F}/08.ldapDomains_name_operations_POST_testConnection.sh" example_ldap 3
+expect "08 POST: no server 3, exit 1, nothing posted" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+run "${F}/08.ldapDomains_name_operations_POST_testConnection.sh" example_ldap 0
+nothing_sent "08 POST: SERVER_NUMBER is 1 or more, nothing sent"
+POST_BODY=
+GET_BODY=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

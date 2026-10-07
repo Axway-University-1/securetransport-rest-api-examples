@@ -130,6 +130,7 @@ assumption about the API.
 | `41.denied_users_scripts.py` | **yes** | The real `22.DeniedUsers` examples: blocks a login name for good and one with a space for two hours, lists with each filter (permanent, temporary, since a date), shows a duplicate, a blank name and a 0 or negative number of hours refused, and unblocks them; a name differing only in case is blocked through the API to show that removing one leaves the other. Then two throwaway end user accounts: both log in through the EndUser API, one is blocked with the real script and is refused (401 "Login failed") while the other still gets in, and it logs in again once unblocked. Ends by comparing the whole list with the one it started with, and checking both accounts are gone. |
 | `42.events_scripts.py` | **yes** | The real `23.Events` examples against a live event. An event exists only while a file is processed, so it builds a flow that holds one: an end user account, an Advanced Routing application, a subscription, a route that sends to an SSH partner, and that partner, a silent TcpSink on this machine. A file is uploaded with the real EndUser example; the event is listed with each filter (a status in capitals finds nothing), read, and deleted together with an id that does not exist. Needs `st_callback_host`. Removes everything, and never an event of another account. |
 | `43.icap_servers_scripts.py` | **yes** | The real `24.IcapServers` examples, in two parts. First all seven against disabled servers pointing nowhere (add, list and filter, check, read, replace, change, delete; a name with a space; a PUT that does not rename; a delete that succeeds although a business unit lists the server). Then what a server is for: a FakeIcap on this machine plays the antivirus, a throwaway business unit lists the server and has a throwaway end user account in it, and files are uploaded with the real EndUser example. A clean file is let through and one with the marker text is blocked (transfer Failed, file removed); with the ICAP server gone a file passes when denyOnConnectionError is false and is refused when it is true; disabled, nothing is scanned. Needs `st_callback_host` for the second part. |
+| `44.ldap_domains_scripts.py` | **yes** | The real `25.LdapDomains` examples: add, list and filter, check, read, replace (the bind password's ciphertext kept, the name not changed), change and delete throwaway domains, a name with a space among them, and every refused argument. Then the connection test against a silent TcpSink on this machine: a domain gets two servers, one with the sink behind it and one with nothing listening; each server's number gives "Successful Connection." (and the sink sees ST connect, with nothing sent) or "Connection failed.", and the first fails too once the sink is gone. Needs `st_callback_host` for that second part. Never turns LDAP login on. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -207,7 +208,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `43` cover: the admin API's session and read behaviour (both as
+`01` through `44` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -227,7 +228,7 @@ python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
 both acknowledgment scripts on a PeSIT loop of their own (`32`), the
 EndUser examples for every resource of its API reference (`33`), and the Admin
-examples added resource by resource from its reference (`34` to `43`).
+examples added resource by resource from its reference (`34` to `44`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a
