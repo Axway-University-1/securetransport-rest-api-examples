@@ -695,6 +695,33 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   `failureEmailNotification` true needs the template and recipients in the same patch (400 "Missing
   failure e-mail recipients."). `referredByRoute=<simple route id>` lists the routes that run it.
 
+- **Route steps metadata** (`/routeStepsMetadata`; example `30.RouteStepsMetadata`): read only, one GET
+  (HEAD 200; POST, PUT and DELETE 405; `/routeStepsMetadata/<type>` 404; XML 406). A **plain array** of
+  entries with 12 keys, not `{resultSet, result}`. The lab lists 17 types (13 Transformation, 4 Routing),
+  more than the reference's enum of 14: **PullFromPartner, SendToFusion and `setflowattributes` (lower
+  case)** are missing from it, so never validate a step type against the reference. `ExecuteRoute` is not
+  listed. `stepType=`, `limit=` and `offset=` are ignored; `fields=` keeps the keys named (an unknown one
+  gives `{}`). The `stepType` **is** the `type` of a route step: a step with another type is 400 "Route Step
+  type is undefined.". **The metadata does not say which fields a step needs; the server does**: a POST
+  /routes whose step lacks fields answers 400 with every missing one in `validationErrors`
+  (`steps[0].compressionType must not be null`) and creates nothing; add what it names and repeat. The
+  smallest step of **all 17 types** was found that way and created, read back and deleted. Every step
+  needs `type`, `status` (a missing one is 400 `steps[0].status must not be null`) and
+  `actionOnStepFailure` (FAIL or PROCEED; the message for a missing one is only "Valid steps.actionOnStepFailure
+  values are..."), plus its own fields; `conditionType` can be left out. **A file filter needs both
+  fileFilterExpression and fileFilterExpressionType (GLOB, REGEXP, TEXT_FILES)**: one without the other is
+  400 "File filter type cannot be empty." (PgpDecryption alone takes the expression alone, and reads the type
+  back null). ExternalScript, setflowattributes and PullFromPartner have no filter. **PgpEncryption's
+  `compressionType` is a number in a string**, "0" none, "-1" preferred, "1" ZIP, "2" ZLIB, "3" BZIP2 (ZIP is
+  400 "Invalid compression type"), unlike Compress's ZIP/JAR/TAR/GZIP. `setflowattributes` keeps
+  `actionOnStepFailure` inside `customProperties` when read back, and `linePaddingLength` reads back as a
+  string. **Creating a route does not look up what a step names**: an account, a transfer site
+  (`<site>#!#CVD#!#`), a PGP key alias, a Fusion integration or a script path that does not exist is 201, so
+  every type can be created on a bare lab with placeholders. The per-type table is in the Notes of
+  `30.RouteStepsMetadata/01` (`01 <type> minimal` prints the step), and
+  `tests/integration/checks/51.route_steps_metadata_scripts.py` creates, reads back and deletes each one
+  and shows that leaving out any field is 400.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

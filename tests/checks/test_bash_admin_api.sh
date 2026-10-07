@@ -1579,6 +1579,47 @@ done
 GET_BODY=
 
 echo
+echo "=== 30.RouteStepsMetadata ==="
+F=30.RouteStepsMetadata
+STEPS='[{"stepType":"Compress","stepCategory":"Transformation","stepDisplayName":"Compress","endpointSchema":"st.compress","stepJarName":"compress-route"},{"stepType":"setflowattributes","stepCategory":"Transformation","stepDisplayName":"Set Flow Attributes","endpointSchema":"st.setflowattributes","stepJarName":"axway-step-setflowattributes"},{"stepType":"SendToPartner","stepCategory":"Routing","stepDisplayName":"Send To Partner","endpointSchema":"st.sendtopartnersite","stepJarName":"sendtopartner-route"},{"stepType":"NoTableType","stepCategory":"Routing","stepDisplayName":"Not In The Table","endpointSchema":"st.x","stepJarName":"x"}]'
+GET_BODY=$(body route_steps "${STEPS}")
+run "${F}/01.routeStepsMetadata_GET.sh"
+expect "01 GET: one call, GET /routeStepsMetadata" "${RC}:$(calls)" "0:GET ${BASE}/routeStepsMetadata"
+has "01 GET: counts the step types (a plain array)" "Route step types: 4"
+has "01 GET: one line per type, category, type, display name" "  Transformation  Compress  Compress"
+has "01 GET: a type written in lower case is shown as it is" "  Transformation  setflowattributes  Set Flow Attributes"
+has "01 GET: a routing type" "  Routing  SendToPartner  Send To Partner"
+run "${F}/01.routeStepsMetadata_GET.sh" Compress
+expect "01 GET: a step type given is read from the same one call" "${RC}:$(calls)" "0:GET ${BASE}/routeStepsMetadata"
+has "01 GET: shows everything about that type" '  "endpointSchema": "st.compress",'
+expect "01 GET: and nothing about the others" "$(printf '%s\n' "${OUT}" | grep -c 'SendToPartner')" "0"
+run "${F}/01.routeStepsMetadata_GET.sh" Compress minimal
+expect "01 GET minimal: still one call, GET /routeStepsMetadata" "${RC}:$(calls)" "0:GET ${BASE}/routeStepsMetadata"
+expect "01 GET minimal: no heading, only the JSON" "$(printf '%s\n' "${OUT}" | grep -c 'Step type')" "0"
+expect "01 GET minimal: Compress is type, status, actionOnStepFailure, filter, compressionType, compressionLevel" \
+    "$(printf '%s\n' "${OUT}" | sed -n '/^{$/,/^}$/p' | jq -c 'keys_unsorted')" '["type","status","actionOnStepFailure","fileFilterExpression","fileFilterExpressionType","compressionType","compressionLevel"]'
+expect "01 GET minimal: the step is of the type asked" "$(printf '%s\n' "${OUT}" | sed -n '/^{$/,/^}$/p' | jq -r '.type + " " + .status + " " + .actionOnStepFailure')" "Compress ENABLED FAIL"
+run "${F}/01.routeStepsMetadata_GET.sh" SendToPartner minimal
+expect "01 GET minimal: SendToPartner names a site with the #!#CVD#!# suffix" "$(printf '%s\n' "${OUT}" | sed -n '/^{$/,/^}$/p' | jq -r '.transferSiteExpression, .transferSiteExpressionType')" "$(printf 'partner_site#!#CVD#!#\nLIST')"
+run "${F}/01.routeStepsMetadata_GET.sh" setflowattributes minimal
+expect "01 GET minimal: setflowattributes needs nothing beyond the three" "$(printf '%s\n' "${OUT}" | sed -n '/^{$/,/^}$/p' | jq -c 'keys_unsorted')" '["type","status","actionOnStepFailure"]'
+run "${F}/01.routeStepsMetadata_GET.sh" NoTableType minimal
+expect "01 GET minimal: a listed type with no table entry, exit 1" "${RC}" "1"
+has "01 GET minimal: says no minimal step is kept" "keeps no minimal step for NoTableType"
+run "${F}/01.routeStepsMetadata_GET.sh" Nope minimal
+expect "01 GET minimal: a type the server does not list, exit 1" "${RC}" "1"
+has "01 GET minimal: says so" "Not a step type of this server"
+run "${F}/01.routeStepsMetadata_GET.sh" compress
+expect "01 GET: the step type is case sensitive: no match, exit 1" "${RC}" "1"
+run "${F}/01.routeStepsMetadata_GET.sh" Nope
+expect "01 GET: an unknown step type, exit 1" "${RC}" "1"
+has "01 GET: says so" "Not a step type of this server"
+STATUS=403 run "${F}/01.routeStepsMetadata_GET.sh"
+expect "01 GET: a refusal exits 1" "${RC}" "1"
+has "01 GET: and prints the code" "HTTP 403"
+GET_BODY=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

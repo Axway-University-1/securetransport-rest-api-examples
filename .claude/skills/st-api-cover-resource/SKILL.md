@@ -47,7 +47,7 @@ Covered, in reference order: accessPolicies, accountSetup, accounts,
 addressBook, administrativeRoles, administrators, applications, businessUnits,
 certificates, configurations, daemons, deniedUsers, events, icapServers,
 ldapDomains, loginRestrictionPolicies (the API only: see below), logs (cancel works only
-for a transfer the server flags cancelable: check 48), mailTemplates, myself, routes (08 to 10 in `09.CompositeRoutes` added to the earlier create, list and delete), servers, transfers, version.
+for a transfer the server flags cancelable: check 48), mailTemplates, myself, routes (08 to 10 in `09.CompositeRoutes` added to the earlier create, list and delete), routeStepsMetadata (read only: one GET, `30.RouteStepsMetadata`), servers, transfers, version.
 
 Left out on purpose: **clusterServices** and the cluster-only configuration
 operations (the lab is standalone), the Oracle-only `database/{componentType}`,
@@ -55,7 +55,7 @@ changing the database connection, replication operations. `coverage.py`
 still counts these 13 configurations operations and 2 clusterServices ones as
 missing; that is expected.
 
-**Next, in order:** routeStepsMetadata, routeStepsCharsets, sessions, sites, siteTemplates, statisticsSummary, subscriptions,
+**Next, in order:** routeStepsCharsets, sessions, sites, siteTemplates, statisticsSummary, subscriptions,
 transactionManager, transferProfiles, userClasses, zones. Run `coverage.py` for
 the operations still missing in the partly covered ones. Update this list when
 a resource is done.

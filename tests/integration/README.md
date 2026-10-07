@@ -137,6 +137,7 @@ assumption about the API.
 | `48.cancel_transfer.py` | **yes** | The real `16.TransferLogs/04` and `03` examples against cancelling. Part A: three running 10 MB transfers (an FTP upload with a throttled client, an EndUser API upload with curl limited to 250 KB a second, a pull over SSH from ST's own SSH server through a `SlowProxy`) are In Progress in the log, the server says they are not cancelable, and a cancel is refused ("not eligible for cancellation") while they carry on. Part B: a PeSIT pull of a file that does not exist fails and waits for a retry; the server calls it cancelable, the cancel is accepted (HTTP 200), the pull summary moves it from "to retry" to "failed", and a second cancel is refused. Objects are removed, log entries stay. The FTP part needs the FTP daemon, the SSH pull needs `st_callback_host`, part B needs the PeSIT port. |
 | `49.mail_templates_scripts.py` | **yes** | The real `29.MailTemplates` examples against throwaway templates (`example_mail.xhtml`, the same name in capitals, and one with a space), each effect read back through the API, content compared with the file uploaded. Shows: a file not named `.xhtml` goes up under the template's name; a name with a `/` is refused by the script (the server would accept it and then the entry could never be addressed or deleted); an empty and a given description; a PUT keeps the description, a PUT on a missing name is refused by the script, and the raw PUT is made once to show it creates the template (204) and clears a missing description. The server's own templates are listed and read, never changed, and checked unchanged at the end. No stand-in server is needed: nothing here sends an e-mail. |
 | `50.routes_scripts.py` | **yes** | The real `09.CompositeRoutes` examples 08 (HEAD), 09 (PUT) and 10 (PATCH) against throwaway routes: a simple route with a Compress and a Rename step, two templates, and a composite route on a throwaway account and subscription that runs the simple route. HEAD finds a route of every type by its exact name, and refuses a name that matches nothing, a wildcard, or two routes (two simple routes may share a name). A PUT sent back whole keeps the steps with their ids, the subscription and the template and changes only the description, on a simple, a composite and a template route; the raw PUT of a fragment is made once to show it answers 204 and silently removes every step. A PATCH changes a step by its position, on a simple and a composite route; the raw calls show that a step id is not an address (400), a position past the end is 400, `type` is read only, a composite route's template cannot be changed, an add at `/steps/1` inserts in the middle and the `precedingStep` links follow, a route that another route runs cannot be deleted, and deleting the route that runs it deletes it. Nothing is run, so no stand-in server is needed. |
+| `51.route_steps_metadata_scripts.py` | **yes** | The real `30.RouteStepsMetadata/01` example against `/routeStepsMetadata`, a read only resource: the plain array of 12-key entries, the listing and the one-type view of the script, and what the Notes claim (`fields=` keeps the keys named, `stepType=` and `limit=` are ignored, XML is 406, HEAD is 200, POST, PUT and DELETE are 405, no read of a single type). Then, for every listed `stepType`, the smallest step the example prints with `01 <type> minimal` is created in a throwaway route (201), read back with `GET /routes/{id}` (the type and every field as sent) and deleted, and leaving out any one of its fields is 400; none of the 17 needs an account, site or key that exists, so none is checked only with an incomplete step. An incomplete `Compress` step names `compressionType`, and an unlisted type is 400 "Route Step type is undefined.". any `example_meta_*` route is removed in a `finally`. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -215,7 +216,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `50` cover: the admin API's session and read behaviour (both as
+`01` through `51` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -235,7 +236,7 @@ python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
 both acknowledgment scripts on a PeSIT loop of their own (`32`), the
 EndUser examples for every resource of its API reference (`33`), and the Admin
-examples added resource by resource from its reference (`34` to `50`).
+examples added resource by resource from its reference (`34` to `51`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a
