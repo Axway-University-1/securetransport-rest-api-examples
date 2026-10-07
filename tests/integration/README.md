@@ -131,6 +131,8 @@ assumption about the API.
 | `42.events_scripts.py` | **yes** | The real `23.Events` examples against a live event. An event exists only while a file is processed, so it builds a flow that holds one: an end user account, an Advanced Routing application, a subscription, a route that sends to an SSH partner, and that partner, a silent TcpSink on this machine. A file is uploaded with the real EndUser example; the event is listed with each filter (a status in capitals finds nothing), read, and deleted together with an id that does not exist. Needs `st_callback_host`. Removes everything, and never an event of another account. |
 | `43.icap_servers_scripts.py` | **yes** | The real `24.IcapServers` examples, in two parts. First all seven against disabled servers pointing nowhere (add, list and filter, check, read, replace, change, delete; a name with a space; a PUT that does not rename; a delete that succeeds although a business unit lists the server). Then what a server is for: a FakeIcap on this machine plays the antivirus, a throwaway business unit lists the server and has a throwaway end user account in it, and files are uploaded with the real EndUser example. A clean file is let through and one with the marker text is blocked (transfer Failed, file removed); with the ICAP server gone a file passes when denyOnConnectionError is false and is refused when it is true; disabled, nothing is scanned. Needs `st_callback_host` for the second part. |
 | `44.ldap_domains_scripts.py` | **yes** | The real `25.LdapDomains` examples: add, list and filter, check, read, replace (the bind password's ciphertext kept, the name not changed), change and delete throwaway domains, a name with a space among them, and every refused argument. Then the connection test against a silent TcpSink on this machine: a domain gets two servers, one with the sink behind it and one with nothing listening; each server's number gives "Successful Connection." (and the sink sees ST connect, with nothing sent) or "Connection failed.", and the first fails too once the sink is gone. Needs `st_callback_host` for that second part. Never turns LDAP login on. |
+| `45.login_restriction_policies_scripts.py` | **yes** | The real `26.LoginRestrictionPolicies` examples against throwaway policies and a throwaway business unit, each effect checked through the API: create (a name with a space among them), list and filter, check, read, replace (rules, their ids and the business units kept), add a rule (a replacement when the name exists, an address checked, a condition not), enable, disable and remove a rule, assign and take away a business unit, delete, and every refused argument. It makes no claim about what a policy does to a login, and never makes a policy the default. |
+| `46.login_restriction_enforcement.py` | **yes** | **Fails by design on the lab the examples were written against, until policy enforcement works there.** Two throwaway end user accounts, one in a throwaway business unit and one in none, both log in over the EndUser API and FTP. The real `26` examples then create a policy that denies every address and assign it to the unit; the account in the unit must be refused over both protocols and the other must still get in, and with the unit taken away the first logs in again. On that lab the refusal never happens (the two "THE POLICY ENFORCES" checks fail, everything else passes); it turns green by itself once enforcement works, and whatever switches it on belongs in its set up. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -208,7 +210,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `44` cover: the admin API's session and read behaviour (both as
+`01` through `46` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -228,7 +230,7 @@ python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
 both acknowledgment scripts on a PeSIT loop of their own (`32`), the
 EndUser examples for every resource of its API reference (`33`), and the Admin
-examples added resource by resource from its reference (`34` to `44`).
+examples added resource by resource from its reference (`34` to `46`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a

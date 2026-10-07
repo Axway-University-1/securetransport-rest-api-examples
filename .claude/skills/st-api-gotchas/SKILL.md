@@ -247,6 +247,24 @@ explicitly configured to use it. Safe to create and delete freely for
 testing `stAddLoginRestrictionRule.py`, which takes the policy name as a
 real command line argument rather than hardcoding one.
 
+Confirmed directly, later, adding the Admin examples from the reference
+(`26.LoginRestrictionPolicies`): `name=` takes the `*` wildcard and ignores case, and
+`isDefault=` works, unlike most other resources. `fields=` must ask for
+`businessUnit` (singular) to get the field `businessUnits`; `businessUnits` answers 400. A rule
+is **known by its name**: adding a rule whose name exists replaces it, a PUT keeps the rules'
+ids, and `/rules/-` puts the new rule **first**, not last. The address is checked
+("Unknown format for client address"), the type is checked, an Expression Language condition
+is **not** (`${nonsense(` is accepted). A business unit is assigned with
+`add /businessUnits/-` (idempotent; a unit that does not exist is 400) and taken away by
+its position. A PUT with another `name` renames the policy; a PUT with no rules and no business
+units empties both. `businessUnits?assignedToLoginRestrictionPolicies=`, the filter the
+server links to, filters nothing. **Enforcement was not observed**: on the lab a policy denying
+`*`, assigned to a business unit, did not stop that unit's accounts logging in over FTP or the
+EndUser API, immediately or two minutes later, with either type. Do not make a policy the
+default to try it: that applies it to every account that has none.
+`tests/integration/checks/46.login_restriction_enforcement.py` asserts the refusal (and that an
+account outside the unit still gets in) and fails on that lab until enforcement works.
+
 ## A certificate's caPassword is one real secret, shared by generation, import and nothing else
 
 Confirmed directly: `POST /certificates` rejects any `caPassword` that is

@@ -272,6 +272,7 @@ already exists.
 | 23. Events | `/events`, the tasks being processed now: list, read, delete a stuck one | 3 | 3 |
 | 24. ICAP Servers | `/icapServers`, antivirus and DLP scan servers: add, change, switch on and off, and what a scan does to a transfer | 7 | 7 |
 | 25. LDAP Domains | `/ldapDomains`, directories users can be looked up in: add, change, remove, and test a connection | 8 | 8 |
+| 26. Login Restriction Policies | `/loginRestrictionPolicies`, rules that allow or deny logins by address: policies, rules, business units | 9 | 9 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same

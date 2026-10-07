@@ -1093,6 +1093,122 @@ POST_BODY=
 GET_BODY=
 
 echo
+echo "=== 26.LoginRestrictionPolicies ==="
+F=26.LoginRestrictionPolicies
+U="${BASE}/loginRestrictionPolicies"
+LRPF="name,type,isDefault,rules,businessUnit"
+POLICIES='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"name":"example_lrp","type":"ALLOW_THEN_DENY","isDefault":false,"rules":[{"name":"a"},{"name":"b"}],"businessUnits":["unit one","unit two"]},{"name":"main policy","type":"DENY_THEN_ALLOW","isDefault":true,"rules":[],"businessUnits":[]}]}'
+GET_BODY=$(body policies "${POLICIES}")
+run "${F}/01.loginRestrictionPolicies_GET.sh" "example*" DENY_THEN_ALLOW
+expect "01 GET: the count, by name, by type, the default policy" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=name
+GET ${U}?name=example*&fields=${LRPF}
+GET ${U}?type=DENY_THEN_ALLOW&fields=${LRPF}
+GET ${U}?isDefault=true&fields=${LRPF}"
+has "01 GET: a policy with two rules and two business units" "  example_lrp  ALLOW_THEN_DENY  2 rule(s)  business units: unit one, unit two"
+has "01 GET: the default policy, with nothing assigned" "  main policy  DENY_THEN_ALLOW  0 rule(s)  default  business units: -"
+run "${F}/01.loginRestrictionPolicies_GET.sh"
+expect "01 GET: every name by default, no type query" "$(calls | sed -n '2p'):$(calls | wc -l | tr -d ' ')" "GET ${U}?name=*&fields=${LRPF}:3"
+run "${F}/01.loginRestrictionPolicies_GET.sh" "*" SIDEWAYS
+expect "01 GET: an unknown TYPE is refused, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=
+
+STATUS=201 LOCATION=example_lrp run "${F}/02.loginRestrictionPolicies_POST.sh"
+expect "02 POST: POST /loginRestrictionPolicies" "${RC}:$(calls)" "0:POST ${U}"
+expect "02 POST: example_lrp, ALLOW_THEN_DENY, and no rules or business units in the body" "$(payload 1 | jq -c .)" '{"name":"example_lrp","type":"ALLOW_THEN_DENY"}'
+has "02 POST: where it is, from Location" "It is at ${U}/example_lrp"
+STATUS=201 LOCATION=x run "${F}/02.loginRestrictionPolicies_POST.sh" "a name" DENY_THEN_ALLOW "why"
+expect "02 POST: a name with a space, the type and description given" "$(payload 1 | jq -c .)" '{"name":"a name","type":"DENY_THEN_ALLOW","description":"why"}'
+STATUS=409 run "${F}/02.loginRestrictionPolicies_POST.sh"
+expect "02 POST: a name that exists (409) exits 1" "${RC}" "1"
+for ARGS in "a/b" "a;b" "a'b" "x SIDEWAYS"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    run "${F}/02.loginRestrictionPolicies_POST.sh" "$@"
+    nothing_sent "02 POST: refuses '${ARGS}', nothing sent"
+done
+run "${F}/02.loginRestrictionPolicies_POST.sh" " "
+nothing_sent "02 POST: a blank NAME is refused, nothing sent"
+
+run "${F}/03.loginRestrictionPolicies_name_HEAD.sh"
+expect "03 HEAD: example_lrp by default" "${RC}:$(calls)" "0:HEAD ${U}/example_lrp"
+STATUS=404 run "${F}/03.loginRestrictionPolicies_name_HEAD.sh" "a name"
+expect "03 HEAD: a name with a space is encoded; 404 exits 1" "${RC}:$(calls)" "1:HEAD ${U}/a%20name"
+
+POLICY='{"id":"p1","name":"example_lrp","type":"ALLOW_THEN_DENY","description":"old","isDefault":false,"rules":[{"id":"r1","name":"a","type":"DENY","clientAddress":"10.0.0.1","isEnabled":true,"expression":""},{"id":"r2","name":"b","type":"ALLOW","clientAddress":"*","isEnabled":false,"expression":"${currentSessions <= 3}"},{"id":"r3","name":"c","type":"DENY","clientAddress":"*.example.com","isEnabled":true,"expression":""}],"businessUnits":["unit one","unit two"],"metadata":{"links":{}}}'
+GET_BODY=$(body policy_one "${POLICY}")
+run "${F}/04.loginRestrictionPolicies_name_GET.sh"
+expect "04 GET: reads the policy" "${RC}:$(calls)" "0:GET ${U}/example_lrp"
+has "04 GET: the summary" "  example_lrp: ALLOW_THEN_DENY, not the default"
+has "04 GET: the business units" "  business units: unit one, unit two"
+has "04 GET: a disabled rule with a condition" '    b  ALLOW  *  disabled  ${currentSessions <= 3}'
+has "04 GET: an enabled rule with no condition" "    c  DENY  *.example.com  enabled  -"
+STATUS_GET=404 run "${F}/04.loginRestrictionPolicies_name_GET.sh" "a name"
+expect "04 GET: a missing policy (404) exits 1, encoded" "${RC}:$(calls | head -n 1)" "1:GET ${U}/a%20name"
+
+STATUS=204 run "${F}/05.loginRestrictionPolicies_name_PUT.sh" example_lrp "new text"
+expect "05 PUT: reads, then PUT" "${RC}:$(calls)" "0:GET ${U}/example_lrp
+PUT ${U}/example_lrp"
+expect "05 PUT: the new description, the name, metadata dropped" "$(payload 1 | jq -c '[.description, .name, has("metadata")]')" '["new text","example_lrp",false]'
+expect "05 PUT: the rules and business units go back, so nothing is lost" "$(payload 1 | jq -c '[(.rules | length), .businessUnits]')" '[3,["unit one","unit two"]]'
+has "05 PUT: prints the description before" "The description of example_lrp is now: old"
+STATUS=204 run "${F}/05.loginRestrictionPolicies_name_PUT.sh" "other policy" x
+expect "05 PUT: the name stays the one in the path, so it cannot rename" "$(payload 1 | jq -r .name)" "other policy"
+GET_BODY=
+STATUS=404 run "${F}/05.loginRestrictionPolicies_name_PUT.sh"
+expect "05 PUT: no such policy, exit 1, nothing put" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+
+STATUS=204 run "${F}/06.loginRestrictionPolicies_name_PATCH.sh"
+expect "06 PATCH: PATCH the policy" "${RC}:$(calls)" "0:PATCH ${U}/example_lrp"
+expect "06 PATCH: a DENY rule for the example host name, at /rules/-, with no condition" \
+  "$(payload 1 | jq -c '[.[0].op, .[0].path, .[0].value.name, .[0].value.type, .[0].value.clientAddress, .[0].value.isEnabled, (.[0].value | has("expression"))]')" \
+  '["add","/rules/-","example rule","DENY","client.example.com",true,false]'
+STATUS=204 run "${F}/06.loginRestrictionPolicies_name_PATCH.sh" "a policy" "office" ALLOW 10.0.0.0/24 '${currentSessions <= 3}'
+expect "06 PATCH: the policy, rule, type, address and condition given" "$(calls):$(payload 1 | jq -c '[.[0].value.name, .[0].value.type, .[0].value.clientAddress, .[0].value.expression]')" \
+  "PATCH ${U}/a%20policy:[\"office\",\"ALLOW\",\"10.0.0.0/24\",\"\${currentSessions <= 3}\"]"
+STATUS=400 run "${F}/06.loginRestrictionPolicies_name_PATCH.sh" example_lrp bad DENY "not an address"
+expect "06 PATCH: a refused address (400) exits 1" "${RC}" "1"
+for ARGS in "example_lrp a/b" "example_lrp r MAYBE"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    run "${F}/06.loginRestrictionPolicies_name_PATCH.sh" "$@"
+    nothing_sent "06 PATCH: refuses '${ARGS}', nothing sent"
+done
+
+STATUS=204 run "${F}/07.loginRestrictionPolicies_name_DELETE.sh"
+expect "07 DELETE: example_lrp by default" "${RC}:$(calls)" "0:DELETE ${U}/example_lrp"
+STATUS=204 run "${F}/07.loginRestrictionPolicies_name_DELETE.sh" "a name/x"
+expect "07 DELETE: the name is URL-encoded once" "$(calls)" "DELETE ${U}/a%20name%2Fx"
+STATUS=404 run "${F}/07.loginRestrictionPolicies_name_DELETE.sh" nope
+expect "07 DELETE: not found (404) exits 1" "${RC}" "1"
+
+GET_BODY=$(body policy_rules "${POLICY}")
+STATUS=204 run "${F}/08.loginRestrictionPolicies_name_PATCH_rule.sh" example_lrp b enable
+expect "08 PATCH: reads the policy, then patches" "${RC}:$(calls)" "0:GET ${U}/example_lrp
+PATCH ${U}/example_lrp"
+expect "08 PATCH: enable rule b, which is at position 1" "$(payload 1 | jq -c '[.[0].op, .[0].path, .[0].value]')" '["replace","/rules/1/isEnabled",true]'
+STATUS=204 run "${F}/08.loginRestrictionPolicies_name_PATCH_rule.sh" example_lrp c
+expect "08 PATCH: disable by default, rule c at position 2" "$(payload 1 | jq -c '[.[0].path, .[0].value]')" '["/rules/2/isEnabled",false]'
+STATUS=204 run "${F}/08.loginRestrictionPolicies_name_PATCH_rule.sh" example_lrp a remove
+expect "08 PATCH: remove rule a, at position 0" "$(payload 1 | jq -c '[.[0].op, .[0].path, (.[0] | has("value"))]')" '["remove","/rules/0",false]'
+run "${F}/08.loginRestrictionPolicies_name_PATCH_rule.sh" example_lrp nosuch
+expect "08 PATCH: no such rule, exit 1, nothing patched" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+run "${F}/08.loginRestrictionPolicies_name_PATCH_rule.sh" example_lrp a explode
+nothing_sent "08 PATCH: ACTION is enable, disable or remove, nothing sent"
+
+STATUS=204 run "${F}/09.loginRestrictionPolicies_name_PATCH_businessUnit.sh" example_lrp "unit three"
+expect "09 PATCH: assign adds to /businessUnits/-, with no read first" "${RC}:$(calls):$(payload 1 | jq -c '[.[0].op, .[0].path, .[0].value]')" \
+  '0:PATCH '"${U}"'/example_lrp:["add","/businessUnits/-","unit three"]'
+STATUS=204 run "${F}/09.loginRestrictionPolicies_name_PATCH_businessUnit.sh" example_lrp "unit two" remove
+expect "09 PATCH: take away unit two, which is at position 1" "$(calls | wc -l | tr -d ' '):$(payload 1 | jq -c '[.[0].op, .[0].path]')" '2:["remove","/businessUnits/1"]'
+run "${F}/09.loginRestrictionPolicies_name_PATCH_businessUnit.sh" example_lrp "unit nine" remove
+expect "09 PATCH: not assigned, exit 1, nothing patched" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+run "${F}/09.loginRestrictionPolicies_name_PATCH_businessUnit.sh" example_lrp
+nothing_sent "09 PATCH: the unit is required, nothing sent"
+run "${F}/09.loginRestrictionPolicies_name_PATCH_businessUnit.sh" example_lrp unit sideways
+nothing_sent "09 PATCH: add or remove only, nothing sent"
+GET_BODY=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

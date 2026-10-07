@@ -46,7 +46,8 @@ Delete them when the probe is done.
 Covered, in reference order: accessPolicies, accountSetup, accounts,
 addressBook, administrativeRoles, administrators, applications, businessUnits,
 certificates, configurations, daemons, deniedUsers, events, icapServers,
-ldapDomains, myself, servers, transfers, version.
+ldapDomains, loginRestrictionPolicies (the API only: see below), myself, servers,
+transfers, version.
 
 Left out on purpose: **clusterServices** and the cluster-only configuration
 operations (the lab is standalone), the Oracle-only `database/{componentType}`,
@@ -54,11 +55,19 @@ changing the database connection, replication operations. `coverage.py`
 still counts these 13 configurations operations and 2 clusterServices ones as
 missing; that is expected.
 
-**Next, in order:** loginRestrictionPolicies (partly in `14.ExpressionLanguage`), logs,
+**Next, in order:** logs,
 mailTemplates, routes, routeStepsMetadata, routeStepsCharsets, sessions, sites, siteTemplates, statisticsSummary, subscriptions,
 transactionManager, transferProfiles, userClasses, zones. Run `coverage.py` for
 the operations still missing in the partly covered ones. Update this list when
 a resource is done.
+
+**An open question:** for loginRestrictionPolicies no behaviour test was possible. On the lab
+a policy denying `*`, assigned to a business unit (and also tried with each of the two types, rules
+disabled, an expression, a network, a delay of two minutes), did not stop an account of that unit
+logging in over FTP (8021) or the EndUser API; SFTP login failed for other reasons. No server option
+turns it on, and `isDefault` was not tried: it would apply to every account. If you learn what makes
+a policy take effect (perhaps the default policy, or a restart), put it in the set up of check 46, which
+already asserts the refusal and FAILS on that lab until then; check 45 covers the API and stays green.
 
 ## The procedure
 
