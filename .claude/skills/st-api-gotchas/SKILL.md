@@ -656,6 +656,24 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   `nack` need a PeSIT transfer; any other operation is 403 with an unhelpful message. Logs are
   never cleaned up by deleting the account: its entries stay.
 
+- **Mail templates** (`/mailTemplates`): a template is an XHTML file stored under a name that
+  must end in `.xhtml`, and the server ships eight of its own (the notification e-mails are
+  built from them). POST and PUT are multipart forms (JSON is 415). The reference says the
+  uploaded file's name is ignored; **it is checked**: a file not named `*.xhtml` is 400 "only
+  .xhtml name extensions are supported", so send it with `;filename=<template name>`. The
+  content is not checked (an empty file or plain text is stored). **PUT on a name that does not
+  exist creates the template and answers 204**, not the 404 the reference lists, and a PUT with
+  no `description` sets it to null: look first, and send the description back. **POST accepts a
+  `/` (and `../`) in the name, and the entry can then not be addressed**: `%2F` in the path is
+  answered 400 by the web server, `%252F` looks for a name holding a literal `%2F`, and there is
+  no other delete, so it stays on the server (the list shows it, `?name=` finds it); the
+  examples refuse `/` and `\`. Names are case sensitive (`example.xhtml` and `EXAMPLE.xhtml`
+  coexist; HEAD and DELETE take the exact case); 300 characters is 400 "Database error creating
+  mail template"; a duplicate is 409. `name=` and `description=` are exact, case sensitive, no
+  `*`; `totalCount` ignores the filter; `limit=-1` is 400. The list is sorted by name, ignoring
+  case. GET one answers the file (`application/xhtml+xml`, whatever `accept` says), HEAD
+  answers 404 with an HTML body, DELETE of an unknown name is a JSON 404.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

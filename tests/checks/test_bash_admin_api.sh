@@ -1381,6 +1381,119 @@ done
 GET_BODY=
 
 echo
+echo "=== 29.MailTemplates ==="
+F=29.MailTemplates
+M="${BASE}/mailTemplates"
+MAIL_LIST='{"resultSet":{"returnCount":2,"totalCount":8},"result":[{"name":"AdhocDefault.xhtml","description":"AdHoc Notifications"},{"name":"example.xhtml","description":null}]}'
+MAIL_ONE='{"resultSet":{"returnCount":1,"totalCount":8},"result":[{"name":"example_mail.xhtml","description":"Example one"}]}'
+MAIL_NONE='{"resultSet":{"returnCount":1,"totalCount":8},"result":[{"name":"example_mail.xhtml","description":null}]}'
+forms() { printf '%s\n' "${OUT}" | grep '^FORM:'; }
+
+GET_BODY=$(body mail_list "${MAIL_LIST}")
+run "${F}/01.mailTemplates_GET.sh"
+expect "01 GET: the count, then every template" "${RC}:$(calls)" "0:GET ${M}?limit=1&fields=name
+GET ${M}?limit=100"
+has "01 GET: says what it is counting" "Mail templates: "
+expect "01 GET: and the total count is on a line of its own (the stub's lines come between)" "$(printf '%s\n' "${OUT}" | grep -cx 8)" "1"
+has "01 GET: one line per template, name and description" "  AdhocDefault.xhtml  AdHoc Notifications"
+has "01 GET: - for a template with no description" "  example.xhtml  -"
+run "${F}/01.mailTemplates_GET.sh" AdhocDefault.xhtml "AdHoc Notifications"
+expect "01 GET: the name and the description are sent as exact filters" "$(calls | tail -2)" "GET ${M}?name=AdhocDefault.xhtml
+GET ${M}?description=AdHoc Notifications"
+GET_BODY=
+
+printf '<html xmlns="http://www.w3.org/1999/xhtml"/>\n' > "${WORK}/files/mail.xhtml"
+printf 'plain text\n' > "${WORK}/files/mail.txt"
+STATUS=201 LOCATION=example_mail.xhtml run "${F}/02.mailTemplates_POST.sh"
+expect "02 POST: POST /mailTemplates" "${RC}:$(calls)" "0:POST ${M}"
+expect "02 POST: the name and the default description are form fields" "$(forms | grep -v '^FORM: file=')" "FORM: name=example_mail.xhtml
+FORM: description=Created by 29.MailTemplates"
+SAMPLE=$(forms | sed -n 's/^FORM: file=@\(.*\);type=application.xhtml+xml;filename=example_mail.xhtml$/\1/p')
+expect "02 POST: with no file, the sample it wrote is sent under the template's name" "$([ -n "${SAMPLE}" ] && echo sent)" "sent"
+expect "02 POST: and it is removed afterwards" "$([ -e "${SAMPLE}" ] && echo left || echo removed)" "removed"
+has "02 POST: prints the end of Location" "Its address ends: example_mail.xhtml"
+STATUS=201 run "${F}/02.mailTemplates_POST.sh" "example other.xhtml" "${WORK}/files/mail.txt" "A <b> & @x"
+expect "02 POST: a file with any name goes up under the template's name, the description as it is" "$(forms)" "FORM: file=@${WORK}/files/mail.txt;type=application/xhtml+xml;filename=example other.xhtml
+FORM: name=example other.xhtml
+FORM: description=A <b> & @x"
+STATUS=201 run "${F}/02.mailTemplates_POST.sh" example_mail.xhtml "${WORK}/files/mail.xhtml" ""
+expect "02 POST: an empty description is sent empty" "$(forms | tail -1)" "FORM: description="
+POST_BODY=$(body mail_dup '{"message":"Error validating request","validationErrors":["Template with name example_mail.xhtml already exists."]}')
+STATUS=409 run "${F}/02.mailTemplates_POST.sh" example_mail.xhtml "${WORK}/files/mail.xhtml"
+expect "02 POST: a 409 exits 1 and says why" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'already exists')" "1:1"
+POST_BODY=
+run "${F}/02.mailTemplates_POST.sh" "  "
+nothing_sent "02 POST: a blank name is refused, nothing sent"
+for ARGS in "a/b.xhtml" "../x.xhtml" 'a\b.xhtml' "example_mail.txt" "example_mail" "example_mail.xhtml ${WORK}/files/missing.xhtml"; do
+    # shellcheck disable=SC2086
+    set -f; set -- ${ARGS}; set +f
+    run "${F}/02.mailTemplates_POST.sh" "$@"
+    nothing_sent "02 POST: refuses '${ARGS}', nothing sent"
+done
+
+STATUS=200 run "${F}/03.mailTemplates_name_HEAD.sh"
+expect "03 HEAD: example_mail.xhtml by default" "${RC}:$(calls)" "0:HEAD ${M}/example_mail.xhtml"
+has "03 HEAD: says it exists" "The mail template example_mail.xhtml exists."
+STATUS=200 run "${F}/03.mailTemplates_name_HEAD.sh" "example mail.xhtml"
+expect "03 HEAD: a name with a space is URL-encoded in the path" "$(calls)" "HEAD ${M}/example%20mail.xhtml"
+STATUS=404 run "${F}/03.mailTemplates_name_HEAD.sh"
+expect "03 HEAD: 404 is 'does not exist', exit 1" "${RC}" "1"
+run "${F}/03.mailTemplates_name_HEAD.sh" "a/b.xhtml"
+nothing_sent "03 HEAD: a name with a / is refused, nothing sent"
+
+GET_BODY=$(body mail_one "${MAIL_ONE}")
+STATUS=200 STATUS_GET=200 run "${F}/04.mailTemplates_name_GET.sh" example_mail.xhtml saved.xhtml
+expect "04 GET: the description from the list, then the file" "${RC}:$(calls)" "0:GET ${M}?name=example_mail.xhtml&fields=description
+GET ${M}/example_mail.xhtml"
+expect "04 GET: the file is asked for as application/xhtml+xml" "$(has_header 'accept: application/xhtml+xml')" "1"
+has "04 GET: says it is the description" "Description: "
+expect "04 GET: and the description is on a line of its own" "$(printf '%s\n' "${OUT}" | grep -cx 'Example one')" "1"
+has "04 GET: says where the file went" "Written to saved.xhtml,"
+expect "04 GET: and it is there" "$([ -f "${WORK}/admin/${F}/saved.xhtml" ] && echo file)" "file"
+STATUS=404 STATUS_GET=404 run "${F}/04.mailTemplates_name_GET.sh" example_mail.xhtml gone.xhtml
+expect "04 GET: a 404 exits 1 and leaves no file" "${RC}:$([ -e "${WORK}/admin/${F}/gone.xhtml" ] && echo file || echo none)" "1:none"
+run "${F}/04.mailTemplates_name_GET.sh" "a/b.xhtml"
+nothing_sent "04 GET: a name with a / is refused, nothing sent"
+GET_BODY=
+
+GET_BODY=$(body mail_one "${MAIL_ONE}")
+STATUS=204 run "${F}/05.mailTemplates_name_PUT.sh" example_mail.xhtml "${WORK}/files/mail.xhtml"
+expect "05 PUT: looks the template up, reads its description, then PUTs" "${RC}:$(calls)" "0:HEAD ${M}/example_mail.xhtml
+GET ${M}?name=example_mail.xhtml&fields=description
+PUT ${M}/example_mail.xhtml"
+expect "05 PUT: the file under the template's name, and the description it had" "$(forms)" "FORM: file=@${WORK}/files/mail.xhtml;type=application/xhtml+xml;filename=example_mail.xhtml
+FORM: description=Example one"
+GET_BODY=$(body mail_none "${MAIL_NONE}")
+STATUS=204 run "${F}/05.mailTemplates_name_PUT.sh" example_mail.xhtml "${WORK}/files/mail.xhtml"
+expect "05 PUT: a template with no description is sent with an empty one" "$(forms | tail -1)" "FORM: description="
+GET_BODY=
+STATUS=204 run "${F}/05.mailTemplates_name_PUT.sh" example_mail.xhtml "${WORK}/files/mail.xhtml" "New text"
+expect "05 PUT: a description given is used, and not looked up" "$(calls):$(forms | tail -1)" "HEAD ${M}/example_mail.xhtml
+PUT ${M}/example_mail.xhtml:FORM: description=New text"
+STATUS=204 run "${F}/05.mailTemplates_name_PUT.sh" example_mail.xhtml "${WORK}/files/mail.xhtml" ""
+expect "05 PUT: an empty description clears it" "$(forms | tail -1)" "FORM: description="
+STATUS=404 run "${F}/05.mailTemplates_name_PUT.sh" example_nope.xhtml "${WORK}/files/mail.xhtml"
+expect "05 PUT: a template that is not there is not created (PUT would): exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+STATUS=400 run "${F}/05.mailTemplates_name_PUT.sh" example_mail.xhtml "${WORK}/files/mail.xhtml" "x"
+expect "05 PUT: a refusal exits 1" "${RC}" "1"
+run "${F}/05.mailTemplates_name_PUT.sh" example_mail.xhtml "${WORK}/files/missing.xhtml"
+nothing_sent "05 PUT: no such file, nothing sent"
+run "${F}/05.mailTemplates_name_PUT.sh"
+nothing_sent "05 PUT: no arguments, nothing sent"
+run "${F}/05.mailTemplates_name_PUT.sh" "a/b.xhtml" "${WORK}/files/mail.xhtml"
+nothing_sent "05 PUT: a name with a / is refused, nothing sent"
+
+STATUS=204 run "${F}/06.mailTemplates_name_DELETE.sh" "example mail.xhtml"
+expect "06 DELETE: the name URL-encoded in the path" "${RC}:$(calls)" "0:DELETE ${M}/example%20mail.xhtml"
+has "06 DELETE: prints the code" "HTTP 204"
+STATUS=404 run "${F}/06.mailTemplates_name_DELETE.sh" example_nope.xhtml
+expect "06 DELETE: a refused delete exits 1" "${RC}" "1"
+run "${F}/06.mailTemplates_name_DELETE.sh"
+nothing_sent "06 DELETE: no name, nothing sent"
+run "${F}/06.mailTemplates_name_DELETE.sh" "a\\b.xhtml"
+nothing_sent "06 DELETE: a name with a backslash is refused, nothing sent"
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else
