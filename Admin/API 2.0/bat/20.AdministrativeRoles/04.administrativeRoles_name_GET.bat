@@ -8,7 +8,7 @@ REM ============================================================================
 REM Description:
 REM This script reads an administrative role, using the
 REM `/administrativeRoles/{name}` endpoint, and the administrators that hold it,
-REM through the members link the role carries.
+REM with /administrators?roleName=.
 REM
 REM Usage:
 REM 04.administrativeRoles_name_GET.bat [ROLE]
@@ -17,10 +17,12 @@ REM   ROLE  the role's name (default example_role)
 REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
-REM - Confirmed directly: the role's metadata.links.members is
-REM   /administrators?roleName=<role>&fields=loginName.
-REM - PowerShell is used to URL-encode the name, read the link and print the
-REM   members, in place of jq.
+REM - Confirmed directly: the role carries metadata.links.members, a ready made
+REM   search for its administrators, but the server encodes it wrongly for a
+REM   name with a space (roleName=Master%2BAdministrator finds nobody). This
+REM   script searches by the name itself instead.
+REM - PowerShell is used to URL-encode the name and print the members, in place
+REM   of jq.
 REM ==============================================================================
 
 SETLOCAL
@@ -47,14 +49,11 @@ IF NOT "%HTTP_CODE%"=="200" (
 TYPE "%RESPONSE_FILE%"
 echo.
 
-SET MEMBERS_URL=
-FOR /F "delims=" %%U IN ('powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).metadata.links.members"') DO SET "MEMBERS_URL=%%U"
-IF DEFINED MEMBERS_URL (
-    echo.
-    echo The administrators that hold it:
-    curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MEMBERS_URL%" -H "accept: application/json" -H "%REFERER_HEADER%" > "%MEMBERS_FILE%"
-    powershell -NoProfile -Command "foreach ($a in (Get-Content -Raw $env:MEMBERS_FILE | ConvertFrom-Json).result) { '  ' + $a.loginName }"
-)
+echo.
+echo The administrators that hold it:
+curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "https://%ST_SERVER%:%ST_PORT%/api/v2.0/administrators" ^
+  --data-urlencode "roleName=%ROLE%" --data-urlencode "fields=loginName" -H "accept: application/json" -H "%REFERER_HEADER%" > "%MEMBERS_FILE%"
+powershell -NoProfile -Command "foreach ($a in (Get-Content -Raw $env:MEMBERS_FILE | ConvertFrom-Json).result) { '  ' + $a.loginName }"
 
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
 IF EXIST "%MEMBERS_FILE%" DEL "%MEMBERS_FILE%"

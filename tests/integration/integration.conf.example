@@ -81,3 +81,11 @@ st_verify_tls="no"
 # than fail. Confirmed directly: this is a real secret specific to your own
 # server, not a value this project can guess or ship a working default for.
 #st_ca_password=""
+
+# The address this machine has as the SecureTransport server sees it. Some
+# checks start a stand-in for an outside system on this machine
+# (tests/integration/lib/dummy_servers.py: a HashiCorp Vault, an S3 bucket, a
+# TCP sink for Axway Sentinel) and point the server at it. The server must be
+# able to connect back here, over any port; through a VPN, this is the
+# address the VPN gives this machine. Leave blank to skip those parts.
+#st_callback_host=""

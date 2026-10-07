@@ -258,8 +258,9 @@ already exists.
 | 07. Subscriptions | `/subscriptions`, Advanced Routing, with and without a trigger file, delete by id | 4 | 4 |
 | 08. Route Templates | `/routes`, template type | 1 | 1 |
 | 09. Composite Routes | `/routes`, composite and simple types, Compress and Decompress steps, linked to a subscription, list, delete by id | 6 | 6 |
-| 12. Business Units | `/businessUnits` | 1 | 1 |
-| 13. Configurations | `/configurations/options` | 2 | 2 |
+| 11. Certificates | `/certificates`, generate, import, export, signing requests | 14 | 14 |
+| 12. Business Units | `/businessUnits`, units, their nesting, and why a delete is refused | 7 | 7 |
+| 13. Configurations | `/configurations`: options, logging, database, Sentinel, login, archiving, external stores, S3 storage profiles | 47 | 47 |
 | 15. Transfers | `/transfers/operations`, a pull on demand | 1 | 1 |
 | 16. Transfer Logs | `/logs/transfers`, by account and status, billable transfers per day | 2 | 2 |
 | 17. Access Policies | `/accessPolicies`, the embedded database's pg_hba.conf rules | 6 | 6 |
@@ -358,15 +359,13 @@ the list doubles as a rough roadmap.
 
 - Transfer operations other than a pull, Sessions, Events and Statistics Summary
 - Transfer Profiles, Route Steps Charsets and Route Steps Metadata
-- Site Templates, Address Book and Account Setup
-- Administrators, Administrative Roles and User Classes
-- Access Policies
+- Site Templates and User Classes
 - Cluster Services, ICAP Servers, LDAP Domains and Zones
 - Mail Templates
 
 Some areas are covered by the python examples but not yet by bash or bat:
-changing routes and subscriptions that already exist, certificates, login
-restriction policies and the transaction manager. See the python table above.
+changing routes and subscriptions that already exist, login restriction
+policies and the transaction manager. See the python table above.
 
 ## Features by Release
 

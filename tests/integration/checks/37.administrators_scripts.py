@@ -86,6 +86,12 @@ try:
                 (new.get("roleName"), new.get("parent")) == (ROLE, config.get("st_user")), new.get("parent"))
         out = roles("04.administrativeRoles_name_GET.sh")
         c.check("04 role GET lists it as a member", "\n  %s" % ADMIN in out, out[-300:])
+        # the server's own members link finds nobody for a name with a space
+        own_role = (admin.get("administrators/" + config["st_user"]).json() or {}).get("roleName")
+        if own_role:
+            out = roles("04.administrativeRoles_name_GET.sh", [own_role])
+            c.check("04 role GET lists %s under its own role, %s" % (config["st_user"], own_role),
+                    "\n  %s\n" % config["st_user"] in out + "\n", out[-300:])
         out = admins("01.administrators_GET.sh", [ROLE])
         c.check("01 lists it among the role's holders", "  %s  created by" % ADMIN in out, out[-300:])
         out = admins("03.administrators_name_HEAD.sh")

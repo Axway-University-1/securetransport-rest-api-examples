@@ -8,7 +8,7 @@
 # Description:
 # This script reads an administrative role, using the
 # `/administrativeRoles/{name}` endpoint, and the administrators that hold it,
-# through the members link the role carries.
+# with /administrators?roleName=.
 #
 # Usage:
 # ./04.administrativeRoles_name_GET.sh [ROLE]
@@ -17,10 +17,11 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - Confirmed directly: the role's metadata.links.members is
-#   /administrators?roleName=<role>&fields=loginName.
-# - Requires `jq`, which URL-encodes the name, reads the link and prints the
-#   members.
+# - Confirmed directly: the role carries metadata.links.members, a ready made
+#   search for its administrators, but the server encodes it wrongly for a
+#   name with a space (roleName=Master%2BAdministrator finds nobody). This
+#   script searches by the name itself instead.
+# - Requires `jq`, which URL-encodes the name and prints the members.
 # ==============================================================================
 
 #
@@ -45,9 +46,7 @@ if [ "${HTTP_CODE}" != "200" ]; then
 fi
 printf '%s\n' "${RESPONSE}"
 
-MEMBERS_URL=$(printf '%s' "${RESPONSE}" | jq -r '.metadata.links.members // empty')
-if [ -n "${MEMBERS_URL}" ]; then
-    printf "\nThe administrators that hold it:\n"
-    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MEMBERS_URL}" -H "accept: application/json" -H "${REFERER_HEADER}" \
-      | jq -r '(.result // [])[] | "  " + .loginName'
-fi
+printf "\nThe administrators that hold it:\n"
+curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/administrators" \
+  --data-urlencode "roleName=${ROLE}" --data-urlencode "fields=loginName" -H "accept: application/json" -H "${REFERER_HEADER}" \
+  | jq -r '(.result // [])[] | "  " + .loginName'

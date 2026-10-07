@@ -461,6 +461,86 @@ resource of the EndUser API reference (`tests/integration/checks/33.enduser_api_
 - **The secret question service** answers 503,
   `error.secretQuestion.serviceDisabled`, when it is not enabled.
 
+## The Admin API, against its own reference
+
+Confirmed directly on 5.5-20260924, while adding examples resource by resource
+from the Admin API reference (`tests/integration/checks/34` onwards):
+
+- **The `metadata.links` the server builds are wrong for a name with a space.**
+  It encodes the space as `+` and then the `+` as `%2B`:
+  `/administrators?roleName=Master%2BAdministrator` and
+  `/accounts?businessUnit=example%2Bbu` find nothing. Build the search
+  yourself, with the name URL-encoded once (`curl -G --data-urlencode`).
+- **`/accessPolicies` answers a plain array**, and a rule's id is its line in
+  pg_hba.conf: the ids after a deleted rule move up. List again before each
+  delete, never delete several ids from one listing.
+- **`/accountSetup` is not all or nothing.** A body that fails part of the way
+  leaves what came before created. Every site and profile in it needs
+  `account`. An account that exists is skipped, not refused.
+- **`/addressBook/sources` has no POST or DELETE**; PUT and PATCH answer 204.
+- **`POST /administrators` needs `parent`**, the administrator it is created
+  under, though the reference does not mark it required: 400 "Please specify
+  parent administrator" without it.
+- **Administrator API keys** (`/administrators/{name}/api-keys`): the key is in
+  the POST answer only; at most 2 per administrator (409); `validityDays` or
+  `expiresAt`, not both (400). The `SECURETRANSPORT-API-KEY` header alone
+  authenticates. A method the key's permissions do not cover answers a
+  plain-text 403; a revoked key a plain-text 401, "Authentication required."
+- **A role's menus come back in no fixed order.** `add` to `/menus/-` adds
+  the menu, not necessarily at the end. `DELETE /administrativeRoles/{name}?targetRoleName=`
+  moves the role's administrators to that role.
+- **Business units:** `baseFolder=` as a filter is ignored (every value gives
+  every unit). `parent` reads null even for a nested unit; the nesting shows in
+  `businessUnitHierarchy` and `metadata.links.parentBusinessUnit`, and
+  `parent=` as a filter works. A delete is refused, 400, while the unit has
+  nested units or accounts.
+- **Certificates:** `expirationTime.from` and `.to` are in milliseconds, not
+  the Unix seconds the reference implies; in seconds they find nothing. A
+  generate (JSON body) answers 201 as multipart/mixed, the JSON in the first
+  part, the id in `Location`; an import (multipart/mixed body) answers 200 with
+  plain JSON. PATCH works only on `accessLevel`, `additionalAttributes` and
+  the external store fields. `POST /certificates/{id}/operations?operation=export`
+  needs a multipart form body even for pem and crt (`-F exportPassword=`),
+  otherwise 400 "Entity is empty."; `includePath=true` on a GET answers an
+  array, the certificate then its chain. Deleting an account deletes its
+  certificates.
+- **Certificate signing requests:** the CSR itself is only in the POST
+  answer (multipart/mixed); a GET answers the JSON alone, and 406 to any other
+  Accept. Read back, `keySize` is 0 and `signAlgorithm` null. With a filter,
+  `totalCount` still counts every request. Completing (multipart form, `alias`
+  and `certificateFile`) answers 200, creates the certificate and removes the
+  request; a CA the server does not trust is accepted, "Not chained to a
+  trusted root".
+- **Configurations are options underneath.** Sentinel, external stores and S3
+  storage profiles are stored as Server Configuration Options
+  (`AxwaySentinel.*`, `TM.ExternalStores.<name>`,
+  `StorageProfiles.S3.Registry.<name>.*`), and the options endpoint can do what
+  the dedicated one refuses. Once a Sentinel `host` is set, `/configurations/sentinel`
+  refuses an empty one ("host must not be null or empty") and then any change:
+  turn reporting off, then clear `AxwaySentinel.RemoteHost.host` and
+  `AxwaySentinel.OverflowFile.path` and restore `.RemoteHost.port` and
+  `.Heartbeat.delay` through `PUT /configurations/options`. An option is cleared
+  with `[""]`; `[]` answers 400 "Invalid argument length.".
+- **External stores:** `GET /configurations/externalStores?name=` with a pattern
+  ending in `*` answers 404 "External Stores configuration is not valid" once it
+  matches a store - it also matches the store's companion option
+  `TM.ExternalStores.<name>.encryptedFields`. Use an exact name. `fields=` is
+  ignored. The `test` operation answers 200 whatever happens; read
+  `fetchStatus`, `connectionStatus`, `authenticationStatus`.
+- **S3 storage profiles** have no resource: add the name to
+  `StorageProfiles.S3.Registry` (one value each), set
+  `StorageProfiles.S3.Registry.<name>.Bucket`, `.Region`, `.CustomEndpointUrl`,
+  `.AccessKey`, `.SecretKey`. Saving them tests the connection (400 when the
+  bucket cannot be reached); `test` is a HEAD on the bucket.
+- **Other configuration endpoints:** a logging option's XML comes only with
+  `Accept: application/xml` (204 when none is set); a PUT on one that was never
+  set answers 400 "not eligible for propagation". Enabling Sentinel needs
+  `overflowFilePath`. The database `test` operation is a multipart form and
+  needs host, port, databaseName, username and password. Login settings are
+  validated whole on every change, so already inconsistent settings refuse even
+  a no-op. Some option groups the list returns answer 501 when read.
+  `allowedSTServers` answers 404 on a standalone server.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     99 curl examples, numbered by topic
-    bat/      91 of them, for Windows
+    bash/     164 curl examples, numbered by topic
+    bat/      156 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -67,11 +67,20 @@ create, read, update, delete cycle for that object.
 | Create a composite route, with or without an extension | `bash/09.CompositeRoutes/` |
 | Compress or decompress in a route, then send to a partner | `bash/09.CompositeRoutes/03.routes_POST_simple_compress.sh`, `04.routes_POST_simple_decompress.sh` |
 | Link a composite route to a subscription, so it runs on what arrives | `bash/09.CompositeRoutes/05.routes_POST_composite_subscription.sh` |
-| Create a business unit | `bash/12.BusinessUnits/` |
-| Change a Server Configuration Option | `bash/13.Configurations/` |
+| Generate, import, export, patch or delete a certificate; list the ones about to expire | `bash/11.Certificates/` 01 to 08 |
+| Make a certificate signing request (CSR) and complete it with the signed certificate | `bash/11.Certificates/` 09 to 14 |
+| Create, list, read, change or delete a business unit | `bash/12.BusinessUnits/` |
+| Change a Server Configuration Option, or several at once | `bash/13.Configurations/01.configurations_PATCH.sh`, `04.configurations_options_PUT.sh` |
+| Read or change server-wide settings: logging, database test, Sentinel, login settings, file archiving, node threshold | `bash/13.Configurations/` 09 to 36 |
+| Fetch secrets from a HashiCorp Vault (external stores) | `bash/13.Configurations/` 37 to 44 |
+| Add and test an S3 storage profile | `bash/13.Configurations/` 45 to 47 |
 | Set up usage reporting to the Axway Platform | `bash/13.Configurations/02.configurations_PATCH_UsageReporting.sh` |
 | Start a pull from a partner on demand | `bash/15.Transfers/` |
 | Read the transfer log, or count billable transfers per day | `bash/16.TransferLogs/` |
+| Manage the embedded database's access rules (pg_hba.conf) | `bash/17.AccessPolicies/` |
+| Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
+| Change an address book source | `bash/19.AddressBook/` |
+| Create administrative roles and administrators; lock one; give one an API key | `bash/20.AdministrativeRoles/`, `bash/21.Administrators/` |
 | Correlate PeSIT transfers and send ACK or NACK | `bash/90.EndToEndAcknowledgment/` |
 | Use SecureTransport's Expression Language in a route condition, a file filter, a rename pattern or a login restriction rule | `bash/14.ExpressionLanguage/` (also in `python/python3/14.ExpressionLanguage/`) |
 | Upload or download files as an end user | `EndUser/API 2.0/bash/02.Files/` |
@@ -160,14 +169,16 @@ Every script resolves its own directory, so it runs from anywhere:
 
 ## What is not covered
 
-Transfer operations other than a pull, sessions, events and statistics summary;
-transfer profiles and route step charsets or metadata; site templates, address
-book, account setup; administrators, administrative roles, user classes; access
-policies; cluster services, ICAP servers, LDAP domains, zones; mail templates.
+The Admin examples are being added resource by resource, in the order of the
+API reference; through configurations it is done (cluster services, and the
+cluster-only configuration operations, are left out: they need a cluster). Not yet in
+bash or bat: transfer operations other than a pull, sessions, events and
+statistics summary; transfer profiles and route step charsets or metadata; site
+templates, user classes; cluster services, ICAP servers, LDAP domains, zones;
+mail templates.
 
-Changing routes and subscriptions that already exist, certificates and the
-transaction manager are covered by the **python** examples but not yet by bash
-or bat.
+Changing routes and subscriptions that already exist, and the transaction
+manager, are covered by the **python** examples but not yet by bash or bat.
 Login restriction policies and EL route conditions are the exception - both
 are covered in bash too, in `14.ExpressionLanguage` (see the table above),
 alongside the python3 twin of the same folder.

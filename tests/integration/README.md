@@ -93,7 +93,7 @@ assumption about the API.
 | `04.accounts_scripts.py` | **yes** | The same cycle, but by running the real `01` through `07` scripts in `Admin/API 2.0/bash/05.Accounts` and verifying each step independently through the API. Touches the literal accounts those scripts create (`UserAccount`, `ServiceAccount`, `TemplateAccount`), not a `ZZTEST_` prefixed name — see its own docstring for the safety rules around that, and around the `john` account two of the scripts depend on. If `john` already exists, `06` and its `_with_file` twin run as name-substituted copies against a throwaway `john_test` instead of being skipped — see "Substituted-copy fallbacks" below. |
 | `05.applications_scripts.py` | **yes** | The real `02` through `07` scripts in `Admin/API 2.0/bash/04.Applications`. If this server already has an application of type `AccountFilePurge` under any name - only one is allowed per server, confirmed directly, and this is exactly the gap that had left `07...DELETE.sh` cleaning up the wrong objects until it was fixed (see the gotchas skill) - `04` through `06` run as name-substituted copies targeting `HumanSystem Application` instead of skipping the whole check. |
 | `06.servers_scripts.py` | **yes** | The real `07` through `12` scripts in `Admin/API 2.0/bash/03.Connect` - server create, read, update, delete. Deliberately not `01`-`05` or `13`: those read or change a daemon (a singleton, not a disposable object) or start and stop real daemons and servers. |
-| `07.businessunits_scripts.py` | **yes** | The real `01.businessUnits_POST.sh`. This folder has no GET, HEAD, PATCH or DELETE example, so this check verifies and cleans up directly through the API rather than invent shipped examples that do not exist. If a business unit named `Finance` already exists, this runs a name-substituted copy targeting a throwaway `Finance_test` instead of skipping. |
+| `07.businessunits_scripts.py` | **yes** | The real `01.businessUnits_POST.sh`, verified and cleaned up through the API (`38` runs the folder's other examples). If a business unit named `Finance` already exists, this runs a name-substituted copy targeting a throwaway `Finance_test` instead of skipping. |
 | `08.transfersites_scripts.py` | **yes** | The real `01.sites_POST.sh`, the same way as business units. A site is addressed by a generated `id`, not by name - confirmed directly, and found via `GET /sites?name=...`. If a site named `HTTP` on account `john` already exists, this runs a name-substituted copy targeting `HTTP_test` on the same, unmodified `john` account instead of skipping. |
 | `09.connect_read.py` | no | `01.daemons_GET.sh`, `02.daemons_name_GET.sh` and `06.servers_GET.sh` for real, plus that every daemon status is one of the two documented values. The read-only counterpart to what `06.servers_scripts.py` deliberately excludes. |
 | `10.configurations_read.py` | no | The shape of a Server Configuration Option response, and that a made up option returns 404. Deliberately never runs either PATCH script in `13.Configurations` - a Configuration Option is a real, persistent server setting, not a disposable object. |
@@ -120,6 +120,13 @@ assumption about the API.
 | `31.subscriptions_routes_transfers_scripts.py` | **yes** | The newer examples as one Advanced Routing flow, on a throwaway `ZZTEST_chain` account: the EndUser folder and upload scripts, the SSH sites, both subscriptions, the Compress and Decompress routes, the composite route linked to the subscription, a pull, the transfer log, and then the clean-up examples in reverse. Each step is checked through the API, and the flow is proved end to end by the uploaded file arriving, pulled, compressed and pushed, in the account's `/delivered` folder. The Admin examples run as name-substituted copies (`john` and every fixed name made throwaway, which `test_integration_helpers.py` checks offline); the EndUser examples run unmodified. The trigger-file subscription and the billable count need 5.5-20260924 or later. Set `st_ssh_host`, `st_ssh_port` and `st_enduser_port` if the defaults do not fit your server. |
 | `32.pesit_acknowledgment_loop_scripts.py` | **yes** | A PeSIT loop between two throwaway accounts on the one server (each with a PeSIT site named after the other, and a transfer profile), and the real `Acknowledgment.sh` and `IteratePesitInbounds.sh` run on the transfers it makes: a NACK for a file nothing forwards, an ACK for one a subscription and route push on under the same `coreId`, and the iterator ACKing the forwarded one while leaving the other for later. The iterator acts on every unacknowledged PeSIT inbound on the server in its window, so it only runs when all of them belong to throwaway accounts. Set `st_pesit_host` and `st_pesit_port` if your PeSIT listener is not `st_server`:17617. |
 | `33.enduser_api_scripts.py` | **yes** | The EndUser examples added from the API reference, run as a throwaway end user with a throwaway partner: the account, a password change and back, the secret questions (or a clean "service not enabled"), the address book; an upload with `Content-MD5`, metadata, listing parameters, rename by PUT and PATCH, share and unshare; MD5Calc, a chunked and a multipart upload, a cancel; a pull and its summary, a push and a folder monitor run through SSH sites the admin API gives the user; the transfer log; the server time. Each effect is checked through the API. Not run: the password reset pair (needs a real email) and `verifymdn` (needs AS2). Puts back your own `myCookie.jar` and `set_variables.local.sh`. |
+| `34.access_policies_scripts.py` | **yes** | The real `17.AccessPolicies` examples: adds a `reject` rule for a database and user that do not exist, after the server's own rules; checks, reads and replaces it, adds a second copy, deletes both, and checks the server's rules are exactly as they were. Rule ids are positions that move up after a delete, so the delete example re-lists before each one. Only for a server on the embedded PostgreSQL database. |
+| `35.account_setup_scripts.py` | **yes** | The real `18.AccountSetup` examples on a throwaway `example_setup` account: the account and an SSH site in one call, a second site added to the existing account (which is skipped, not refused), the whole setup read back, and the delete, checked to take the sites with it. |
+| `36.address_book_scripts.py` | **yes** | The real `19.AddressBook` examples on the server's LDAP source, which has no POST or DELETE: changes its page size with PATCH and back with PUT, and checks the source is exactly as it was. Skips when there is no LDAP source. |
+| `37.administrators_scripts.py` | **yes** | The real `20.AdministrativeRoles` and `21.Administrators` examples: a throwaway role and an administrator that holds it; read, lock, unlock, replace and patch; an API key, a call made with the key alone, its revoke and the 401 that follows; deleting the role with its administrator moved to another role. Also lists your own administrator under your own role, a name with a space. |
+| `38.business_units_scripts.py` | **yes** | The real `12.BusinessUnits` examples 02 to 07 on a throwaway unit and a nested one whose name has a space, with one account in it: list, check, read and count the account, PUT and PATCH, the delete refused while a nested unit or an account remains, then the deletes. |
+| `39.certificates_scripts.py` | **yes** | The real `11.Certificates` examples: generates `example_cert` with the server's CA, checks the 40 and 20 day expiry searches, reads and patches it, exports it as pem, crt and pkcs12, imports the pem as a throwaway account's partner certificate; then a signing request generated, listed and read, signed by a throwaway CA made with openssl, and completed, and a second one deleted. Needs `st_ca_password`; the signing needs openssl. Removes the files the examples write into their folder. |
+| `40.configurations_scripts.py` | **yes** | The real `13.Configurations` examples 03 to 47: the read-only ones as they are; two options, the file archiving and the node threshold settings changed and put back exactly; the database connection test with a wrong password; the login settings with a PATCH to the value they have; and, against stand-ins on this machine (see below), Sentinel sending its heartbeat to a TCP sink, an external store logging in to a fake HashiCorp Vault and reading a secret, and an S3 storage profile reaching a fake bucket. Not run: maintenance mode and the keystore password. Needs `st_callback_host` for the stand-ins. Every setting it touches is compared with its value before, at the end. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -167,6 +174,24 @@ Where a check needs an endpoint the bundled mock does not implement -
 with a confusing 404. Only `01` through `04` are meaningfully exercised by
 `--mock`.
 
+## Stand-ins for outside systems
+
+Some configurations only show they work when the server reaches something
+outside: a secret vault, an S3 bucket, an Axway Sentinel. `lib/dummy_servers.py`
+has throwaway stand-ins a check starts on this machine for the time it runs,
+each in a thread, on a port the system picks:
+
+- `FakeVault` - a HashiCorp Vault: an AppRole login, then KV version 2 reads.
+- `FakeS3` - an S3 service, path style, any credentials, objects in memory.
+- `TcpSink` - accepts connections and keeps what arrives, for Sentinel.
+
+The server must be able to connect back to this machine: set `st_callback_host`
+in integration.conf to this machine's address as the server sees it (through a
+VPN, the address the VPN gives it). Without it, the parts that need a stand-in
+are skipped. `tests/checks/test_dummy_servers.py` checks the stand-ins
+themselves, offline. To keep one up by hand while trying an example:
+`python3 tests/integration/lib/dummy_servers.py vault|s3|sink [PORT]`.
+
 ## Adding a check
 
 Drop a numbered file into `checks/`. It should:
@@ -178,7 +203,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `33` cover: the admin API's session and read behaviour (both as
+`01` through `40` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -196,8 +221,9 @@ patches and restores every real subscription on the server, by explicit
 decision - all eight Expression Language exercises, in both bash and
 python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
-both acknowledgment scripts on a PeSIT loop of their own (`32`), and the
-EndUser examples for every resource of its API reference (`33`).
+both acknowledgment scripts on a PeSIT loop of their own (`32`), the
+EndUser examples for every resource of its API reference (`33`), and the Admin
+examples added resource by resource from its reference (`34` to `40`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a
