@@ -21,6 +21,8 @@
 # Usage:
 # ./02.routes_condition_EL.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: conditionType accepts
 #   MATCH_ALL, MATCH_FIRST, ALWAYS or EL. When it is EL, the expression text

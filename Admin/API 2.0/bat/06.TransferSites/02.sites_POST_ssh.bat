@@ -16,6 +16,8 @@ REM
 REM Usage:
 REM 02.sites_POST_ssh.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The sites are attached to the account "john", which must already exist.

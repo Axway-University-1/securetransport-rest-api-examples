@@ -16,6 +16,8 @@
 #   ID  the rule's id, its line in pg_hba.conf (default: the rule
 #       02.accessPolicies_POST.sh adds, looked up now)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Only for a server on the embedded PostgreSQL database.

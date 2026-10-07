@@ -20,6 +20,8 @@ REM
 REM   PATTERN  a policy name, * matches anything (default *)
 REM   TYPE     ALLOW_THEN_DENY or DENY_THEN_ALLOW: only the policies of this type (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the answer is {resultSet, result}. name= takes the * wildcard and

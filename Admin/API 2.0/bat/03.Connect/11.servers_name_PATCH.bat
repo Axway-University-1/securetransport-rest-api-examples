@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 11.servers_name_PATCH.bat
 REM
+REM Risk: config - changes a protocol server
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The PATCH method allows partial updates to specific fields.

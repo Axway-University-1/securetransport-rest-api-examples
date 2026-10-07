@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 11.transfers_pull_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Run steps 01 to 10 first.
 REM - Uses PowerShell to build the JSON bodies.

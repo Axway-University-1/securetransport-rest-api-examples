@@ -12,6 +12,8 @@
 # Usage:
 # ./06.routes_POST_template.sh
 #
+# Risk: write
+#
 # Notes:
 # - Requires `jq`, which builds the JSON body.
 # - The id is saved as BT_ID_TEMPLATE for the later steps.

@@ -13,6 +13,8 @@
 # Usage:
 # ./21.configurations_loginSettings_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Requires `jq`, which prints the summary.

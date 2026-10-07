@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 47.configurations_storageProfiles_options_PUT_unregister.bat
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The other profiles in the registry stay.

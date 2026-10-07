@@ -16,6 +16,8 @@ REM
 REM   DAYS     how many days to count, today included (default 7)
 REM   ACCOUNT  count only this account's transfers (default: every account)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The account is filtered with account=. The endpoint ignores accountName=

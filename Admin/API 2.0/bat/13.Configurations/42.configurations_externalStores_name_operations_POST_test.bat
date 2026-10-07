@@ -17,6 +17,8 @@ REM
 REM   SECRET_PATH  a secret to fetch, for example example/db
 REM   NAME  the external store (default example_vault)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the answer is 200 whatever the outcome; fetchStatus,

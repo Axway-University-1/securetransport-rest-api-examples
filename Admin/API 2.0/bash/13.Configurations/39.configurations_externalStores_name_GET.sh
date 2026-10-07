@@ -14,6 +14,8 @@
 #
 #   NAME  the external store (default example_vault)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The AppRole's secret_id comes back masked.

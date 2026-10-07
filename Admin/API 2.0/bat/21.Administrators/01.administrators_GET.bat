@@ -17,6 +17,8 @@ REM 01.administrators_GET.bat [ROLE]
 REM
 REM   ROLE  the role to list the administrators of (default Master Administrator)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Many more filters exist: parent, isLimited, localAuthentication,

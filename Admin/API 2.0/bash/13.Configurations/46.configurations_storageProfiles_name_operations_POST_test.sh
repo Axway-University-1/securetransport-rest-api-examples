@@ -16,6 +16,8 @@
 #
 #   PROFILE  the storage profile (default example_s3)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: a working profile answers 204; the server asks for the

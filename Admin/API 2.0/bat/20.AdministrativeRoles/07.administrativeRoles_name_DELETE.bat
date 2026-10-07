@@ -17,6 +17,8 @@ REM
 REM   TARGET_ROLE  the role the administrators that hold example_role move to.
 REM                Without it, a role still held is not deleted.
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It deletes example_role, which 02.administrativeRoles_POST.bat creates. Only

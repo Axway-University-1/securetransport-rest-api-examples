@@ -15,6 +15,8 @@ REM Usage:
 REM 17.configurations_database_operations_POST_test.bat
 REM
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It tests the database the server uses now: the host, port and name come

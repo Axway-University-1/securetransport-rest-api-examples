@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 25.configurations_maintenance_operations_POST.bat start|stop
 REM
+REM Risk: disruptive - puts the whole server in maintenance mode
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - NOT RUN on the shared lab these examples were checked against: it changes

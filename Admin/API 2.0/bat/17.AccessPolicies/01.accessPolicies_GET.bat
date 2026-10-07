@@ -16,6 +16,8 @@ REM
 REM Usage:
 REM 01.accessPolicies_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Only for a server on the embedded PostgreSQL database.

@@ -15,6 +15,8 @@
 #
 #   DAYS  how many days the certificate is valid (default 365)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It generates example_cert, a local x509 certificate - one the server itself

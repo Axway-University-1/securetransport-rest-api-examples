@@ -14,6 +14,8 @@
 # Usage:
 # ./06.accessPolicies_id_DELETE.sh
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Only for a server on the embedded PostgreSQL database.

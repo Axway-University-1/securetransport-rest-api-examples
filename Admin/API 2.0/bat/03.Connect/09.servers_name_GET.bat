@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM call 09_servers_name_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - The fields parameter must be used in combination with protocol.

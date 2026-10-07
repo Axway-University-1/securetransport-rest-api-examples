@@ -17,6 +17,8 @@
 #   OPERATION  cancel, resubmit, verify, ack or nack
 #   MESSAGE    for ack and nack only: the message to send (optional)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The id is required: these operations act on a real transfer.

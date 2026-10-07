@@ -20,6 +20,8 @@
 # Usage:
 # ./08.transferSites_dynamicProperties.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: a site's host and
 #   downloadPattern fields accept and store the literal template text

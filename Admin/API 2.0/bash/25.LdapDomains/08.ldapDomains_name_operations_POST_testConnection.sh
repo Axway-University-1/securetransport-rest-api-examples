@@ -15,6 +15,8 @@
 #   NAME           the domain (default example_ldap)
 #   SERVER_NUMBER  which of its servers, counting from 1 (default 1)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The server is named by its id, which the script looks up in the domain.

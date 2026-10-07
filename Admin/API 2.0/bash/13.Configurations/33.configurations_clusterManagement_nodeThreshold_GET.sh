@@ -13,6 +13,8 @@
 # Usage:
 # ./33.configurations_clusterManagement_nodeThreshold_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Requires `jq`, which prints the summary.

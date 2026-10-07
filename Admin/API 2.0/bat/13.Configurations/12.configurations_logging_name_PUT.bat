@@ -18,6 +18,8 @@ REM   NAME        the option (default Logging.Admin.config)
 REM   PROFILE_ID  its profile (default: the one 09.configurations_logging_GET.bat
 REM               lists it with)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Each logging option belongs to a configuration profile; profileId says which, and is required.

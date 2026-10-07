@@ -18,6 +18,8 @@ REM
 REM   ACCOUNT  the test account to remove, with everything derived from its name
 REM            (default btTestAccount). Use the same name given to 00.run_all.bat.
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Deletes the objects named in settings.bat, on the account named there. Check
 REM   the names before running it.

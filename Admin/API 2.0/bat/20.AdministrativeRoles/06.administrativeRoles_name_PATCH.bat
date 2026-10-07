@@ -15,6 +15,8 @@ REM 06.administrativeRoles_name_PATCH.bat [MENU]
 REM
 REM   MENU  the menu to add (default File Tracking)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The role is example_role, a limited role with the Change Password menu only.

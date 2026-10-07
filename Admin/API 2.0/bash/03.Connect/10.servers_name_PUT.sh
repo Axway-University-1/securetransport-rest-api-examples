@@ -14,6 +14,8 @@
 # Usage:
 # ./10.servers_name_PUT.sh
 #
+# Risk: config - changes a protocol server
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The PUT method replaces the entire object, so all required fields must be included.

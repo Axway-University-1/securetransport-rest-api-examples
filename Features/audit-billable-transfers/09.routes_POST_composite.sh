@@ -14,6 +14,8 @@
 # Usage:
 # ./09.routes_POST_composite.sh
 #
+# Risk: write
+#
 # Notes:
 # - Needs the ids saved by 06.routes_POST_template.sh, 07.routes_POST_simple.sh
 #   and 08.subscriptions_POST.sh.

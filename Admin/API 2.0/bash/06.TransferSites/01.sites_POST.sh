@@ -11,6 +11,8 @@
 # Usage:
 # ./01.sites_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The site is attached to an account, which must already exist. This example

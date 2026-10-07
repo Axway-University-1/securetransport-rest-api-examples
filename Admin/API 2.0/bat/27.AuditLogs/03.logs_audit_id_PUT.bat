@@ -15,6 +15,8 @@ REM
 REM   ID           the entry's id (see 01.logs_audit_GET.bat, 02.logs_audit_id_GET.bat)
 REM   DESCRIPTION  the text to try (default "Changed by 03.logs_audit_id_PUT.bat")
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the server ANSWERS 204, as for a change, but the description stays what

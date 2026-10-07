@@ -15,6 +15,8 @@ REM 04.certificates_id_HEAD.bat [NAME]
 REM
 REM   NAME  the certificate's name (default example_cert)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The certificate is looked up by name, and must be the only one with that name.

@@ -15,6 +15,8 @@ REM 34.configurations_clusterManagement_nodeThreshold_PUT.bat [NODES]
 REM
 REM   NODES  the number of nodes expected (default 1)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The email goes through the server's SMTP settings (the SMTP.Group options).

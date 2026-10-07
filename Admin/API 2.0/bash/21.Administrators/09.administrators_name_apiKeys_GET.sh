@@ -18,6 +18,8 @@
 #   KEY  a key 08.administrators_name_apiKeys_POST.sh printed, to call
 #        GET /myself with it (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The administrator is example_admin, which 02.administrators_POST.sh creates.

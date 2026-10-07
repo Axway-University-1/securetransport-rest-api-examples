@@ -13,6 +13,8 @@
 # Usage:
 # ./36.configurations_replication_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A server without replication answers enabled false and no subscriptions.

@@ -17,6 +17,8 @@ REM   ID         the transfer's id (see 03.logs_transfers_id_GET.bat)
 REM   OPERATION  cancel, resubmit, verify, ack or nack
 REM   MESSAGE    for ack and nack only: the message to send (optional)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The id is required: these operations act on a real transfer.

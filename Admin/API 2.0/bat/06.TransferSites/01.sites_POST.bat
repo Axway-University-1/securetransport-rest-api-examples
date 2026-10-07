@@ -11,6 +11,8 @@ REM
 REM Usage:
 REM 01.sites_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The site is attached to an account, which must already exist. This example

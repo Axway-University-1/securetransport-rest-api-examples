@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 02.accounts_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A template account needs a user class. This example uses "VirtClass",

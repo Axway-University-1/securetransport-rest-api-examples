@@ -18,6 +18,8 @@
 #   TO       the folder to move them to, relative to the home folder
 #   PATTERN  a glob for the files to move (default *)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

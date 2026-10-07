@@ -13,6 +13,8 @@
 # Usage:
 # ./16.configurations_database_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The password never comes back.

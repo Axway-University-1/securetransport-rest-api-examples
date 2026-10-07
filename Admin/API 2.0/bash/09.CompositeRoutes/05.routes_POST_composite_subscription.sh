@@ -17,6 +17,8 @@
 # Usage:
 # ./05.routes_POST_composite_subscription.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Run these first:

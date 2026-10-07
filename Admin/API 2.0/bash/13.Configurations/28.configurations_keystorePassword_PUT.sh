@@ -13,6 +13,8 @@
 # Usage:
 # ./28.configurations_keystorePassword_PUT.sh
 #
+# Risk: disruptive - changes the keystore password; cannot be undone without the old one
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - NOT RUN on the shared lab these examples were checked against: it changes

@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 10.servers_name_PUT.bat
 REM
+REM Risk: config - changes a protocol server
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The PUT method replaces the entire object, so all required fields must be included.

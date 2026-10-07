@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM call 01_daemons_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - The script uses basic authentication and filters JSON output using findstr.

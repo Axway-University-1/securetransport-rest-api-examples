@@ -12,6 +12,8 @@
 # Usage:
 # ./01.myself_POST.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This script does not use a cookie jar, so authentication is required for each call.

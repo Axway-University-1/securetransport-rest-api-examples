@@ -17,6 +17,8 @@
 #   TARGET_ROLE  the role the administrators that hold example_role move to.
 #                Without it, a role still held is not deleted.
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It deletes example_role, which 02.administrativeRoles_POST.sh creates. Only

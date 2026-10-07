@@ -16,6 +16,8 @@
 #   HOST  the directory server (default: the SecureTransport server itself)
 #   PORT  its port (default 389)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - An LDAP domain only authenticates users when the server's login settings turn LDAP on

@@ -14,6 +14,8 @@ REM 07.loginRestrictionPolicies_name_DELETE.bat [NAME]
 REM
 REM   NAME  the policy (default example_lrp)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Only delete a policy you added: the business units it was assigned to lose its rules.

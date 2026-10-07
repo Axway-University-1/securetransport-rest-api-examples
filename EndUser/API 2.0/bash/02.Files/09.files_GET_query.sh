@@ -20,6 +20,8 @@
 #            home folder itself)
 #   PATTERN  a glob for the pattern listing (default *.txt)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

@@ -16,6 +16,8 @@
 #   OPERATION_ID  the operation to cancel (default: a new upload of
 #                 cancelled_upload.txt, declared here to be cancelled)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

@@ -15,6 +15,8 @@
 #
 #   NODES  the number of nodes expected (default 1)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The email goes through the server's SMTP settings (the SMTP.Group options).

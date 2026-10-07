@@ -15,6 +15,8 @@
 #   ID  the transfer's id, as 01.logs_transfers_GET.sh lists it under id.urlrepresentation
 #       (default: the newest transfer in the log)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The id is the urlrepresentation of the transfer's id object: Base64 of "Id

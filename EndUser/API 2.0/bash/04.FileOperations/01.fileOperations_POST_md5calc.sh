@@ -18,6 +18,8 @@
 #   FILE        the file on the server, relative to the home folder
 #   LOCAL_COPY  a local file to compare the checksum with (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

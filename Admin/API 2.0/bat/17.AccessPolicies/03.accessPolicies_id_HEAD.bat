@@ -16,6 +16,8 @@ REM
 REM   ID  the rule's id, its line in pg_hba.conf (default: the rule
 REM       02.accessPolicies_POST.bat adds, looked up now)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Only for a server on the embedded PostgreSQL database.

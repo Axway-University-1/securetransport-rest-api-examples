@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 09.routes_POST_composite.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Needs the ids saved by 06.routes_POST_template.bat, 07.routes_POST_simple.bat
 REM   and 08.subscriptions_POST.bat.

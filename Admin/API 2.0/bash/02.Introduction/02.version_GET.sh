@@ -13,6 +13,8 @@
 # Usage:
 # ./02.version_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This script demonstrates how to parse and filter JSON responses using grep.

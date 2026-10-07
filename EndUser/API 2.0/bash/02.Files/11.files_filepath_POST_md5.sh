@@ -21,6 +21,8 @@
 #                  the home folder). It must exist: see 02.files_name_POST_folder.sh.
 #   TRANSFER_MODE  BINARY (default) or ASCII
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

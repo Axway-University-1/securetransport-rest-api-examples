@@ -16,6 +16,8 @@
 #   HOURS       block for this many hours; leave out to block for good
 #   NOTE        why (optional)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - 03.deniedUsers_name_DELETE.sh removes the name again.

@@ -13,6 +13,8 @@
 # Usage:
 # ./09.configurations_logging_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Each logging option belongs to a configuration profile; profileId says which.

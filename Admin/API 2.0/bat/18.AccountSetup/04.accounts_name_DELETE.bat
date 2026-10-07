@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 04.accounts_name_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: deleting the account also deletes its transfer sites

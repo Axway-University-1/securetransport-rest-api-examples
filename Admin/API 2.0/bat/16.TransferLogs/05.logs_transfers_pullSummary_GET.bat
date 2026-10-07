@@ -16,6 +16,8 @@ REM
 REM   OPERATION_INDEX  the pull's index, from the link in the 202 answer of
 REM                    15.Transfers/01.transfers_operations_POST_pull.bat (operationIndex=...)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The summary counts the files the pull found, not the pull itself: a pull that found nothing,

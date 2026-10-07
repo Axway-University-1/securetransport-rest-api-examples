@@ -14,6 +14,8 @@
 #
 #   LOGIN_NAME  the name to unblock (default example_denied)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This unblocks a login name: only remove the ones you added. The list also

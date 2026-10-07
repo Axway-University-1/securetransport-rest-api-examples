@@ -12,6 +12,8 @@
 # Usage:
 # ./24.configurations_maintenance_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - 25.configurations_maintenance_operations_POST.sh turns it on and off.

@@ -25,6 +25,8 @@
 # Usage:
 # ./07.routes_POST_simple.sh
 #
+# Risk: write
+#
 # Notes:
 # - Requires `jq`, which builds the JSON bodies.
 # - A site is addressed as <site>#!#CVD#!# in transferSiteExpression - CVD is

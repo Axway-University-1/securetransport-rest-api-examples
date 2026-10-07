@@ -19,6 +19,8 @@ REM   REGION    its region (default us-east-1)
 REM   ENDPOINT  an S3-compatible service's address, for example
 REM             http://s3.example.com:9000 (default: AWS itself)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - S3_ACCESS_KEY and S3_SECRET_KEY are read from the environment; leave them

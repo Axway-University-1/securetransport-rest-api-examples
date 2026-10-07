@@ -17,6 +17,8 @@ REM
 REM   SECONDS  the new readTimeout
 REM   NAME  the external store (default example_vault)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Changing a store clears the secrets the server cached from it.

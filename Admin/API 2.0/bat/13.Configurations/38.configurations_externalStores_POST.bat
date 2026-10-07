@@ -16,6 +16,8 @@ REM
 REM   VAULT_URL  the Vault, for example https://vault.example.com:8200
 REM   MOUNT      the KV secrets engine's path (default secret)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The store is example_vault.

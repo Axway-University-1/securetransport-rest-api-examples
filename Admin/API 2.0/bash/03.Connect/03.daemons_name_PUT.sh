@@ -13,6 +13,8 @@
 # Usage:
 # ./03.daemons_name_PUT.sh
 #
+# Risk: config - changes the SSH daemon
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The script uses basic authentication and sends JSON payloads via PUT requests.

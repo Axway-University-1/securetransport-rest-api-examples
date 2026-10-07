@@ -16,6 +16,8 @@
 #   MINUTES    how far back, in whole minutes (default 60)
 #   COMPONENT  one component, for example FTPD (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the same endpoint answers text/csv when asked, with a header row: Time,

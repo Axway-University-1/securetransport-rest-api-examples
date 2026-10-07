@@ -13,6 +13,8 @@
 # Usage:
 # ./18.configurations_sentinel_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - eventStates lists each transfer state: true reports it, false does not,

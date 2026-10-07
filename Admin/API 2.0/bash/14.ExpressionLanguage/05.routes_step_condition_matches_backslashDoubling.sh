@@ -42,6 +42,8 @@
 # Usage:
 # ./05.routes_step_condition_matches_backslashDoubling.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: a route with the four
 #   backslash form stores a condition value containing exactly two backslash

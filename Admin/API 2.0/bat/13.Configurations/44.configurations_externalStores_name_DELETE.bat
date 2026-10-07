@@ -14,6 +14,8 @@ REM 44.configurations_externalStores_name_DELETE.bat [NAME]
 REM
 REM   NAME  the external store (default example_vault)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Anything that fetches its secrets from the store stops working: only ever

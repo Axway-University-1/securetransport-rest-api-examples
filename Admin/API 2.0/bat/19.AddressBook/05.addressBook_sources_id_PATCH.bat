@@ -18,6 +18,8 @@ REM
 REM   MAX_PAGE_ENTRIES  the new page size
 REM   SOURCE            the source's name (default LDAP)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the value before the change, to put it back with.

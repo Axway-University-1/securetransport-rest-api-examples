@@ -13,6 +13,8 @@ REM 07.ldapDomains_name_DELETE.bat [NAME]
 REM
 REM   NAME  the domain (default example_ldap)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Only delete a domain you added: users that sign in through it can no longer do so.

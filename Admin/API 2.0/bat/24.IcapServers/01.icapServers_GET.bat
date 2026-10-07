@@ -20,6 +20,8 @@ REM
 REM   NAME  list the server with exactly this name (optional)
 REM   TYPE  only the servers of this type: INCOMING, OUTGOING or BOTH (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - An ICAP server scans transfers only for the business units that list it in

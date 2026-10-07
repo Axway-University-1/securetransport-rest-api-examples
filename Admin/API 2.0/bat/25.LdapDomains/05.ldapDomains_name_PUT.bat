@@ -15,6 +15,8 @@ REM
 REM   NAME         the domain (default example_ldap)
 REM   DESCRIPTION  the new description (default "Replaced by 05.ldapDomains_name_PUT.bat")
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the description before, to put back with.

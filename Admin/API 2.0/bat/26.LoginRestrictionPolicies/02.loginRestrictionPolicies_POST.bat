@@ -17,6 +17,8 @@ REM   TYPE         ALLOW_THEN_DENY or DENY_THEN_ALLOW (default ALLOW_THEN_DENY):
 REM                rules is evaluated first
 REM   DESCRIPTION  optional
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A policy that is not assigned to a business unit and is not the default has no

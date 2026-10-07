@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 12.files_GET_result.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Run it after 11.transfers_pull_POST.bat.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.

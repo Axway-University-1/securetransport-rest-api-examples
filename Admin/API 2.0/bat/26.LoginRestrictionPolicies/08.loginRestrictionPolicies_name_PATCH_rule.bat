@@ -16,6 +16,8 @@ REM   NAME       the policy (default example_lrp)
 REM   RULE_NAME  the rule (default "example rule")
 REM   ACTION     enable, disable or remove (default disable)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A rule is addressed by its position in the rules list, which changes as rules are added

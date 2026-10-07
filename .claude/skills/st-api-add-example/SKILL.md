@@ -67,6 +67,8 @@ checked.
 # Usage:
 # ./02.accounts_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Requires `jq`, which is used to edit the retrieved JSON.
@@ -75,6 +77,21 @@ checked.
 ```
 
 In a `.bat` the same block uses `REM` instead of `#`.
+
+The **Risk** line says how much the example can change on the server, so that
+a reader (and the trainer kit, through `tools/list_examples.py`) can tell what
+is safe to run. One of:
+
+| Level | Meaning |
+| ----- | ------- |
+| `read` | changes nothing: GET, HEAD, a login or logout, a connection test |
+| `write` | creates, changes or deletes objects: accounts, sites, routes, policies |
+| `config` | changes a server-wide setting; put it back afterwards |
+| `disruptive` | stops a service, or cannot easily be undone: a demonstration only |
+
+Add the reason after a dash when it is not obvious from the name:
+`# Risk: disruptive - stops and starts daemons`. The bat twin carries the same
+line; `tests/checks/check_risk_headers.py` checks both.
 
 The **Notes** section is where the value is. Put in it what the reader cannot
 see from the code: prerequisites ("run 08.RouteTemplates first"), things the
@@ -179,6 +196,7 @@ hand to someone else.
 - [ ] python compiles: `python3 -m py_compile`
 - [ ] the bat twin exists and behaves the same
 - [ ] the `Script Name:` header matches the filename
+- [ ] the `Risk:` line is there, the same in both twins
 - [ ] no server address, hostname, credential, customer name or internal IP
       anywhere in the file — placeholders are `<SERVER>` and
       `<BASE64_ENCODED_USERNAME_COLON_PASSWORD>`

@@ -20,6 +20,8 @@
 # Usage:
 # ./02.routes_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The route template must already exist. Run 08.RouteTemplates first.

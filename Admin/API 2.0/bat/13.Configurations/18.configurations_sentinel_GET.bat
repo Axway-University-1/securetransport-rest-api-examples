@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 18.configurations_sentinel_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - eventStates lists each transfer state: true reports it, false does not,

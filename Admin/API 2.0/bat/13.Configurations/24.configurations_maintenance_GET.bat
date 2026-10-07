@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 24.configurations_maintenance_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - 25.configurations_maintenance_operations_POST.bat turns it on and off.

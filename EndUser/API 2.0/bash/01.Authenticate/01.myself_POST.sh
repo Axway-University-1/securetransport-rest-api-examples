@@ -15,6 +15,8 @@
 # Usage:
 # ./01.myself_POST.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The cookie jar is written next to the examples as myCookie.jar, and the

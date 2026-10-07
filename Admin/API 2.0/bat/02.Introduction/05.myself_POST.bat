@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM call 05_myself_POST.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - For complete documentation, refer to folder 01.Authentication.
 REM - Ensure that set_variables.bat is called beforehand to set required variables.

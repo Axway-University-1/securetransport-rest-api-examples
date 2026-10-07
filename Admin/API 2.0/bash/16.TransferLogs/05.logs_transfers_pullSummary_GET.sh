@@ -16,6 +16,8 @@
 #   OPERATION_INDEX  the pull's index, from the link in the 202 answer of
 #                    15.Transfers/01.transfers_operations_POST_pull.sh (operationIndex=...)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The summary counts the files the pull found, not the pull itself: a pull that found nothing,

@@ -16,6 +16,8 @@ REM
 REM   NAME          the certificate's name (default example_cert)
 REM   ACCESS_LEVEL  PRIVATE, PUBLIC or BUSINESS_UNIT (default PUBLIC)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The certificate is looked up by name, and must be the only one with that name.

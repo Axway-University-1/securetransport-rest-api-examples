@@ -19,6 +19,8 @@
 # Usage:
 # ./06.accounts_name_PATCH.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The add operation is best suited for arrays. You can use it to add a new

@@ -19,6 +19,8 @@ REM
 REM Usage:
 REM 03.subscriptions_POST_triggerfile.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Run 02.subscriptions_POST.bat first. It creates the application and the

@@ -14,6 +14,8 @@ REM 03.events_operations_POST_delete.bat EVENT_ID [EVENT_ID...]
 REM
 REM   EVENT_ID  the events to delete: required, as 01.events_GET.bat shows them
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Delete only events you know are stuck: it ends the server's tracking of the

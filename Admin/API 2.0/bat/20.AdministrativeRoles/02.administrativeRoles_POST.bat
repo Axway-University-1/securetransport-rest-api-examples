@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 02.administrativeRoles_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The role is example_role, a limited role with the Change Password menu only.

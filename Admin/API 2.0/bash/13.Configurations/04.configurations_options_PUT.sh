@@ -17,6 +17,8 @@
 #               AddressBook.Limit.DefaultDisplayEntries=10 and
 #               AddressBook.Limit.MaxDisplayEntries=100, their usual values)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A configuration applies to the whole server: every account and every user.

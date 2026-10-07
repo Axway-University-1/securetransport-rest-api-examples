@@ -20,6 +20,8 @@
 #   ACCOUNT_PATTERN  an account name, * matches anything (default *)
 #   STATUS           only the events with this status, for example active (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The list is usually empty: an event lives only while a file is being processed.

@@ -17,6 +17,8 @@
 # Usage:
 # ./01.addressBook_sources_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - type is LOCAL, LDAP or CUSTOM. name and parentGroup filter too.

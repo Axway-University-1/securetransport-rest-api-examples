@@ -14,6 +14,8 @@
 #
 #   DAYS  delete archived files older than this many days
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the value before, to put back with.

@@ -16,6 +16,8 @@
 # Usage:
 # ./02.subscriptions_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The account "john" and its site SSH_PULL must already exist. Run

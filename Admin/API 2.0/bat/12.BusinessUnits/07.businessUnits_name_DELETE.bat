@@ -14,6 +14,8 @@ REM 07.businessUnits_name_DELETE.bat NAME
 REM
 REM   NAME  the business unit. There is no default: name the one to delete.
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the server refuses, 400, to delete a unit that still has

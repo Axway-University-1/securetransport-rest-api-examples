@@ -17,6 +17,8 @@ REM
 REM Usage:
 REM 01.addressBook_sources_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - type is LOCAL, LDAP or CUSTOM. name and parentGroup filter too.

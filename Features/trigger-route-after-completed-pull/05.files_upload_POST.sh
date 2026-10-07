@@ -16,6 +16,8 @@
 # Usage:
 # ./05.files_upload_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run 04.files_POST_folders first, so the folder exists.
 # - Needs settings.local.sh with AR_ACCOUNT_PASSWORD. See settings.sh.

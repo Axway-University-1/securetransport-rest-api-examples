@@ -16,6 +16,8 @@ REM
 REM   NAME         the policy (default example_lrp)
 REM   DESCRIPTION  the new description (default "Replaced by 05.loginRestrictionPolicies_name_PUT.bat")
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the description before, to put back with.

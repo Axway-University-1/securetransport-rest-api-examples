@@ -16,6 +16,8 @@
 #
 #   MAX_MB  the largest file archived, in MB
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the value before, to put back with.

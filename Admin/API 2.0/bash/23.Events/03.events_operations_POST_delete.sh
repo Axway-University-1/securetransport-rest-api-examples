@@ -14,6 +14,8 @@
 #
 #   EVENT_ID  the events to delete: required, as 01.events_GET.sh shows them
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Delete only events you know are stuck: it ends the server's tracking of the

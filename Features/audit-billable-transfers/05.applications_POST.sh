@@ -13,6 +13,8 @@
 # Usage:
 # ./05.applications_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Requires `jq`, which builds the JSON body.
 # ==============================================================================

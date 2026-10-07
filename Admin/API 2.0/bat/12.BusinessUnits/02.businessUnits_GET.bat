@@ -18,6 +18,8 @@ REM
 REM   PATTERN  a name, * matches anything (default *)
 REM   PARENT   list the units nested under this one (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: baseFolder= is ignored, every value gives every unit.

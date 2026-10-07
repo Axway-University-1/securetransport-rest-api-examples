@@ -14,6 +14,8 @@
 # Usage:
 # ./03.myself_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The script uses basic authentication and filters JSON output using grep.

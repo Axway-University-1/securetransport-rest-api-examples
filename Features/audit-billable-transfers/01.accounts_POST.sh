@@ -17,6 +17,8 @@
 # Usage:
 # ./01.accounts_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, which builds the JSON body.

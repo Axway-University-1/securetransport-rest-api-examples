@@ -17,6 +17,8 @@
 #
 #   ROLE  the role to list the administrators of (default Master Administrator)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Many more filters exist: parent, isLimited, localAuthentication,

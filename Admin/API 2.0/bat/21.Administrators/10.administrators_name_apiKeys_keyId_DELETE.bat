@@ -15,6 +15,8 @@ REM 10.administrators_name_apiKeys_keyId_DELETE.bat [KEY_ID]
 REM
 REM   KEY_ID  the key to revoke (default: every key of example_admin)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The administrator is example_admin, which 02.administrators_POST.bat creates.

@@ -13,6 +13,8 @@
 # Usage:
 # ./02.routes_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The names must be unique, as ST rejects a duplicate route template name.

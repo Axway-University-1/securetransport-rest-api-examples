@@ -14,6 +14,8 @@
 # Usage:
 # ./12.servers_name_DELETE.sh
 #
+# Risk: config - removes a protocol server
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The server name must be valid and exist in the system.

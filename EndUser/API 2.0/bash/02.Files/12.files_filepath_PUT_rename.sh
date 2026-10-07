@@ -16,6 +16,8 @@
 #   FROM  the file or folder, relative to the home folder
 #   TO    its new path, relative to the home folder. A different folder moves it.
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

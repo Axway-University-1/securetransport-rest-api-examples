@@ -14,6 +14,8 @@
 # Usage:
 # ./03.sites_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This example uses the account "john". 02.sites_POST_ssh.sh creates two SSH

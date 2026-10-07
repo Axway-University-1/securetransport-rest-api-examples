@@ -13,6 +13,8 @@
 # Usage:
 # ./08.servers_name_HEAD.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - HEAD requests are efficient for existence checks without retrieving full content.

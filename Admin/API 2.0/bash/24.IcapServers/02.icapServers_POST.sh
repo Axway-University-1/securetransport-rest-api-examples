@@ -17,6 +17,8 @@
 #   URL   icap://host:port/service (default icap://icap.example.com:1344/AVSCAN)
 #   TYPE  INCOMING, OUTGOING or BOTH: which transfers it scans (default INCOMING)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - An ICAP server scans transfers only for the business units that list it in

@@ -15,6 +15,8 @@ REM 05.configurations_options_name_HEAD.bat [NAME]
 REM
 REM   NAME  the option (default AddressBook.Enabled)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM ==============================================================================

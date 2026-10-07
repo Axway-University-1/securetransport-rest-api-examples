@@ -13,6 +13,8 @@
 # Usage:
 # ./04.daemons_name_PATCH.sh
 #
+# Risk: config - changes the SSH daemon
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The script uses JSON Patch format and basic authentication.

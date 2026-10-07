@@ -17,6 +17,8 @@
 #   AUTH_METHOD  the rule's new authentication method (default scram-sha-256):
 #                trust, reject, scram-sha-256, md5 or password
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Only for a server on the embedded PostgreSQL database.

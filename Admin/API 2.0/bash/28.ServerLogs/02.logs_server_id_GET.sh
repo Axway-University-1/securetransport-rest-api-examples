@@ -15,6 +15,8 @@
 #   ID  the entry's id, as 01.logs_server_GET.sh could show it under id.urlrepresentation
 #       (default: the newest entry)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The id is the urlrepresentation of the id object: Base64 of "Id [mConfigurationId=...,

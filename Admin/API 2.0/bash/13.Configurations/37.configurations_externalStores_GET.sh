@@ -15,6 +15,8 @@
 #
 #   NAME  list only the store with this exact name
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: a name pattern ending in *, such as example*, answers

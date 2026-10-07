@@ -20,6 +20,8 @@
 #              as *.example.com, or * for any (default client.example.com, a name reserved for examples)
 #   CONDITION  an Expression Language condition, for example ${currentSessions <= 3} (optional)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A policy that is not assigned to a business unit and is not the default has no

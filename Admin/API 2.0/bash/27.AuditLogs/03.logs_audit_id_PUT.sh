@@ -15,6 +15,8 @@
 #   ID           the entry's id (see 01.logs_audit_GET.sh, 02.logs_audit_id_GET.sh)
 #   DESCRIPTION  the text to try (default "Changed by 03.logs_audit_id_PUT.sh")
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the server ANSWERS 204, as for a change, but the description stays what

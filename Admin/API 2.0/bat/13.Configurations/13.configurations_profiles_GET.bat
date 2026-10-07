@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 13.configurations_profiles_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - node is the server or edge the profile applies to; protocol is null for the

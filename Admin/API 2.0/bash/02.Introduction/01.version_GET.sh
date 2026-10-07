@@ -13,6 +13,8 @@
 # Usage:
 # ./01.version_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This script uses basic authentication and will be updated to token-based

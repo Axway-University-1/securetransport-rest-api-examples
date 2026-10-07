@@ -13,6 +13,8 @@
 #
 #   NAME  the domain (default example_ldap)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Only delete a domain you added: users that sign in through it can no longer do so.

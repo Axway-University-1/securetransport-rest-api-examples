@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 07.routes_POST_simple.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Uses PowerShell to build the JSON body.
 REM - Run 03.sites_POST_push.bat first: the step names the push site.

@@ -16,6 +16,8 @@
 # Usage:
 # ./03.accounts_name_HEAD.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - HEAD returns the headers only, which makes it a cheap existence check.

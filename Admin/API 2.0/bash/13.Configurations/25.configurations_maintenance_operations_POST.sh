@@ -13,6 +13,8 @@
 # Usage:
 # ./25.configurations_maintenance_operations_POST.sh start|stop
 #
+# Risk: disruptive - puts the whole server in maintenance mode
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - NOT RUN on the shared lab these examples were checked against: it changes

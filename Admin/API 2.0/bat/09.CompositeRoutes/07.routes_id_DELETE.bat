@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 07.routes_id_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - This cleans up the routes 02 to 05 in this folder create for the account

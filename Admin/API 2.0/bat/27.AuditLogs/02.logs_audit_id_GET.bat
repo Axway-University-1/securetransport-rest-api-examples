@@ -14,6 +14,8 @@ REM 02.logs_audit_id_GET.bat [ID]
 REM
 REM   ID  the entry's id (default: the newest entry)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The id is a plain string, unlike the composite ids of the transfer and server logs.

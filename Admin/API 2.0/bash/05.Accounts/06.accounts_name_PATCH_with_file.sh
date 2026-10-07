@@ -17,6 +17,8 @@
 # Usage:
 # ./06.accounts_name_PATCH_with_file.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The 06.patch_body folder holds one file per example change. Point

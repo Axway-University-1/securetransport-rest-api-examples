@@ -15,6 +15,8 @@
 # ./00.run_all.sh              run steps 01 to 13 and leave everything in place
 # ./00.run_all.sh --cleanup    the same, then run 99.cleanup_DELETE.sh at the end
 #
+# Risk: write
+#
 # Notes:
 # - It stops at the first step that fails: a non-zero exit, or a line starting
 #   HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing is cleaned up,

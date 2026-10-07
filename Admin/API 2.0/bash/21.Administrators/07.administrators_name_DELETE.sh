@@ -12,6 +12,8 @@
 # Usage:
 # ./07.administrators_name_DELETE.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It deletes example_admin, which 02.administrators_POST.sh creates. Only ever

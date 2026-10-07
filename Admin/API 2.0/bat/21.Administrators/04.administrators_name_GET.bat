@@ -15,6 +15,8 @@ REM 04.administrators_name_GET.bat [ADMIN]
 REM
 REM   ADMIN  the login name (default example_admin)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The password itself never comes back: password is empty.

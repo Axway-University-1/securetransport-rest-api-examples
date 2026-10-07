@@ -24,6 +24,8 @@
 # Usage:
 # ./03.routes_step_fileFilterExpression_glob.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: fileFilterExpressionType only
 #   accepts GLOB, REGEXP or TEXT_FILES - not "REGEX", which would be a

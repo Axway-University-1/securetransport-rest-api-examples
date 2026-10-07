@@ -13,6 +13,8 @@
 #
 #   NAME  the server (default example_icap)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the delete succeeds even when business units still list the

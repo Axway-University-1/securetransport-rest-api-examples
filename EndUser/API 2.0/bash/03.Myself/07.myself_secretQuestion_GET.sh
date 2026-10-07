@@ -18,6 +18,8 @@
 #   TOKEN  the security token from a password reset email. Without it, the
 #          logged-in user's own question is read.
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Without a token, a session must already exist. Run

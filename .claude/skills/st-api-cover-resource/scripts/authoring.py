@@ -5,7 +5,7 @@ bat twin with its header derived from the bash one, so the two never disagree.
     from authoring import write_sh, write_bat
     write_sh("22.DeniedUsers", "01.deniedUsers_GET.sh",
              description=["This script lists ... using the", "`/deniedUsers` endpoint."],
-             usage=["./01.deniedUsers_GET.sh"],
+             usage=["./01.deniedUsers_GET.sh"], risk="read",
              notes=["- Requires `jq`, which prints one name per line."],
              body=r'''
     curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}" ...
@@ -34,13 +34,20 @@ def _who():
     return author, os.environ.get("ST_LOCATION", "Sofia"), datetime.date.today().isoformat()
 
 
-def write_sh(folder, name, description, usage, notes, body, main_url=None, root=BASH):
-    """description, usage, notes: lists of lines without the leading '# '."""
+RISKS = ("read", "write", "config", "disruptive")
+
+
+def write_sh(folder, name, description, usage, notes, body, main_url=None, root=BASH, risk=None):
+    """description, usage, notes: lists of lines without the leading '# '.
+    risk: "read", "write", "config" or "disruptive", optionally followed by " - why"."""
+    if not risk or risk.split(" - ")[0] not in RISKS:
+        raise ValueError("risk must be one of %s, optionally followed by ' - why': got %r" % (", ".join(RISKS), risk))
     author, location, created = _who()
     lines = ["#!/bin/bash", "# " + RULE, "# Script Name: " + name, "# Author: " + author,
              "# Created: " + created, "# Location: " + location, "# " + RULE, "# Description:"]
     lines += [("# " + line).rstrip() for line in description]
     lines += ["#", "# Usage:"] + [("# " + line).rstrip() for line in usage]
+    lines += ["#", "# Risk: " + risk]
     lines += ["#", "# Notes:", "# - Ensure that `set_variables.sh` is correctly configured and sourced."]
     lines += [("# " + line).rstrip() for line in notes]
     lines += ["# " + RULE, "",

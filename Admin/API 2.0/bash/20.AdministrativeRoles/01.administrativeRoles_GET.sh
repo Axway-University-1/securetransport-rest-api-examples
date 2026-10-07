@@ -16,6 +16,8 @@
 # Usage:
 # ./01.administrativeRoles_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - roleName, isLimited, isBounceAllowed and menus filter too.

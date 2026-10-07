@@ -13,6 +13,8 @@
 # Usage:
 # ./01.myself_cookie_POST.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The cookie jar file will store session data for reuse.

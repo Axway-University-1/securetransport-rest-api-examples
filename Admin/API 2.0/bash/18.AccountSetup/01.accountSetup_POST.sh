@@ -13,6 +13,8 @@
 # Usage:
 # ./01.accountSetup_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The account is example_setup, with an SSH site named example_setup_site.

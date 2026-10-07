@@ -14,6 +14,8 @@ REM 31.configurations_fileArchiving_PATCH.bat DAYS
 REM
 REM   DAYS  delete archived files older than this many days
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the value before, to put back with.

@@ -14,6 +14,8 @@
 # Usage:
 # ./09.servers_name_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The `fields` parameter must be used in combination with `protocol`.

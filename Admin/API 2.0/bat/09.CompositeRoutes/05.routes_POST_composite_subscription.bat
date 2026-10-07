@@ -17,6 +17,8 @@ REM
 REM Usage:
 REM 05.routes_POST_composite_subscription.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Run these first:

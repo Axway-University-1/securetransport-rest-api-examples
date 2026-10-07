@@ -16,6 +16,8 @@
 #   QUESTION  one of the questions 06.secretQuestions_GET.sh lists
 #   ANSWER    its answer
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

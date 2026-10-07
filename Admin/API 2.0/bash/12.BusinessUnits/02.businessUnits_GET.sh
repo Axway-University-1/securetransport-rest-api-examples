@@ -18,6 +18,8 @@
 #   PATTERN  a name, * matches anything (default *)
 #   PARENT   list the units nested under this one (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: baseFolder= is ignored, every value gives every unit.

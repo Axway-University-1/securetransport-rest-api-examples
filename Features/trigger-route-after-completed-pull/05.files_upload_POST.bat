@@ -16,6 +16,8 @@ REM
 REM Usage:
 REM 05.files_upload_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Run 04.files_POST_folders first, so the folder exists.
 REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.

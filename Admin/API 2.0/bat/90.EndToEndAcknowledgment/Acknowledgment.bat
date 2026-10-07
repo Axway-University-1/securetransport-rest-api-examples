@@ -1,6 +1,7 @@
 @echo off
 REM Script Name: Acknowledgment.bat
 REM Description: This script sends ACK/NACK for PeSIT transfers based on the provided CORE_ID.
+REM Risk: write
 REM Author: Plamen Milenkov
 REM Version: 1.0.0
 REM Date: 2025-08-DD

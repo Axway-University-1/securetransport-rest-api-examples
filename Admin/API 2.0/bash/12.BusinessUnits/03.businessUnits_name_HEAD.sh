@@ -16,6 +16,8 @@
 #   NAME  the business unit (default Finance, which 01.businessUnits_POST.sh
 #         creates)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Requires `jq`, which URL-encodes the name.

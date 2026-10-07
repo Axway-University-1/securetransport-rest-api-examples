@@ -180,18 +180,18 @@ Every script resolves its own directory, so it runs from anywhere:
 ## What is not covered
 
 The Admin examples are being added resource by resource, in the order of the
-API reference; through configurations it is done (cluster services, and the
-cluster-only configuration operations, are left out: they need a cluster). Not yet in
-bash or bat: transfer operations other than a pull, sessions, events and
-statistics summary; transfer profiles and route step charsets or metadata; site
-templates, user classes; cluster services, ICAP servers, LDAP domains, zones;
-mail templates.
+API reference; through the logs it is done (cluster services, and the
+cluster-only configuration operations, are left out: they need a cluster). Not
+yet in bash or bat: mail templates, sessions, statistics summary, zones;
+transfer profiles and route step charsets or metadata; site templates, user
+classes; the transaction manager. `.claude/skills/st-api-cover-resource` keeps
+the exact list.
 
 Changing routes and subscriptions that already exist, and the transaction
 manager, are covered by the **python** examples but not yet by bash or bat.
-Login restriction policies and EL route conditions are the exception - both
-are covered in bash too, in `14.ExpressionLanguage` (see the table above),
-alongside the python3 twin of the same folder.
+
+Every example's header says how much it changes, in a `Risk:` line (read,
+write, config, disruptive); `python3 tools/list_examples.py --table` lists them.
 
 ## Exploring the live API
 

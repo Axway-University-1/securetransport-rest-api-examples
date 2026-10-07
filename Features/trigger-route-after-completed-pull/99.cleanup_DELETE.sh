@@ -12,6 +12,8 @@
 # Usage:
 # ./99.cleanup_DELETE.sh
 #
+# Risk: write
+#
 # Notes:
 # - Deletes the objects named in settings.sh, on the account named there. Check
 #   the names before running it.

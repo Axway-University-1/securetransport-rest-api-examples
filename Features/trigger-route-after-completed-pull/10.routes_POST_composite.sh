@@ -13,6 +13,8 @@
 # Usage:
 # ./10.routes_POST_composite.sh
 #
+# Risk: write
+#
 # Notes:
 # - Requires `jq`, which builds the JSON body.
 # - Needs the ids saved by steps 6, 7 and 9.

@@ -18,6 +18,8 @@
 #
 #   ACCOUNT  the account whose transfers to read (default john)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The account is filtered with account=. The endpoint ignores accountName=

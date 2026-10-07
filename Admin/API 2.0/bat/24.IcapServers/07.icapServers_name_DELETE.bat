@@ -13,6 +13,8 @@ REM 07.icapServers_name_DELETE.bat [NAME]
 REM
 REM   NAME  the server (default example_icap)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the delete succeeds even when business units still list the

@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 99.cleanup_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Deletes the objects named in settings.bat, on the account named there. Check
 REM   the names before running it.

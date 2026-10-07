@@ -14,6 +14,8 @@
 #
 #   NAME  the external store (default example_vault)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Anything that fetches its secrets from the store stops working: only ever

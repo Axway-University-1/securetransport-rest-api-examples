@@ -34,6 +34,8 @@ REM Exit Codes:
 REM 0 - Success
 REM 1 - Error (e.g. missing parameters, API failure)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Credentials come from set_variables.bat, which loads set_variables.local.bat.
 REM ==============================================================================

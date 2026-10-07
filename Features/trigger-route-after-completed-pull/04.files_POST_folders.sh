@@ -13,6 +13,8 @@
 # Usage:
 # ./04.files_POST_folders.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run 01.accounts_POST first.
 # - Needs settings.local.sh with AR_ACCOUNT_PASSWORD. See settings.sh.

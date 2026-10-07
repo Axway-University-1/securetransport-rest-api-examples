@@ -15,6 +15,8 @@
 #   NAME  the business unit (default Finance, which 01.businessUnits_POST.sh
 #         creates)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: metadata.links.accounts and .applications are ready made

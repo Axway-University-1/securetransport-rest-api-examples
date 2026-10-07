@@ -19,6 +19,8 @@
 #   ENDPOINT  an S3-compatible service's address, for example
 #             http://s3.example.com:9000 (default: AWS itself)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - S3_ACCESS_KEY and S3_SECRET_KEY are read from the environment; leave them

@@ -19,6 +19,8 @@
 #   VALUE  the new sharedFoldersCollaborationAllowed, true or false (default
 #          true)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the value before, to put it back with. A new unit has null: the

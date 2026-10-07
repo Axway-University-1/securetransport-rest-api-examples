@@ -16,6 +16,8 @@ REM
 REM Usage:
 REM 03.accounts_name_HEAD.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - HEAD returns the headers only, which makes it a cheap existence check.

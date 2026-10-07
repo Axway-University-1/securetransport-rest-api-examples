@@ -16,6 +16,8 @@
 #
 #   DEPTH  the new adminCertificateDepthLimit (default 10)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the value before, to put back with.

@@ -16,6 +16,8 @@ REM
 REM   ACCOUNT  the account to read (default example_setup, which
 REM            01.accountSetup_POST.bat creates)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - With accept: application/json the certificates' properties come back; with

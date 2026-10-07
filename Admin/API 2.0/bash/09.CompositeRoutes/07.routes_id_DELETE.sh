@@ -15,6 +15,8 @@
 # Usage:
 # ./07.routes_id_DELETE.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This cleans up the routes 02 to 05 in this folder create for the account

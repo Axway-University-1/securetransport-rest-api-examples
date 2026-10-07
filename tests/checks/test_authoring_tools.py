@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory() as work:
                             ["./01.widgets_GET.sh [NAME]"],
                             ["- NAME defaults to example_widget, so export it first:",
                              "    export WIDGET_KEY='a key'", "- Requires `jq`, which looks the id up."],
-                            'printf "%s\\n" "${MAIN_URL}"\n', main_url="widgets", root=sh_root)
+                            'printf "%s\\n" "${MAIN_URL}"\n', main_url="widgets", root=sh_root, risk="read")
     text = open(sh).read()
     check("bash: the house header, with the name, author and location",
           text.startswith("#!/bin/bash\n# ====") and "# Script Name: 01.widgets_GET.sh\n# Author: Test Author\n" in text
@@ -59,6 +59,14 @@ with tempfile.TemporaryDirectory() as work:
     check("bash: set_variables sourced from the script's folder, the Referer and MAIN_URL set",
           'source "${SCRIPT_DIR}/../set_variables.sh"' in text and 'REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"' in text
           and 'MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/widgets"' in text)
+    check("bash: the Risk line, between Usage and Notes", "# ./01.widgets_GET.sh [NAME]\n#\n# Risk: read\n#\n# Notes:" in text, text[:700])
+    try:
+        authoring.write_sh("99.Widgets", "02.widgets_POST.sh", ["x"], ["x"], [], "", root=sh_root)
+        refused = False
+    except ValueError:
+        refused = True
+    check("bash: a missing or unknown risk is refused", refused)
+    check("bat: the Risk line goes to the twin", "REM Risk: read\n" in open(authoring.write_bat("99.Widgets", "01.widgets_GET.bat", "", root=bat_root, sh_root=sh_root)).read())
     check("bash: executable, and bash -n passes", os.access(sh, os.X_OK)
           and subprocess.run(["bash", "-n", sh]).returncode == 0)
     bat = authoring.write_bat("99.Widgets", "01.widgets_GET.bat", "echo done\n", main_url="widgets",

@@ -15,6 +15,8 @@ REM 02.certificates_POST_generate.bat [DAYS]
 REM
 REM   DAYS  how many days the certificate is valid (default 365)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It generates example_cert, a local x509 certificate - one the server itself

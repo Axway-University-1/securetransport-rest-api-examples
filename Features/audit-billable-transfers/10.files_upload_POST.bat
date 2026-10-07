@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 10.files_upload_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Run 01.accounts_POST.bat and 04.files_POST_folders.bat first.
 REM - Scenarios 2.1 and 2.2 upload BT_INBOUND_ONLY_COUNT and BT_IN_AND_OUT_COUNT

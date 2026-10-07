@@ -15,6 +15,8 @@
 #
 #   MENU  the menu to add (default File Tracking)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The role is example_role, a limited role with the Change Password menu only.

@@ -13,6 +13,8 @@
 # Usage:
 # ./04.accounts_name_DELETE.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: deleting the account also deletes its transfer sites

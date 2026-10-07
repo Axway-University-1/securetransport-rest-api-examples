@@ -11,6 +11,8 @@
 # Usage:
 # ./01.businessUnits_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The baseFolder is the root under which the accounts of this business unit

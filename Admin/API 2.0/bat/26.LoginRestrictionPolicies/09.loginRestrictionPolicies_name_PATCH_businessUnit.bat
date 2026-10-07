@@ -16,6 +16,8 @@ REM   NAME           the policy
 REM   BUSINESS_UNIT  the business unit
 REM   add|remove     assign it, or take it away (default add)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - NOT confirmed: that a policy assigned to a business unit changes who can log in. On

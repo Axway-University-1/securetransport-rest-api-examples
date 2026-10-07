@@ -12,6 +12,8 @@
 # Usage:
 # ./02.administrativeRoles_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The role is example_role, a limited role with the Change Password menu only.

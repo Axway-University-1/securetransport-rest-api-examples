@@ -15,6 +15,8 @@
 #
 #   ROLE  the role's name (default example_role)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the role carries metadata.links.members, a ready made

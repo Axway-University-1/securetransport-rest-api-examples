@@ -13,6 +13,8 @@
 # Usage:
 # ./06.myself_DELETE.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The cookie jar is used to persist session state across requests.

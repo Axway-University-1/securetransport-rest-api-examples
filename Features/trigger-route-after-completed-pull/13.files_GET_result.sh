@@ -14,6 +14,8 @@
 # Usage:
 # ./13.files_GET_result.sh
 #
+# Risk: read
+#
 # Notes:
 # - Run it after 12.files_PUT_triggerfile.sh. The pull and the route run
 #   asynchronously, so the push can take a few seconds to arrive. The script

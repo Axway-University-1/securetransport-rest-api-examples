@@ -18,6 +18,8 @@
 #   USAGE  private, local, partner, login or trusted (default local)
 #   DAYS   list the ones that expire within this many days (default 30)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: expirationTime.from and .to are in milliseconds since

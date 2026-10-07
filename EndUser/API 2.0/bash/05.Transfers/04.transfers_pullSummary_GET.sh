@@ -16,6 +16,8 @@
 #   OPERATION_INDEX  the operationIndex the pull was started with (see
 #                    03.transfers_operations_POST_pull.sh)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

@@ -16,6 +16,8 @@ REM
 REM Usage:
 REM 01.administrativeRoles_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - roleName, isLimited, isBounceAllowed and menus filter too.

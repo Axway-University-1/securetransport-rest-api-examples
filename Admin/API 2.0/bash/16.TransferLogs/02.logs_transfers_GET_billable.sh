@@ -16,6 +16,8 @@
 #   DAYS     how many days to count, today included (default 7)
 #   ACCOUNT  count only this account's transfers (default: every account)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The account is filtered with account=. The endpoint ignores accountName=

@@ -15,6 +15,8 @@
 # Usage:
 # ./12.files_GET_result.sh
 #
+# Risk: read
+#
 # Notes:
 # - Run it after 11.transfers_pull_POST.sh.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.

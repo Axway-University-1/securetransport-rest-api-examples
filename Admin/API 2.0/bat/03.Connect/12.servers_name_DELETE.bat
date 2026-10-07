@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 12.servers_name_DELETE.bat
 REM
+REM Risk: config - removes a protocol server
+REM
 REM Notes:
 REM - Ensure that `set_variables.bat` is correctly configured and called.
 REM - The server name must be valid and exist in the system.

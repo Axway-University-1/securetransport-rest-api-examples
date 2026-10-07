@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 03.applications_name_HEAD.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Application names with spaces must be URL-encoded.

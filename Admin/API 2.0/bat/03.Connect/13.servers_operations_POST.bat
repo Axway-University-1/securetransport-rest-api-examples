@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 13.servers_operations_POST.bat
 REM
+REM Risk: disruptive - stops and starts protocol servers
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Daemons must be running for certain servers to start successfully.

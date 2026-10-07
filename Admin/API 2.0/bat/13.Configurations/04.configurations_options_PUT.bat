@@ -17,6 +17,8 @@ REM   NAME=VALUE  an option and its new value, one argument each (default:
 REM               AddressBook.Limit.DefaultDisplayEntries=10 and
 REM               AddressBook.Limit.MaxDisplayEntries=100, their usual values)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A configuration applies to the whole server: every account and every user.

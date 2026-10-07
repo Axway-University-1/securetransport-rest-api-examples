@@ -16,6 +16,8 @@ REM 22.configurations_loginSettings_PUT.bat [DEPTH]
 REM
 REM   DEPTH  the new adminCertificateDepthLimit (default 10)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the value before, to put back with.

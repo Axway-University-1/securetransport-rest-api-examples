@@ -15,6 +15,8 @@
 #
 #   ADMIN  the login name (default example_admin)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - 05.administrators_name_PUT.sh unlocks it again.

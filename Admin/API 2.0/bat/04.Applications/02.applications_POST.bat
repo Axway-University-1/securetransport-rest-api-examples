@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 02.applications_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Maintenance applications require specific schema fields.

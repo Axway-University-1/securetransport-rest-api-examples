@@ -18,6 +18,8 @@
 #   DENY_ON_ERROR  true to deny a transfer when the server cannot be reached, false to
 #                  let it go on (optional: left as it is)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - An ICAP server scans transfers only for the business units that list it in

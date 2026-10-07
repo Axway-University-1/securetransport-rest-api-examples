@@ -11,6 +11,8 @@ REM
 REM Usage:
 REM 01.businessUnits_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The baseFolder is the root under which the accounts of this business unit

@@ -16,6 +16,8 @@ REM   NAME         the domain (default example_ldap)
 REM   DESCRIPTION  the new description (default "Patched by 06.ldapDomains_name_PATCH.bat")
 REM   PORT         the new port of the first server (optional: left as it is)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A list is addressed by index: /ldapServers/0/port is the first server.

@@ -32,6 +32,8 @@ REM For example:
 REM files_GET_download.bat subscription/s1/only_inbound.txt 50
 REM files_GET_download.bat btTestAccount/delivered-1/inbound_and_one_outbound.txt 50 partner_to_push_to
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to URL-encode the path.

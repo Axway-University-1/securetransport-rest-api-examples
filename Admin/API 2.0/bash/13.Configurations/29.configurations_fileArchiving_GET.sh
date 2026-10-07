@@ -13,6 +13,8 @@
 # Usage:
 # ./29.configurations_fileArchiving_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The archive can be a folder or an S3 bucket (isS3Storage and the s3*

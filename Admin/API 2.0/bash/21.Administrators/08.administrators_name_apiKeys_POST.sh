@@ -19,6 +19,8 @@
 #                read is GET and HEAD; write is POST, PUT and PATCH; delete is
 #                DELETE.
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The administrator is example_admin, which 02.administrators_POST.sh creates.

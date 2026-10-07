@@ -15,6 +15,8 @@
 # Usage:
 # ./04.accounts_name_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The type is always returned, even when it is not listed in the fields.

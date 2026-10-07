@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 36.configurations_replication_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A server without replication answers enabled false and no subscriptions.

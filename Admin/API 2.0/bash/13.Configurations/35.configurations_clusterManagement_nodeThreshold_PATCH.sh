@@ -14,6 +14,8 @@
 #
 #   whether to send the email (default false)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: a success answers 204, with no body.

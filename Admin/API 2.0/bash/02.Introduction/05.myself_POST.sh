@@ -13,6 +13,8 @@
 # Usage:
 # ./05.myself_POST.sh
 #
+# Risk: read
+#
 # Notes:
 # - For complete documentation, refer to folder 01.Authentication.
 # - Ensure that `set_variables.sh` is correctly configured and sourced.

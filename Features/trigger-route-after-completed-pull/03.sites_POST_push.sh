@@ -13,6 +13,8 @@
 # Usage:
 # ./03.sites_POST_push.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run 01.accounts_POST.sh first.
 # - Needs settings.local.sh with AR_ACCOUNT_PASSWORD. See settings.sh.

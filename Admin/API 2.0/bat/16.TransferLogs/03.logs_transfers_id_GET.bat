@@ -15,6 +15,8 @@ REM
 REM   ID  the transfer's id, as 01.logs_transfers_GET.bat lists it under id.urlrepresentation
 REM       (default: the newest transfer in the log)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The id is the urlrepresentation of the transfer's id object: Base64 of "Id

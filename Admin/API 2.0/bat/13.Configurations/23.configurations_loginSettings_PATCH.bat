@@ -16,6 +16,8 @@ REM
 REM   VALUE  optional, required or requiredForUserClasses (default optional);
 REM          requiredForUserClasses also needs requirePasswordUserClasses
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the value before, to put back with.

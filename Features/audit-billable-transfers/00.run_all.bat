@@ -34,6 +34,8 @@ REM 00.run_all.bat test_account             a test account named test_account
 REM 00.run_all.bat test_account 6 12        and 6 inbound only, 12 in and out
 REM 00.run_all.bat test_account 6 12 --cleanup
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - It stops at the first setup step that fails: a non-zero exit, or a line
 REM   starting HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing

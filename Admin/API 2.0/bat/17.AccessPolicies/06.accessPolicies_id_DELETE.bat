@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 06.accessPolicies_id_DELETE.bat
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Only for a server on the embedded PostgreSQL database.

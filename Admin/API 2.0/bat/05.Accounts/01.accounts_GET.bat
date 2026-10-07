@@ -16,6 +16,8 @@ REM
 REM Usage:
 REM 01.accounts_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The type is always returned, even when it is not listed in the fields.

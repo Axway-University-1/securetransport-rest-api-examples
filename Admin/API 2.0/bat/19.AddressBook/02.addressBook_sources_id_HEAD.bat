@@ -15,6 +15,8 @@ REM 02.addressBook_sources_id_HEAD.bat [SOURCE]
 REM
 REM   SOURCE  the source's name (default LDAP). Its id is looked up by name.
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A source is addressed by its id, not its name.

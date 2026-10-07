@@ -15,6 +15,8 @@ REM
 REM   OUTPUT  the file to write (default audit_log.csv)
 REM   HOURS   how far back, in whole hours (default 24)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the same endpoint answers text/csv when asked, with a header row:

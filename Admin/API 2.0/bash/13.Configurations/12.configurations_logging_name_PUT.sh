@@ -18,6 +18,8 @@
 #   PROFILE_ID  its profile (default: the one 09.configurations_logging_GET.sh
 #               lists it with)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Each logging option belongs to a configuration profile; profileId says which, and is required.

@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM call 02_daemons_name_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - Requires curl and PowerShell.

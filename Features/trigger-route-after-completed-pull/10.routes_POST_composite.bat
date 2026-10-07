@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 10.routes_POST_composite.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Uses PowerShell to build the JSON body.
 REM - Needs the ids saved by steps 6, 7 and 9.

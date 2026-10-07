@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 16.configurations_database_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The password never comes back.

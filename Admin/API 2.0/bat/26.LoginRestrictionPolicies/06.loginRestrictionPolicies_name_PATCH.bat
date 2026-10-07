@@ -20,6 +20,8 @@ REM   ADDRESS    an IPv4 or IPv6 address, a network in CIDR notation, a host nam
 REM              as *.example.com, or * for any (default client.example.com, a name reserved for examples)
 REM   CONDITION  an Expression Language condition, for example ${currentSessions <= 3} (optional)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A policy that is not assigned to a business unit and is not the default has no

@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM call 04_myself_PATCH.bat
 REM
+REM Risk: config - changes the password of the administrator every example logs in as
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - Be cautious when executing this script, as it will change your password.

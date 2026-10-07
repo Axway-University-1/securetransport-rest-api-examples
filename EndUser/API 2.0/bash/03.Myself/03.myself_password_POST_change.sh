@@ -15,6 +15,8 @@
 # Usage:
 # ./03.myself_password_POST_change.sh NEW_PASSWORD
 #
+# Risk: write - changes the password of the end user it logs in as
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

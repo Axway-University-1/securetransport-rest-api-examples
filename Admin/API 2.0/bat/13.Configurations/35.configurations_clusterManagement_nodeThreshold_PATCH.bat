@@ -14,6 +14,8 @@ REM 35.configurations_clusterManagement_nodeThreshold_PATCH.bat [true|false]
 REM
 REM   whether to send the email (default false)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: a success answers 204, with no body.

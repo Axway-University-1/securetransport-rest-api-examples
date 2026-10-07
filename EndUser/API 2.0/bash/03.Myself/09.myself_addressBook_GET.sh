@@ -17,6 +17,8 @@
 #   SEARCH  what to look for, for example jo* (default: everything)
 #   LIMIT   how many entries to return (default 20)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 05.applications_name_PUT.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - PUT replaces the entire object, so all required fields must be preserved.

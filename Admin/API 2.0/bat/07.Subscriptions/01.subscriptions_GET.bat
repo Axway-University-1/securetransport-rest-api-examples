@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 01.subscriptions_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - This example uses the account "john". 02.subscriptions_POST.bat and

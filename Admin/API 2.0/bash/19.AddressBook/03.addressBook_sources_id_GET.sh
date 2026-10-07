@@ -15,6 +15,8 @@
 #
 #   SOURCE  the source's name (default LDAP). Its id is looked up by name.
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Requires `jq`, which reads the id.

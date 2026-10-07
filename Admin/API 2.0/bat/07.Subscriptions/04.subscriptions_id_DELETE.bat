@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 04.subscriptions_id_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - This cleans up what 02.subscriptions_POST.bat and

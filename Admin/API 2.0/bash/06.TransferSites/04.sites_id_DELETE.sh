@@ -14,6 +14,8 @@
 # Usage:
 # ./04.sites_id_DELETE.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This cleans up the two sites 02.sites_POST_ssh.sh creates for the account

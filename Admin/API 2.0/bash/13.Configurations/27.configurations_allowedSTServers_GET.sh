@@ -12,6 +12,8 @@
 # Usage:
 # ./27.configurations_allowedSTServers_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: a standalone server answers 404 here; the list belongs

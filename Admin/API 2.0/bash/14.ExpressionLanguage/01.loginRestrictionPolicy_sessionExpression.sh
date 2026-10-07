@@ -25,6 +25,8 @@
 # Usage:
 # ./01.loginRestrictionPolicy_sessionExpression.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: POST /loginRestrictionPolicies
 #   requires "type" (ALLOW_THEN_DENY or DENY_THEN_ALLOW) and a policy starts

@@ -15,6 +15,8 @@ REM 05.administrators_name_PUT.bat [ADMIN]
 REM
 REM   ADMIN  the login name (default example_admin)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - 06.administrators_name_PATCH.bat locks it; this unlocks it.

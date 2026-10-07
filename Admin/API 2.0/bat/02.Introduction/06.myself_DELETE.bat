@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM call 06_myself_DELETE.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - The cookie jar is used to persist session state across requests.

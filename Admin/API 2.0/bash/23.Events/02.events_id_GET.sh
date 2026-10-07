@@ -14,6 +14,8 @@
 #
 #   EVENT_ID  the event (default: the first one 01.events_GET.sh lists)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - An event that is not there, or not visible to this administrator, answers 404

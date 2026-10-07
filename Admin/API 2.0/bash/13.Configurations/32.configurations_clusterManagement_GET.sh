@@ -12,6 +12,8 @@
 # Usage:
 # ./32.configurations_clusterManagement_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A standalone server answers isCluster false and no nodes.

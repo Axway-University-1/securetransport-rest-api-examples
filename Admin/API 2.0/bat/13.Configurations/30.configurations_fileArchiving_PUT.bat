@@ -16,6 +16,8 @@ REM 30.configurations_fileArchiving_PUT.bat MAX_MB
 REM
 REM   MAX_MB  the largest file archived, in MB
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the value before, to put back with.

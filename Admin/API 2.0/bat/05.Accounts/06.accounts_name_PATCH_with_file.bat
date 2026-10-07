@@ -17,6 +17,8 @@ REM
 REM Usage:
 REM 06.accounts_name_PATCH_with_file.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The 06.patch_body folder holds one file per example change. Point

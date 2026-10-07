@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 02.administrators_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The administrator is example_admin, with the role example_role: run

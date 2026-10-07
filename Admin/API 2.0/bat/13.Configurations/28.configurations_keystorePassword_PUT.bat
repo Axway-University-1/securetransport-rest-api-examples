@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 28.configurations_keystorePassword_PUT.bat
 REM
+REM Risk: disruptive - changes the keystore password; cannot be undone without the old one
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - NOT RUN on the shared lab these examples were checked against: it changes

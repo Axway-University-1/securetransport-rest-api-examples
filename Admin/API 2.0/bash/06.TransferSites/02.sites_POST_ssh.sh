@@ -16,6 +16,8 @@
 # Usage:
 # ./02.sites_POST_ssh.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The sites are attached to the account "john", which must already exist.

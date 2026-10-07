@@ -16,6 +16,8 @@ REM
 REM   REQUEST_ID  the request's id (default: the one request for
 REM               CN=example_csr,O=Example, which 09 creates)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: a completed request is gone, 404.

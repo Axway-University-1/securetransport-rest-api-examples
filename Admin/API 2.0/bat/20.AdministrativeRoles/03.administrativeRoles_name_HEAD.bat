@@ -15,6 +15,8 @@ REM 03.administrativeRoles_name_HEAD.bat [ROLE]
 REM
 REM   ROLE  the role's name (default example_role)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A role name with spaces is URL-encoded in the path, as here.

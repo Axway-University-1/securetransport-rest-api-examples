@@ -12,6 +12,8 @@
 # Usage:
 # ./02.accessPolicies_POST.sh
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Only for a server on the embedded PostgreSQL database.

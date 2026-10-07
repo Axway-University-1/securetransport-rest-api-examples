@@ -13,6 +13,8 @@
 # Usage:
 # ./47.configurations_storageProfiles_options_PUT_unregister.sh
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The other profiles in the registry stay.

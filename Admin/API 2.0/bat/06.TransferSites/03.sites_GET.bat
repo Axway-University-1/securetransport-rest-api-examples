@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 03.sites_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - This example uses the account "john". 02.sites_POST_ssh.bat creates two SSH

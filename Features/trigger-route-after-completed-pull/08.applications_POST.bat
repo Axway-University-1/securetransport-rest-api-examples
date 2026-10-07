@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 08.applications_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Uses PowerShell to build the JSON body.
 REM - The application is called AR_APPLICATION in settings.bat.

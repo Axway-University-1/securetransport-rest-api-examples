@@ -16,6 +16,8 @@
 #   VALUE  optional, required or requiredForUserClasses (default optional);
 #          requiredForUserClasses also needs requirePasswordUserClasses
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the value before, to put back with.

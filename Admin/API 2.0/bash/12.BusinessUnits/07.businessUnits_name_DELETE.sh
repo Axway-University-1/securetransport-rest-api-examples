@@ -14,6 +14,8 @@
 #
 #   NAME  the business unit. There is no default: name the one to delete.
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the server refuses, 400, to delete a unit that still has

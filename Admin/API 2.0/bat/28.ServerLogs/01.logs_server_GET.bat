@@ -21,6 +21,8 @@ REM               between them (optional)
 REM   LEVELS      one or more of ALL DEBUG ERROR FATAL INFO TRACE WARN, with commas between them
 REM               (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the server log is OLDEST first, the opposite of the audit log, so a

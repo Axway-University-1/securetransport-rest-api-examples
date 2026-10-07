@@ -21,6 +21,8 @@
 #   LEVELS      one or more of ALL DEBUG ERROR FATAL INFO TRACE WARN, with commas between them
 #               (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the server log is OLDEST first, the opposite of the audit log, so a

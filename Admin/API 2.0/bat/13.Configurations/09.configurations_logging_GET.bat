@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 09.configurations_logging_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Each logging option belongs to a configuration profile; profileId says which.

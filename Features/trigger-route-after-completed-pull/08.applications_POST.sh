@@ -13,6 +13,8 @@
 # Usage:
 # ./08.applications_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Requires `jq`, which builds the JSON body.
 # - The application is called AR_APPLICATION in settings.sh.

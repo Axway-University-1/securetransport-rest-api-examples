@@ -15,6 +15,8 @@
 # Usage:
 # ./02.accounts_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A template account needs a user class. This example uses "VirtClass",

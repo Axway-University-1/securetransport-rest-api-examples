@@ -17,6 +17,8 @@
 # Usage:
 # ./03.routes_POST_simple_compress.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The site SSH_PUSH must already exist. Run

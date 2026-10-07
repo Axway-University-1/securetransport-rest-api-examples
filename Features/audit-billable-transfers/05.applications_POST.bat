@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 05.applications_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Uses PowerShell to build the JSON body.
 REM ==============================================================================

@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 01.configurations_PATCH.bat
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - An option holds a list of values, so the path targets an index:

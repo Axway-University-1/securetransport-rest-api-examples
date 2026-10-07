@@ -15,6 +15,8 @@
 # Usage:
 # ./06.routes_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This example uses the account "john" and the simple route

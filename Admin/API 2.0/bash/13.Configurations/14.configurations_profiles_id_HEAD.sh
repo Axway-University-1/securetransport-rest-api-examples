@@ -16,6 +16,8 @@
 #   PROFILE_ID  the profile (default: the SecureTransport Server Configuration
 #               profile)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A profile's id is a number, and may be negative.

@@ -20,6 +20,8 @@
 #   OBJECT_NAME  one object's exact name (optional)
 #   OPERATION    CREATE, UPDATE, DELETE or CREATE_OR_UPDATE (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The audit log is the server's record of changes made through the Admin UI and this API.

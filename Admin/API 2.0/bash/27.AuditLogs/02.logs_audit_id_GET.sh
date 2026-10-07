@@ -14,6 +14,8 @@
 #
 #   ID  the entry's id (default: the newest entry)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The id is a plain string, unlike the composite ids of the transfer and server logs.

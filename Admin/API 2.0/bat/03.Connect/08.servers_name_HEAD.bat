@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM call 08_servers_name_HEAD.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - HEAD requests are efficient for existence checks without retrieving full content.

@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 26.configurations_adminui_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - adminUiConfig is a JSON document inside a string; jq's fromjson reads it.

@@ -12,6 +12,8 @@
 # Usage:
 # ./02.configurations_PATCH_UsageReporting.sh
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Fill in the client, secret and environment values below before running.

@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 03.sites_POST_push.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Run 01.accounts_POST.bat first.
 REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.

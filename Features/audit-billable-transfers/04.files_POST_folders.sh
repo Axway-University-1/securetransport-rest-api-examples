@@ -18,6 +18,8 @@
 # Usage:
 # ./04.files_POST_folders.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run 01.accounts_POST.sh first.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.

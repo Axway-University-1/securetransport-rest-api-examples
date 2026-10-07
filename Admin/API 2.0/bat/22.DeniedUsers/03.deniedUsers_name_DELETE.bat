@@ -14,6 +14,8 @@ REM 03.deniedUsers_name_DELETE.bat [LOGIN_NAME]
 REM
 REM   LOGIN_NAME  the name to unblock (default example_denied)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - This unblocks a login name: only remove the ones you added. The list also

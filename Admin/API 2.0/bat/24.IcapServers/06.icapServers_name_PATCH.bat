@@ -18,6 +18,8 @@ REM   ENABLED        true to scan, false to stop (default false)
 REM   DENY_ON_ERROR  true to deny a transfer when the server cannot be reached, false to
 REM                  let it go on (optional: left as it is)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - An ICAP server scans transfers only for the business units that list it in

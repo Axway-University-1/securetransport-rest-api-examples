@@ -13,6 +13,8 @@
 # Usage:
 # ./13.configurations_profiles_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - node is the server or edge the profile applies to; protocol is null for the

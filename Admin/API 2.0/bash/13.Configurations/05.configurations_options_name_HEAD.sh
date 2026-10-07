@@ -15,6 +15,8 @@
 #
 #   NAME  the option (default AddressBook.Enabled)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # ==============================================================================

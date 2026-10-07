@@ -32,6 +32,8 @@
 # ./files_GET_download.sh subscription/s1/only_inbound.txt 50
 # ./files_GET_download.sh btTestAccount/delivered-1/inbound_and_one_outbound.txt 50 partner_to_push_to
 #
+# Risk: read
+#
 # Notes:
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, which URL-encodes the path.

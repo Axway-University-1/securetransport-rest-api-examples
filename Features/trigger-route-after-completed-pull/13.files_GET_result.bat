@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 13.files_GET_result.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Run it after 12.files_PUT_triggerfile.bat. The pull and the route run
 REM   asynchronously, so the push can take a few seconds to arrive. The script

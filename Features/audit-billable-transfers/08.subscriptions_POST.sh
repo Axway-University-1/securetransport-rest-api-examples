@@ -25,6 +25,8 @@
 # Usage:
 # ./08.subscriptions_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run 02.sites_POST_pull.sh and 05.applications_POST.sh first.
 # - Requires `jq`, which builds the JSON bodies.

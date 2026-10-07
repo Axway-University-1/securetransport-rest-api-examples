@@ -20,6 +20,8 @@
 #   NAME  list the server with exactly this name (optional)
 #   TYPE  only the servers of this type: INCOMING, OUTGOING or BOTH (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - An ICAP server scans transfers only for the business units that list it in

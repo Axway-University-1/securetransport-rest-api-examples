@@ -19,6 +19,8 @@ REM   NAME   the business unit
 REM   VALUE  the new sharedFoldersCollaborationAllowed, true or false (default
 REM          true)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the value before, to put it back with. A new unit has null: the

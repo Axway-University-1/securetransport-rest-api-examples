@@ -16,6 +16,8 @@
 #   VAULT_URL  the Vault, for example https://vault.example.com:8200
 #   MOUNT      the KV secrets engine's path (default secret)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The store is example_vault.

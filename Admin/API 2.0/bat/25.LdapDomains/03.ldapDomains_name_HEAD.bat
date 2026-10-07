@@ -14,6 +14,8 @@ REM 03.ldapDomains_name_HEAD.bat [NAME]
 REM
 REM   NAME  the domain (default example_ldap)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The name goes into the path URL-encoded once, with jq's @uri.

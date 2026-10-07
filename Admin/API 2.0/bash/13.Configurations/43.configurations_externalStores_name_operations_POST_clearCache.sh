@@ -17,6 +17,8 @@
 #   SECRET_PATH  the secret, for example example/db
 #   NAME  the external store (default example_vault)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the answer is 200, "Cache was cleared successfully for

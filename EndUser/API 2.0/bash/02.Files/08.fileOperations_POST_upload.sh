@@ -23,6 +23,8 @@
 #               home folder itself). The folder must exist. See
 #               02.files_name_POST_folder.sh.
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It logs in and out on its own, so 01.Authenticate is not needed first.

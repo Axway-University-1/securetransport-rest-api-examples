@@ -14,6 +14,8 @@
 #
 #   USAGE  local or private (default: both)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: with a filter, resultSet.totalCount still counts every

@@ -25,6 +25,8 @@ REM LABEL is printed in the heading (for example "before" or "after"); it does n
 REM change what is measured. ACCOUNT reports on another test account than the
 REM default (the same name given to 00.run_all.bat).
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Each account is filtered with account=, an exact match. Not accountName=:
 REM   /logs/transfers ignores that without a word and counts every account on the

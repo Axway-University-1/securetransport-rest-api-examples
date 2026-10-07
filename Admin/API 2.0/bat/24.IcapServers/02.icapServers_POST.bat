@@ -17,6 +17,8 @@ REM   NAME  the server's name (default example_icap)
 REM   URL   icap://host:port/service (default icap://icap.example.com:1344/AVSCAN)
 REM   TYPE  INCOMING, OUTGOING or BOTH: which transfers it scans (default INCOMING)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - An ICAP server scans transfers only for the business units that list it in

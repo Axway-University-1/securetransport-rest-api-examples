@@ -15,6 +15,8 @@ REM 03.addressBook_sources_id_GET.bat [SOURCE]
 REM
 REM   SOURCE  the source's name (default LDAP). Its id is looked up by name.
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - PowerShell is used to read the id, in place of jq.

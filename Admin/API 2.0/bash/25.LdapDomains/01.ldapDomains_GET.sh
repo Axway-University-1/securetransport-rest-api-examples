@@ -18,6 +18,8 @@
 #   NAME              list the domain with exactly this name (optional)
 #   PROTOCOL_VERSION  2 or 3: only the domains of this version (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - An LDAP domain only authenticates users when the server's login settings turn LDAP on

@@ -25,6 +25,8 @@
 # Usage:
 # ./12.files_PUT_triggerfile.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run it after 11.transfers_pull_POST.sh. It waits up to AR_WAIT_SECONDS for the
 #   trigger file to appear, because the pull is asynchronous. The first route

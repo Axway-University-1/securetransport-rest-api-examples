@@ -17,6 +17,8 @@ REM
 REM Usage:
 REM 03.routes_POST_simple_compress.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The site SSH_PUSH must already exist. Run

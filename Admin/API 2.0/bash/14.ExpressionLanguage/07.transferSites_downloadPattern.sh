@@ -23,6 +23,8 @@
 # Usage:
 # ./07.transferSites_downloadPattern.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: downloadPatternType is only
 #   recognised on some site types (ssh here) - the same field name on an

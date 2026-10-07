@@ -15,6 +15,8 @@
 # Usage:
 # ./02.applications_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Maintenance applications require specific schema fields.

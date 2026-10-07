@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 07.configurations_options_groups_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the answer is a plain array, not {result: [...]}.

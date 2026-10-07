@@ -16,6 +16,8 @@
 #   HOST  the Sentinel server
 #   PORT  its port (default 1305)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the settings before, to put back with

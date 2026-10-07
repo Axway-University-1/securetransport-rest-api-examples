@@ -18,6 +18,8 @@ REM
 REM   USAGE  private, local, partner, login or trusted (default local)
 REM   DAYS   list the ones that expire within this many days (default 30)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: expirationTime.from and .to are in milliseconds since

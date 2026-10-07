@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 06.routes_POST_template.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Uses PowerShell to build the JSON body.
 REM - The id is saved as BT_ID_TEMPLATE for the later steps.

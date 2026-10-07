@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM call 04_daemons_name_PATCH.bat
 REM
+REM Risk: config - changes the SSH daemon
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - Requires curl and PowerShell.

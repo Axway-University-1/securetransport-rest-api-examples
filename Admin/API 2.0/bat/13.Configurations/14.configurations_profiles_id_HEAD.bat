@@ -16,6 +16,8 @@ REM
 REM   PROFILE_ID  the profile (default: the SecureTransport Server Configuration
 REM               profile)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A profile's id is a number, and may be negative.

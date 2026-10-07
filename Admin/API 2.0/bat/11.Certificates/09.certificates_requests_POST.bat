@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 09.certificates_requests_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The request is for CN=example_csr,O=Example, a local certificate - one the

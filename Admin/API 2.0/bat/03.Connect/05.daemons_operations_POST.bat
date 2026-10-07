@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM call 05_daemons_operations_POST.bat
 REM
+REM Risk: disruptive - stops and starts daemons: every protocol on them goes down meanwhile
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - Requires curl.

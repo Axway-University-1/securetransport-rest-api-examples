@@ -20,6 +20,8 @@ REM
 REM   ACCOUNT_PATTERN  an account name, * matches anything (default *)
 REM   STATUS           only the events with this status, for example active (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The list is usually empty: an event lives only while a file is being processed.

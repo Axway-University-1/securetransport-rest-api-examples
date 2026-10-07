@@ -14,6 +14,8 @@ REM 39.configurations_externalStores_name_GET.bat [NAME]
 REM
 REM   NAME  the external store (default example_vault)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The AppRole's secret_id comes back masked.

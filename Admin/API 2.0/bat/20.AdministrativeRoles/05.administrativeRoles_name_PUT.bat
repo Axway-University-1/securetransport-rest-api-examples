@@ -16,6 +16,8 @@ REM
 REM   MENU  the menus the role opens, each one argument (default: Change Password
 REM         and Audit Log)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The role is example_role, a limited role with the Change Password menu only.

@@ -13,6 +13,8 @@
 # Usage:
 # ./20.configurations_sentinel_PUT.sh
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The host, port and the other settings stay, ready to turn on again.

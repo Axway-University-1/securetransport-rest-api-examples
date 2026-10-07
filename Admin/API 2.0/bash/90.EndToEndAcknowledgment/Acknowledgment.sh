@@ -39,6 +39,8 @@
 # 1 - Error (e.g., missing parameters, API failure)
 # 2 - Retry suggested (e.g., outbound transfer not yet available)
 #
+# Risk: write
+#
 # Notes:
 # - Credentials come from set_variables.sh, which loads set_variables.local.sh.
 # - This script is intended for internal use and assumes trusted network access.

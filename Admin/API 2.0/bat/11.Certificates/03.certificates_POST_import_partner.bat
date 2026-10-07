@@ -19,6 +19,8 @@ REM   CERT_FILE  the partner's certificate, PEM or DER, for example the
 REM              example_cert.pem 08.certificates_id_operations_POST_export.bat
 REM              writes
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It imports the certificate as example_partner.

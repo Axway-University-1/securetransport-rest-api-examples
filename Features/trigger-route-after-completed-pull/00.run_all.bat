@@ -15,6 +15,8 @@ REM Usage:
 REM 00.run_all.bat              run steps 01 to 13 and leave everything in place
 REM 00.run_all.bat --cleanup    the same, then run 99.cleanup_DELETE.bat at the end
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - It stops at the first step that fails: a non-zero exit, or a line starting
 REM   HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing is cleaned up,

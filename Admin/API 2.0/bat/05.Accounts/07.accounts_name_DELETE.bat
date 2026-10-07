@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 07.accounts_name_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - This script deletes data. Check the account names before running it.

@@ -14,6 +14,8 @@
 # Usage:
 # ./07.applications_name_DELETE.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Application names with spaces must be URL-encoded.

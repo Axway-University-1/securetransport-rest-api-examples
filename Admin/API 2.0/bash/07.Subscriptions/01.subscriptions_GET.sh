@@ -14,6 +14,8 @@
 # Usage:
 # ./01.subscriptions_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This example uses the account "john". 02.subscriptions_POST.sh and

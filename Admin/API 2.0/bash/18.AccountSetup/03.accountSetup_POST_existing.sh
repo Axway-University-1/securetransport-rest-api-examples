@@ -13,6 +13,8 @@
 # Usage:
 # ./03.accountSetup_POST_existing.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Run 01.accountSetup_POST.sh first. This adds example_setup_site2 to

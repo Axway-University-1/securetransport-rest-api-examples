@@ -31,6 +31,8 @@
 # Usage:
 # ./06.routes_step_renameExpression.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: this field round trips exactly
 #   as sent - no backslash-doubling is needed for any of the three examples,

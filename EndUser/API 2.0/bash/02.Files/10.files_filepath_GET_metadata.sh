@@ -16,6 +16,8 @@
 #   FILE  the file, relative to the home folder, for example test.txt or
 #         reports/2026/summary.csv
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

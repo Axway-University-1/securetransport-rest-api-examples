@@ -12,6 +12,8 @@
 # Usage:
 # ./02.administrators_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The administrator is example_admin, with the role example_role: run

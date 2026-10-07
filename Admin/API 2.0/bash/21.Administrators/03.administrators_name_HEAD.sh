@@ -15,6 +15,8 @@
 #
 #   ADMIN  the login name (default example_admin)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # ==============================================================================

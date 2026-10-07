@@ -16,6 +16,8 @@ REM
 REM   HOST  the Sentinel server
 REM   PORT  its port (default 1305)
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the settings before, to put back with

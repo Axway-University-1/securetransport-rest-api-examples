@@ -13,6 +13,8 @@
 # Usage:
 # ./11.transfers_pull_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Requires `jq`, which builds the JSON body.
 # - Run steps 1 to 10 first.

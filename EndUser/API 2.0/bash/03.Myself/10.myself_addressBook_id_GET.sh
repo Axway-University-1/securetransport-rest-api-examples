@@ -15,6 +15,8 @@
 #   ID  the entry's id, as 09.myself_addressBook_GET.sh prints it (default:
 #       the first entry of the address book)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

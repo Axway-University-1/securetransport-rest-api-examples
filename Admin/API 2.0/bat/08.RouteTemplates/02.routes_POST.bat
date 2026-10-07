@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 02.routes_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The names must be unique, as ST rejects a duplicate route template name.

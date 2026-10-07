@@ -14,6 +14,8 @@ REM 10.certificates_requests_GET.bat [USAGE]
 REM
 REM   USAGE  local or private (default: both)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: with a filter, resultSet.totalCount still counts every

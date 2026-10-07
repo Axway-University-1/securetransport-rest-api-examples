@@ -16,6 +16,8 @@ REM   OUTPUT     the file to write (default server_log.csv)
 REM   MINUTES    how far back, in whole minutes (default 60)
 REM   COMPONENT  one component, for example FTPD (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the same endpoint answers text/csv when asked, with a header row: Time,

@@ -21,6 +21,8 @@
 #               folder). The folder must exist.
 #   CHUNK_SIZE  bytes per chunk (default 1048576, 1 MiB)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

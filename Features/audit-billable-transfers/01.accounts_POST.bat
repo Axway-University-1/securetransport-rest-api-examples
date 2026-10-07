@@ -17,6 +17,8 @@ REM
 REM Usage:
 REM 01.accounts_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body.

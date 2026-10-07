@@ -16,6 +16,8 @@
 #   TRANSFER_ID  the transferId of an AS2 transfer, as 01.transfers_GET.sh lists
 #                them (for example with protocol=as2)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.

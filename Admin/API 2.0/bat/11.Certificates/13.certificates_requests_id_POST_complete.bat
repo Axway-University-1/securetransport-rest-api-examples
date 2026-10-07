@@ -19,6 +19,8 @@ REM   SIGNED_CERT  the certificate the CA signed, PEM or DER
 REM   REQUEST_ID  the request's id (default: the one request for
 REM               CN=example_csr,O=Example, which 09 creates)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The certificate is named example_csr_cert (alias).

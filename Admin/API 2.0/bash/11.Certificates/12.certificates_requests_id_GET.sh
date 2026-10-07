@@ -15,6 +15,8 @@
 #   REQUEST_ID  the request's id (default: the one request for
 #               CN=example_csr,O=Example, which 09 creates)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the answer is the request's JSON only, never the CSR;

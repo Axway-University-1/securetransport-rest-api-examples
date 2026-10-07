@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 09.subscriptions_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Uses PowerShell to build the JSON body.
 REM - Run 02.sites_POST_pull.bat and 08.applications_POST.bat first: the subscription

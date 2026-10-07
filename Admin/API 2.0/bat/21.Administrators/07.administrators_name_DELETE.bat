@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 07.administrators_name_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It deletes example_admin, which 02.administrators_POST.bat creates. Only ever

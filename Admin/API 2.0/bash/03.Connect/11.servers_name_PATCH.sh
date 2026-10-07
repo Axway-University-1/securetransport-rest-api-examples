@@ -14,6 +14,8 @@
 # Usage:
 # ./11.servers_name_PATCH.sh
 #
+# Risk: config - changes a protocol server
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The PATCH method allows partial updates to specific fields.

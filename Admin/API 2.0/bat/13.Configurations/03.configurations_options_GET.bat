@@ -18,6 +18,8 @@ REM 03.configurations_options_GET.bat [PATTERN]
 REM
 REM   PATTERN  an option name, * matches anything (default AddressBook*)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - values is always a list, even for an option with one value; defaultValues

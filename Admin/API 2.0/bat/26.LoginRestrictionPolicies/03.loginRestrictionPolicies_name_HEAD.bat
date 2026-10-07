@@ -14,6 +14,8 @@ REM 03.loginRestrictionPolicies_name_HEAD.bat [NAME]
 REM
 REM   NAME  the policy (default example_lrp)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The name goes into the path URL-encoded once, with jq's @uri.

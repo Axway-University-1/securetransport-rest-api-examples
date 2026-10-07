@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 04.sites_id_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - This cleans up the two sites 02.sites_POST_ssh.bat creates for the account

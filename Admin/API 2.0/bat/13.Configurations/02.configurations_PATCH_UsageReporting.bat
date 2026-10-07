@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 02.configurations_PATCH_UsageReporting.bat
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Fill in the client, secret and environment values below before running.

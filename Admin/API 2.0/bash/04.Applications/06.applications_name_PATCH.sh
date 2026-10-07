@@ -15,6 +15,8 @@
 # Usage:
 # ./06.applications_name_PATCH.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - PATCH allows partial updates without replacing the entire object.

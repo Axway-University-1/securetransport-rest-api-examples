@@ -14,6 +14,8 @@
 #   NAME  the certificate's name (default example_cert, which
 #         02.certificates_POST_generate.sh creates)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The certificate is looked up by name, and must be the only one with that name.

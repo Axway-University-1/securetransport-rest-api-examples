@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 29.configurations_fileArchiving_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The archive can be a folder or an S3 bucket (isS3Storage and the s3*

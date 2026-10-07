@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM call 07_servers_POST.bat
 REM
+REM Risk: config - adds protocol servers, which open ports
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - Requires curl and PowerShell.

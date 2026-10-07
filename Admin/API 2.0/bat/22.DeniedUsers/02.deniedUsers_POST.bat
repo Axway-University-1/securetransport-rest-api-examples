@@ -16,6 +16,8 @@ REM   LOGIN_NAME  the name to block (default example_denied)
 REM   HOURS       block for this many hours; leave out to block for good
 REM   NOTE        why (optional)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - 03.deniedUsers_name_DELETE.bat removes the name again.

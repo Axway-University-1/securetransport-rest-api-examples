@@ -15,6 +15,8 @@
 # ./17.configurations_database_operations_POST_test.sh
 #
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It tests the database the server uses now: the host, port and name come

@@ -16,6 +16,8 @@ REM
 REM   AUTH_METHOD  the rule's new authentication method (default scram-sha-256):
 REM                trust, reject, scram-sha-256, md5 or password
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Only for a server on the embedded PostgreSQL database.

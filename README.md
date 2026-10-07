@@ -138,6 +138,24 @@ to run `base64` by hand.
 | Admin | 8444 | 444 |
 | EndUser | 8443 | 443 |
 
+### How much an example changes
+
+Every example's header has a `Risk:` line, so you can tell before running it
+what it may change on the server:
+
+| Risk | Meaning |
+| ---- | ------- |
+| `read` | Changes nothing: a GET or HEAD, a login or logout, a connection test. |
+| `write` | Creates, changes or deletes objects: accounts, sites, routes, policies. |
+| `config` | Changes a server-wide setting. Put it back afterwards. |
+| `disruptive` | Stops a service, or cannot easily be undone: daemon and server operations, maintenance mode, the keystore password. Run these only on a lab of your own. |
+
+To list them all, with the endpoint each one calls:
+
+```
+python3 tools/list_examples.py --table     # or without --table, as JSON
+```
+
 ### Running an example
 
 Each example is self contained and can be run directly:
@@ -162,6 +180,7 @@ Admin/API 2.0/          Administrator API, on the admin port
 EndUser/API 2.0/
     bash/               end user API, on the user port
 Features/               complete solutions, one folder per feature
+tools/                  list_examples.py: every example, its endpoint and Risk
 images/                 screenshots used by this README
 ```
 
@@ -364,15 +383,15 @@ unzip -j export_configuration.zip systemConfiguration.xml -d /home/axway/api
 These areas of the API do not have examples yet. Contributions are welcome, and
 the list doubles as a rough roadmap.
 
-- Transfer operations other than a pull, Sessions, Events and Statistics Summary
+- Mail Templates, Sessions, Statistics Summary and Zones
 - Transfer Profiles, Route Steps Charsets and Route Steps Metadata
 - Site Templates and User Classes
-- Cluster Services, ICAP Servers, LDAP Domains and Zones
-- Mail Templates
+- The Transaction Manager
+- Cluster Services (not planned: the examples are written against a standalone server)
 
 Some areas are covered by the python examples but not yet by bash or bat:
-changing routes and subscriptions that already exist, login restriction
-policies and the transaction manager. See the python table above.
+changing routes and subscriptions that already exist, and the transaction
+manager. See the python table above.
 
 ## Features by Release
 

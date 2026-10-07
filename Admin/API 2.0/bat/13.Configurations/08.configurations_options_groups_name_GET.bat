@@ -15,6 +15,8 @@ REM 08.configurations_options_groups_name_GET.bat [GROUP]
 REM
 REM   GROUP  the group (default StorageProfiles.S3.Group)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: some groups the list returns answer 501 "Group with

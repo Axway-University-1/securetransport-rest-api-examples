@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 20.configurations_sentinel_PUT.bat
 REM
+REM Risk: config
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The host, port and the other settings stay, ready to turn on again.

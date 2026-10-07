@@ -16,6 +16,8 @@
 #   MENU  the menus the role opens, each one argument (default: Change Password
 #         and Audit Log)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The role is example_role, a limited role with the Change Password menu only.

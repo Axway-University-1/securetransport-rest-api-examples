@@ -16,6 +16,8 @@
 #   RULE_NAME  the rule (default "example rule")
 #   ACTION     enable, disable or remove (default disable)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A rule is addressed by its position in the rules list, which changes as rules are added

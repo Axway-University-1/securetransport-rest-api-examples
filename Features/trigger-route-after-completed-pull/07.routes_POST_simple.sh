@@ -13,6 +13,8 @@
 # Usage:
 # ./07.routes_POST_simple.sh
 #
+# Risk: write
+#
 # Notes:
 # - Requires `jq`, which builds the JSON body.
 # - Run 03.sites_POST_push.sh first: the step names the push site.

@@ -25,6 +25,8 @@
 # change what is measured. ACCOUNT reports on another test account than the
 # default (the same name given to 00.run_all.sh).
 #
+# Risk: read
+#
 # Notes:
 # - Each account is filtered with account=, an exact match. Not accountName=:
 #   /logs/transfers ignores that without a word and counts every account on the

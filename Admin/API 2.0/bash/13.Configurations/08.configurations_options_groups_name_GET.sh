@@ -15,6 +15,8 @@
 #
 #   GROUP  the group (default StorageProfiles.S3.Group)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: some groups the list returns answer 501 "Group with

@@ -18,6 +18,8 @@
 #
 #   PATTERN  an option name, * matches anything (default AddressBook*)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - values is always a list, even for an option with one value; defaultValues

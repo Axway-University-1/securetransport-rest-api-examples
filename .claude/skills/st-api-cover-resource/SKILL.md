@@ -128,7 +128,8 @@ what a name with a space does. Rules:
 
 One script per operation, `NN.resource_METHOD.sh`, numbered in the reference's
 order: GET list, POST, HEAD, GET one, PUT, PATCH, DELETE, then sub-resources and
-operations. Write them with `authoring.write_sh`. Imitate:
+operations. Write them with `authoring.write_sh`, which needs `risk=` (read, write,
+config or disruptive, optionally " - why"; see st-api-add-example). Imitate:
 
 | Shape | Look at |
 | ----- | ------- |

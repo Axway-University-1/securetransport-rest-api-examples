@@ -14,6 +14,8 @@ REM
 REM   NAME  the certificate's name (default example_cert, which
 REM         02.certificates_POST_generate.bat creates)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The certificate is looked up by name, and must be the only one with that name.

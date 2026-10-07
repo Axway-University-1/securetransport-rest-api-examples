@@ -20,6 +20,8 @@
 #   PATTERN  a policy name, * matches anything (default *)
 #   TYPE     ALLOW_THEN_DENY or DENY_THEN_ALLOW: only the policies of this type (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the answer is {resultSet, result}. name= takes the * wildcard and

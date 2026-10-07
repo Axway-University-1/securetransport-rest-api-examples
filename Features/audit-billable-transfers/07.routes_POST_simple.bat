@@ -25,6 +25,8 @@ REM
 REM Usage:
 REM 07.routes_POST_simple.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Uses PowerShell to build the JSON bodies.
 REM - A site is addressed as <site>#!#CVD#!# in transferSiteExpression - CVD is

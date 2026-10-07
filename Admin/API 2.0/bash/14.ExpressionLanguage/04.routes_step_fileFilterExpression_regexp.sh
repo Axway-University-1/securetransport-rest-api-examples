@@ -24,6 +24,8 @@
 # Usage:
 # ./04.routes_step_fileFilterExpression_regexp.sh
 #
+# Risk: write
+#
 # Notes:
 # - Confirmed directly against a real server: fileFilterExpression with
 #   fileFilterExpressionType=REGEXP is a raw regular expression string - it

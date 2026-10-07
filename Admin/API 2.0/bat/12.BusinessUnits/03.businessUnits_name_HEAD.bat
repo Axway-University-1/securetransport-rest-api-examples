@@ -16,6 +16,8 @@ REM
 REM   NAME  the business unit (default Finance, which 01.businessUnits_POST.bat
 REM         creates)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - PowerShell is used to URL-encode the name, in place of jq.

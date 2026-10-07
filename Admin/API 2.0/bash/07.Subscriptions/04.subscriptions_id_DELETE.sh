@@ -15,6 +15,8 @@
 # Usage:
 # ./04.subscriptions_id_DELETE.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This cleans up what 02.subscriptions_POST.sh and

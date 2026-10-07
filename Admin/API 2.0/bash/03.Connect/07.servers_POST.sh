@@ -14,6 +14,8 @@
 # Usage:
 # ./07.servers_POST.sh
 #
+# Risk: config - adds protocol servers, which open ports
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The serverName must be unique.

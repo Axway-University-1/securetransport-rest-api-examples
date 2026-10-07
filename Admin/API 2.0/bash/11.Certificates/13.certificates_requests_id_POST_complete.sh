@@ -19,6 +19,8 @@
 #   REQUEST_ID  the request's id (default: the one request for
 #               CN=example_csr,O=Example, which 09 creates)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The certificate is named example_csr_cert (alias).

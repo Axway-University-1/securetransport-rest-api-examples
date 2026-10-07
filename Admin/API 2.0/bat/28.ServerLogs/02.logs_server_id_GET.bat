@@ -15,6 +15,8 @@ REM
 REM   ID  the entry's id, as 01.logs_server_GET.bat could show it under id.urlrepresentation
 REM       (default: the newest entry)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The id is the urlrepresentation of the id object: Base64 of "Id [mConfigurationId=...,

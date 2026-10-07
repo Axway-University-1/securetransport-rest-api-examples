@@ -14,6 +14,8 @@
 # Usage:
 # ./13.servers_operations_POST.sh
 #
+# Risk: disruptive - stops and starts protocol servers
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Daemons must be running for certain servers to start successfully.

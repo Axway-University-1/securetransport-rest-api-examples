@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM call 01_myself_POST.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is called beforehand to set required variables.
 REM - This script does not use a cookie jar, so authentication is required for each call.

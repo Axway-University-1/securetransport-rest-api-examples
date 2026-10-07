@@ -18,6 +18,8 @@ REM 01.logs_transfers_GET.bat [ACCOUNT]
 REM
 REM   ACCOUNT  the account whose transfers to read (default john)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The account is filtered with account=. The endpoint ignores accountName=

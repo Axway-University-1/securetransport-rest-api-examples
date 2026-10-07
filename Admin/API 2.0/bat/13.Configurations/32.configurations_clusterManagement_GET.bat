@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 32.configurations_clusterManagement_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A standalone server answers isCluster false and no nodes.

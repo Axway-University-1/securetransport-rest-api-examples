@@ -16,6 +16,8 @@ REM
 REM Usage:
 REM 02.subscriptions_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The account "john" and its site SSH_PULL must already exist. Run

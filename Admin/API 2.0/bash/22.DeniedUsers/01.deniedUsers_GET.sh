@@ -20,6 +20,8 @@
 #   PATTERN  a login name, * matches anything (default *)
 #   SINCE    only the ones blocked on or after this date, as yyyy-MM-dd (optional)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the answer is {resultSet, result}; each entry has

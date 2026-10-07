@@ -16,6 +16,8 @@ REM   NAME  the domain's name (default example_ldap)
 REM   HOST  the directory server (default: the SecureTransport server itself)
 REM   PORT  its port (default 389)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - An LDAP domain only authenticates users when the server's login settings turn LDAP on

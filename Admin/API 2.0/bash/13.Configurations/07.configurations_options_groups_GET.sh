@@ -13,6 +13,8 @@
 # Usage:
 # ./07.configurations_options_groups_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the answer is a plain array, not {result: [...]}.

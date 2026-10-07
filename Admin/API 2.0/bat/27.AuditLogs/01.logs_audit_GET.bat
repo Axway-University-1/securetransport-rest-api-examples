@@ -20,6 +20,8 @@ REM   OBJECT_TYPE  for example BusinessUnit or Account (optional)
 REM   OBJECT_NAME  one object's exact name (optional)
 REM   OPERATION    CREATE, UPDATE, DELETE or CREATE_OR_UPDATE (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The audit log is the server's record of changes made through the Admin UI and this API.

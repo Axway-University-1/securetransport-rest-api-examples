@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 01.accountSetup_POST.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The account is example_setup, with an SSH site named example_setup_site.

@@ -15,6 +15,8 @@
 # Usage:
 # ./10.files_upload_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run 01.accounts_POST.sh and 04.files_POST_folders.sh first.
 # - Scenarios 2.1 and 2.2 upload BT_INBOUND_ONLY_COUNT and BT_IN_AND_OUT_COUNT

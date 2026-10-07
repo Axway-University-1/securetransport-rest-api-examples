@@ -19,6 +19,8 @@ REM   PERMISSIONS  read, write and delete, comma separated (default read).
 REM                read is GET and HEAD; write is POST, PUT and PATCH; delete is
 REM                DELETE.
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The administrator is example_admin, which 02.administrators_POST.bat creates.

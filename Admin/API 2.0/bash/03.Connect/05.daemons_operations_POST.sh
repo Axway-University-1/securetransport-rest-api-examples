@@ -13,6 +13,8 @@
 # Usage:
 # ./05.daemons_operations_POST.sh
 #
+# Risk: disruptive - stops and starts daemons: every protocol on them goes down meanwhile
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The script uses basic authentication and POST requests with query parameters.

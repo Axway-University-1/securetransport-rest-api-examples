@@ -12,6 +12,8 @@
 # Usage:
 # ./02.myself_DELETE.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - ST requires a Referer header on these calls.

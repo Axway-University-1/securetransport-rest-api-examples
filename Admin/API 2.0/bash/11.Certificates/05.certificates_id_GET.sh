@@ -17,6 +17,8 @@
 #
 #   NAME  the certificate's name (default example_cert)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The certificate is looked up by name, and must be the only one with that name.

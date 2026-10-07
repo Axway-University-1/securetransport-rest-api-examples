@@ -16,6 +16,8 @@
 #   DESCRIPTION  the new description (default "Patched by 06.ldapDomains_name_PATCH.sh")
 #   PORT         the new port of the first server (optional: left as it is)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A list is addressed by index: /ldapServers/0/port is the first server.

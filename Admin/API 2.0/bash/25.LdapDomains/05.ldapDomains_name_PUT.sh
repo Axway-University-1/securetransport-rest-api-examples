@@ -15,6 +15,8 @@
 #   NAME         the domain (default example_ldap)
 #   DESCRIPTION  the new description (default "Replaced by 05.ldapDomains_name_PUT.sh")
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the description before, to put back with.

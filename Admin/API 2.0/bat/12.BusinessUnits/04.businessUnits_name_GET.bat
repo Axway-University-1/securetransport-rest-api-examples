@@ -15,6 +15,8 @@ REM
 REM   NAME  the business unit (default Finance, which 01.businessUnits_POST.bat
 REM         creates)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: metadata.links.accounts and .applications are ready made

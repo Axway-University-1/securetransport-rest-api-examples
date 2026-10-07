@@ -15,6 +15,8 @@ REM 37.configurations_externalStores_GET.bat [NAME]
 REM
 REM   NAME  list only the store with this exact name
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: a name pattern ending in *, such as example*, answers

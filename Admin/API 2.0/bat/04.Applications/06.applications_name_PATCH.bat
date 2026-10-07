@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 06.applications_name_PATCH.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - PATCH allows partial updates without replacing the entire object.

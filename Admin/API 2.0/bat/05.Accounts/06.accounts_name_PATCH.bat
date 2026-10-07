@@ -19,6 +19,8 @@ REM
 REM Usage:
 REM 06.accounts_name_PATCH.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The add operation is best suited for arrays. You can use it to add a new

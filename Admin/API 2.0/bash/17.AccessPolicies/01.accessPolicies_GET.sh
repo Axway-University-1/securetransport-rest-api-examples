@@ -16,6 +16,8 @@
 # Usage:
 # ./01.accessPolicies_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Only for a server on the embedded PostgreSQL database.

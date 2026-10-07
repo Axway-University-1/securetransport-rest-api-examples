@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 01.transfers_operations_POST_pull.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The account "john" and its site SSH_PULL must already exist. Run

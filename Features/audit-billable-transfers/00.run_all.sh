@@ -34,6 +34,8 @@
 # ./00.run_all.sh test_account 6 12        and 6 inbound only, 12 in and out
 # ./00.run_all.sh test_account 6 12 --cleanup
 #
+# Risk: write
+#
 # Notes:
 # - It stops at the first setup step that fails: a non-zero exit, or a line
 #   starting HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing

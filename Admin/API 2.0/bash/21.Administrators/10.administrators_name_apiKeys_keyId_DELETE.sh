@@ -15,6 +15,8 @@
 #
 #   KEY_ID  the key to revoke (default: every key of example_admin)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The administrator is example_admin, which 02.administrators_POST.sh creates.

@@ -14,6 +14,8 @@ REM 02.events_id_GET.bat [EVENT_ID]
 REM
 REM   EVENT_ID  the event (default: the first one 01.events_GET.bat lists)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - An event that is not there, or not visible to this administrator, answers 404

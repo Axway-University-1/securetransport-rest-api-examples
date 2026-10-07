@@ -17,6 +17,8 @@
 #   SECONDS  the new readTimeout
 #   NAME  the external store (default example_vault)
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Changing a store clears the secrets the server cached from it.

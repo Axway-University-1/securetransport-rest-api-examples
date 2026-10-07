@@ -16,6 +16,8 @@
 #   ACCOUNT  the account to read (default example_setup, which
 #            01.accountSetup_POST.sh creates)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - With accept: application/json the certificates' properties come back; with

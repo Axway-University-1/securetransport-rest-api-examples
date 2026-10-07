@@ -25,6 +25,8 @@ REM
 REM Usage:
 REM 12.files_PUT_triggerfile.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Run it after 11.transfers_pull_POST.bat. It waits up to AR_WAIT_SECONDS for the
 REM   trigger file to appear, because the pull is asynchronous. The first route

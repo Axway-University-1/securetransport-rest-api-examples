@@ -18,6 +18,8 @@
 #   ACCOUNT  the test account to remove, with everything derived from its name
 #            (default btTestAccount). Use the same name given to 00.run_all.sh.
 #
+# Risk: write
+#
 # Notes:
 # - Deletes the objects named in settings.sh, on the account named there. Check
 #   the names before running it.

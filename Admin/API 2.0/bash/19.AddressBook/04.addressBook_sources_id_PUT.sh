@@ -17,6 +17,8 @@
 #   MAX_PAGE_ENTRIES  the new page size
 #   SOURCE            the source's name (default LDAP)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the value before the change, to put it back with.

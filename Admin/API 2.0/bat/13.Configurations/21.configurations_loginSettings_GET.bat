@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 21.configurations_loginSettings_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - PowerShell is used to print the summary, in place of jq.

@@ -18,6 +18,8 @@ REM
 REM   NAME              list the domain with exactly this name (optional)
 REM   PROTOCOL_VERSION  2 or 3: only the domains of this version (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - An LDAP domain only authenticates users when the server's login settings turn LDAP on

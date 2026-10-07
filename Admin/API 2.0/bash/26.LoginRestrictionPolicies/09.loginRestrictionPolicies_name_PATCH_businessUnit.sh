@@ -16,6 +16,8 @@
 #   BUSINESS_UNIT  the business unit
 #   add|remove     assign it, or take it away (default add)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - NOT confirmed: that a policy assigned to a business unit changes who can log in. On

@@ -18,6 +18,8 @@
 # Usage:
 # ./02.sites_POST_pull.sh
 #
+# Risk: write
+#
 # Notes:
 # - Run 01.accounts_POST.sh first.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.

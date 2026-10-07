@@ -18,6 +18,8 @@ REM
 REM   KEY  a key 08.administrators_name_apiKeys_POST.bat printed, to call
 REM        GET /myself with it (optional)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The administrator is example_admin, which 02.administrators_POST.bat creates.

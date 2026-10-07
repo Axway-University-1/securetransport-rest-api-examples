@@ -16,6 +16,8 @@
 #   NAME    the server (default example_icap)
 #   MAX_MB  the largest file, in MB; 0 is unlimited (default 10)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It prints the value before, to put back with.

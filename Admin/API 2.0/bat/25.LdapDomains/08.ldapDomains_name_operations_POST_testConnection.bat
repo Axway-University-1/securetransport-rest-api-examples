@@ -15,6 +15,8 @@ REM
 REM   NAME           the domain (default example_ldap)
 REM   SERVER_NUMBER  which of its servers, counting from 1 (default 1)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The server is named by its id, which the script looks up in the domain.

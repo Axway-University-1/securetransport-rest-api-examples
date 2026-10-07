@@ -14,6 +14,8 @@
 # Usage:
 # ./09.certificates_requests_POST.sh
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The request is for CN=example_csr,O=Example, a local certificate - one the

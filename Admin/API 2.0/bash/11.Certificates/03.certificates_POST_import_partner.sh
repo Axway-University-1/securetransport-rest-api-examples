@@ -19,6 +19,8 @@
 #              example_cert.pem 08.certificates_id_operations_POST_export.sh
 #              writes
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It imports the certificate as example_partner.

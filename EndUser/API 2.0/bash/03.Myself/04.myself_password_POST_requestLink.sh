@@ -18,6 +18,8 @@
 #   USERNAME  the account's login name, which the server may also require
 #             (default ST_USER)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced. Only
 #   ST_SERVER, ST_PORT and ST_USER are used: the user has no password to log in

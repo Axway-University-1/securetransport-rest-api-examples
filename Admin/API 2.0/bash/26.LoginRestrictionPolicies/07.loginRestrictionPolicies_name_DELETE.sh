@@ -14,6 +14,8 @@
 #
 #   NAME  the policy (default example_lrp)
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Only delete a policy you added: the business units it was assigned to lose its rules.

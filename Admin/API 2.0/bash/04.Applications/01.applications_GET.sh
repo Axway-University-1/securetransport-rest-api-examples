@@ -15,6 +15,8 @@
 # Usage:
 # ./01.applications_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The type filter uses a predefined list of application types.

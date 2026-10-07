@@ -12,6 +12,8 @@ REM
 REM Usage:
 REM 27.configurations_allowedSTServers_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: a standalone server answers 404 here; the list belongs

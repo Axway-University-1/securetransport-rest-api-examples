@@ -21,6 +21,8 @@
 #           new-folder). A nested path such as reports/2026 works, as long as
 #           its parent exists.
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - It logs in and out on its own, so 01.Authenticate is not needed first.

@@ -17,6 +17,8 @@
 # Usage:
 # ./06.servers_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The script uses basic authentication and GET requests with query parameters.

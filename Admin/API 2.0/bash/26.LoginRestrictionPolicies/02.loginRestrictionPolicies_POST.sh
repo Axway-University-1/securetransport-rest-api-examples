@@ -17,6 +17,8 @@
 #                rules is evaluated first
 #   DESCRIPTION  optional
 #
+# Risk: write
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A policy that is not assigned to a business unit and is not the default has no

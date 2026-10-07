@@ -12,6 +12,8 @@
 # Usage:
 # ./01.configurations_PATCH.sh
 #
+# Risk: config
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - An option holds a list of values, so the path targets an index:

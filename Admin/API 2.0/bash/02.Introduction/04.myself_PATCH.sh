@@ -13,6 +13,8 @@
 # Usage:
 # ./04.myself_PATCH.sh
 #
+# Risk: config - changes the password of the administrator every example logs in as
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Be cautious when executing this script, as it will change your password.

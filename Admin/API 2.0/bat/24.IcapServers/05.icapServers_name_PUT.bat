@@ -16,6 +16,8 @@ REM
 REM   NAME    the server (default example_icap)
 REM   MAX_MB  the largest file, in MB; 0 is unlimited (default 10)
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - It prints the value before, to put back with.

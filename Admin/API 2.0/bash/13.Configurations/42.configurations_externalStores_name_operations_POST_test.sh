@@ -17,6 +17,8 @@
 #   SECRET_PATH  a secret to fetch, for example example/db
 #   NAME  the external store (default example_vault)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the answer is 200 whatever the outcome; fetchStatus,

@@ -13,6 +13,8 @@
 # Usage:
 # ./26.configurations_adminui_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - adminUiConfig is a JSON document inside a string; jq's fromjson reads it.

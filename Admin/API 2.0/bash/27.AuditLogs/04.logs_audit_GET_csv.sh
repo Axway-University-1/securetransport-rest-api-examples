@@ -15,6 +15,8 @@
 #   OUTPUT  the file to write (default audit_log.csv)
 #   HOURS   how far back, in whole hours (default 24)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: the same endpoint answers text/csv when asked, with a header row:

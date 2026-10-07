@@ -14,6 +14,8 @@
 #
 #   NAME  the policy (default example_lrp)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The name goes into the path URL-encoded once, with jq's @uri.

@@ -15,6 +15,8 @@ REM 04.administrativeRoles_name_GET.bat [ROLE]
 REM
 REM   ROLE  the role's name (default example_role)
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the role carries metadata.links.members, a ready made

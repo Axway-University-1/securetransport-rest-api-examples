@@ -14,6 +14,8 @@ REM
 REM Usage:
 REM 07.applications_name_DELETE.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Application names with spaces must be URL-encoded.

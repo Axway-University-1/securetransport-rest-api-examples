@@ -15,6 +15,8 @@ REM
 REM Usage:
 REM 01.applications_GET.bat
 REM
+REM Risk: read
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The type filter uses a predefined list of application types.

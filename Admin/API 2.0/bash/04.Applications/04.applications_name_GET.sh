@@ -13,6 +13,8 @@
 # Usage:
 # ./04.applications_name_GET.sh
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Application names with spaces must be URL-encoded.

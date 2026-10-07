@@ -16,6 +16,8 @@
 #   REQUEST_ID  the request's id (default: the one request for
 #               CN=example_csr,O=Example, which 09 creates)
 #
+# Risk: read
+#
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Confirmed directly: a completed request is gone, 404.

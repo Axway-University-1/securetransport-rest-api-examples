@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM 03.accountSetup_POST_existing.bat
 REM
+REM Risk: write
+REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Run 01.accountSetup_POST.bat first. This adds example_setup_site2 to
