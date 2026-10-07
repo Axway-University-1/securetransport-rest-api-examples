@@ -9,6 +9,9 @@ real HashiCorp Vault, S3 bucket or Axway Sentinel:
 - FakeS3     answers path-style S3 requests with any credentials, keeping
              objects in memory - enough for an S3 storage profile's test.
 - TcpSink    accepts connections and keeps what it receives, for Sentinel.
+- FakeIcap   an ICAP server: answers OPTIONS, reads a REQMOD or RESPMOD request
+             with its preview, and either lets the file through (204) or blocks
+             it with a 403 when it holds the marker text. Records each request.
 
 Each runs in a background thread on a port the system picks, listening on
 every interface, and records the requests it saw. The ST server must be able
@@ -20,7 +23,7 @@ machine's address as the server sees it.
         ...
         assert any(r["path"].endswith("/approle/login") for r in vault.requests)
 
-Run on its own to keep one up by hand:  python3 dummy_servers.py vault|s3|sink [PORT]
+Run on its own to keep one up by hand:  python3 dummy_servers.py vault|s3|sink|icap [PORT]
 """
 import hashlib
 import json
@@ -248,10 +251,140 @@ class TcpSink:
         self.thread.join(5)
 
 
+class FakeIcap:
+    """
+    An ICAP server (RFC 3507), enough for SecureTransport's scan: OPTIONS, then
+    REQMOD or RESPMOD with an Encapsulated header and a chunked body, with or
+    without a preview. A file whose bytes contain `marker` is blocked with a
+    403 response; anything else is let through with 204 No Content.
+
+    requests holds one dict per scan: method, icap_headers (a dict), http_head
+    (the encapsulated HTTP header, as text), body (the file's bytes so far, up
+    to the whole file) and blocked. options holds the OPTIONS requests seen.
+    """
+    MARKER = b"EICAR-ICAP-TEST"
+
+    def __init__(self, port=0, marker=None, preview=1024):
+        self.marker = marker if marker is not None else self.MARKER
+        self.preview = preview
+        self.requests, self.options, self.raw = [], [], []
+        self.sock = socket.socket()
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("0.0.0.0", port))
+        self.sock.listen()
+        self.port = self.sock.getsockname()[1]
+        self.thread = threading.Thread(target=self._accept, daemon=True)
+
+    def _accept(self):
+        while True:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            threading.Thread(target=self._serve, args=(conn,), daemon=True).start()
+
+    @staticmethod
+    def _read_until(conn, buf, token):
+        while token not in buf:
+            data = conn.recv(65536)
+            if not data:
+                return None, buf
+            buf += data
+        head, _, rest = buf.partition(token)
+        return head, rest
+
+    @staticmethod
+    def _read_exact(conn, buf, size):
+        while len(buf) < size:
+            data = conn.recv(65536)
+            if not data:
+                break
+            buf += data
+        return buf[:size], buf[size:]
+
+    def _read_chunks(self, conn, buf):
+        """The chunked body: (bytes, whether it ended with ieof, the rest of the buffer)."""
+        body, ieof = b"", False
+        while True:
+            line, buf = self._read_until(conn, buf, b"\r\n")
+            if line is None:
+                return body, ieof, buf
+            size_text = line.split(b";")[0].strip()
+            size = int(size_text or b"0", 16)
+            ieof = b"ieof" in line
+            if size == 0:
+                _, buf = self._read_until(conn, buf, b"\r\n") if not buf.startswith(b"\r\n") else (None, buf[2:])
+                return body, ieof, buf
+            chunk, buf = self._read_exact(conn, buf, size)
+            body += chunk
+            _, buf = self._read_exact(conn, buf, 2)
+
+    def _serve(self, conn):
+        conn.settimeout(120)
+        buf = b""
+        try:
+            while True:
+                head, buf = self._read_until(conn, buf, b"\r\n\r\n")
+                if head is None:
+                    return
+                lines = head.decode("latin-1").split("\r\n")
+                self.raw.append(head)
+                method = lines[0].split(" ")[0]
+                headers = {k.strip().lower(): v.strip() for k, _, v in (l.partition(":") for l in lines[1:] if ":" in l)}
+                if method == "OPTIONS":
+                    self.options.append({"line": lines[0], "icap_headers": headers})
+                    conn.sendall(("ICAP/1.0 200 OK\r\nMethods: REQMOD, RESPMOD\r\nService: FakeIcap\r\nISTag: \"fake-icap-1\"\r\n"
+                                  "Max-Connections: 20\r\nOptions-TTL: 60\r\nAllow: 204\r\nPreview: %d\r\n"
+                                  "Transfer-Complete: *\r\nEncapsulated: null-body=0\r\n\r\n" % self.preview).encode())
+                    continue
+                offsets = {}
+                for part in headers.get("encapsulated", "").split(","):
+                    key, _, value = part.strip().partition("=")
+                    if value.isdigit():
+                        offsets[key] = int(value)
+                http_len = (offsets.get("req-body") or offsets.get("res-body") or offsets.get("null-body") or 0)
+                http_head, buf = self._read_exact(conn, buf, http_len)
+                body, ieof = b"", True
+                if "req-body" in offsets or "res-body" in offsets:
+                    body, ieof, buf = self._read_chunks(conn, buf)
+                    if not ieof and "preview" in headers:
+                        blocked_early = self.marker in body
+                        if not blocked_early:
+                            conn.sendall(b"ICAP/1.0 100 Continue\r\n\r\n")
+                            more, _, buf = self._read_chunks(conn, buf)
+                            body += more
+                blocked = self.marker in body
+                self.requests.append({"method": method, "icap_headers": headers, "http_head": http_head.decode("latin-1"),
+                                      "body": body, "blocked": blocked})
+                if blocked:
+                    page = b"<html><body>Blocked by FakeIcap</body></html>"
+                    http = b"HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\nContent-Length: %d\r\n\r\n" % len(page)
+                    conn.sendall(b"ICAP/1.0 200 OK\r\nISTag: \"fake-icap-1\"\r\nEncapsulated: res-hdr=0, res-body=%d\r\n\r\n" % len(http)
+                                 + http + (b"%x\r\n" % len(page)) + page + b"\r\n0\r\n\r\n")
+                else:
+                    conn.sendall(b"ICAP/1.0 204 No Content\r\nISTag: \"fake-icap-1\"\r\nEncapsulated: null-body=0\r\n\r\n")
+        except (OSError, ValueError):
+            return
+        finally:
+            conn.close()
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self.sock.close()
+        self.thread.join(5)
+
+
 if __name__ == "__main__":
-    kinds = {"vault": FakeVault, "s3": FakeS3, "sink": TcpSink}
+    kinds = {"vault": FakeVault, "s3": FakeS3, "sink": TcpSink, "icap": FakeIcap}
     if len(sys.argv) < 2 or sys.argv[1] not in kinds:
-        sys.exit("usage: dummy_servers.py vault|s3|sink [PORT]")
+        sys.exit("usage: dummy_servers.py vault|s3|sink|icap [PORT]")
     with kinds[sys.argv[1]](int(sys.argv[2]) if len(sys.argv) > 2 else 0) as dummy:
         print("%s listening on port %d; Ctrl-C to stop" % (sys.argv[1], dummy.port), flush=True)
         try:

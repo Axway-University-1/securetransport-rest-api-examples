@@ -1,0 +1,74 @@
+#!/bin/bash
+# ==============================================================================
+# Script Name: 01.icapServers_GET.sh
+# Author: Plamen Milenkov
+# Created: 2026-10-07
+# Location: Sofia
+# ==============================================================================
+# Description:
+# This script lists the ICAP servers using the `/icapServers` endpoint: the antivirus
+# or data loss prevention servers SecureTransport sends transfers to, to be scanned.
+# It demonstrates:
+# - Counting them, and listing them with their type, address and whether enabled
+# - Only the enabled ones, with serverEnabled=
+# - One server by its name, with basicSettings.name=
+# - Only the ones of one type, with basicSettings.type=
+#
+# Usage:
+# ./01.icapServers_GET.sh [NAME [TYPE]]
+#
+#   NAME  list the server with exactly this name (optional)
+#   TYPE  only the servers of this type: INCOMING, OUTGOING or BOTH (optional)
+#
+# Notes:
+# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - An ICAP server scans transfers only for the business units that list it in
+#   enabledIcapServers (see 12.BusinessUnits), and only while it is enabled.
+# - Confirmed directly: the answer is {resultSet, result}. basicSettings.name= and
+#   basicSettings.url= are matched exactly: no * wildcard, and not without regard to
+#   case. A type that does not exist answers 400 "Unknown name value ... for enum
+#   class".
+# - Requires `jq`, which prints one server per line.
+# ==============================================================================
+
+#
+# Get the directory of this script, so that it can be run from any location
+#
+SCRIPT_DIR=$(dirname "$(realpath "$0")")
+
+source "${SCRIPT_DIR}/../set_variables.sh"
+
+REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
+MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/icapServers"
+NAME="$1"
+TYPE="$2"
+if [ -n "${TYPE}" ] && ! [[ "${TYPE}" =~ ^(INCOMING|OUTGOING|BOTH)$ ]]; then
+    printf "TYPE is INCOMING, OUTGOING or BOTH, not %s.\n" "${TYPE}"
+    exit 2
+fi
+LINE='"  \(.basicSettings.name)  \(.basicSettings.type)  \(.basicSettings.url)  \(if .serverEnabled then "enabled" else "disabled" end)"'
+FIELDS="serverEnabled,basicSettings.name,basicSettings.type,basicSettings.url"
+
+printf "ICAP servers: "
+curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?limit=1&fields=serverEnabled" -H "accept: application/json" -H "${REFERER_HEADER}" \
+  | jq -r '.resultSet.totalCount'
+
+printf "\nAll of them: name, type, address, enabled:\n"
+curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "fields=${FIELDS}" \
+  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+
+printf "\nOnly the enabled ones:\n"
+curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "serverEnabled=true" --data-urlencode "fields=${FIELDS}" \
+  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+
+if [ -n "${NAME}" ]; then
+    printf "\nThe one named %s:\n" "${NAME}"
+    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "basicSettings.name=${NAME}" --data-urlencode "fields=${FIELDS}" \
+      -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+fi
+
+if [ -n "${TYPE}" ]; then
+    printf "\nOnly the ones of type %s:\n" "${TYPE}"
+    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "basicSettings.type=${TYPE}" --data-urlencode "fields=${FIELDS}" \
+      -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+fi

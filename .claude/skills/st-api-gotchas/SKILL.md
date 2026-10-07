@@ -574,6 +574,25 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   arrival, and deleting an account leaves its home folder on disk: give a test
   upload a name of its own and delete it afterwards.
 
+- **ICAP servers** (`/icapServers`) scan a transfer only for the **business units that
+  list them in `enabledIcapServers`**, and only while `serverEnabled` is true; an
+  enabled server that no unit lists scans nothing, so a test can scope the scan to a
+  throwaway unit and leave every other transfer alone. Confirmed directly: ST sends
+  `OPTIONS`, then each file as a `REQMOD` with a preview (`X-Authenticated-User` is
+  `Local://<account>` in base64); a block (ICAP 200 with an HTTP 403) leaves the
+  transfer `Failed` and removes the file, after the file has first been listed (the scan
+  is asynchronous, a few seconds); several files may be scanned in any order. With the
+  server unreachable, `denyOnConnectionError` true refuses the file and false lets it
+  through; disabled, nothing is scanned. A PUT whose body has another
+  `basicSettings.name`, or a PATCH of `/basicSettings/name`, **renames** the server.
+  The `basicSettings.name`, `.url` and the other filters are exact (no `*`, case
+  sensitive); the `url` is not checked (`http://x` is accepted); maxSize and
+  previewSize are required. Deleting a server a unit still lists succeeds and takes it
+  out of that unit's list. `businessUnits?icapServer=` filters nothing (every value
+  lists every unit): read `enabledIcapServers` and select yourself. In a business
+  unit an account's home folder must end with the account name, so a fresh folder per
+  test run has to come from the unit's `baseFolder`.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

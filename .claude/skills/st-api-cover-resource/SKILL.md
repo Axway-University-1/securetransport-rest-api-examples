@@ -45,8 +45,8 @@ Delete them when the probe is done.
 
 Covered, in reference order: accessPolicies, accountSetup, accounts,
 addressBook, administrativeRoles, administrators, applications, businessUnits,
-certificates, configurations, daemons, deniedUsers, events, myself, servers,
-transfers, version.
+certificates, configurations, daemons, deniedUsers, events, icapServers, myself,
+servers, transfers, version.
 
 Left out on purpose: **clusterServices** and the cluster-only configuration
 operations (the lab is standalone), the Oracle-only `database/{componentType}`,
@@ -54,7 +54,7 @@ changing the database connection, replication operations. `coverage.py`
 still counts these 13 configurations operations and 2 clusterServices ones as
 missing; that is expected.
 
-**Next, in order:** icapServers, ldapDomains,
+**Next, in order:** ldapDomains,
 loginRestrictionPolicies (partly in `14.ExpressionLanguage`), logs,
 mailTemplates, routes, routeStepsMetadata, routeStepsCharsets, sessions, sites, siteTemplates, statisticsSummary, subscriptions,
 transactionManager, transferProfiles, userClasses, zones. Run `coverage.py` for

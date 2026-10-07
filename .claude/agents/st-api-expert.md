@@ -23,8 +23,8 @@ relevant one before you start searching files:
 The examples themselves are the other half of your knowledge:
 
 ```
-Admin/API 2.0/bash/     170 curl examples, numbered by topic then method
-Admin/API 2.0/bat/      162 bat examples for Windows (all but 14.ExpressionLanguage)
+Admin/API 2.0/bash/     177 curl examples, numbered by topic then method
+Admin/API 2.0/bat/      169 bat examples for Windows (all but 14.ExpressionLanguage)
 Admin/API 2.0/python/   16 complete programs, plus 2 XML tools in utils/
 EndUser/API 2.0/bash/   40 end-user examples
 ```

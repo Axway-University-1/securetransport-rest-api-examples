@@ -129,6 +129,7 @@ assumption about the API.
 | `40.configurations_scripts.py` | **yes** | The real `13.Configurations` examples 03 to 47: the read-only ones as they are; two options, the file archiving and the node threshold settings changed and put back exactly; the database connection test with a wrong password; the login settings with a PATCH to the value they have; and, against stand-ins on this machine (see below), Sentinel sending its heartbeat to a TCP sink, an external store logging in to a fake HashiCorp Vault and reading a secret, and an S3 storage profile reaching a fake bucket. Not run: maintenance mode and the keystore password. Needs `st_callback_host` for the stand-ins. Every setting it touches is compared with its value before, at the end. |
 | `41.denied_users_scripts.py` | **yes** | The real `22.DeniedUsers` examples: blocks a login name for good and one with a space for two hours, lists with each filter (permanent, temporary, since a date), shows a duplicate, a blank name and a 0 or negative number of hours refused, and unblocks them; a name differing only in case is blocked through the API to show that removing one leaves the other. Then two throwaway end user accounts: both log in through the EndUser API, one is blocked with the real script and is refused (401 "Login failed") while the other still gets in, and it logs in again once unblocked. Ends by comparing the whole list with the one it started with, and checking both accounts are gone. |
 | `42.events_scripts.py` | **yes** | The real `23.Events` examples against a live event. An event exists only while a file is processed, so it builds a flow that holds one: an end user account, an Advanced Routing application, a subscription, a route that sends to an SSH partner, and that partner, a silent TcpSink on this machine. A file is uploaded with the real EndUser example; the event is listed with each filter (a status in capitals finds nothing), read, and deleted together with an id that does not exist. Needs `st_callback_host`. Removes everything, and never an event of another account. |
+| `43.icap_servers_scripts.py` | **yes** | The real `24.IcapServers` examples, in two parts. First all seven against disabled servers pointing nowhere (add, list and filter, check, read, replace, change, delete; a name with a space; a PUT that does not rename; a delete that succeeds although a business unit lists the server). Then what a server is for: a FakeIcap on this machine plays the antivirus, a throwaway business unit lists the server and has a throwaway end user account in it, and files are uploaded with the real EndUser example. A clean file is let through and one with the marker text is blocked (transfer Failed, file removed); with the ICAP server gone a file passes when denyOnConnectionError is false and is refused when it is true; disabled, nothing is scanned. Needs `st_callback_host` for the second part. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -186,13 +187,14 @@ each in a thread, on a port the system picks:
 - `FakeVault` - a HashiCorp Vault: an AppRole login, then KV version 2 reads.
 - `FakeS3` - an S3 service, path style, any credentials, objects in memory.
 - `TcpSink` - accepts connections and keeps what arrives, for Sentinel.
+- `FakeIcap` - an ICAP server (OPTIONS, then REQMOD with a preview): lets a file through with 204, or blocks one that holds the marker text with a 403, and records each scan.
 
 The server must be able to connect back to this machine: set `st_callback_host`
 in integration.conf to this machine's address as the server sees it (through a
 VPN, the address the VPN gives it). Without it, the parts that need a stand-in
 are skipped. `tests/checks/test_dummy_servers.py` checks the stand-ins
 themselves, offline. To keep one up by hand while trying an example:
-`python3 tests/integration/lib/dummy_servers.py vault|s3|sink [PORT]`.
+`python3 tests/integration/lib/dummy_servers.py vault|s3|sink|icap [PORT]`.
 
 ## Adding a check
 
@@ -205,7 +207,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `42` cover: the admin API's session and read behaviour (both as
+`01` through `43` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -225,7 +227,7 @@ python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
 both acknowledgment scripts on a PeSIT loop of their own (`32`), the
 EndUser examples for every resource of its API reference (`33`), and the Admin
-examples added resource by resource from its reference (`34` to `42`).
+examples added resource by resource from its reference (`34` to `43`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a

@@ -895,6 +895,98 @@ run "${F}/03.events_operations_POST_delete.sh"
 nothing_sent "03 POST: no ids, so nothing is deleted and nothing is sent"
 
 echo
+echo "=== 24.IcapServers ==="
+F=24.IcapServers
+U="${BASE}/icapServers"
+FIELDS="serverEnabled%2CbasicSettings.name%2CbasicSettings.type%2CbasicSettings.url"
+ICAPS='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"serverEnabled":true,"basicSettings":{"name":"example_icap","type":"INCOMING","url":"icap://h:1344/AVSCAN"}},{"serverEnabled":false,"basicSettings":{"name":"other icap","type":"BOTH","url":"icap://o:1344/REQMOD"}}]}'
+GET_BODY=$(body icaps "${ICAPS}")
+run "${F}/01.icapServers_GET.sh" example_icap INCOMING
+expect "01 GET: the count, all, enabled, one by name, one type" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=serverEnabled
+GET ${U}?fields=${FIELDS//%2C/,}
+GET ${U}?serverEnabled=true&fields=${FIELDS//%2C/,}
+GET ${U}?basicSettings.name=example_icap&fields=${FIELDS//%2C/,}
+GET ${U}?basicSettings.type=INCOMING&fields=${FIELDS//%2C/,}"
+has "01 GET: an enabled server" "  example_icap  INCOMING  icap://h:1344/AVSCAN  enabled"
+has "01 GET: a disabled one, name with a space" "  other icap  BOTH  icap://o:1344/REQMOD  disabled"
+run "${F}/01.icapServers_GET.sh"
+expect "01 GET: no name or type, so only three calls" "$(calls | wc -l | tr -d ' ')" "3"
+run "${F}/01.icapServers_GET.sh" "" SIDEWAYS
+expect "01 GET: an unknown TYPE is refused, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=
+
+STATUS=201 LOCATION=example_icap run "${F}/02.icapServers_POST.sh"
+expect "02 POST: POST /icapServers" "${RC}:$(calls)" "0:POST ${U}"
+expect "02 POST: created disabled, with the defaults" "$(payload 1 | jq -c '[.serverEnabled, .basicSettings.name, .basicSettings.type, .basicSettings.url, .basicSettings.maxSize, .basicSettings.previewSize, .basicSettings.denyOnConnectionError]')" \
+  '[false,"example_icap","INCOMING","icap://icap.example.com:1344/AVSCAN",10,1024,false]'
+has "02 POST: where it is, from Location" "It is at ${U}/example_icap"
+STATUS=201 LOCATION=x run "${F}/02.icapServers_POST.sh" "a name" icap://h:1344/REQMOD BOTH
+expect "02 POST: a name with a space, the address and type given" "$(payload 1 | jq -c '[.basicSettings.name, .basicSettings.url, .basicSettings.type]')" '["a name","icap://h:1344/REQMOD","BOTH"]'
+STATUS=409 run "${F}/02.icapServers_POST.sh"
+expect "02 POST: a name that exists (409) exits 1" "${RC}" "1"
+for ARGS in "a/b" "a;b" "a'b" "x http://h/s" "x icap://h INCOMING" "x icap://h/s SIDEWAYS"; do
+    # shellcheck disable=SC2086
+    set -- ${ARGS}
+    run "${F}/02.icapServers_POST.sh" "$@"
+    nothing_sent "02 POST: refuses '${ARGS}', nothing sent"
+done
+run "${F}/02.icapServers_POST.sh" " "
+nothing_sent "02 POST: a blank NAME is refused, nothing sent"
+
+run "${F}/03.icapServers_name_HEAD.sh"
+expect "03 HEAD: example_icap by default" "${RC}:$(calls)" "0:HEAD ${U}/example_icap"
+STATUS=404 run "${F}/03.icapServers_name_HEAD.sh" "a name"
+expect "03 HEAD: a name with a space is encoded; 404 exits 1" "${RC}:$(calls)" "1:HEAD ${U}/a%20name"
+
+ICAP='{"serverEnabled":true,"basicSettings":{"name":"example_icap","type":"INCOMING","url":"icap://h:1344/AVSCAN","maxSize":10,"previewSize":1024,"denyOnConnectionError":true},"scanFilteringSettings":{"policyExpression":""},"metadata":{"links":{}}}'
+BUS='{"result":[{"name":"unit_a","enabledIcapServers":["example_icap","x"]},{"name":"unit_b","enabledIcapServers":["x"]},{"name":"unit_c"}]}'
+SEQUENCE=$(sequence icap_one "${ICAP}" "${BUS}")
+run "${F}/04.icapServers_name_GET.sh"
+expect "04 GET: the server, then the business units" "${RC}:$(calls)" "0:GET ${U}/example_icap
+GET ${BASE}/businessUnits?limit=500&fields=name,enabledIcapServers"
+has "04 GET: the summary" "  example_icap: INCOMING icap://h:1344/AVSCAN, enabled"
+has "04 GET: the limits and what happens when unreachable" "  when it cannot be reached: the transfer is denied"
+has "04 GET: no scan policy means every transfer" "  scan policy: none, every transfer"
+expect "04 GET: only the units that list it" "$(printf '%s\n' "${OUT}" | grep -c '^  unit_')" "1"
+has "04 GET: that unit" "  unit_a"
+SEQUENCE=
+STATUS_GET=404 run "${F}/04.icapServers_name_GET.sh" "a name"
+expect "04 GET: a missing server (404) exits 1, encoded" "${RC}:$(calls | head -n 1)" "1:GET ${U}/a%20name"
+
+GET_BODY=$(body icap_put "${ICAP}")
+STATUS=204 run "${F}/05.icapServers_name_PUT.sh" example_icap 25
+expect "05 PUT: reads, then PUT" "${RC}:$(calls)" "0:GET ${U}/example_icap
+PUT ${U}/example_icap"
+expect "05 PUT: the whole server, maxSize changed, metadata dropped" "$(payload 1 | jq -c '[.basicSettings.maxSize, .basicSettings.previewSize, .serverEnabled, has("metadata")]')" '[25,1024,true,false]'
+has "05 PUT: prints the value before" "maxSize of example_icap is now 10 MB."
+STATUS=204 run "${F}/05.icapServers_name_PUT.sh" "other icap" 5
+expect "05 PUT: the name stays the one in the path, so it cannot rename" "$(payload 1 | jq -r '.basicSettings.name')" "other icap"
+run "${F}/05.icapServers_name_PUT.sh" example_icap many
+nothing_sent "05 PUT: MAX_MB must be a number, nothing sent"
+GET_BODY=
+STATUS=400 run "${F}/05.icapServers_name_PUT.sh"
+expect "05 PUT: no such server, exit 1, nothing put" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+
+STATUS=204 run "${F}/06.icapServers_name_PATCH.sh" example_icap true true
+expect "06 PATCH: PATCH the server" "${RC}:$(calls)" "0:PATCH ${U}/example_icap"
+expect "06 PATCH: enabled, and deny when unreachable" "$(payload 1 | jq -c '[.[] | [.path, .value]]')" '[["/serverEnabled",true],["/basicSettings/denyOnConnectionError",true]]'
+STATUS=204 run "${F}/06.icapServers_name_PATCH.sh"
+expect "06 PATCH: off by default, and the deny setting left alone" "$(payload 1 | jq -c '[.[] | [.path, .value]]')" '[["/serverEnabled",false]]'
+run "${F}/06.icapServers_name_PATCH.sh" example_icap maybe
+nothing_sent "06 PATCH: ENABLED is true or false, nothing sent"
+run "${F}/06.icapServers_name_PATCH.sh" example_icap true 1
+nothing_sent "06 PATCH: DENY_ON_ERROR is true or false, nothing sent"
+STATUS=404 run "${F}/06.icapServers_name_PATCH.sh" nope
+expect "06 PATCH: no such server (404) exits 1" "${RC}" "1"
+
+STATUS=204 run "${F}/07.icapServers_name_DELETE.sh"
+expect "07 DELETE: example_icap by default" "${RC}:$(calls)" "0:DELETE ${U}/example_icap"
+STATUS=204 run "${F}/07.icapServers_name_DELETE.sh" "a name/x"
+expect "07 DELETE: the name is URL-encoded once" "$(calls)" "DELETE ${U}/a%20name%2Fx"
+STATUS=404 run "${F}/07.icapServers_name_DELETE.sh" nope
+expect "07 DELETE: not found (404) exits 1" "${RC}" "1"
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else
