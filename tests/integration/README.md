@@ -127,6 +127,7 @@ assumption about the API.
 | `38.business_units_scripts.py` | **yes** | The real `12.BusinessUnits` examples 02 to 07 on a throwaway unit and a nested one whose name has a space, with one account in it: list, check, read and count the account, PUT and PATCH, the delete refused while a nested unit or an account remains, then the deletes. |
 | `39.certificates_scripts.py` | **yes** | The real `11.Certificates` examples: generates `example_cert` with the server's CA, checks the 40 and 20 day expiry searches, reads and patches it, exports it as pem, crt and pkcs12, imports the pem as a throwaway account's partner certificate; then a signing request generated, listed and read, signed by a throwaway CA made with openssl, and completed, and a second one deleted. Needs `st_ca_password`; the signing needs openssl. Removes the files the examples write into their folder. |
 | `40.configurations_scripts.py` | **yes** | The real `13.Configurations` examples 03 to 47: the read-only ones as they are; two options, the file archiving and the node threshold settings changed and put back exactly; the database connection test with a wrong password; the login settings with a PATCH to the value they have; and, against stand-ins on this machine (see below), Sentinel sending its heartbeat to a TCP sink, an external store logging in to a fake HashiCorp Vault and reading a secret, and an S3 storage profile reaching a fake bucket. Not run: maintenance mode and the keystore password. Needs `st_callback_host` for the stand-ins. Every setting it touches is compared with its value before, at the end. |
+| `41.denied_users_scripts.py` | **yes** | The real `22.DeniedUsers` examples: blocks a login name for good and one with a space for two hours, lists with each filter (permanent, temporary, since a date), shows a duplicate, a blank name and a 0 or negative number of hours refused, and unblocks them; a name differing only in case is blocked through the API to show that removing one leaves the other. Then two throwaway end user accounts: both log in through the EndUser API, one is blocked with the real script and is refused (401 "Login failed") while the other still gets in, and it logs in again once unblocked. Ends by comparing the whole list with the one it started with, and checking both accounts are gone. |
 
 Where a server is more permissive than expected — for example if it accepts a
 call with no `Referer`, or tolerates `replace` on an unset field — the check
@@ -203,7 +204,7 @@ Drop a numbered file into `checks/`. It should:
 
 ## What is not covered yet
 
-`01` through `40` cover: the admin API's session and read behaviour (both as
+`01` through `41` cover: the admin API's session and read behaviour (both as
 a harness client and as the real Authentication/Introduction scripts,
 including the one PATCH script that changes its own caller's password), the
 full account lifecycle, applications, server CRUD, business units, transfer
@@ -223,7 +224,7 @@ python3 - and the sites, subscriptions, routes, pull and transfer log
 examples as one working flow, with the lookups they rely on (`30`, `31`), and
 both acknowledgment scripts on a PeSIT loop of their own (`32`), the
 EndUser examples for every resource of its API reference (`33`), and the Admin
-examples added resource by resource from its reference (`34` to `40`).
+examples added resource by resource from its reference (`34` to `41`).
 `manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
 reasons of its own documented below.
 Real bugs in the shipped examples were found and fixed getting here - a

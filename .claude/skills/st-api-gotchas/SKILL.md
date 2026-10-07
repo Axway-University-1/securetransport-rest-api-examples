@@ -541,6 +541,23 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   a no-op. Some option groups the list returns answer 501 when read.
   `allowedSTServers` answers 404 on a standalone server.
 
+- **Denied users** (`/deniedUsers`): only GET, POST and DELETE; GET or HEAD on one
+  name answers 405. POST answers 201 with the entry's address in `Location` and
+  no body. `ttl` is in hours and left out for a permanent block (`blockedUntil`
+  null). **POST accepts an empty `loginName`, and the entry can then not be
+  removed through the API** (DELETE with an empty name is 405, with a space or
+  a NUL it is "not found"); also 0, negative and absurd `ttl` values, which
+  give entries that have already expired. Check both before sending. A
+  duplicate is 400; DELETE of a name not in the list is 400, not 404. An
+  expired temporary entry stays listed until the server's blocked-users cleaner
+  removes it. The `loginName` filter ignores case but entries are case
+  sensitive: `example_denied` and `EXAMPLE_DENIED` coexist, and DELETE takes the
+  exact name. The date filters take yyyy-MM-dd, RFC 2822 or a millisecond
+  timestamp. A blocked name is refused at the EndUser login (`POST /myself`)
+  with 401 "Login failed. Re-submit your credentials." - the same text as a
+  wrong password, so test with a login that worked just before - and logs in
+  again as soon as the entry is removed; other accounts are unaffected.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

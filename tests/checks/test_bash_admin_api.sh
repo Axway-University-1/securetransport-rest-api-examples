@@ -796,6 +796,55 @@ expect "47 PUT: the last one leaves [\"\"], not []" "$(payload 1 | jq -c '.[0].v
 GET_BODY=
 
 echo
+echo "=== 22.DeniedUsers ==="
+F=22.DeniedUsers
+U="${BASE}/deniedUsers"
+DENIED='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"loginName":"example_denied","blockedAt":"Wed, 07 Oct 2026 08:01:03 +0300","blockedUntil":null,"blockedBy":"admin","note":"first"},{"loginName":"example_temp","blockedAt":"Wed, 07 Oct 2026 08:01:03 +0300","blockedUntil":"Wed, 07 Oct 2026 11:01:03 +0300","blockedBy":"admin","note":null}]}'
+GET_BODY=$(body denied "${DENIED}")
+run "${F}/01.deniedUsers_GET.sh" "example*" 2026-10-07
+expect "01 GET: the count, the pattern, permanent, temporary, since" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=loginName
+GET ${U}?loginName=example*
+GET ${U}?loginName=example*&isPermanent=true
+GET ${U}?loginName=example*&isPermanent=false
+GET ${U}?loginName=example*&blockedAt.from=2026-10-07"
+has "01 GET: a permanent entry" "  example_denied  permanent  by admin  first"
+has "01 GET: a temporary one, with the date it ends and no note" "  example_temp  until Wed, 07 Oct 2026 11:01:03 +0300  by admin  "
+run "${F}/01.deniedUsers_GET.sh"
+expect "01 GET: every name by default, no since query" "$(calls | sed -n '2p'):$(calls | wc -l | tr -d ' ')" "GET ${U}?loginName=*:4"
+run "${F}/01.deniedUsers_GET.sh" "*" 07/10/2026
+nothing_sent "01 GET: SINCE must be yyyy-MM-dd, nothing sent"
+GET_BODY=
+
+STATUS=201 LOCATION=example_denied run "${F}/02.deniedUsers_POST.sh"
+expect "02 POST: POST /deniedUsers" "${RC}:$(calls)" "0:POST ${U}"
+expect "02 POST: permanent by default, so no ttl, and no note" "$(payload 1 | jq -c .)" '{"loginName":"example_denied"}'
+has "02 POST: where the entry is, from the Location header" "It is at ${U}/example_denied"
+has "02 POST: says for good" "Blocking example_denied for good..."
+STATUS=201 LOCATION=x run "${F}/02.deniedUsers_POST.sh" "a name" 5 "why not"
+expect "02 POST: a name with a space, ttl as a number, and the note" "$(payload 1 | jq -c .)" '{"loginName":"a name","ttl":5,"note":"why not"}'
+has "02 POST: says for how long" "Blocking a name for 5 hours..."
+STATUS=400 run "${F}/02.deniedUsers_POST.sh"
+expect "02 POST: 'already exists' (400) exits 1" "${RC}" "1"
+for BAD in "" " "; do
+    run "${F}/02.deniedUsers_POST.sh" "${BAD}"
+    [ -z "${BAD}" ] && continue
+    nothing_sent "02 POST: a blank LOGIN_NAME is refused, nothing sent"
+done
+for HOURS in 0 -1 two 1.5; do
+    run "${F}/02.deniedUsers_POST.sh" example_denied "${HOURS}"
+    nothing_sent "02 POST: HOURS '${HOURS}' is refused, nothing sent"
+done
+
+STATUS=204 run "${F}/03.deniedUsers_name_DELETE.sh"
+expect "03 DELETE: example_denied by default" "${RC}:$(calls)" "0:DELETE ${U}/example_denied"
+STATUS=204 run "${F}/03.deniedUsers_name_DELETE.sh" "a name/with+odd&chars"
+expect "03 DELETE: the name goes into the path URL-encoded once" "$(calls)" "DELETE ${U}/a%20name%2Fwith%2Bodd%26chars"
+STATUS=400 run "${F}/03.deniedUsers_name_DELETE.sh" example_nope
+expect "03 DELETE: a name not in the list (400) exits 1" "${RC}" "1"
+run "${F}/03.deniedUsers_name_DELETE.sh" " "
+nothing_sent "03 DELETE: a blank LOGIN_NAME is refused, nothing sent"
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

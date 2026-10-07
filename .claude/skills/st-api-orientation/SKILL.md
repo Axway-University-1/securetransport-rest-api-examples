@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     164 curl examples, numbered by topic
-    bat/      156 of them, for Windows
+    bash/     167 curl examples, numbered by topic
+    bat/      159 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -81,6 +81,7 @@ create, read, update, delete cycle for that object.
 | Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
 | Change an address book source | `bash/19.AddressBook/` |
 | Create administrative roles and administrators; lock one; give one an API key | `bash/20.AdministrativeRoles/`, `bash/21.Administrators/` |
+| Block a login name, for good or for hours, list the blocked ones, unblock one | `bash/22.DeniedUsers/` |
 | Correlate PeSIT transfers and send ACK or NACK | `bash/90.EndToEndAcknowledgment/` |
 | Use SecureTransport's Expression Language in a route condition, a file filter, a rename pattern or a login restriction rule | `bash/14.ExpressionLanguage/` (also in `python/python3/14.ExpressionLanguage/`) |
 | Upload or download files as an end user | `EndUser/API 2.0/bash/02.Files/` |

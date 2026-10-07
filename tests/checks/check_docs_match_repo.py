@@ -67,6 +67,7 @@ rows = [("01. Authentication", "01.Authentication"),
         ("20. Administrative Roles", "20.AdministrativeRoles"),
         ("21. Administrators", "21.Administrators"),
         ("11. Certificates", "11.Certificates"),
+        ("22. Denied Users", "22.DeniedUsers"),
         ("90. End To End Acknowledgment", "90.EndToEndAcknowledgment")]
 
 for label, folder in rows:
