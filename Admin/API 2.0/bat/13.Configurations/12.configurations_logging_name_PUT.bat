@@ -26,7 +26,7 @@ REM - Confirmed directly: on a server where the option was never set, a PUT
 REM   answers 400 "Option ... is not eligible for propagation because its
 REM   initial configuration is not fetched yet." and nothing changes.
 REM - Changes the server's logging: try it on a test server first.
-REM - PowerShell is used to looks the profile up, in place of jq.
+REM - PowerShell is used to look the profile up, in place of jq.
 REM ==============================================================================
 
 SETLOCAL

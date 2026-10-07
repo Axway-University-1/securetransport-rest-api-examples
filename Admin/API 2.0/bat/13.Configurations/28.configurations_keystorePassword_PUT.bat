@@ -19,7 +19,7 @@ REM - NOT RUN on the shared lab these examples were checked against: it changes
 REM   the whole server, and cannot simply be undone. Its request is checked
 REM   offline, against a stub.
 REM - OLD_KEYSTORE_PASSWORD and NEW_KEYSTORE_PASSWORD are read from the
-REM   environment, so export them first:
+REM   environment, so set them first:
 REM     SET OLD_KEYSTORE_PASSWORD=the current password
 REM     SET NEW_KEYSTORE_PASSWORD=the new password
 REM - Keep the new password safe: the keystore holds the server's private keys.

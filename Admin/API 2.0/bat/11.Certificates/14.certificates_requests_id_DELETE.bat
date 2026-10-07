@@ -19,7 +19,7 @@ REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A certificate the CA signs for a deleted request can no longer be
 REM   completed: its private key is gone.
-REM - PowerShell is used to looks the id up, in place of jq.
+REM - PowerShell is used to look the id up, in place of jq.
 REM ==============================================================================
 
 SETLOCAL

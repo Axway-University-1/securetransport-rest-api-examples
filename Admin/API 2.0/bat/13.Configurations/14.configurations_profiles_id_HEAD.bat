@@ -19,7 +19,7 @@ REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - A profile's id is a number, and may be negative.
-REM - PowerShell is used to looks the id up, in place of jq.
+REM - PowerShell is used to look the id up, in place of jq.
 REM ==============================================================================
 
 SETLOCAL

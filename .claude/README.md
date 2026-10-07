@@ -11,6 +11,9 @@ These are ordinary markdown files. Open them:
 | [skills/st-api-orientation/SKILL.md](skills/st-api-orientation/SKILL.md) | What is in the repository, how to configure and run it, and a task-to-example index. **Start here.** |
 | [skills/st-api-gotchas/SKILL.md](skills/st-api-gotchas/SKILL.md) | The non-obvious traps in the API and in scripting against it. The most useful file here — read it before writing a call, not after it fails. |
 | [skills/st-api-add-example/SKILL.md](skills/st-api-add-example/SKILL.md) | The house style, for when you add or change an example. |
+| [skills/st-api-cover-resource/SKILL.md](skills/st-api-cover-resource/SKILL.md) | The end-to-end procedure for covering one Admin API resource, what is done and what is next, and the tools in `scripts/` it uses. |
+| [agents/st-api-expert.md](agents/st-api-expert.md) | Answers questions about the API from the examples. |
+| [agents/st-api-resource-author.md](agents/st-api-resource-author.md) | Covers one Admin resource by that procedure, on Sonnet. |
 
 ## Keeping this honest
 

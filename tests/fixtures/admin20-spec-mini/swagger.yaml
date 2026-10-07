@@ -1,0 +1,38 @@
+openapi: 3.0.1
+info:
+  title: A synthetic slice of the Admin API reference, for the authoring tools' test
+tags:
+  - name: widgets
+  - name: gadgets
+paths:
+  /gadgets:
+    get:
+      tags:
+        - gadgets
+      summary: Get gadgets.
+      parameters:
+        - name: limit
+          in: query
+  /widgets:
+    get:
+      tags:
+        - widgets
+      summary: Get widgets.
+    post:
+      tags:
+        - widgets
+      summary: Create a widget.
+  /widgets/{name}:
+      head:
+        tags:
+          - widgets
+        summary: Check if a widget exists.
+        parameters:
+          - name: name
+            in: path
+      delete:
+        tags:
+          - widgets
+        summary: Delete a widget.
+components:
+  schemas: {}

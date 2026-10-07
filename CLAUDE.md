@@ -17,8 +17,36 @@ No script or behaviour change is done until a test covers it.
 - Test data is synthetic. Nothing from a real server goes into `tests/fixtures/`;
   captured data belongs in `tests/local/`, which git ignores.
 
-CI (`.github/workflows/tests.yml`) runs `tests/run_all.sh` on every push and pull
-request. Also follow `.claude/skills/st-api-add-example` for house style.
+CI (`.github/workflows/tests.yml`) runs `tests/run_all.sh` on **Linux** on every
+push and pull request; check it after a push. Also follow
+`.claude/skills/st-api-add-example` for house style.
+
+## Admin API coverage
+
+Examples are being added one Admin API resource at a time, in the order of the
+API reference. `.claude/skills/st-api-cover-resource` is the procedure, the
+list of what is done and what is next, and the tools (spec, coverage, lab,
+generators, docs sync). Follow it step by step; update its list when a
+resource is done.
+
+## Which model
+
+- **Sonnet** for covering the next resource by that procedure: reading the
+  reference, probing the lab, writing the scripts, bat twins, tests and docs.
+  `.claude/agents/st-api-resource-author.md` runs it as a subagent.
+- **Opus** for what the procedure does not cover: a new kind of stand-in
+  server, a change to the test harness or the tools, a lab finding that
+  changes what an example should teach, a CI failure that does not reproduce
+  on macOS, and reviewing a finished resource before it is committed.
+
+## Safety on the lab
+
+- Probe with throwaway `example_*` objects; put any changed setting back
+  exactly and compare it with the saved copy.
+- Never run what changes the whole server and cannot be undone (maintenance
+  mode, the keystore password, the database connection).
+- Stop only processes you started, by PID, after checking their command and
+  working folder.
 
 ## Feature examples
 

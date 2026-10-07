@@ -20,7 +20,7 @@ REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: the answer is the request's JSON only, never the CSR;
 REM   asking for anything but JSON answers 406. Keep the CSR
 REM   09.certificates_requests_POST.bat writes.
-REM - PowerShell is used to looks the id up, in place of jq.
+REM - PowerShell is used to look the id up, in place of jq.
 REM ==============================================================================
 
 SETLOCAL

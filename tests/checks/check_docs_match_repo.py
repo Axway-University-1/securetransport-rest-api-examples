@@ -105,7 +105,10 @@ print("=== the .claude skills still describe this repository ===")
 
 pack = glob.glob(os.path.join(REPO, ".claude/skills/*/SKILL.md")) + \
        glob.glob(os.path.join(REPO, ".claude/agents/*.md"))
-chk("the knowledge pack is present", len(pack) == 4, len(pack))
+PACK = ["skills/st-api-orientation/SKILL.md", "skills/st-api-gotchas/SKILL.md", "skills/st-api-add-example/SKILL.md",
+        "skills/st-api-cover-resource/SKILL.md", "agents/st-api-expert.md", "agents/st-api-resource-author.md"]
+have_pack = sorted(os.path.relpath(p, os.path.join(REPO, ".claude")) for p in pack)
+chk("the knowledge pack is present, and nothing in it is unlisted here", have_pack == sorted(PACK), have_pack)
 
 for p in pack:
     text = open(p).read()

@@ -38,8 +38,11 @@ Rules learned the hard way:
 - a dot after the number, then underscores inside the name
 - the `Script Name:` line in the header must match the actual filename
 
-A new topic folder uses the next free number. The existing gaps (10, 11) are
-reserved for Transfer Profiles and Certificates.
+A new topic folder uses the next free number; 10 is free.
+
+**Covering a whole Admin resource** (every operation of one API tag) is a
+procedure of its own, with tools that write these headers for you: use
+**st-api-cover-resource**. This skill is the style it applies.
 
 ## The file header
 

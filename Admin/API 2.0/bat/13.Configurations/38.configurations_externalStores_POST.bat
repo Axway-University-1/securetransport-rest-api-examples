@@ -20,7 +20,7 @@ REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The store is example_vault.
 REM - VAULT_ROLE_ID and VAULT_SECRET_ID, the AppRole's credentials, are read from
-REM   the environment, so export them first:
+REM   the environment, so set them first:
 REM     SET VAULT_ROLE_ID=the role id
 REM     SET VAULT_SECRET_ID=the secret id
 REM - ${vault.api.auth.token} in the headers is replaced by the token the login

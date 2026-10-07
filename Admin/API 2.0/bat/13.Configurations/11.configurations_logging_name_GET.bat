@@ -24,7 +24,7 @@ REM - The XML is written to NAME.xml, in the current folder.
 REM - Confirmed directly: the JSON never holds the XML; ask for it with
 REM   "accept: application/xml". An option with no XML set answers 204, and the
 REM   server then uses its own default configuration.
-REM - PowerShell is used to looks the profile up, in place of jq.
+REM - PowerShell is used to look the profile up, in place of jq.
 REM ==============================================================================
 
 SETLOCAL

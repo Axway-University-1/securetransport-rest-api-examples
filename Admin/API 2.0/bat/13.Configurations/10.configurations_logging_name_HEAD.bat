@@ -20,7 +20,7 @@ REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Each logging option belongs to a configuration profile; profileId says which, and is required.
-REM - PowerShell is used to looks the profile up, in place of jq.
+REM - PowerShell is used to look the profile up, in place of jq.
 REM ==============================================================================
 
 SETLOCAL

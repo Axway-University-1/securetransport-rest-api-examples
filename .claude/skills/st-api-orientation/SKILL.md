@@ -90,7 +90,9 @@ create, read, update, delete cycle for that object.
 | Checksum a file on the server, upload in chunks, cancel an upload | `EndUser/API 2.0/bash/04.FileOperations/` |
 | Pull, push or run a folder monitor as an end user, and read the user's own transfer log | `EndUser/API 2.0/bash/05.Transfers/` |
 
-The numbering has gaps (10 and 11 are absent). Those topics have no examples yet.
+The numbering has one gap: 10 is free. Folders 17 and up follow the Admin API
+reference's order, one resource each; see **st-api-cover-resource** for how they
+are added and what is next.
 
 ## The python examples are a different kind of thing
 

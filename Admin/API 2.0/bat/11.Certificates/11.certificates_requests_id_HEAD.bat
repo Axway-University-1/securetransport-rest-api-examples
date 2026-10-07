@@ -19,7 +19,7 @@ REM
 REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: a completed request is gone, 404.
-REM - PowerShell is used to looks the id up, in place of jq.
+REM - PowerShell is used to look the id up, in place of jq.
 REM ==============================================================================
 
 SETLOCAL

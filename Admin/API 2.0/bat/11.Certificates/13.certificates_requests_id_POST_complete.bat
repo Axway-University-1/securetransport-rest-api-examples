@@ -27,7 +27,7 @@ REM   certificate signed by a CA the server does not trust is accepted, and read
 REM   "Not chained to a trusted root": import the CA as a trusted certificate
 REM   first.
 REM - 07.certificates_id_DELETE.bat example_csr_cert removes the certificate.
-REM - PowerShell is used to looks the id up and read the answer, in place of jq.
+REM - PowerShell is used to look the id up and read the answer, in place of jq.
 REM ==============================================================================
 
 SETLOCAL
