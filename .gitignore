@@ -32,8 +32,9 @@ $RECYCLE.BIN/
 # Editor and IDE files
 # ------------------------------------------------------------------------------
 # Claude Code local settings. The knowledge pack in .claude/skills and
-# .claude/agents is shared, but this file is personal to each machine and
-# records local permission grants, so it stays out of git.
+# .claude/agents is shared, but these files are personal to each machine and
+# record local permission grants, so they stay out of git.
+.claude/settings.json
 .claude/settings.local.json
 
 # vi / vim swap files
