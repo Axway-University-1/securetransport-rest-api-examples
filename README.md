@@ -276,7 +276,7 @@ already exists.
 | 06. Transfer Sites | `/sites`, HTTP and SSH pull and push sites, list, delete by id | 4 | 4 |
 | 07. Subscriptions | `/subscriptions`, Advanced Routing, with and without a trigger file, delete by id | 4 | 4 |
 | 08. Route Templates | `/routes`, template type | 1 | 1 |
-| 09. Composite Routes | `/routes`, composite and simple types, Compress and Decompress steps, linked to a subscription, list, delete by id | 6 | 6 |
+| 09. Composite Routes | `/routes`, composite and simple types, Compress and Decompress steps, linked to a subscription, list, check, replace, patch a step, delete by id | 9 | 9 |
 | 11. Certificates | `/certificates`, generate, import, export, signing requests | 14 | 14 |
 | 12. Business Units | `/businessUnits`, units, their nesting, and why a delete is refused | 7 | 7 |
 | 13. Configurations | `/configurations`: options, logging, database, Sentinel, login, archiving, external stores, S3 storage profiles | 47 | 47 |

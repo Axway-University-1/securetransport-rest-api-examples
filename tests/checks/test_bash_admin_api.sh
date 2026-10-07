@@ -1494,6 +1494,91 @@ run "${F}/06.mailTemplates_name_DELETE.sh" "a\\b.xhtml"
 nothing_sent "06 DELETE: a name with a backslash is refused, nothing sent"
 
 echo
+echo "=== 09.CompositeRoutes (08 to 10: the routes operations not called before) ==="
+F=09.CompositeRoutes
+R="${BASE}/routes"
+ONE_ROUTE='{"resultSet":{"returnCount":1,"totalCount":1},"result":[{"id":"r1id","name":"example_route"}]}'
+# the name filter takes a *, so a longer name comes back too: only the exact one counts
+LONGER='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"id":"r1id","name":"example_route"},{"id":"r2id","name":"example_route2"}]}'
+TWO_SAME='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"id":"r1id","name":"example_route"},{"id":"r2id","name":"example_route"}]}'
+NO_ROUTE='{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}'
+ROUTE_FULL='{"id":"r1id","name":"example_route","description":"old text","type":"SIMPLE","conditionType":"ALWAYS","condition":"true","steps":[{"id":"s1","type":"Compress","status":"ENABLED","metadata":{"links":{"route":"x"}}},{"id":"s2","type":"SendToPartner","status":"ENABLED"}],"metadata":{"links":{"self":"y"}}}'
+
+GET_BODY=$(body route_one "${ONE_ROUTE}")
+run "${F}/08.routes_id_HEAD.sh" example_route
+expect "08 HEAD: looks the id up by name, then HEADs the id" "${RC}:$(calls)" "0:GET ${R}?name=example_route&fields=id,name
+HEAD ${R}/r1id"
+has "08 HEAD: says the route exists, with its id" "The route example_route exists, id r1id."
+run "${F}/08.routes_id_HEAD.sh"
+expect "08 HEAD: SimpleRoute_Compress by default" "$(calls | head -1)" "GET ${R}?name=SimpleRoute_Compress&fields=id,name"
+STATUS=404 run "${F}/08.routes_id_HEAD.sh" example_route
+expect "08 HEAD: 404 is 'does not exist', exit 1" "${RC}" "1"
+GET_BODY=$(body route_longer "${LONGER}")
+run "${F}/08.routes_id_HEAD.sh" example_route
+expect "08 HEAD: a longer name matched by the filter is not counted" "${RC}:$(calls | tail -1)" "0:HEAD ${R}/r1id"
+GET_BODY=$(body route_same "${TWO_SAME}")
+run "${F}/08.routes_id_HEAD.sh" example_route
+expect "08 HEAD: two routes of one name, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+GET_BODY=$(body route_none "${NO_ROUTE}")
+run "${F}/08.routes_id_HEAD.sh" example_route
+expect "08 HEAD: no such route, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+run "${F}/08.routes_id_HEAD.sh" "example route"
+expect "08 HEAD: a name with a space goes into the query for curl to encode" "$(calls)" "GET ${R}?name=example route&fields=id,name"
+
+SEQUENCE=$(sequence put_ok "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=204 run "${F}/09.routes_id_PUT.sh" example_route "new text"
+expect "09 PUT: looks the id up, reads the route, PUTs it" "${RC}:$(calls)" "0:GET ${R}?name=example_route&fields=id,name
+GET ${R}/r1id
+PUT ${R}/r1id"
+expect "09 PUT: sends the whole route, steps included, only description changed, metadata dropped" \
+  "$(payload 1 | jq -c .)" \
+  '{"id":"r1id","name":"example_route","description":"new text","type":"SIMPLE","conditionType":"ALWAYS","condition":"true","steps":[{"id":"s1","type":"Compress","status":"ENABLED","metadata":{"links":{"route":"x"}}},{"id":"s2","type":"SendToPartner","status":"ENABLED"}]}'
+has "09 PUT: prints the description before" "The description of example_route is now: old text"
+has "09 PUT: prints the code" "HTTP 204"
+SEQUENCE=$(sequence put_default "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=204 run "${F}/09.routes_id_PUT.sh" example_route
+expect "09 PUT: a default description" "$(payload 1 | jq -r .description)" "Changed by 09.routes_id_PUT.sh"
+SEQUENCE=$(sequence put_quote "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=204 run "${F}/09.routes_id_PUT.sh" example_route 'say "hi" \ done'
+expect "09 PUT: quotes and a backslash stay valid JSON" "$(payload 1 | jq -r .description)" 'say "hi" \ done'
+SEQUENCE=$(sequence put_refused "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=400 run "${F}/09.routes_id_PUT.sh" example_route x
+expect "09 PUT: a refusal exits 1" "${RC}" "1"
+SEQUENCE=
+GET_BODY=$(body route_none "${NO_ROUTE}")
+run "${F}/09.routes_id_PUT.sh" example_route x
+expect "09 PUT: no such route, exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+run "${F}/09.routes_id_PUT.sh"
+expect "09 PUT: no name, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+
+SEQUENCE=$(sequence patch_ok "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=204 run "${F}/10.routes_id_PATCH.sh" example_route SendToPartner
+expect "10 PATCH: looks the id up, reads the route, PATCHes it" "${RC}:$(calls)" "0:GET ${R}?name=example_route&fields=id,name
+GET ${R}/r1id
+PATCH ${R}/r1id"
+expect "10 PATCH: disables the step found at its position (1), nothing else" "$(payload 1 | jq -c .)" \
+  '[{"op":"replace","path":"/steps/1/status","value":"DISABLED"}]'
+has "10 PATCH: prints the position and the status before" "The SendToPartner step of example_route is at position 1, and is ENABLED."
+has "10 PATCH: prints the code" "HTTP 204"
+SEQUENCE=$(sequence patch_first "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=204 run "${F}/10.routes_id_PATCH.sh" example_route Compress ENABLED
+expect "10 PATCH: the first step is position 0, and a status can be given" "$(payload 1 | jq -c .)" \
+  '[{"op":"replace","path":"/steps/0/status","value":"ENABLED"}]'
+SEQUENCE=$(sequence patch_nostep "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=204 run "${F}/10.routes_id_PATCH.sh" example_route Rename
+expect "10 PATCH: no step of that type, exit 1, no PATCH" "${RC}:$(calls | grep -c PATCH)" "1:0"
+SEQUENCE=$(sequence patch_refused "${ONE_ROUTE}" "${ROUTE_FULL}")
+STATUS=400 run "${F}/10.routes_id_PATCH.sh" example_route Compress
+expect "10 PATCH: a refusal exits 1" "${RC}" "1"
+SEQUENCE=
+for args in "" "example_route" "example_route Compress enabled" "example_route Compress MAYBE"; do
+    # shellcheck disable=SC2086
+    run "${F}/10.routes_id_PATCH.sh" ${args}
+    expect "10 PATCH: bad arguments (${args:-none}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+GET_BODY=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

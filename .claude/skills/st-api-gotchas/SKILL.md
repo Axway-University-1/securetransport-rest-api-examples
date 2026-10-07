@@ -674,6 +674,27 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   case. GET one answers the file (`application/xhtml+xml`, whatever `accept` says), HEAD
   answers 404 with an HTML body, DELETE of an unknown name is a JSON 404.
 
+- **Routes** (`/routes`; examples `09.CompositeRoutes` 08 to 10): contrary to "A route step has no
+  id" above, a step **has an `id`** (and a `precedingStep` link) on read, and a PUT that sends the
+  steps back with their ids keeps them. It is still not an address: a patch path
+  `/steps/<id>/status` is 400 "Can't reference field ... on array"; use the position
+  (`/steps/1/status`, past the end is 400 "Array index N is out of bounds"). Contrary to "PATCH cannot
+  insert into the middle of an array", `add` at `/steps/1` **did** insert in the middle and the
+  `precedingStep` links followed, `add` at `/steps/-` appends and `remove` at `/steps/N` deletes; PUT of
+  the whole route is still the safe way. Contrary to "replace needs the field to exist", `replace` of
+  a `description` that is null worked (204), as did `add` on one that was set. **A PUT with a body that
+  has no steps answers 204 and removes every step**, and a PUT with no `type` or `conditionType` is 400.
+  `type` and `id` are read only in a patch (400), and a composite route's `routeTemplate` cannot
+  change (400 "Cannot change the Template ..."; a route that is not a template is a different 400).
+  A PUT or PATCH of `name` renames, and **two simple routes may share a name** (the list's `name=`
+  takes a `*`, so look an id up by the exact name and refuse more than one). HEAD answers 200 for a
+  route of every type and 404 with no body otherwise; GET of an unknown id is a JSON 404, "Route with
+  id X not found or not accessible.". `metadata` in a PUT body is accepted and ignored. A simple
+  route that another route runs (an `ExecuteRoute` step) cannot be deleted, 400 "Route is in use.";
+  **deleting the template or composite route that runs it deletes the simple route too**.
+  `failureEmailNotification` true needs the template and recipients in the same patch (400 "Missing
+  failure e-mail recipients."). `referredByRoute=<simple route id>` lists the routes that run it.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

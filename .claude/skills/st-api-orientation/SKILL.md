@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     210 curl examples, numbered by topic
-    bat/      202 of them, for Windows
+    bash/     213 curl examples, numbered by topic
+    bat/      205 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -67,6 +67,7 @@ create, read, update, delete cycle for that object.
 | Create a composite route, with or without an extension | `bash/09.CompositeRoutes/` |
 | Compress or decompress in a route, then send to a partner | `bash/09.CompositeRoutes/03.routes_POST_simple_compress.sh`, `04.routes_POST_simple_decompress.sh` |
 | Link a composite route to a subscription, so it runs on what arrives | `bash/09.CompositeRoutes/05.routes_POST_composite_subscription.sh` |
+| Check that a route exists, replace a route whole (and not lose its steps), or enable or disable one of its steps | `bash/09.CompositeRoutes/08.routes_id_HEAD.sh`, `09.routes_id_PUT.sh`, `10.routes_id_PATCH.sh` |
 | Generate, import, export, patch or delete a certificate; list the ones about to expire | `bash/11.Certificates/` 01 to 08 |
 | Make a certificate signing request (CSR) and complete it with the signed certificate | `bash/11.Certificates/` 09 to 14 |
 | Create, list, read, change or delete a business unit | `bash/12.BusinessUnits/` |
@@ -181,11 +182,10 @@ Every script resolves its own directory, so it runs from anywhere:
 ## What is not covered
 
 The Admin examples are being added resource by resource, in the order of the
-API reference; through the logs it is done (cluster services, and the
+API reference; through the routes it is done (cluster services, and the
 cluster-only configuration operations, are left out: they need a cluster). Not
-yet in bash or bat: mail templates, sessions, statistics summary, zones;
-transfer profiles and route step charsets or metadata; site templates, user
-classes; the transaction manager. `.claude/skills/st-api-cover-resource` keeps
+yet in bash or bat: route step metadata and charsets, sessions, statistics summary, zones;
+transfer profiles; site templates, user classes; the transaction manager. `.claude/skills/st-api-cover-resource` keeps
 the exact list.
 
 Changing routes and subscriptions that already exist, and the transaction
