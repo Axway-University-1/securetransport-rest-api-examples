@@ -239,7 +239,13 @@ class TcpSink:
         return self
 
     def __exit__(self, *exc):
+        # On Linux close() alone leaves accept() blocked and the port listening
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
         self.sock.close()
+        self.thread.join(5)
 
 
 if __name__ == "__main__":
