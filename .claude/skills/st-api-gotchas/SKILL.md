@@ -722,6 +722,19 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   `tests/integration/checks/51.route_steps_metadata_scripts.py` creates, reads back and deletes each one
   and shows that leaving out any field is 400.
 
+- **Route steps charsets** (`/routeStepsCharsets`; example `31.RouteStepsCharsets`): read only, one GET (HEAD
+  200; POST, PUT, PATCH and DELETE 405; `/routeStepsCharsets/UTF-8` 404; XML and CSV 406). The answer is **one
+  object, `{"charsets": [...]}`**, neither a plain array (as `/routeStepsMetadata` is) nor `{resultSet, result}`:
+  396 unique names on the lab, sorted ignoring case. `name=`, `limit=`, `offset=` and `fields=` are ignored.
+  **The list is the canonical names, not everything a step accepts**: the six step types with a charset
+  (CharactersReplace, EncodingConversion, LineEnding, LineFolding, LinePadding, LineTruncating) refuse one Java
+  does not know (400 "The charset specified by inputCharset is not supported.", or outputCharset) and an empty one
+  (400 "The charset name specified by inputCharset is illegal."), but accept `utf-8`, `UTF8` and `ASCII`, which are
+  not in the list, and store them as written. A name in the list is always accepted; one outside it may be. Every
+  charset in the 17 minimal steps of `30.RouteStepsMetadata` (UTF-8, and UTF-16 as the output of
+  EncodingConversion) is in the list. `01 step FILE` checks a step, a list of steps or a route against it;
+  `tests/integration/checks/52.route_steps_charsets_scripts.py` covers it.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

@@ -1620,6 +1620,54 @@ has "01 GET: and prints the code" "HTTP 403"
 GET_BODY=
 
 echo
+echo "=== 31.RouteStepsCharsets ==="
+F=31.RouteStepsCharsets
+CHARSETS='{"charsets":["Big5","IBM037","ISO-8859-1","US-ASCII","UTF-16","UTF-8","windows-1252"]}'
+GET_BODY=$(body charsets "${CHARSETS}")
+run "${F}/01.routeStepsCharsets_GET.sh"
+expect "01 GET: one call, GET /routeStepsCharsets" "${RC}:$(calls)" "0:GET ${BASE}/routeStepsCharsets"
+has "01 GET: counts the charsets (in an object, not an array)" "Character sets: 7"
+has "01 GET: one name per line" "  Big5"
+has "01 GET: a name with a hyphen and lower case letters is shown as it is" "  windows-1252"
+run "${F}/01.routeStepsCharsets_GET.sh" UTF-8
+expect "01 GET: a name given is looked up in the one answer" "${RC}:$(calls)" "0:GET ${BASE}/routeStepsCharsets"
+has "01 GET: a listed name" "UTF-8 is in the list."
+run "${F}/01.routeStepsCharsets_GET.sh" utf-8
+expect "01 GET: a name that differs only in case is not listed as written, exit 1" "${RC}" "1"
+has "01 GET: and the listed spelling is shown" "utf-8 is not in the list as written; the list has UTF-8."
+run "${F}/01.routeStepsCharsets_GET.sh" NOPE-9
+expect "01 GET: a name that is not listed, exit 1" "${RC}" "1"
+has "01 GET: says so" "NOPE-9 is not in the list."
+
+printf '%s\n' '{"name":"example_route","steps":[{"type":"Compress"},{"type":"EncodingConversion","inputCharset":"UTF-8","outputCharset":"UTF-16"},{"type":"LineEnding","inputCharset":"IBM037"}]}' > "${WORK}/files/route_ok.json"
+run "${F}/01.routeStepsCharsets_GET.sh" step "${WORK}/files/route_ok.json"
+expect "01 GET step: a route's steps, one call, exit 0" "${RC}:$(calls)" "0:GET ${BASE}/routeStepsCharsets"
+has "01 GET step: the input charset of a step, by its position and type" "  step 1 EncodingConversion inputCharset UTF-8: listed"
+has "01 GET step: the output charset" "  step 1 EncodingConversion outputCharset UTF-16: listed"
+has "01 GET step: a later step" "  step 2 LineEnding inputCharset IBM037: listed"
+expect "01 GET step: a step with no charset has no line" "$(printf '%s\n' "${OUT}" | grep -c 'Compress')" "0"
+printf '%s\n' '[{"type":"EncodingConversion","inputCharset":"UTF-8","outputCharset":"UTF8"}]' > "${WORK}/files/steps_bad.json"
+run "${F}/01.routeStepsCharsets_GET.sh" step "${WORK}/files/steps_bad.json"
+expect "01 GET step: a charset that is not listed, exit 1" "${RC}" "1"
+has "01 GET step: is marked" "  step 0 EncodingConversion outputCharset UTF8: NOT listed"
+printf '%s\n' '{"type":"Rename","outputFileName":"a.txt"}' > "${WORK}/files/step_none.json"
+run "${F}/01.routeStepsCharsets_GET.sh" step "${WORK}/files/step_none.json"
+expect "01 GET step: a single step with no charset, exit 0" "${RC}" "0"
+has "01 GET step: says nothing was to check" "nothing to check"
+printf '%s\n' '{"type":"LinePadding","inputCharset":"UTF-8"}' > "${WORK}/files/step_one.json"
+run "${F}/01.routeStepsCharsets_GET.sh" step "${WORK}/files/step_one.json"
+has "01 GET step: a single step object" "  step 0 LinePadding inputCharset UTF-8: listed"
+printf 'not json\n' > "${WORK}/files/not_json.txt"
+for args in "step" "step ${WORK}/files/missing.json" "step ${WORK}/files/not_json.txt" "UTF-8 extra" "step ${WORK}/files/step_one.json extra"; do
+    run "${F}/01.routeStepsCharsets_GET.sh" ${args}
+    expect "01 GET: bad arguments '${args##*/}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS=403 run "${F}/01.routeStepsCharsets_GET.sh"
+expect "01 GET: a refusal exits 1" "${RC}" "1"
+has "01 GET: and prints the code" "HTTP 403"
+GET_BODY=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

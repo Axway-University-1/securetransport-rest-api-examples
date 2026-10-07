@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     214 curl examples, numbered by topic
-    bat/      206 of them, for Windows
+    bash/     215 curl examples, numbered by topic
+    bat/      207 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -83,6 +83,7 @@ create, read, update, delete cycle for that object.
 | Search what the protocol servers logged (a login, a failure), or export the server log | `bash/28.ServerLogs/` |
 | Add, replace, read or delete a mail template (the XHTML behind the notification e-mails) | `bash/29.MailTemplates/` |
 | List the route step types the server knows (the `type` of a step in a route) | `bash/30.RouteStepsMetadata/` |
+| List the character sets a route step may name, or check a step's `inputCharset` and `outputCharset` against them | `bash/31.RouteStepsCharsets/` |
 | Manage the embedded database's access rules (pg_hba.conf) | `bash/17.AccessPolicies/` |
 | Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
 | Change an address book source | `bash/19.AddressBook/` |
