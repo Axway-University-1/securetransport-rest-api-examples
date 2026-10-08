@@ -36,6 +36,8 @@
 #   AR_PULLED_SUFFIX.
 # - Needs settings.local.sh with AR_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, which reads the listing and builds the JSON body.
+# - Exits 1 when no trigger file turns up, when no operation id comes back, or when
+#   the server refuses the content.
 # - If the old trigger file cannot be deleted either, the new one is uploaded as
 #   <name>_fixed.trigger. It still ends in .trigger, so the trigger condition
 #   matches it.
@@ -110,6 +112,8 @@ fi
 
 # 2. Send the new content to that operation
 ar_enduser_call PUT "fileOperations/${OPERATION_ID}" "application/octet-stream" "${CONTENT}"
+PUT_RC=$?
 printf "%s\nHTTP %s\n" "${AR_EU_BODY}" "${AR_EU_CODE}"
 
 ar_enduser_logout
+exit "${PUT_RC}"

@@ -21,6 +21,7 @@ REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body.
 REM - doAsOut renames each file as it is sent, to ${stenv.target}_PUSHED, so the
 REM   outbound rows in File Tracking can be told from the inbound ones.
+REM - Exits 1 when the server refuses the site.
 REM - The upload folder must not be the subscription folder, or the pushed files
 REM   would trigger the route again.
 REM ==============================================================================
@@ -36,15 +37,12 @@ IF "%AR_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-SET REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 
 powershell -NoProfile -Command "@{ type='ssh'; protocol='ssh'; name=$env:AR_PUSH_SITE; host=$env:AR_SSH_HOST; port=$env:AR_SSH_PORT; userName=$env:AR_TEST_ACCOUNT; usePassword=$true; password=$env:AR_ACCOUNT_PASSWORD; account=$env:AR_TEST_ACCOUNT; transferType='partner'; uploadFolder=$env:AR_DELIVERED_FOLDER; postTransmissionActions=@{ doAsOut=$env:AR_PUSH_RENAME } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the push site %AR_PUSH_SITE%...
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "https://%ST_SERVER%:%ST_PORT%/api/v2.0/sites" ^
-  -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
-  -w "\nHTTP %%{http_code}\n" -d "@%BODY_FILE%"
-
+CALL "%~dp0..\lib\post_admin.bat" sites "%BODY_FILE%"
+SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
-EXIT /B 0
+EXIT /B %POST_RESULT%

@@ -24,6 +24,7 @@
 # - Run 01.accounts_POST.sh first.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, which builds the JSON body.
+# - Stops at the first site the server refuses, and exits 1.
 # - The SSH port is BT_SSH_PORT, 8022 by default. It is not the REST API port.
 # - Site N is named <account>PullSite<N> and its pattern matches the file(s) for
 #   scenario <N> only: see settings.sh for the mapping from scenario to file.
@@ -67,9 +68,9 @@ create_pull_site() {
 
 # Scenarios 2.1 and 2.2 can run several files (BT_INBOUND_ONLY_COUNT,
 # BT_IN_AND_OUT_COUNT): the pattern matches the plain name and the numbered ones
-create_pull_site 1 "${BT_FILE_ONLY_INBOUND%.txt}*.txt"
-create_pull_site 2 "${BT_FILE_ONE_OUTBOUND%.txt}*.txt"
-create_pull_site 3 "${BT_FILE_TWO_OUTBOUNDS}"
-create_pull_site 4 "file_*_for_compress.txt"
-create_pull_site 5 "${BT_FILE_ARCHIVE_NAME}"
-create_pull_site 6 "${BT_FILE_ARCHIVE2P_NAME}"
+create_pull_site 1 "${BT_FILE_ONLY_INBOUND%.txt}*.txt" || exit 1
+create_pull_site 2 "${BT_FILE_ONE_OUTBOUND%.txt}*.txt" || exit 1
+create_pull_site 3 "${BT_FILE_TWO_OUTBOUNDS}" || exit 1
+create_pull_site 4 "file_*_for_compress.txt" || exit 1
+create_pull_site 5 "${BT_FILE_ARCHIVE_NAME}" || exit 1
+create_pull_site 6 "${BT_FILE_ARCHIVE2P_NAME}" || exit 1

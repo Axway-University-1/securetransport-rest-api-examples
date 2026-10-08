@@ -27,6 +27,8 @@
 # - The folder's name goes in the URL, and the body says it is a directory. POST
 #   /files with the name in the body is refused with a 409, whatever the body
 #   (confirmed on Features/trigger-route-after-completed-pull).
+# - Stops at the first folder the server refuses (a 409 when it is already there),
+#   logs out, and exits 1.
 # - A nested folder is created after its parent, like a plain mkdir.
 # - The port is BT_ENDUSER_PORT, 8443 by default. It is not the Admin port.
 # - Confirmed directly: an account's home folder stays on disk, with its owner, when the account is
@@ -56,29 +58,37 @@ create_folder() {
                    isOther: false, isShared: false}')
     printf "Creating the folder %s...\n" "${path}"
     ar_enduser_call POST "files/${path}" "application/json" "${body}"
+    local call_rc=$?
     printf "%s\nHTTP %s\n" "${AR_EU_BODY}" "${AR_EU_CODE}"
     if [ "${AR_EU_CODE}" = "403" ] && [[ "${AR_EU_BODY}" == *"Error occurred while creating file"* ]]; then
         printf "Hint: a 403 \"Error occurred while creating file\" for a folder directly in an account's home usually\nmeans the home folder is left over from an earlier run and belongs to another uid (it stays on disk when\nthe account is deleted). Use another account name (./00.run_all.sh ANOTHER_NAME, or BT_TEST_ACCOUNT in settings.local.sh), so that the account gets a new home folder.\n"
     fi
+    return "${call_rc}"
+}
+
+# A refused folder stops the run: log out, and exit 1
+stop_if_refused() {
+    ar_enduser_logout
+    exit 1
 }
 
 # The test account: the subscription folder, then one subfolder per scenario
 bt_login_as "${BT_TEST_ACCOUNT}" || exit 1
-create_folder "${BT_SUBSCRIPTION_FOLDER#/}"
+create_folder "${BT_SUBSCRIPTION_FOLDER#/}" || stop_if_refused
 for n in 1 2 3 4 5 6; do
-    create_folder "${BT_SUBSCRIPTION_FOLDER#/}/s${n}"
+    create_folder "${BT_SUBSCRIPTION_FOLDER#/}/s${n}" || stop_if_refused
 done
 ar_enduser_logout
 
 # partner_to_pull_from: the test account's folder, then its drop folder
 bt_login_as "${BT_PULL_PARTNER}" || exit 1
-create_folder "${BT_RUN_FOLDER#/}"
-create_folder "${BT_DROP_FOLDER#/}"
+create_folder "${BT_RUN_FOLDER#/}" || stop_if_refused
+create_folder "${BT_DROP_FOLDER#/}" || stop_if_refused
 ar_enduser_logout
 
 # partner_to_push_to: the test account's folder, then the two delivered folders
 bt_login_as "${BT_PUSH_PARTNER}" || exit 1
-create_folder "${BT_RUN_FOLDER#/}"
-create_folder "${BT_DELIVERED_1_FOLDER#/}"
-create_folder "${BT_DELIVERED_2_FOLDER#/}"
+create_folder "${BT_RUN_FOLDER#/}" || stop_if_refused
+create_folder "${BT_DELIVERED_1_FOLDER#/}" || stop_if_refused
+create_folder "${BT_DELIVERED_2_FOLDER#/}" || stop_if_refused
 ar_enduser_logout

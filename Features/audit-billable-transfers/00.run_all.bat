@@ -47,10 +47,14 @@ REM   create a folder directly in it (a 403 in step 04). So, only when no accoun
 REM   name was chosen (no ACCOUNT, no BT_RUN_ACCOUNT, no BT_TEST_ACCOUNT in
 REM   settings.local.bat), the run checks right after step 01 that the test account
 REM   can create a folder directly in its home (bt_home_probe, made and removed
-REM   again). If not, it deletes that test account only (never a partner), and
-REM   moves to the next free name: <default>_2, _3, up to _9. It stops after _9.
+REM   again; the check is Features\lib\home_folder.bat, shared with the other
+REM   feature). If not, it deletes that test account only (never a partner), and
+REM   moves to the next free name: <default>_2, _3, up to _9. It stops after _9, and
+REM   also when the account cannot be deleted.
 REM   The report, --cleanup and the cleanup hint use the name it ended on.
 REM   A name you chose is never changed: step 04 then fails, with a hint.
+REM - With --cleanup, the exit code of the run is the cleanup's: 1 when it could not remove
+REM   everything (it says what is left).
 REM - The partners are shared by every test account. A run of another test
 REM   account on the same day, at the same time, adds to their counts too.
 REM ==============================================================================
@@ -170,15 +174,16 @@ IF "%MATCHED%"=="1" (
     echo still under way when step 3 ran shows up there, and in a later report.
 )
 
-IF "%CLEANUP%"=="1" (
-    echo.
-    echo === Cleanup: 99.cleanup_DELETE.bat ===
-    CALL "%~dp099.cleanup_DELETE.bat"
-) ELSE (
-    echo.
-    echo Run 99.cleanup_DELETE.bat %BT_TEST_ACCOUNT% to remove everything this created.
-)
+IF "%CLEANUP%"=="1" GOTO :run_cleanup
+echo.
+echo Run 99.cleanup_DELETE.bat %BT_TEST_ACCOUNT% to remove everything this created.
 EXIT /B 0
+
+:run_cleanup
+echo.
+echo === Cleanup: 99.cleanup_DELETE.bat ===
+CALL "%~dp099.cleanup_DELETE.bat"
+EXIT /B %ERRORLEVEL%
 
 :count
 SET NAME=%1
@@ -224,48 +229,25 @@ IF DEFINED LOG_HAS_ERROR (
 )
 EXIT /B 0
 
-REM home_probe: can the test account create a folder directly in its home? Makes
-REM the folder bt_home_probe and removes it again. Sets PROBE_RC: 0 yes, 1 the home
-REM is stale (a 403 "Error occurred while creating file"), 2 could not tell (the
-REM login failed, or another error), which 04 then reports as it always did.
-:home_probe
-SET PROBE_RC=2
-SET EU_ACCOUNT=%BT_TEST_ACCOUNT%
-CALL "%~dp0..\lib\enduser.bat" login >NUL
-IF ERRORLEVEL 1 EXIT /B 0
-SET PROBE_BODY=%TEMP%\bt_probe_%RANDOM%.json
-powershell -NoProfile -Command "@{ isDirectory=$true; isRegularFile=$false; isSymbolicLink=$false; isOther=$false; isShared=$false } | ConvertTo-Json -Compress" > "%PROBE_BODY%"
-CALL "%~dp0..\lib\enduser.bat" call POST "files/bt_home_probe" "application/json" "%PROBE_BODY%"
-IF EXIST "%PROBE_BODY%" DEL "%PROBE_BODY%"
-SET PROBE_CODE=%EU_CODE%
-IF "%PROBE_CODE:~0,1%"=="2" SET PROBE_RC=0
-IF "%PROBE_CODE:~0,1%"=="2" CALL "%~dp0..\lib\enduser.bat" call DELETE "files/bt_home_probe" ""
-IF "%PROBE_CODE%"=="403" FINDSTR /C:"Error occurred while creating file" "%EU_BODY_FILE%" >NUL && SET PROBE_RC=1
-CALL "%~dp0..\lib\enduser.bat" logout >NUL
-EXIT /B 0
-
-REM ensure_usable_home: after step 01. Only when no account name was chosen.
+REM ensure_usable_home: after step 01. Only when no account name was chosen. Is the
+REM test account's home folder usable? The probe (a top-level folder bt_home_probe,
+REM made and removed again) and the next free name are in Features\lib\home_folder.bat,
+REM shared with the other feature.
 :ensure_usable_home
 IF "%ACCOUNT_CHOSEN%"=="1" EXIT /B 0
 SET PROBE_N=1
 :probe_again
-CALL :home_probe
-IF NOT "%PROBE_RC%"=="1" EXIT /B 0
-SET /A PROBE_N=PROBE_N+1
-:next_name
-IF %PROBE_N% GTR 9 GOTO :names_used_up
-SET EXISTS_CODE=
-FOR /F %%C IN ('curl -s -o nul -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" --head "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts/%BT_DEFAULT_ACCOUNT%_%PROBE_N%" -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT"') DO SET EXISTS_CODE=%%C
-IF NOT "%EXISTS_CODE%"=="200" GOTO :name_free
-SET /A PROBE_N=PROBE_N+1
-GOTO :next_name
-:name_free
-echo.
-echo The home folder of %BT_TEST_ACCOUNT% is left over from an earlier run and belongs to another uid,
-echo so the account cannot create folders in it. A new name is used: %BT_DEFAULT_ACCOUNT%_%PROBE_N%.
-echo Deleting the account %BT_TEST_ACCOUNT% ^(its home folder stays^)...
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X DELETE "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts/%BT_TEST_ACCOUNT%" ^
-  -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT" -w "\nHTTP %%{http_code}\n"
+CALL "%~dp0..\lib\home_folder.bat" probe "%BT_TEST_ACCOUNT%" bt_home_probe
+REM 2: could not tell, which 04 then reports as it always did
+IF ERRORLEVEL 2 EXIT /B 0
+IF NOT ERRORLEVEL 1 EXIT /B 0
+SET /A PROBE_N=%PROBE_N%+1
+CALL "%~dp0..\lib\home_folder.bat" next_free "%BT_DEFAULT_ACCOUNT%" %PROBE_N%
+SET PROBE_N=%HF_NEXT_N%
+IF "%PROBE_N%"=="0" GOTO :names_used_up
+CALL "%~dp0..\lib\home_folder.bat" say_stale "%BT_TEST_ACCOUNT%" "%BT_DEFAULT_ACCOUNT%_%PROBE_N%"
+CALL "%~dp0..\lib\admin_calls.bat" delete "accounts/%BT_TEST_ACCOUNT%"
+IF ERRORLEVEL 1 GOTO :delete_refused
 SET BT_RUN_ACCOUNT=%BT_DEFAULT_ACCOUNT%_%PROBE_N%
 CALL "%~dp0settings.bat"
 echo.
@@ -280,11 +262,12 @@ CALL "%~dp0billable_GET_report.bat" before > "%REPORT_LOG%"
 CALL :today_count "%BT_TEST_ACCOUNT%" BEFORE_TEST
 IF EXIST "%REPORT_LOG%" DEL "%REPORT_LOG%"
 GOTO :probe_again
+:delete_refused
+echo The account %BT_TEST_ACCOUNT% could not be deleted, so the run stops here.
+SET STEP_FAILED=1
+EXIT /B 1
 :names_used_up
-echo.
-echo The home folder of %BT_TEST_ACCOUNT% is left over from an earlier run, and so is every name up to %BT_DEFAULT_ACCOUNT%_9
-echo ^(or the account exists^). Remove the old home folders, or run 00.run_all.bat ANOTHER_NAME.
-echo Run 99.cleanup_DELETE.bat %BT_TEST_ACCOUNT% to remove what this created.
+CALL "%~dp0..\lib\home_folder.bat" say_used_up "%BT_DEFAULT_ACCOUNT%" "%BT_TEST_ACCOUNT%"
 SET STEP_FAILED=1
 EXIT /B 1
 

@@ -20,6 +20,7 @@ REM Notes:
 REM - Needs the ids saved by 06.routes_POST_template.bat, 07.routes_POST_simple.bat
 REM   and 08.subscriptions_POST.bat.
 REM - Uses PowerShell to build the JSON bodies.
+REM - Stops at the first route the server refuses, and exits 1.
 REM - The ids are saved as BT_ID_COMPOSITE_2 to BT_ID_COMPOSITE_6.
 REM ==============================================================================
 
@@ -35,10 +36,15 @@ IF NOT DEFINED BT_ID_TEMPLATE (
 )
 
 CALL :create_composite_route 2
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_composite_route 3
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_composite_route 4
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_composite_route 5
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_composite_route 6
+IF ERRORLEVEL 1 EXIT /B 1
 EXIT /B 0
 
 :create_composite_route
@@ -60,5 +66,6 @@ powershell -NoProfile -Command "@{ type='COMPOSITE'; account=$env:BT_TEST_ACCOUN
 
 echo Creating the composite route %ROUTE_NAME%...
 CALL "%~dp0..\lib\post_admin.bat" routes "%BODY_FILE%" BT_ID_COMPOSITE_%SCENARIO_N%
+SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
-EXIT /B 0
+EXIT /B %POST_RESULT%

@@ -22,6 +22,7 @@
 # - Run 04.files_POST_folders first, so the folder exists.
 # - Needs settings.local.sh with AR_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, which builds the JSON body and reads the id.
+# - Stops at the first call the server refuses, logs out, and exits 1.
 # - The port is AR_ENDUSER_PORT, 8443 by default. It is not the Admin port.
 # - The content is sent with PUT, not POST: POST is refused with a 415 for every
 #   content type except multipart, and multipart names the file after the local
@@ -66,7 +67,12 @@ for i in $(seq 1 "${AR_SAMPLE_FILES}"); do
     # 2. Send the content to that operation
     printf "Sending the content to operation %s...\n" "${OPERATION_ID}"
     ar_enduser_call PUT "fileOperations/${OPERATION_ID}" "application/octet-stream" "Sample file ${i} for the pull test."
+    PUT_RC=$?
     printf "%s\nHTTP %s\n" "${AR_EU_BODY}" "${AR_EU_CODE}"
+    if [ "${PUT_RC}" -ne 0 ]; then
+        ar_enduser_logout
+        exit 1
+    fi
 done
 
 ar_enduser_logout

@@ -9,3 +9,6 @@ export AR_ACCOUNT_PASSWORD='<choose-a-password>'
 # export AR_SSH_HOST="<host of this server's SSH listener>"
 # export AR_SSH_PORT="8022"
 # export AR_ENDUSER_PORT="8443"
+# export AR_HOME_ROOT="/home"
+# A name chosen here is never changed by 00.run_all.sh (see "A stale home folder" there):
+# export AR_TEST_ACCOUNT="<another account name>"

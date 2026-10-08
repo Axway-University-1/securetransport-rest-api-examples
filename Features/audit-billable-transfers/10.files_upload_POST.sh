@@ -23,6 +23,8 @@
 #   files, numbered when there is more than one. See settings.sh.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, `zip`, which builds the archives, and `mktemp`.
+# - Stops at the first call the server refuses (no operation id, or a refused
+#   content), logs out, and exits 1.
 # - The content call uses PUT, not POST: POST is refused with a 415 (confirmed
 #   on Features/trigger-route-after-completed-pull).
 # ==============================================================================
@@ -62,7 +64,16 @@ upload_bytes() {
 
     printf "Sending the content to operation %s...\n" "${operation_id}"
     ar_enduser_call PUT "fileOperations/${operation_id}" "application/octet-stream" "@${local_file}"
+    local put_rc=$?
     printf "%s\nHTTP %s\n" "${AR_EU_BODY}" "${AR_EU_CODE}"
+    return "${put_rc}"
+}
+
+# An upload the server refuses stops the run: log out, and exit 1 (the trap removes
+# the work folder)
+stop_if_refused() {
+    ar_enduser_logout
+    exit 1
 }
 
 upload_text_file() {
@@ -78,11 +89,11 @@ upload_text_file() {
 upload_scenario_files() {
     local name="$1" count="$2" text="$3" i
     if [ "${count}" -eq 1 ]; then
-        upload_text_file "${name}" "${text}"
+        upload_text_file "${name}" "${text}" || stop_if_refused
         return
     fi
     for i in $(seq 1 "${count}"); do
-        upload_text_file "${name%.txt}_${i}.txt" "${text} File ${i} of ${count}."
+        upload_text_file "${name%.txt}_${i}.txt" "${text} File ${i} of ${count}." || stop_if_refused
     done
 }
 
@@ -90,9 +101,9 @@ bt_login_as "${BT_PULL_PARTNER}" || exit 1
 
 upload_scenario_files "${BT_FILE_ONLY_INBOUND}" "${BT_INBOUND_ONLY_COUNT}" "Scenario 2.1: only inbound, no outbound at all."
 upload_scenario_files "${BT_FILE_ONE_OUTBOUND}" "${BT_IN_AND_OUT_COUNT}" "Scenario 2.2: inbound, then pushed out once."
-upload_text_file "${BT_FILE_TWO_OUTBOUNDS}" "Scenario 2.3: inbound, then pushed out twice."
-upload_text_file "${BT_FILE_COMPRESS_1}" "Scenario 2.4, file 1 of 2, to be compressed together."
-upload_text_file "${BT_FILE_COMPRESS_2}" "Scenario 2.4, file 2 of 2, to be compressed together."
+upload_text_file "${BT_FILE_TWO_OUTBOUNDS}" "Scenario 2.3: inbound, then pushed out twice." || stop_if_refused
+upload_text_file "${BT_FILE_COMPRESS_1}" "Scenario 2.4, file 1 of 2, to be compressed together." || stop_if_refused
+upload_text_file "${BT_FILE_COMPRESS_2}" "Scenario 2.4, file 2 of 2, to be compressed together." || stop_if_refused
 
 # The two archives are built locally, then uploaded as ordinary binary content
 build_archive() {
@@ -102,7 +113,7 @@ build_archive() {
     printf '%s\n' "${file_a_text}" > "${archive_dir}/${file_a_name}"
     printf '%s\n' "${file_b_text}" > "${archive_dir}/${file_b_name}"
     ( cd "${archive_dir}" && zip -q "../${archive_name}" "${file_a_name}" "${file_b_name}" )
-    upload_bytes "${BT_DROP_FOLDER}/${archive_name}" "${WORK}/${archive_name}"
+    upload_bytes "${BT_DROP_FOLDER}/${archive_name}" "${WORK}/${archive_name}" || stop_if_refused
 }
 
 build_archive "${BT_FILE_ARCHIVE_NAME}" \

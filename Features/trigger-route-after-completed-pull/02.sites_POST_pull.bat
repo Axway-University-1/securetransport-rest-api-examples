@@ -22,6 +22,7 @@ REM - Uses PowerShell to build the JSON body.
 REM - doAsIn renames each file as it is received, to ${stenv.target}_PULLED, so the
 REM   inbound rows in File Tracking can be told from the outbound ones.
 REM - The SSH port is AR_SSH_PORT, 8022 by default. It is not the REST API port.
+REM - Exits 1 when the server refuses the site.
 REM - If the pull later fails to log in, check first whether this server allows an
 REM   account to open an SSH session to itself.
 REM ==============================================================================
@@ -37,15 +38,12 @@ IF "%AR_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-SET REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 
 powershell -NoProfile -Command "@{ type='ssh'; protocol='ssh'; name=$env:AR_PULL_SITE; host=$env:AR_SSH_HOST; port=$env:AR_SSH_PORT; userName=$env:AR_TEST_ACCOUNT; usePassword=$true; password=$env:AR_ACCOUNT_PASSWORD; account=$env:AR_TEST_ACCOUNT; transferType='partner'; downloadFolder=$env:AR_PULL_FROM_FOLDER; downloadPatternType='glob'; downloadPattern='*'; postTransmissionActions=@{ doAsIn=$env:AR_PULL_RENAME } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the pull site %AR_PULL_SITE%...
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "https://%ST_SERVER%:%ST_PORT%/api/v2.0/sites" ^
-  -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" ^
-  -w "\nHTTP %%{http_code}\n" -d "@%BODY_FILE%"
-
+CALL "%~dp0..\lib\post_admin.bat" sites "%BODY_FILE%"
+SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
-EXIT /B 0
+EXIT /B %POST_RESULT%

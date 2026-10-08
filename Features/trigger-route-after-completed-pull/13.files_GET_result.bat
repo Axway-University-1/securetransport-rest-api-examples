@@ -22,7 +22,7 @@ REM   asynchronously, so the push can take a few seconds to arrive. The script
 REM   waits up to AR_WAIT_SECONDS for the files in the last folder.
 REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to read the listing.
-REM - Exits 1 if nothing arrived in the last folder.
+REM - Exits 1 if nothing arrived in the last folder, or if the server refused a listing.
 REM - This only shows files. The transfer log shows the route runs themselves.
 REM ==============================================================================
 
@@ -55,14 +55,17 @@ GOTO :wait_loop
 
 :show
 SET LAST_COUNT=0
+SET LISTINGS_REFUSED=
 FOR %%F IN (%AR_CHECK_FOLDERS%) DO CALL :show_folder %%F
 
 CALL "%~dp0..\lib\enduser.bat" logout
+IF DEFINED LISTINGS_REFUSED EXIT /B 1
 IF %LAST_COUNT% GTR 0 EXIT /B 0
 EXIT /B 1
 
 :count_files
 CALL "%~dp0..\lib\enduser.bat" call GET "files/%1" ""
+SET LIST_RC=%ERRORLEVEL%
 SET FILE_COUNT=0
 FOR /F %%N IN ('powershell -NoProfile -Command "try { @((Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile }).Count } catch { 0 }"') DO SET FILE_COUNT=%%N
 EXIT /B 0
@@ -71,6 +74,8 @@ EXIT /B 0
 CALL :count_files %1
 echo.
 echo %1: %FILE_COUNT% file^(s^)
+IF NOT "%LIST_RC%"=="0" echo The listing of %1 was refused ^(HTTP %EU_CODE%^).
+IF NOT "%LIST_RC%"=="0" SET LISTINGS_REFUSED=1
 powershell -NoProfile -Command "try { (Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile } | ForEach-Object { '    ' + $_.fileName + '  (' + $_.size + ' bytes)' } } catch { }"
 IF "%1"=="%LAST_FOLDER%" SET LAST_COUNT=%FILE_COUNT%
 EXIT /B 0

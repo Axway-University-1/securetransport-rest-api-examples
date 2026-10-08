@@ -11,3 +11,6 @@ REM SET BT_SSH_PORT=8022
 REM SET BT_ENDUSER_PORT=8443
 REM SET BT_PULL_PARTNER=partner_to_pull_from
 REM SET BT_PUSH_PARTNER=partner_to_push_to
+REM SET BT_HOME_ROOT=/home
+REM A name chosen here is never changed by 00.run_all.bat (see "A stale home folder" there):
+REM SET BT_TEST_ACCOUNT=<another account name>

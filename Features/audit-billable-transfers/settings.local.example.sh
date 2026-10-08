@@ -12,3 +12,6 @@ export BT_ACCOUNT_PASSWORD='<choose-a-password>'
 # export BT_ENDUSER_PORT="8443"
 # export BT_PULL_PARTNER="partner_to_pull_from"
 # export BT_PUSH_PARTNER="partner_to_push_to"
+# export BT_HOME_ROOT="/home"
+# A name chosen here is never changed by 00.run_all.sh (see "A stale home folder" there):
+# export BT_TEST_ACCOUNT="<another account name>"

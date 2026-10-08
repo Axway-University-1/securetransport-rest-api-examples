@@ -36,6 +36,8 @@ REM - The names come from the settings: AR_SAMPLE_PREFIX, AR_SAMPLE_FILES and
 REM   AR_PULLED_SUFFIX.
 REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to read the listing and to build the JSON body.
+REM - Exits 1 when no trigger file turns up, when no operation id comes back, or when
+REM   the server refuses the content.
 REM - If the old trigger file cannot be deleted either, the new one is uploaded as
 REM   <name>_fixed.trigger. It still ends in .trigger, so the trigger condition
 REM   matches it.
@@ -115,6 +117,7 @@ IF NOT DEFINED OPERATION_ID (
 
 REM 2. Send the new content to that operation
 CALL "%~dp0..\lib\enduser.bat" call PUT "fileOperations/%OPERATION_ID%" "application/octet-stream" "%CONTENT_FILE%"
+SET PUT_RESULT=%ERRORLEVEL%
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.
@@ -122,4 +125,4 @@ echo.
 CALL "%~dp0..\lib\enduser.bat" logout
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 IF EXIST "%CONTENT_FILE%" DEL "%CONTENT_FILE%"
-EXIT /B 0
+EXIT /B %PUT_RESULT%

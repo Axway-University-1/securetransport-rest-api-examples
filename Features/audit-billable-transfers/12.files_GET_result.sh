@@ -21,6 +21,8 @@
 # - Run it after 11.transfers_pull_POST.sh.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`.
+# - Exits 1 when the server refuses a listing. While it waits for delivered-2 to
+#   fill, a refused listing is retried like an empty one, and then reported.
 # - This only shows files. 00.run_all.sh's own analysis step is about the
 #   billable counts, not this listing; this is a sanity check along the way.
 # ==============================================================================
@@ -39,17 +41,25 @@ if [ -z "${BT_ACCOUNT_PASSWORD}" ]; then
     exit 1
 fi
 
-# Print the regular files in a folder, and set FILE_COUNT
+# List a folder, and set FILE_COUNT (the regular files in it) and LIST_RC (0 unless the
+# server refused the listing)
 list_folder() {
     ar_enduser_call GET "files$1" ""
+    LIST_RC=$?
     FILE_COUNT=$(printf '%s' "${AR_EU_BODY}" | jq '[(.files // [])[] | select(.isRegularFile)] | length' 2>/dev/null)
     FILE_COUNT=${FILE_COUNT:-0}
 }
 
-# Print a folder's regular files, after its account and name
+# Print a folder's regular files, after its account and name. A listing the server
+# refuses is said so, and ends the script with exit 1.
+LISTINGS_REFUSED=0
 show_folder() {
     list_folder "$2"
     printf "\n%s %s: %s file(s)\n" "$1" "$2" "${FILE_COUNT}"
+    if [ "${LIST_RC}" -ne 0 ]; then
+        printf "The listing was refused (HTTP %s).\n" "${AR_EU_CODE}"
+        LISTINGS_REFUSED=1
+    fi
     printf '%s' "${AR_EU_BODY}" | jq -r '(.files // [])[] | select(.isRegularFile) | "    " + .fileName + "  (" + (.size | tostring) + " bytes)"' 2>/dev/null
 }
 
@@ -74,3 +84,5 @@ for n in 1 2 3 4 5 6; do
     show_folder "${BT_TEST_ACCOUNT}" "${BT_SUBSCRIPTION_FOLDER}/s${n}"
 done
 ar_enduser_logout
+
+[ "${LISTINGS_REFUSED}" -eq 0 ]

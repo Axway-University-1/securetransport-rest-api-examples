@@ -72,12 +72,58 @@ Each example is a `.sh` and a `.bat`. Run them in order, or run them all with th
 master script:
 
 ```
-./00.run_all.sh              # steps 1 to 13, leaves everything in place
-./00.run_all.sh --cleanup    # the same, then removes everything (step 99)
+./00.run_all.sh [ACCOUNT] [--cleanup]
+
+./00.run_all.sh                       # steps 1 to 13, leaves everything in place
+./00.run_all.sh --cleanup             # the same, then removes everything (step 99)
+./00.run_all.sh test_account          # the same, with a test account named test_account
 ```
 
-On Windows: `00.run_all.bat` and `00.run_all.bat --cleanup`. The master script
-stops at the first step that fails, and does not clean up, so you can look.
+On Windows: `00.run_all.bat`, with the same arguments. The master script
+stops at the first step that fails, and does not clean up, so you can look. A
+step fails when it exits 1, which every example does when the server refuses a
+call, or when its output has a line starting `HTTP 4` or `HTTP 5`.
+
+`ACCOUNT` is the test account to create and use. Without it the run starts with
+`arTestAccount`, and moves to another name when that one cannot be used: see
+[the test account's name](#the-test-accounts-name). The sites, routes,
+application and subscription keep the names in `settings.sh` whatever the
+account is called, so run one account at a time. To clean up a named account by
+hand, give the same name: `./99.cleanup_DELETE.sh test_account`. If the run
+chose the name itself, use the one it printed (for example
+`./99.cleanup_DELETE.sh arTestAccount_2`), also after a run that stopped half
+way: a stopped run cleans up nothing.
+
+### The test account's name
+
+You can run `./00.run_all.sh` with no arguments, again and again, and it works.
+The reason it needs care: an account's home folder stays on disk, with its
+owner, when the account is deleted. A new account with another uid (the
+examples use 41733) cannot create a folder directly in such a home, and step 04
+gets a 403 "Error occurred while creating file: null". Folders below an
+existing one still work, which hides the cause. A lab that ran these examples
+before the uid was changed has such a home for `arTestAccount`, and the API
+cannot remove it.
+
+So, when you did **not** choose a name, `00.run_all.sh` checks right after
+step 01 whether the test account can create a folder in its home (a throwaway
+folder, `ar_home_probe`, which it removes at once):
+
+- **It can** (a new lab, or a home the account owns): nothing changes, the
+  account is `arTestAccount`.
+- **It cannot** (403 "Error occurred while creating file"): it says so, deletes
+  only the test account, and moves to `arTestAccount_2`, then `_3` and so on up
+  to `_9`, skipping a name that already exists as an account. The cleanup hint
+  and `--cleanup` use the name it ended on.
+- **Any other result** (a failed login, a 403 with another message): no change.
+  Step 04 reports it.
+
+A name you choose (an argument, `AR_RUN_ACCOUNT`, or an `AR_TEST_ACCOUNT` other
+than the default in `settings.local`) is never changed: step 04 stops with a
+hint to use another name. Running the scripts by hand has no such check; give
+step 01 and the rest a new name yourself (`AR_TEST_ACCOUNT` in
+`settings.local.sh`). The probe and the choice of the next name are shared with
+`audit-billable-transfers`, in `Features/lib/home_folder.sh`.
 
 | Step | Example | What it does |
 | ---- | ------- | ------------ |
@@ -94,7 +140,7 @@ stops at the first step that fails, and does not clean up, so you can look.
 | 11 | `11.transfers_pull_POST` | Runs the pull by hand |
 | 12 | `12.files_PUT_triggerfile` | Rewrites the trigger file with the renamed file names, which re-triggers the subscription |
 | 13 | `13.files_GET_result` | Lists the files in `outbound-drop`, `subscription` and `delivered`, waiting for the push to arrive |
-| 99 | `99.cleanup_DELETE` | Deletes the routes, subscription and application, the two sites, empties and removes `outbound-drop` and `delivered`, then deletes the test account |
+| 99 | `99.cleanup_DELETE [ACCOUNT]` | Deletes the routes, subscription and application, the two sites, empties and removes `outbound-drop` and `delivered`, then deletes the test account |
 
 ### Before you run them
 
@@ -156,6 +202,14 @@ Steps 6 to 10 save the ids of what they create in `state.local.sh` (or `.bat`),
 which git ignores, and later steps read them. Step 99 does not need that file: it
 finds everything by the names in the settings, so it still works if the file is
 lost or the steps were run more than once.
+
+### When the cleanup cannot remove everything
+
+`99.cleanup_DELETE` exits 1 when the server refuses a delete, when a list it
+needs cannot be read, or when it cannot tell whether the account exists. It
+names what is left, keeps `state.local.sh`, and can be run again. Something that
+is already gone (HTTP 404) is not a failure. It exits 0, and removes the saved
+ids, only when everything it looked for is gone.
 
 ### Checking the result
 

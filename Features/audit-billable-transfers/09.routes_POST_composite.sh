@@ -21,6 +21,7 @@
 #   and 08.subscriptions_POST.sh.
 # - Requires `jq`, which builds the JSON bodies.
 # - The ids are saved as BT_ID_COMPOSITE_2 to BT_ID_COMPOSITE_6.
+# - Stops at the first route the server refuses, and exits 1.
 # ==============================================================================
 
 #
@@ -61,5 +62,5 @@ create_composite_route() {
 }
 
 for n in 2 3 4 5 6; do
-    create_composite_route "${n}"
+    create_composite_route "${n}" || exit 1
 done

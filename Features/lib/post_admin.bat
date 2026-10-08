@@ -13,6 +13,8 @@ REM
 REM Usage:
 REM CALL post_admin.bat PATH BODY_FILE [STATE_KEY]
 REM
+REM Sets AR_ADMIN_CODE to the HTTP code of the call (000 when there was no answer).
+REM
 REM Notes:
 REM - Ids are kept in state.local.bat, next to this file, which git ignores. A
 REM   later example reads the ids an earlier one saved, and 99.cleanup_DELETE.bat
@@ -32,6 +34,8 @@ curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "https://%ST_SERVER%:%ST_PORT%/a
 FOR /F "tokens=2" %%C IN ('findstr /B /I "HTTP/" "%PA_HEADERS%"') DO SET PA_CODE=%%C
 FOR /F "tokens=2" %%L IN ('findstr /B /I "location:" "%PA_HEADERS%"') DO SET PA_LOCATION=%%L
 IF EXIST "%PA_HEADERS%" DEL "%PA_HEADERS%"
+IF NOT DEFINED PA_CODE SET PA_CODE=000
+SET AR_ADMIN_CODE=%PA_CODE%
 
 echo.
 echo HTTP %PA_CODE%

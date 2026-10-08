@@ -22,6 +22,7 @@
 # - doAsIn renames each file as it is received, to ${stenv.target}_PULLED, so the
 #   inbound rows in File Tracking can be told from the outbound ones.
 # - The SSH port is AR_SSH_PORT, 8022 by default. It is not the REST API port.
+# - Exits 1 when the server refuses the site.
 # - If the pull later fails to log in, check first whether this server allows an
 #   account to open an SSH session to itself.
 # ==============================================================================
@@ -41,8 +42,6 @@ if [ -z "${AR_ACCOUNT_PASSWORD}" ]; then
     exit 1
 fi
 
-REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
-
 BODY=$(jq -n \
   --arg name "${AR_PULL_SITE}" \
   --arg host "${AR_SSH_HOST}" \
@@ -58,6 +57,4 @@ BODY=$(jq -n \
     postTransmissionActions: {doAsIn: $rename}}')
 
 printf "Creating the pull site %s...\n" "${AR_PULL_SITE}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites" \
-  -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-  -w "\nHTTP %{http_code}\n" -d "${BODY}"
+ar_admin_post "sites" "${BODY}" || exit 1

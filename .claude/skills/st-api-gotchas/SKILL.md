@@ -1082,6 +1082,17 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   exist"; a rule patched without `clientAddress`, or with a type other than ALLOW or DENY, is 400 with the reasons in
   `validationErrors`; a duplicate login restriction policy is 409.
 
+- **Features: what the failure handling run on the lab showed** (`audit-billable-transfers`, `trigger-route-after-completed-pull`,
+  `Features/lib`; 5.5-20260924). A `#` in an unencoded file path cuts the URL: `DELETE /files/dir/a#1.txt` asks for
+  `/dir/a` and answers 404 "Unable to delete file: /dir/a. (file not found)"; a space makes curl send nothing (code 000);
+  encoded segments work for GET and DELETE (204). A GET or DELETE of a folder that does not exist is a **404**, also inside a
+  stale home (not the 403 of a create there), so a clean-up can tell "not there" from "refused". `HEAD /accounts/<name>` is 200
+  or 404. Deleting an application that still has subscriptions is 400 "Application for ID: ... has active subscriptions". A
+  wrong password on the EndUser login is 401 "Login failed. Re-submit your credentials.". The stale home was reproduced on both
+  features (an account of uid 1001 deleted, then a new one of uid 41733): the probe got the 403, both runs moved to `<name>_2`
+  or `_3` and went on to the end. A clean-up that cannot tell whether something exists (the server unreachable) must not say
+  "nothing to delete", and one that cannot read the list of sites that log in as a partner must keep the partner.
+
 - **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
   the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
   An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST

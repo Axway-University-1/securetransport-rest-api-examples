@@ -23,6 +23,14 @@ REM - Unlike Features/trigger-route-after-completed-pull, files here are NOT
 REM   renamed on receive or send. The point of this feature is telling billable
 REM   from non-billable transfers by their exact file names in File Tracking, so
 REM   the names stay exactly as given.
+REM - The test account's name is read under four names, all the same account:
+REM   BT_RUN_ACCOUNT (what 00.run_all.bat, 99.cleanup_DELETE.bat or the report was
+REM   given on the command line: it wins), BT_TEST_ACCOUNT (what the examples use),
+REM   BT_DEFAULT_ACCOUNT (the name 00.run_all.bat counts from when it moves on) and
+REM   EU_ACCOUNT (what the shared End User helper logs in as: a script SETs it to log
+REM   in as a partner). The password is BT_ACCOUNT_PASSWORD here and
+REM   EU_ACCOUNT_PASSWORD in the helper. Features\lib uses its own names
+REM   (AR_STATE_FILE, AR_EU_*, EU_*, AC_*, HF_*): they are not settings.
 REM ==============================================================================
 
 REM The test account. 00.run_all.bat and 99.cleanup_DELETE.bat take another name

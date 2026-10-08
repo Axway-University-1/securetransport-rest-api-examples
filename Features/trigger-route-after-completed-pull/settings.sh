@@ -16,9 +16,20 @@
 #   both the pull and the push, so no other server is needed.
 # - delivered must not be the subscription folder. If it were, the pushed files
 #   would be seen as new arrivals and the route would trigger itself forever.
+# - The account's name is read under three names, all the same account:
+#   AR_RUN_ACCOUNT (what 00.run_all.sh or 99.cleanup_DELETE.sh was given on the
+#   command line: it wins), AR_TEST_ACCOUNT (what the examples use) and EU_ACCOUNT
+#   (what the shared End User helper logs in as). The password is likewise
+#   AR_ACCOUNT_PASSWORD here and EU_ACCOUNT_PASSWORD in the helper. Features/lib
+#   uses its own names (ar_*, AR_STATE_FILE, AR_EU_*, EU_*): they are not settings.
 # ==============================================================================
 
-export AR_TEST_ACCOUNT="arTestAccount"
+# The test account. 00.run_all.sh and 99.cleanup_DELETE.sh take another name on the
+# command line (AR_RUN_ACCOUNT, applied below, after settings.local.sh).
+# When nobody chose a name, 00.run_all.sh may move to <default>_2, _3 and so on:
+# see "A stale home folder" in its notes.
+export AR_DEFAULT_ACCOUNT="arTestAccount"
+export AR_TEST_ACCOUNT="${AR_DEFAULT_ACCOUNT}"
 export AR_ACCOUNT_PASSWORD=""
 
 export AR_PULL_SITE="arTestPullSite"
@@ -71,8 +82,10 @@ export AR_CREATE_FOLDERS="outbound-drop delivered"
 # be picked up by the next run.
 export AR_CLEAN_FOLDERS="${AR_CREATE_FOLDERS} subscription"
 
-# Must be a home folder your server accepts. /home/<name> is the usual one.
-export AR_HOME_FOLDER="/home/${AR_TEST_ACCOUNT}"
+# The account's home folder is <AR_HOME_ROOT>/<account>, set below, after the
+# account name is known. It must be a folder your server accepts; /home is the
+# usual one.
+export AR_HOME_ROOT="/home"
 # The folders below are relative to the account's home. A login to this server,
 # whether by the loopback sites, the subscription or the End User API, starts in
 # the home folder, so /outbound-drop means /home/arTestAccount/outbound-drop.
@@ -90,7 +103,15 @@ if [ -f "${LOCAL_SETTINGS}" ]; then
     source "${LOCAL_SETTINGS}"
 fi
 
+# A value given on the command line of 00.run_all.sh (or 99.cleanup_DELETE.sh) wins
+# over both the default above and settings.local.sh
+[ -n "${AR_RUN_ACCOUNT}" ] && export AR_TEST_ACCOUNT="${AR_RUN_ACCOUNT}"
+
+# Derived from the account name
+export AR_HOME_FOLDER="${AR_HOME_ROOT}/${AR_TEST_ACCOUNT}"
+
 source "${FEATURE_DIR}/../lib/post_admin.sh"
+source "${FEATURE_DIR}/../lib/admin_calls.sh"
 
 # enduser.sh is shared across Features/ and reads neutral names, not this
 # feature's own AR_ prefix
@@ -98,3 +119,4 @@ export EU_ACCOUNT="${AR_TEST_ACCOUNT}"
 export EU_ACCOUNT_PASSWORD="${AR_ACCOUNT_PASSWORD}"
 export EU_ENDUSER_PORT="${AR_ENDUSER_PORT}"
 source "${FEATURE_DIR}/../lib/enduser.sh"
+source "${FEATURE_DIR}/../lib/home_folder.sh"

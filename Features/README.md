@@ -56,12 +56,30 @@ Copy `settings.local.example.sh` to `settings.local.sh` in the feature's folder
 cd Features/<feature-folder>
 ./00.run_all.sh                # the whole scenario, in order
 ./00.run_all.sh --cleanup      # the same, and everything it made is removed at the end
-./99.cleanup_DELETE.sh         # remove what an earlier run left
+./00.run_all.sh ACCOUNT        # the same, with the test account named ACCOUNT
+./99.cleanup_DELETE.sh [ACCOUNT]   # remove what an earlier run left
 ```
 
 `00.run_all` runs the numbered scripts in order and checks what each one did; you can
 also run a numbered script on its own. Each example comes as a `.sh` for bash and a
 `.bat` for Windows, side by side.
+
+Every example exits 1 when the server refuses a call, and `00.run_all` stops at the
+first step that does. `99.cleanup_DELETE` exits 1 when it could not delete something,
+says what is left and keeps `state.local.sh`; it is safe to run again.
+
+When no account name is given, `00.run_all` checks that the new test account can use
+its home folder, and moves to `<name>_2`, `_3` and so on when a home folder left over
+from an earlier run belongs to another uid (see the feature's README).
+
+Names: the settings of a feature have its own prefix (`AR_` for
+`trigger-route-after-completed-pull`, `BT_` for `audit-billable-transfers`), and the
+shared helpers in `Features/lib/` use theirs (`ar_*` functions, `AR_STATE_FILE`,
+`AR_EU_*`, `EU_*`). They are not settings, except `EU_ACCOUNT`, `EU_ACCOUNT_PASSWORD`
+and `EU_ENDUSER_PORT`: the helper reads those, and each feature's `settings.sh` sets
+them from its own `AR_`/`BT_` ones. So the test account is read under several names
+(the command line's `AR_RUN_ACCOUNT`/`BT_RUN_ACCOUNT`, then `AR_TEST_ACCOUNT`/
+`BT_TEST_ACCOUNT`, then `EU_ACCOUNT`); each `settings.sh` says so.
 
 ## Adding a feature
 
@@ -73,7 +91,9 @@ also run a numbered script on its own. Each example comes as a `.sh` for bash an
    `.bat` for each, with the same name. Add `00.run_all` (the whole scenario, with
    `--cleanup`), `99.cleanup_DELETE` (removes what the others made), `settings.sh`
    with its `settings.local.example.sh` and `.bat` twins, and use the shared helpers
-   in `Features/lib/` (`post_admin`, `enduser`) so a refused call stops the run.
+   in `Features/lib/` (`post_admin` and `admin_calls` for the Admin API, `enduser` for
+   the End User API, `home_folder` for the test account's home) so a refused call
+   stops the run: end a call with `|| exit 1`, and stop at the first one that fails.
 4. Start every script with the version check above, using the release that
    introduced the feature.
 5. Add the feature to the list in this file, under its release. Create a new

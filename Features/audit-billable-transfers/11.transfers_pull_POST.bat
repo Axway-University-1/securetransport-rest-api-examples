@@ -19,6 +19,7 @@ REM
 REM Notes:
 REM - Run steps 01 to 10 first.
 REM - Uses PowerShell to build the JSON bodies.
+REM - Stops at the first pull the server refuses, and exits 1.
 REM - Each call answers 202 on success: the pull is asynchronous. 00.run_all.bat
 REM   pauses afterwards to give the pulls, and the routes they trigger, time to run.
 REM ==============================================================================
@@ -30,11 +31,17 @@ IF ERRORLEVEL 10 EXIT /B 0
 CALL "%~dp0settings.bat"
 
 CALL :run_pull 1
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :run_pull 2
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :run_pull 3
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :run_pull 4
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :run_pull 5
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :run_pull 6
+IF ERRORLEVEL 1 EXIT /B 1
 EXIT /B 0
 
 :run_pull
@@ -46,5 +53,6 @@ powershell -NoProfile -Command "@{ accountName=$env:BT_TEST_ACCOUNT; site=$env:S
 
 echo Pulling from %SITE_NAME% into %SUB_FOLDER%...
 CALL "%~dp0..\lib\post_admin.bat" "transfers/operations?operation=pull" "%BODY_FILE%"
+SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
-EXIT /B 0
+EXIT /B %POST_RESULT%

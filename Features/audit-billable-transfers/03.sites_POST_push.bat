@@ -20,6 +20,7 @@ REM Notes:
 REM - Run 01.accounts_POST.bat first.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body.
+REM - Stops at the first site the server refuses, and exits 1.
 REM - Only scenario 2.6 (archive pushed to two partners) uses the second site.
 REM   Every other scenario that pushes uses the first one.
 REM ==============================================================================
@@ -36,7 +37,9 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
 )
 
 CALL :create_push_site "%BT_PUSH_SITE_1%" "%BT_DELIVERED_1_FOLDER%"
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_push_site "%BT_PUSH_SITE_2%" "%BT_DELIVERED_2_FOLDER%"
+IF ERRORLEVEL 1 EXIT /B 1
 EXIT /B 0
 
 :create_push_site
@@ -47,5 +50,6 @@ powershell -NoProfile -Command "@{ type='ssh'; protocol='ssh'; name=$env:SITE_NA
 
 echo Creating the push site %SITE_NAME%, delivering to %SITE_FOLDER%...
 CALL "%~dp0..\lib\post_admin.bat" sites "%BODY_FILE%"
+SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
-EXIT /B 0
+EXIT /B %POST_RESULT%

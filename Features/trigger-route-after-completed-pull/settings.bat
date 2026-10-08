@@ -17,9 +17,21 @@ REM - The design is a loopback: the SecureTransport server is its own partner fo
 REM   both the pull and the push, so no other server is needed.
 REM - delivered must not be the subscription folder. If it were, the pushed files
 REM   would be seen as new arrivals and the route would trigger itself forever.
+REM - The account's name is read under three names, all the same account:
+REM   AR_RUN_ACCOUNT (what 00.run_all.bat or 99.cleanup_DELETE.bat was given on the
+REM   command line: it wins), AR_TEST_ACCOUNT (what the examples use) and EU_ACCOUNT
+REM   (what the shared End User helper logs in as). The password is likewise
+REM   AR_ACCOUNT_PASSWORD here and EU_ACCOUNT_PASSWORD in the helper. Features\lib
+REM   uses its own names (AR_STATE_FILE, AR_EU_*, EU_*, AC_*, HF_*): they are not
+REM   settings.
 REM ==============================================================================
 
-SET AR_TEST_ACCOUNT=arTestAccount
+REM The test account. 00.run_all.bat and 99.cleanup_DELETE.bat take another name on
+REM the command line (AR_RUN_ACCOUNT, applied below, after settings.local.bat).
+REM When nobody chose a name, 00.run_all.bat may move to <default>_2, _3 and so on:
+REM see "A stale home folder" in its notes.
+SET AR_DEFAULT_ACCOUNT=arTestAccount
+SET AR_TEST_ACCOUNT=%AR_DEFAULT_ACCOUNT%
 SET AR_ACCOUNT_PASSWORD=
 
 SET AR_PULL_SITE=arTestPullSite
@@ -74,8 +86,10 @@ REM and the subscription folder, whose pulled files and trigger files would othe
 REM be picked up by the next run.
 SET AR_CLEAN_FOLDERS=%AR_CREATE_FOLDERS% subscription
 
-REM Must be a home folder your server accepts. /home/<name> is the usual one.
-SET AR_HOME_FOLDER=/home/%AR_TEST_ACCOUNT%
+REM The account's home folder is <AR_HOME_ROOT>/<account>, set below, after the
+REM account name is known. It must be a folder your server accepts; /home is the
+REM usual one.
+SET AR_HOME_ROOT=/home
 REM The folders below are relative to the account's home. A login to this server,
 REM whether by the loopback sites, the subscription or the End User API, starts in
 REM the home folder, so /outbound-drop means /home/arTestAccount/outbound-drop.
@@ -88,6 +102,14 @@ REM feature's state (state.local.bat), separately from any other feature's.
 SET FEATURE_DIR=%~dp0
 
 IF EXIST "%~dp0settings.local.bat" CALL "%~dp0settings.local.bat"
+
+REM A value given on the command line of 00.run_all.bat (or 99.cleanup_DELETE.bat) wins
+REM over both the default above and settings.local.bat
+IF DEFINED AR_RUN_ACCOUNT SET AR_TEST_ACCOUNT=%AR_RUN_ACCOUNT%
+
+REM Derived from the account name
+SET AR_HOME_FOLDER=%AR_HOME_ROOT%/%AR_TEST_ACCOUNT%
+
 REM Ids saved by earlier examples
 IF EXIST "%~dp0state.local.bat" CALL "%~dp0state.local.bat"
 

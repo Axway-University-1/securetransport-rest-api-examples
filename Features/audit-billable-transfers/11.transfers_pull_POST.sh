@@ -19,6 +19,7 @@
 # Notes:
 # - Run steps 01 to 10 first.
 # - Requires `jq`, which builds the JSON bodies.
+# - Stops at the first pull the server refuses, and exits 1.
 # - Each call answers 202 on success: the pull is asynchronous. 00.run_all.sh
 #   pauses afterwards to give the pulls, and the routes they trigger, time to run.
 # ==============================================================================
@@ -45,5 +46,5 @@ run_pull() {
 }
 
 for n in 1 2 3 4 5 6; do
-    run_pull "${n}"
+    run_pull "${n}" || exit 1
 done

@@ -23,6 +23,8 @@ REM - Scenarios 2.1 and 2.2 upload BT_INBOUND_ONLY_COUNT and BT_IN_AND_OUT_COUNT
 REM   files, numbered when there is more than one. See settings.bat.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the archives and the JSON bodies.
+REM - Stops at the first call the server refuses (no operation id, or a refused
+REM   content), logs out, and exits 1.
 REM - The content call uses PUT, not POST: POST is refused with a 415 (confirmed
 REM   on Features/trigger-route-after-completed-pull).
 REM ==============================================================================
@@ -48,6 +50,7 @@ IF ERRORLEVEL 1 (
     EXIT /B 1
 )
 
+SET UPLOAD_FAILED=
 CALL :upload_scenario_files "%BT_FILE_ONLY_INBOUND%" %BT_INBOUND_ONLY_COUNT% "Scenario 2.1: only inbound, no outbound at all."
 CALL :upload_scenario_files "%BT_FILE_ONE_OUTBOUND%" %BT_IN_AND_OUT_COUNT% "Scenario 2.2: inbound, then pushed out once."
 CALL :upload_text_file "%BT_FILE_TWO_OUTBOUNDS%" "Scenario 2.3: inbound, then pushed out twice."
@@ -59,12 +62,14 @@ CALL :build_archive "%BT_FILE_ARCHIVE2P_NAME%" "%BT_FILE_DECOMPRESS2P_1%" "Scena
 
 CALL "%~dp0..\lib\enduser.bat" logout
 RMDIR /S /Q "%WORK%"
+IF DEFINED UPLOAD_FAILED EXIT /B 1
 EXIT /B 0
 
 REM upload_scenario_files NAME COUNT TEXT
 REM   One file under NAME when COUNT is 1, otherwise COUNT numbered copies:
 REM   only_inbound.txt, or only_inbound_1.txt to only_inbound_<COUNT>.txt
 :upload_scenario_files
+IF DEFINED UPLOAD_FAILED EXIT /B 1
 SET USF_NAME=%~1
 SET USF_COUNT=%~2
 SET USF_TEXT=%~3
@@ -76,6 +81,7 @@ FOR /L %%I IN (1,1,%USF_COUNT%) DO CALL :upload_text_file "%USF_NAME:.txt=%_%%I.
 EXIT /B 0
 
 :upload_text_file
+IF DEFINED UPLOAD_FAILED EXIT /B 1
 SET UP_NAME=%~1
 SET UP_TEXT=%~2
 SET UP_LOCAL=%WORK%\%UP_NAME%
@@ -84,6 +90,7 @@ CALL :upload_bytes "%BT_DROP_FOLDER%/%UP_NAME%" "%UP_LOCAL%"
 EXIT /B 0
 
 :build_archive
+IF DEFINED UPLOAD_FAILED EXIT /B 1
 SET UP_ARCHIVE_NAME=%~1
 SET UP_FILE_A=%~2
 SET UP_TEXT_A=%~3
@@ -99,6 +106,7 @@ CALL :upload_bytes "%BT_DROP_FOLDER%/%UP_ARCHIVE_NAME%" "%UP_ARCHIVE_PATH%"
 EXIT /B 0
 
 :upload_bytes
+IF DEFINED UPLOAD_FAILED EXIT /B 1
 SET UB_PATH=%~1
 SET UB_LOCAL=%~2
 SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
@@ -113,11 +121,13 @@ IF NOT DEFINED OPERATION_ID (
     echo No operation id came back ^(HTTP %EU_CODE%^), so nothing was uploaded. The response was:
     TYPE "%EU_BODY_FILE%"
     IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
+    SET UPLOAD_FAILED=1
     EXIT /B 1
 )
 
 echo Sending the content to operation %OPERATION_ID%...
 CALL "%~dp0..\lib\enduser.bat" call PUT "fileOperations/%OPERATION_ID%" "application/octet-stream" "%UB_LOCAL%"
+IF ERRORLEVEL 1 SET UPLOAD_FAILED=1
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.

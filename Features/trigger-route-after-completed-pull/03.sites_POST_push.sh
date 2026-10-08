@@ -21,6 +21,7 @@
 # - Requires `jq`, which builds the JSON body.
 # - doAsOut renames each file as it is sent, to ${stenv.target}_PUSHED, so the
 #   outbound rows in File Tracking can be told from the inbound ones.
+# - Exits 1 when the server refuses the site.
 # - The upload folder must not be the subscription folder, or the pushed files
 #   would trigger the route again.
 # ==============================================================================
@@ -40,8 +41,6 @@ if [ -z "${AR_ACCOUNT_PASSWORD}" ]; then
     exit 1
 fi
 
-REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
-
 BODY=$(jq -n \
   --arg name "${AR_PUSH_SITE}" \
   --arg host "${AR_SSH_HOST}" \
@@ -56,6 +55,4 @@ BODY=$(jq -n \
     postTransmissionActions: {doAsOut: $rename}}')
 
 printf "Creating the push site %s...\n" "${AR_PUSH_SITE}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites" \
-  -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-  -w "\nHTTP %{http_code}\n" -d "${BODY}"
+ar_admin_post "sites" "${BODY}" || exit 1

@@ -23,10 +23,19 @@ REM
 REM   login    logs in as the test account. Sets EU_JAR and EU_CSRF.
 REM   call     makes a call in that session. The response body is in EU_BODY_FILE
 REM            and the HTTP code in EU_CODE. ERRORLEVEL is 0 only for a 2xx code.
+REM            Each segment of PATH is URL-encoded (see admin_calls.bat), so a file
+REM            name from a listing with a space or a # in it reaches the server whole.
 REM   logout   DELETE /myself and forget the session.
 REM
 REM Notes:
 REM - The port is EU_ENDUSER_PORT, not the Admin port.
+REM - Confirmed directly (5.5-20260924): a file name from a listing with a # in it, put into the URL
+REM   as it is, cuts the path short: DELETE /files/dir/a#1.txt asks for /dir/a and is a 404 "Unable
+REM   to delete file: /dir/a. (file not found)". A space makes curl send nothing (code 000). With each
+REM   segment encoded (a%231.txt, my%20file%231.txt) the GET and the DELETE both work.
+REM - A path with a ? in it cannot carry a query string: the ? is encoded like the
+REM   rest. No example here needs one.
+REM - Needs admin_calls.bat, next to this file, to encode the path.
 REM ==============================================================================
 
 GOTO :%~1
@@ -42,6 +51,7 @@ curl -s -k -u "%EU_ACCOUNT%:%EU_ACCOUNT_PASSWORD%" -X POST "https://%ST_SERVER%:
   --cookie-jar "%EU_JAR%" -D "%EU_HEADERS%" -o "%EU_BODY_FILE%"
 FOR /F "tokens=2" %%C IN ('findstr /B /I "HTTP/" "%EU_HEADERS%"') DO SET EU_CODE=%%C
 FOR /F "tokens=2" %%T IN ('findstr /B /I "csrftoken:" "%EU_HEADERS%"') DO SET EU_CSRF=%%T
+IF NOT DEFINED EU_CODE SET EU_CODE=000
 IF "%EU_CODE:~0,1%"=="2" (
     IF EXIST "%EU_HEADERS%" DEL "%EU_HEADERS%"
     echo Logged in to the End User API as %EU_ACCOUNT%.
@@ -58,17 +68,19 @@ EXIT /B 1
 :call
 SET EU_HEADERS=%TEMP%\ar_eu_headers_%RANDOM%.txt
 SET EU_CODE=
+CALL "%~dp0admin_calls.bat" encode "%~3"
 IF "%~5"=="" (
-    curl -s -k -b "%EU_JAR%" -X %~2 "https://%ST_SERVER%:%EU_ENDUSER_PORT%/api/v2.0/%~3" ^
+    curl -s -k -b "%EU_JAR%" -X %~2 "https://%ST_SERVER%:%EU_ENDUSER_PORT%/api/v2.0/%AC_ENCODED_PATH%" ^
       -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT" ^
       -H "csrfToken: %EU_CSRF%" -D "%EU_HEADERS%" -o "%EU_BODY_FILE%"
 ) ELSE (
-    curl -s -k -b "%EU_JAR%" -X %~2 "https://%ST_SERVER%:%EU_ENDUSER_PORT%/api/v2.0/%~3" ^
+    curl -s -k -b "%EU_JAR%" -X %~2 "https://%ST_SERVER%:%EU_ENDUSER_PORT%/api/v2.0/%AC_ENCODED_PATH%" ^
       -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT" ^
       -H "csrfToken: %EU_CSRF%" -H "Content-Type: %~4" -D "%EU_HEADERS%" -o "%EU_BODY_FILE%" --data-binary "@%~5"
 )
 FOR /F "tokens=2" %%C IN ('findstr /B /I "HTTP/" "%EU_HEADERS%"') DO SET EU_CODE=%%C
 IF EXIST "%EU_HEADERS%" DEL "%EU_HEADERS%"
+IF NOT DEFINED EU_CODE SET EU_CODE=000
 IF "%EU_CODE:~0,1%"=="2" EXIT /B 0
 EXIT /B 1
 

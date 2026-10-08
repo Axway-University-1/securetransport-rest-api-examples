@@ -31,6 +31,7 @@
 # - Run 02.sites_POST_pull.sh and 05.applications_POST.sh first.
 # - Requires `jq`, which builds the JSON bodies.
 # - The ids are saved as BT_ID_SUBSCRIPTION_1 to BT_ID_SUBSCRIPTION_6.
+# - Stops at the first subscription the server refuses, and exits 1.
 # ==============================================================================
 
 #
@@ -71,9 +72,9 @@ TRIGGER_EXTRA=$(jq -n --arg name "file_\${date('yyyyddMMHHmmss')}.trigger" \
                                triggerOnConditionEnabled: true,
                                triggerOnConditionExpression: $condition}}')
 
-create_subscription 1 '{}'
-create_subscription 2 '{}'
-create_subscription 3 '{}'
-create_subscription 4 "${TRIGGER_EXTRA}"
-create_subscription 5 '{}'
-create_subscription 6 '{}'
+create_subscription 1 '{}' || exit 1
+create_subscription 2 '{}' || exit 1
+create_subscription 3 '{}' || exit 1
+create_subscription 4 "${TRIGGER_EXTRA}" || exit 1
+create_subscription 5 '{}' || exit 1
+create_subscription 6 '{}' || exit 1

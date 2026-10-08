@@ -6,12 +6,19 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Two small helpers shared across Features/, loaded by each feature's settings.sh.
+# Small helpers shared across Features/, loaded by each feature's settings.sh.
 #
 # - ar_admin_post PATH BODY [STATE_KEY]   POST to the Admin API and print the
 #   response and the HTTP code. On success, the id of the new object is read
-#   from the Location header and saved under STATE_KEY.
+#   from the Location header and saved under STATE_KEY. Returns 0 only for a
+#   2xx code, so a caller ends with `|| exit 1`.
 # - ar_state_get STATE_KEY                print a saved id.
+# - ar_encode_path PATH                   print PATH with each segment URL-encoded
+#   (a space, a # or a ? in a name must not end the path early); the / between
+#   the segments stays. Needs jq.
+#
+# Sets AR_ADMIN_CODE to the HTTP code of the last call (000 when there was no
+# answer at all).
 #
 # Notes:
 # - Ids are kept in state.local.sh, next to the feature's own scripts (not next to
@@ -32,6 +39,11 @@ ar_state_get() {
     [ -f "${AR_STATE_FILE}" ] && ( source "${AR_STATE_FILE}"; eval "printf '%s' \"\${$1}\"" )
 }
 
+# ar_encode_path PATH: every segment encoded on its own, the / between them kept
+ar_encode_path() {
+    printf '%s' "$1" | jq -Rr 'split("/") | map(@uri) | join("/")'
+}
+
 ar_admin_post() {
     local path="$1" body="$2" key="$3" hdr code location id
     hdr=$(mktemp)
@@ -41,6 +53,8 @@ ar_admin_post() {
     code=$(head -n 1 "${hdr}" | awk '{print $2}')
     location=$(grep -i '^location:' "${hdr}" | tr -d '\r' | awk '{print $2}')
     rm -f "${hdr}"
+    code="${code:-000}"
+    AR_ADMIN_CODE="${code}"
     printf "\nHTTP %s\n" "${code}"
     case "${code}" in
         2*) ;;

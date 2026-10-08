@@ -22,6 +22,14 @@
 #   renamed on receive or send. The point of this feature is telling billable
 #   from non-billable transfers by their exact file names in File Tracking, so
 #   the names stay exactly as given.
+# - The test account's name is read under four names, all the same account:
+#   BT_RUN_ACCOUNT (what 00.run_all.sh, 99.cleanup_DELETE.sh or the report was given
+#   on the command line: it wins), BT_TEST_ACCOUNT (what the examples use),
+#   BT_DEFAULT_ACCOUNT (the name 00.run_all.sh counts from when it moves on) and
+#   EU_ACCOUNT (what the shared End User helper logs in as: bt_login_as changes it to
+#   log in as a partner). The password is BT_ACCOUNT_PASSWORD here and
+#   EU_ACCOUNT_PASSWORD in the helper. Features/lib uses its own names (ar_*,
+#   AR_STATE_FILE, AR_EU_*, EU_*): they are not settings.
 # ==============================================================================
 
 # The test account. 00.run_all.sh and 99.cleanup_DELETE.sh take another name on
@@ -126,6 +134,7 @@ export BT_SIMPLE_ROUTE_PREFIX="${BT_TEST_ACCOUNT}SimpleRoute"        # ...Simple
 export BT_COMPOSITE_ROUTE_PREFIX="${BT_TEST_ACCOUNT}CompositeRoute"  # ...CompositeRoute2 to 6
 
 source "${FEATURE_DIR}/../lib/post_admin.sh"
+source "${FEATURE_DIR}/../lib/admin_calls.sh"
 
 # enduser.sh is shared across Features/ and reads neutral names, not this
 # feature's own BT_ prefix. It logs in as EU_ACCOUNT, read at login time.
@@ -133,6 +142,7 @@ export EU_ACCOUNT="${BT_TEST_ACCOUNT}"
 export EU_ACCOUNT_PASSWORD="${BT_ACCOUNT_PASSWORD}"
 export EU_ENDUSER_PORT="${BT_ENDUSER_PORT}"
 source "${FEATURE_DIR}/../lib/enduser.sh"
+source "${FEATURE_DIR}/../lib/home_folder.sh"
 
 # bt_login_as ACCOUNT: an End User API session as one of the three accounts
 bt_login_as() {

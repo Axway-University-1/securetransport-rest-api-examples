@@ -159,9 +159,10 @@ fi
 
 # Like real curl, the -w text comes after the response body.
 #
-# HEAD with -w "%{http_code}", as an existence check: print STUB_CURL_STATUS (200)
+# HEAD with -w "%{http_code}", as an existence check: print STUB_CURL_STATUS_HEAD, or
+# else STUB_CURL_STATUS (200 when neither is set)
 if [[ "${method}" == "HEAD" && "${write_out}" == *http_code* ]]; then
-    printf '%s' "${STUB_CURL_STATUS:-200}"
+    printf '%s' "${STUB_CURL_STATUS_HEAD:-${STUB_CURL_STATUS:-200}}"
 elif [[ -n "${STUB_CURL_PRINT_CODE}" && "${write_out}" == *http_code* ]]; then
     # Opt in: act on any -w format, as curl does after the response, so a script that
     # prints "HTTP <code>" shows the status STUB_CURL_STATUS gives (201 by default)

@@ -21,6 +21,8 @@ REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.
 REM - Which folders is set by AR_CREATE_FOLDERS: outbound-drop, where the pull
 REM   finds its files, and delivered, where the push puts them.
 REM - Uses PowerShell to build the JSON body.
+REM - Stops at the first folder the server refuses (a 409 when it is already there), logs
+REM   out, and exits 1.
 REM - The port is AR_ENDUSER_PORT, 8443 by default. It is not the Admin port.
 REM - Confirmed directly: an account's home folder stays on disk, with its owner, when the account is
 REM   deleted. A new account with ANOTHER uid cannot create a folder directly in it: every such POST is 403
@@ -44,12 +46,16 @@ IF "%AR_ACCOUNT_PASSWORD%"=="" (
 CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 
+SET FOLDER_FAILED=
 FOR %%F IN (%AR_CREATE_FOLDERS%) DO CALL :create_folder %%F
 
 CALL "%~dp0..\lib\enduser.bat" logout
+IF DEFINED FOLDER_FAILED EXIT /B 1
 EXIT /B 0
 
 :create_folder
+REM A refused folder stops the run: the later steps need it
+IF DEFINED FOLDER_FAILED EXIT /B 1
 SET FOLDER_NAME=%1
 SET BODY_FILE=%TEMP%\ar_body_%RANDOM%.json
 REM The folder's name is in the URL. The body describes it as a directory.
@@ -60,6 +66,7 @@ CALL "%~dp0..\lib\enduser.bat" call POST "files/%FOLDER_NAME%" "application/json
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.
-IF "%EU_CODE%"=="403" FINDSTR /C:"Error occurred while creating file" "%EU_BODY_FILE%" >NUL && echo Hint: a 403 "Error occurred while creating file" for a folder directly in an account's home usually means the home folder is left over from an earlier run and belongs to another uid ^(it stays on disk when the account is deleted^). Use another AR_TEST_ACCOUNT ^(in settings.local.bat^), so that the account gets a new home folder.
+IF "%EU_CODE%"=="403" FINDSTR /C:"Error occurred while creating file" "%EU_BODY_FILE%" >NUL && echo Hint: a 403 "Error occurred while creating file" for a folder directly in an account's home usually means the home folder is left over from an earlier run and belongs to another uid ^(it stays on disk when the account is deleted^). Use another account name ^(00.run_all.bat ANOTHER_NAME, or AR_TEST_ACCOUNT in settings.local.bat^), so that the account gets a new home folder.
+IF NOT "%EU_CODE:~0,1%"=="2" SET FOLDER_FAILED=1
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B 0

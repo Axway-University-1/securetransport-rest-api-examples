@@ -22,6 +22,7 @@ REM Notes:
 REM - Run 04.files_POST_folders first, so the folder exists.
 REM - Needs settings.local.bat with AR_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body and to read the id.
+REM - Stops at the first call the server refuses, logs out, and exits 1.
 REM - The port is AR_ENDUSER_PORT, 8443 by default. It is not the Admin port.
 REM - The content is sent with PUT, not POST: POST is refused with a 415 for every
 REM   content type except multipart, and multipart names the file after the local
@@ -77,6 +78,7 @@ REM 2. Send the content to that operation
 echo Sending the content to operation %OPERATION_ID%...
 > "%CONTENT_FILE%" echo Sample file %1 for the pull test.
 CALL "%~dp0..\lib\enduser.bat" call PUT "fileOperations/%OPERATION_ID%" "application/octet-stream" "%CONTENT_FILE%"
+IF ERRORLEVEL 1 SET UPLOAD_FAILED=1
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.

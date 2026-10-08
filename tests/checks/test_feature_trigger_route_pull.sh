@@ -41,15 +41,36 @@ echo 'export AR_STEP_PAUSE_SECONDS=0' >> "${RUN}/settings.local.sh"
 SERVER_NEW="${WORK}/version_new.json"; echo '{"version":"5.5-20260924"}' > "${SERVER_NEW}"
 SERVER_OLD="${WORK}/version_old.json"; echo '{"version":"5.5-20260923"}' > "${SERVER_OLD}"
 
-# run SCRIPT VERSION_FILE -> sets OUT (stdout+stderr), RC
+# run SCRIPT VERSION_FILE [LOCATION_ID [STATUS]] -> sets OUT (stdout+stderr), RC.
+# A HEAD (does the account exist?) answers HEAD_STATUS, 200 unless a test says otherwise,
+# whatever STATUS the other calls get.
 run() {
-    OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="$2" \
+    OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="$2" STUB_CURL_STATUS_HEAD="${HEAD_STATUS:-200}" \
           STUB_CURL_LOCATION_ID="${3:-new-id}" STUB_CURL_STATUS="${4:-201}" STUB_CURL_CSRF="csrf-abc" bash "./$1" 2>&1)
+    RC=$?
+}
+# The same, with a status per method (stub_curl_by_method): run_by_method SCRIPT BODY_FILE VAR=value...
+# with STUB_STATUS_GET, _POST, _PUT, _DELETE and so on among the variables
+mkdir -p "${WORK}/bin_by_method"
+cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin_by_method/stub_curl_real" && chmod +x "${WORK}/bin_by_method/stub_curl_real"
+cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin_by_method/curl" && chmod +x "${WORK}/bin_by_method/curl"
+run_by_method() {
+    local script="$1" body="$2"
+    shift 2
+    rm -f "${WORK}/counter."*
+    OUT=$(cd "${RUN}" && env PATH="${WORK}/bin_by_method:${PATH}" STUB_COUNTER="${WORK}/counter" STUB_CURL_GET_BODY="${body}" \
+          STUB_CURL_POST_BODY="${POST_BODY:-}" STUB_CURL_STATUS_HEAD="${HEAD_STATUS:-200}" STUB_CURL_LOCATION_ID="new-id" \
+          STUB_CURL_CSRF="csrf-abc" "$@" bash "./${script}" 2>&1)
     RC=$?
 }
 # the method and URL of every request the example made, in order
 calls() { echo "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL:/ {print m, $2}'; }
 payload() { echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | head -n 1 | base64 -d; }
+# Only the bodies of the POST calls, in order: the content PUT calls are not JSON
+post_payloads() {
+    echo "${OUT}" | awk '/^METHOD:/ {m=$2} /^PAYLOAD_B64:/ {if (m == "POST") print substr($0, 14)}' \
+      | while read -r b; do echo "$b" | base64 -d; echo; done
+}
 # the method and URL of the last request, which is the one the example makes
 last_call() { echo "${OUT}" | grep -E '^(METHOD|URL):' | tail -n 2 | tr '\n' ' '; }
 
@@ -95,6 +116,20 @@ echo "${B}" | jq -e . >/dev/null 2>&1 && pass "the body is valid JSON" || fail "
     && pass "the upload folder is not the subscription folder" || fail "upload folder equals the subscription folder: the route would trigger itself"
 
 echo
+echo "=== 01 to 03: a refused call is printed and ends the example with exit 1 ==="
+# The POSTs go through ar_admin_post (Features/lib/post_admin.sh), which reads the code
+# from the response headers and returns 1 for anything but a 2xx. A raw curl -w printed
+# the code and always exited 0, so a run on its own went on as if nothing had happened
+for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh; do
+    run "${s}" "${SERVER_NEW}" x 409
+    if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"HTTP 409"* ]]; then pass "${s}: a 409 is printed, and it exits 1"; else fail "${s}: exit ${RC} on a 409"; fi
+    run "${s}" "${SERVER_NEW}" x 500
+    if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"HTTP 500"* ]]; then pass "${s}: a 500 is printed, and it exits 1"; else fail "${s}: exit ${RC} on a 500"; fi
+    run "${s}" "${SERVER_NEW}" x 201
+    [ "${RC}" -eq 0 ] && [[ "${OUT}" == *"HTTP 201"* ]] && pass "${s}: a 201 is printed, and it exits 0" || fail "${s}: exit ${RC} on a 201"
+done
+
+echo
 echo "=== 04.files_POST_folders.sh ==="
 run 04.files_POST_folders.sh "${SERVER_NEW}"
 [ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
@@ -123,6 +158,15 @@ OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${SERVER_NEW
 if [[ "${OUT}" == *"HTTP 403"* ]] && [[ "${OUT}" == *"Hint: a 403"* ]] && [[ "${OUT}" == *"another uid"* ]]; then pass "a 403 'Error occurred while creating file' says the home folder probably belongs to another uid"; else fail "no hint for the 403 (output: ${OUT:0:300})"; fi
 run 04.files_POST_folders.sh "${SERVER_NEW}"
 [[ "${OUT}" != *"Hint:"* ]] && pass "no hint when the folders are created" || fail "a hint without a 403"
+# A folder the server refuses (409: it is there already) stops the example at the first one
+OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${SERVER_NEW}" STUB_CURL_STATUS=201 \
+      STUB_CURL_STATUS_FILES=409 STUB_CURL_CSRF="csrf-abc" bash "./04.files_POST_folders.sh" 2>&1)
+RC=$?
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"HTTP 409"* ]] && [ "$(calls | grep -c '^POST .*/files/')" -eq 1 ] && calls | tail -n 1 | grep -q '^DELETE .*myself$'; then
+    pass "a refused folder: exit 1, no further folder is tried, and it logs out"
+else
+    fail "refused folder: exit ${RC}, $(calls | grep -c '^POST .*/files/') folder calls"
+fi
 
 echo
 echo "=== 05.files_upload_POST.sh ==="
@@ -143,6 +187,12 @@ FIRST=$(echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | head -n 1 | base64 -d)
 echo '{"error":"no such folder"}' > "${WORK}/no_id.json"
 run04 "${WORK}/no_id.json"
 if [ "${RC}" -eq 1 ] && ! calls | grep -q 'fileOperations/'; then pass "no operation id: stops, and sends no content"; else fail "went on without an id (exit ${RC})"; fi
+POST_BODY="${WORK}/operation.json" run_by_method 05.files_upload_POST.sh "${SERVER_NEW}" STUB_STATUS_PUT=403
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"HTTP 403"* ]] && [ "$(calls | grep -c '^PUT ')" -eq 1 ] && calls | tail -n 1 | grep -q '^DELETE .*myself$'; then
+    pass "a refused content call: exit 1, the later files are not uploaded, and it logs out"
+else
+    fail "refused PUT: exit ${RC}, $(calls | grep -c '^PUT ') puts"
+fi
 
 echo
 echo "=== 06 to 10: the routes, application and subscription bodies ==="
@@ -233,6 +283,12 @@ FB=$(echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | head -n 1 | base64 -d | jq -
 printf '{"version": "5.5-20260924", "files": []}' > "${WORK}/version_no_trigger.json"
 run12 "${WORK}/version_no_trigger.json"
 if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"No trigger file"* ]] && ! calls | grep -q 'fileOperations'; then pass "no trigger file: says so, and uploads nothing"; else fail "no-trigger case (exit ${RC})"; fi
+POST_BODY="${WORK}/operation.json" run_by_method 12.files_PUT_triggerfile.sh "${WORK}/version_and_triggers.json" STUB_STATUS_PUT=403
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"HTTP 403"* ]] && calls | tail -n 1 | grep -q '^DELETE .*myself$'; then
+    pass "a refused content call: exit 1, and it logs out"
+else
+    fail "refused PUT (exit ${RC})"
+fi
 
 echo
 echo "=== 13.files_GET_result.sh ==="
@@ -249,6 +305,13 @@ run 13.files_GET_result.sh "${WORK}/version_and_files.json"
 printf '{"version": "5.5-20260924", "files": []}' > "${WORK}/version_and_nofiles.json"
 run 13.files_GET_result.sh "${WORK}/version_and_nofiles.json"
 [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"delivered: 0 file(s)"* ]] && pass "exits 1 when nothing reached the last folder" || fail "empty case: exit ${RC}"
+# A listing the server refuses is said so and ends it with exit 1, even when the last folder has files
+run_by_method 13.files_GET_result.sh "${WORK}/version_and_files.json" STUB_STATUS_GET=403
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"The listing of outbound-drop was refused (HTTP 403)."* ]]; then
+    pass "a refused listing: says which, and exits 1"
+else
+    fail "refused listing (exit ${RC}): $(echo "${OUT}" | tail -n 4)"
+fi
 
 echo
 echo "=== 99.cleanup_DELETE.sh ==="
@@ -278,7 +341,7 @@ ORDER=$(echo "${D}" | sed 's#.*/api/v2.0/##' | tr '\n' ' ')
 [ "${ORDER}" = "routes/comp-4 routes/simple-2 routes/tmpl-1 subscriptions/sub-3 applications/arTestPullApplication sites/site-pull sites/site-push files/outbound-drop files/delivered files/subscription myself accounts/arTestAccount " ] \
     && pass "finds by name; deletes the routes, subscription, application, sites, then the folders, then the account" || fail "order: ${ORDER}"
 echo "${D}" | grep -qE 'sub-else|site-other|site-else|route-else' && fail "deleted something that is not the test account's" || pass "leaves other accounts' objects and unrelated ones alone"
-run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json" x 404
+HEAD_STATUS=404 run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json" x 404
 if [[ "${OUT}" == *"does not exist (HTTP 404)"* ]] && ! calls | grep -q '^DELETE .*/accounts/'; then pass "an account that is already gone is reported, not deleted"; else fail "missing account: $(echo "${OUT}" | tail -n 3)"; fi
 calls | grep -q '^HEAD .*/accounts/arTestAccount$' && pass "checks that the account exists first" || fail "no existence check"
 echo '{"version":"5.5-20260924","result":[]}' > "${WORK}/version_no_objects.json"
@@ -296,7 +359,60 @@ if [[ "${OUT}" == *"folders are left in place"* ]] && ! calls | grep -q 'DELETE 
 mv "${RUN}/settings.local.sh.off" "${RUN}/settings.local.sh"
 printf 'export AR_ID_TEMPLATE=left-over\n' > "${RUN}/state.local.sh"
 run 99.cleanup_DELETE.sh "${WORK}/version_no_objects.json"
-[ ! -f "${RUN}/state.local.sh" ] && pass "removes the saved ids" || fail "state file left behind"
+[ "${RC}" -eq 0 ] && [ ! -f "${RUN}/state.local.sh" ] && pass "everything gone: exit 0, and the saved ids are removed" || fail "state file left behind (exit ${RC})"
+
+# A delete the server refuses: exit 1, what is left is named, and the saved ids stay
+printf 'export AR_ID_TEMPLATE=left-over\n' > "${RUN}/state.local.sh"
+run_by_method 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json" STUB_STATUS_DELETE=403
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Not everything was removed. Left on the server:"* ]] \
+   && [[ "${OUT}" == *"  routes comp-4 (HTTP 403)"* ]] && [[ "${OUT}" == *"  sites site-push (HTTP 403)"* ]] \
+   && [[ "${OUT}" == *"  the folder outbound-drop (HTTP 403)"* ]] && [[ "${OUT}" == *"  the account arTestAccount (HTTP 403)"* ]]; then
+    pass "refused deletes: exit 1, and every object, folder and the account that is left is named"
+else
+    fail "refused deletes (exit ${RC}): $(echo "${OUT}" | sed -n '/Not everything/,$p')"
+fi
+[ -f "${RUN}/state.local.sh" ] && [[ "${OUT}" == *"The saved ids in "*"state.local.sh are kept."* ]] && pass "refused deletes: the saved ids are kept, and it says so" || fail "state file was removed with objects left"
+# A 404 on a delete means it is gone: not a failure
+printf 'export AR_ID_TEMPLATE=left-over\n' > "${RUN}/state.local.sh"
+run_by_method 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json" STUB_STATUS_DELETE=404
+[ "${RC}" -eq 0 ] && [ ! -f "${RUN}/state.local.sh" ] && pass "a delete that answers 404 (already gone) is not a failure" || fail "404 treated as a failure (exit ${RC})"
+# A list the server refuses: nothing can be said to be gone
+printf 'export AR_ID_TEMPLATE=left-over\n' > "${RUN}/state.local.sh"
+run_by_method 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json" STUB_STATUS_GET=500
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"The list of routes could not be read (HTTP 500)"* ]] && [[ "${OUT}" == *"  sites: the list could not be read (HTTP 500)"* ]] \
+   && ! echo "$(calls)" | grep -q '^DELETE .*/\(routes\|sites\|subscriptions\|applications\)/' && [ -f "${RUN}/state.local.sh" ]; then
+    pass "a refused list: exit 1, nothing is deleted from it, and it is named as left"
+else
+    fail "refused list (exit ${RC}): $(echo "${OUT}" | sed -n '/Not everything/,$p')"
+fi
+# An account the server will not say anything about is not "gone"
+printf 'export AR_ID_TEMPLATE=left-over\n' > "${RUN}/state.local.sh"
+HEAD_STATUS=500 run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json"
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Could not tell whether the account arTestAccount exists (HTTP 500)."* ]] && [[ "${OUT}" != *"Nothing to delete"* ]] \
+   && ! calls | grep -q '^DELETE .*/accounts/' && [ -f "${RUN}/state.local.sh" ]; then
+    pass "an account that cannot be checked: exit 1, not reported as gone, the saved ids are kept"
+else
+    fail "unchecked account (exit ${RC})"
+fi
+# A folder that is not there is skipped (a 404 on its listing), not deleted
+printf 'export AR_ID_TEMPLATE=left-over\n' > "${RUN}/state.local.sh"
+run_by_method 99.cleanup_DELETE.sh "${WORK}/version_no_objects.json" STUB_CURL_STATUS_FILES=404
+if [ "${RC}" -eq 0 ] && [[ "${OUT}" == *"The folder outbound-drop is not there."* ]] && ! calls | grep -q '^DELETE .*/files/'; then
+    pass "a folder that is not there: skipped, nothing deleted from it, exit 0"
+else
+    fail "missing folder (exit ${RC}): $(calls | grep files/)"
+fi
+# A file name from a listing goes into the URL encoded: a space or a # must not end the path early
+cat > "${WORK}/version_and_odd_names.json" <<JSON
+{"version": "5.5-20260924", "files": [
+  {"fileName": "my file#1.txt", "isRegularFile": true},
+  {"fileName": "a#1.txt", "isRegularFile": true},
+  {"fileName": "50% off?.txt", "isRegularFile": true}]}
+JSON
+run 99.cleanup_DELETE.sh "${WORK}/version_and_odd_names.json"
+ODD=$(calls | grep '^DELETE .*/files/subscription/' | sed 's#.*/files/subscription/##' | tr '\n' ' ')
+[ "${ODD}" = "my%20file%231.txt a%231.txt 50%25%20off%3F.txt " ] \
+    && pass "a space, a #, a % and a ? in a file name are encoded in the DELETE" || fail "encoded names: ${ODD}"
 
 echo
 echo "=== 00.run_all.sh ==="
@@ -318,8 +434,13 @@ cat > "${WORK}/everything.json" <<JSON
 }
 JSON
 rm -f "${RUN}/state.local.sh"
-master() { OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/everything.json" STUB_CURL_POST_BODY="${WORK}/operation.json" \
-           STUB_CURL_LOCATION_ID="new-id" STUB_CURL_STATUS="${STATUS:-201}" STUB_CURL_PRINT_CODE=1 STUB_CURL_CSRF="csrf-abc" bash ./00.run_all.sh "$@" 2>&1); RC=$?; }
+# PRINT_CODE= (set, empty) makes the stub print no code of its own: only a script that reads the
+# status from the response headers, as ar_admin_post does, can then tell that a call was refused.
+# HEAD_STATUS is what an existence check answers (200: the account is there), DELETE_STATUS the
+# status of every DELETE when it is set.
+master() { OUT=$(cd "${RUN}" && PATH="${STUB_BIN:-${WORK}/bin}:${PATH}" STUB_CURL_GET_BODY="${WORK}/everything.json" STUB_CURL_POST_BODY="${WORK}/operation.json" \
+           STUB_CURL_LOCATION_ID="new-id" STUB_CURL_STATUS="${STATUS:-201}" STUB_CURL_STATUS_HEAD="${HEAD_STATUS-200}" \
+           STUB_CURL_STATUS_DELETE="${DELETE_STATUS:-}" STUB_CURL_PRINT_CODE="${PRINT_CODE-1}" STUB_CURL_CSRF="csrf-abc" bash ./00.run_all.sh "$@" 2>&1); RC=$?; }
 STATUS=201 master
 [ "${RC}" -eq 0 ] && pass "runs all the steps and exits 0" || fail "exit ${RC}: $(echo "${OUT}" | tail -n 5)"
 STEPS_SEEN=$(echo "${OUT}" | sed -n 's/^=== Step \([0-9]*\) of \([0-9]*\): \(.*\) ===$/\1\/\2 \3/p' | tr '\n' ',')
@@ -334,10 +455,142 @@ STATUS=500 master
 if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Stopped at step 1 of 13: 01.accounts_POST.sh failed"* ]] && [[ "${OUT}" != *"Step 2 of 13"* ]]; then pass "stops at the first step whose output shows an HTTP error, and runs nothing after it"; else fail "failure case (exit ${RC})"; fi
 STATUS=201 master --bogus
 [ "${RC}" -eq 2 ] && pass "an unknown option is refused" || fail "--bogus exit ${RC}"
+# The first step is refused and nothing else tells the run: the stub prints no code of its own, so
+# only the status read from the response makes the step exit 1
+PRINT_CODE= STATUS=500 master
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Stopped at step 1 of 13: 01.accounts_POST.sh failed"* ]] && [[ "${OUT}" != *"Step 2 of 13"* ]]; then
+    pass "a refused first call stops the run at step 1 (the step itself exits 1)"
+else
+    fail "refused first call not noticed (exit ${RC}): $(echo "${OUT}" | tail -n 4)"
+fi
+
+echo
+echo "=== 00.run_all.sh: another account name ==="
+rm -f "${RUN}/state.local.sh"
+STATUS=201 master test_account
+[ "${RC}" -eq 0 ] && pass "./00.run_all.sh test_account runs and exits 0" || fail "exit ${RC}: $(echo "${OUT}" | tail -n 5)"
+B=$(echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | head -n 1 | base64 -d)
+[ "$(echo "${B}" | jq -r '.name + " " + .homeFolder')" = "test_account /home/test_account" ] \
+    && pass "the account it creates is test_account, with its home folder to match" || fail "account body: ${B}"
+[ "$(post_payloads | jq -r 'select(.accountName != null) | .accountName')" = "test_account" ] \
+    && pass "the pull is for test_account" || fail "pull account"
+echo "${OUT}" | grep -qF "BASIC_AUTH: test_account:${TRICKY}" && pass "the End User API login is as test_account" || fail "End User login: $(echo "${OUT}" | grep BASIC_AUTH | sed -n 3p)"
+[[ "${OUT}" == *"Run ./99.cleanup_DELETE.sh test_account to remove everything this created."* ]] && pass "the cleanup hint names the account" || fail "cleanup hint: $(echo "${OUT}" | tail -n 2)"
+[ "$(calls | grep -c 'bt_home_probe\|ar_home_probe')" -eq 0 ] && pass "a name that was chosen is not probed" || fail "a chosen name was probed"
+STATUS=201 master test_account --cleanup
+calls | grep -q '^HEAD .*/accounts/test_account$' && calls | grep -q '^DELETE .*/accounts/test_account$' && pass "--cleanup after the name cleans up that same account" || fail "cleanup target: $(calls | grep -E 'HEAD|accounts')"
+[ -f "${RUN}/state.local.sh" ] && fail "state file left after a clean --cleanup" || pass "a clean --cleanup removes the saved ids"
+STATUS=201 master --cleanup test_account
+calls | grep -q '^DELETE .*/accounts/test_account$' && pass "the name may come after --cleanup" || fail "--cleanup test_account"
+for bad in "test_account other" "bad/name" "-x"; do
+    # shellcheck disable=SC2086
+    STATUS=201 master ${bad}
+    [ "${RC}" -eq 2 ] && ! calls | grep -q '^POST' && pass "refused, nothing sent: ./00.run_all.sh ${bad}" || fail "accepted: ./00.run_all.sh ${bad} (exit ${RC})"
+done
+run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json"
+EXTRA_OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/version_and_objects.json" STUB_CURL_STATUS_HEAD=200 STUB_CURL_STATUS=201 STUB_CURL_CSRF=csrf-abc bash ./99.cleanup_DELETE.sh test_account 2>&1)
+echo "${EXTRA_OUT}" | grep -q '^URL: .*/accounts/test_account$' && pass "./99.cleanup_DELETE.sh test_account cleans up that account" || fail "99 with an account"
+for bad in "bad/name" "a b"; do
+    EXTRA_OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/version_and_objects.json" STUB_CURL_CSRF=csrf-abc bash ./99.cleanup_DELETE.sh ${bad} 2>&1)
+    [ $? -eq 2 ] && ! echo "${EXTRA_OUT}" | grep -q '^METHOD: DELETE' && pass "refused, nothing deleted: ./99.cleanup_DELETE.sh ${bad}" || fail "accepted: ./99.cleanup_DELETE.sh ${bad}"
+done
+
+echo
+echo "=== 00.run_all.sh: the home folder of the default account ==="
+# A clean lab: the probe folder is made and removed, nothing else changes. The folder POSTs answer
+# from a sequence file: one line per POST to a /files/ URL, the last repeating. The probe is the
+# first one, so a refused first line is a stale home, as on a lab that has seen the account before.
+SEQ="${WORK}/files_seq.txt"
+STALE_BODY="${WORK}/stale.json"
+echo '{"message":"Error validating request","validationErrors":["Error occurred while creating file: null"]}' > "${STALE_BODY}"
+calls() { echo "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL:/ {print m, $2}'; }
+probe_run() {
+    rm -f "${SEQ}.served"
+    export STUB_CURL_FILES_POST_SEQUENCE="${SEQ}"
+    rm -f "${RUN:?}/state.local.sh"
+    STATUS=201 HEAD_STATUS="${HEAD_STATUS-404}" master "$@"
+    unset STUB_CURL_FILES_POST_SEQUENCE
+}
+printf '201\n' > "${SEQ}"
+probe_run
+[ "${RC}" -eq 0 ] && pass "clean lab: the run completes" || fail "clean lab: exit ${RC}: $(echo "${OUT}" | tail -n 5)"
+[ "$(calls | grep -c 'files/ar_home_probe$')" -eq 2 ] && calls | grep -q '^POST .*files/ar_home_probe$' && calls | grep -q '^DELETE .*files/ar_home_probe$' \
+    && pass "clean lab: one probe, a POST and a DELETE of ar_home_probe" || fail "probe calls: $(calls | grep probe)"
+[ "$(calls | grep -c '^POST .*/accounts$')" -eq 1 ] && [ "$(calls | grep -c '^DELETE .*/accounts/')" -eq 0 ] \
+    && pass "clean lab: the account is created once, and none is deleted" || fail "account calls: $(calls | grep '/accounts')"
+[[ "${OUT}" == *"Run ./99.cleanup_DELETE.sh to remove everything this created."* ]] && [[ "${OUT}" != *"arTestAccount_2"* ]] \
+    && pass "clean lab: the plain default name is kept to the end, and the output is as it always was" || fail "clean lab name"
+
+# A stale home: the first probe is refused, the second works
+printf '403\t%s\n201\n' "${STALE_BODY}" > "${SEQ}"
+probe_run
+[ "${RC}" -eq 0 ] && pass "stale home: the run completes" || fail "stale home: exit ${RC}: $(echo "${OUT}" | tail -n 8)"
+[[ "${OUT}" == *"The home folder of arTestAccount is left over from an earlier run and belongs to another uid"* ]] \
+    && [[ "${OUT}" == *"A new name is used: arTestAccount_2."* ]] && pass "stale home: says why, and which name it uses now" || fail "no switch message"
+[ "$(calls | grep '^DELETE .*/accounts/' | sed 's#.*/accounts/##' | tr '\n' ' ')" = "arTestAccount " ] \
+    && pass "stale home: deletes only the stale account" || fail "deleted: $(calls | grep '^DELETE .*/accounts/')"
+PAYLOAD_NAMES=$(post_payloads | jq -r 'select(.type=="user") | .name + " " + .homeFolder' 2>/dev/null | tr '\n' '|')
+[ "${PAYLOAD_NAMES}" = "arTestAccount /home/arTestAccount|arTestAccount_2 /home/arTestAccount_2|" ] \
+    && pass "stale home: step 01 runs again for arTestAccount_2, with its own home folder" || fail "account names: ${PAYLOAD_NAMES}"
+[ "$(calls | grep -c '^POST .*files/ar_home_probe$')" -eq 2 ] && [ "$(calls | grep -c '^DELETE .*files/ar_home_probe$')" -eq 1 ] \
+    && pass "stale home: two probes, and the probe folder is removed once it was made" || fail "probe calls"
+[ "$(calls | grep -c '^HEAD .*/accounts/arTestAccount_2$')" -eq 1 ] && pass "stale home: it checked that arTestAccount_2 is free first" || fail "no free-name check: $(calls | grep HEAD)"
+[[ "${OUT}" == *"Run ./99.cleanup_DELETE.sh arTestAccount_2 to remove everything this created."* ]] \
+    && pass "stale home: the cleanup hint names the account it ended on" || fail "cleanup hint: $(echo "${OUT}" | tail -n 3)"
+[ "$(post_payloads | jq -r 'select(.accountName != null) | .accountName')" = "arTestAccount_2" ] \
+    && echo "${OUT}" | grep -qF "BASIC_AUTH: arTestAccount_2:${TRICKY}" && pass "stale home: the rest of the run is for arTestAccount_2" || fail "the rest of the run did not follow the new name"
+probe_run --cleanup
+calls | grep -q '^HEAD .*/accounts/arTestAccount_2$' && ! calls | grep -q '^HEAD .*/accounts/arTestAccount$' \
+    && pass "stale home: --cleanup cleans up the name it ended on" || fail "cleanup target: $(calls | grep '^HEAD')"
+
+# The account that cannot be deleted stops the run
+printf '403\t%s\n201\n' "${STALE_BODY}" > "${SEQ}"
+DELETE_STATUS=403 probe_run
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"The account arTestAccount could not be deleted, so the run stops here."* ]] && [[ "${OUT}" != *"Step 2 of 13"* ]]; then
+    pass "stale home: an account that cannot be deleted stops the run, before anything else is made"
+else
+    fail "refused delete of the stale account (exit ${RC}): $(echo "${OUT}" | tail -n 4)"
+fi
+
+# A name the user chose is never changed
+printf '403\t%s\n' "${STALE_BODY}" > "${SEQ}"
+probe_run test_account
+[ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Stopped at step 4 of 13: 04.files_POST_folders.sh failed"* ]] && [[ "${OUT}" == *"Hint: a 403"* ]] \
+    && pass "explicit name: no switch, step 04 fails with the hint" || fail "explicit name: exit ${RC}: $(echo "${OUT}" | tail -n 6)"
+[ "$(calls | grep -c 'ar_home_probe')" -eq 0 ] && [ "$(calls | grep -c '^DELETE .*/accounts/')" -eq 0 ] \
+    && pass "explicit name: no probe, nothing deleted" || fail "explicit name made calls"
+export AR_RUN_ACCOUNT=arTestAccount
+probe_run
+unset AR_RUN_ACCOUNT
+[ "${RC}" -eq 1 ] && [ "$(calls | grep -c 'ar_home_probe')" -eq 0 ] \
+    && pass "AR_RUN_ACCOUNT, even the default name, counts as chosen" || fail "AR_RUN_ACCOUNT: exit ${RC}"
+printf 'export AR_TEST_ACCOUNT=fromLocalSettings\n' >> "${RUN}/settings.local.sh"
+probe_run
+grep -v 'fromLocalSettings' "${RUN}/settings.local.sh" > "${RUN}/settings.local.sh.tmp"; mv "${RUN}/settings.local.sh.tmp" "${RUN}/settings.local.sh"
+[ "${RC}" -eq 1 ] && [ "$(calls | grep -c 'ar_home_probe')" -eq 0 ] && [ "$(calls | grep -c '^DELETE .*/accounts/')" -eq 0 ] \
+    && pass "a name set in settings.local.sh counts as chosen too" || fail "AR_TEST_ACCOUNT in settings.local.sh: exit ${RC}"
+
+# Every name up to _9 is stale
+printf '403\t%s\n' "${STALE_BODY}" > "${SEQ}"
+probe_run
+[ "${RC}" -eq 1 ] && [[ "${OUT}" == *"every name up to arTestAccount_9"* ]] && [[ "${OUT}" == *"Run ./99.cleanup_DELETE.sh arTestAccount_9 to remove what this created."* ]] \
+    && pass "exhaustion: stops with a clear message after _9, naming the account to clean up" || fail "exhaustion: exit ${RC}: $(echo "${OUT}" | tail -n 5)"
+DELETED=$(calls | grep '^DELETE .*/accounts/' | sed 's#.*/accounts/##' | tr '\n' ' ')
+[ "${DELETED}" = "arTestAccount arTestAccount_2 arTestAccount_3 arTestAccount_4 arTestAccount_5 arTestAccount_6 arTestAccount_7 arTestAccount_8 " ] \
+    && pass "exhaustion: deleted only the names this run created" || fail "deleted: ${DELETED}"
+[[ "${OUT}" != *"Step 2 of 13"* ]] && pass "exhaustion: nothing after step 01 ran" || fail "ran on"
+# A name that is already an account is skipped: the first existence check answers 200 (arTestAccount_2
+# is taken), the next 404. stub_curl_by_method answers a HEAD per call from STUB_STATUS_HEAD_SEQ, and
+# HEAD_STATUS= (empty) lets it, not the plain 200, say what a HEAD answers
+printf '403\t%s\n201\n' "${STALE_BODY}" > "${SEQ}"
+rm -f "${WORK}/counter."*
+STUB_BIN="${WORK}/bin_by_method" STUB_COUNTER="${WORK}/counter" STUB_STATUS_HEAD_SEQ="200 404" HEAD_STATUS= probe_run
+[ "${RC}" -eq 0 ] && [[ "${OUT}" == *"A new name is used: arTestAccount_3."* ]] && [ "$(calls | grep -c '^HEAD ')" -eq 2 ] \
+    && pass "stale home: a name that is already an account is skipped, so arTestAccount_3 is used" || fail "skip taken name (exit ${RC}): $(echo "${OUT}" | grep -i 'new name')"
 
 echo
 echo "=== Guard rails ==="
-for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh 05.files_upload_POST.sh 06.routes_POST_template.sh 07.routes_POST_simple.sh 08.applications_POST.sh 09.subscriptions_POST.sh 10.routes_POST_composite.sh 11.transfers_pull_POST.sh 12.files_PUT_triggerfile.sh 13.files_GET_result.sh 99.cleanup_DELETE.sh; do
+for s in 00.run_all.sh 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh 05.files_upload_POST.sh 06.routes_POST_template.sh 07.routes_POST_simple.sh 08.applications_POST.sh 09.subscriptions_POST.sh 10.routes_POST_composite.sh 11.transfers_pull_POST.sh 12.files_PUT_triggerfile.sh 13.files_GET_result.sh 99.cleanup_DELETE.sh; do
     run "${s}" "${SERVER_OLD}"
     if [ "${RC}" -eq 0 ] && [[ "${OUT}" == *SKIPPED* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|DELETE)'; then
         pass "${s}: skipped, and sends nothing, on an older server"

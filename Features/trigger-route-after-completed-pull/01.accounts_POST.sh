@@ -20,6 +20,9 @@
 # - Requires `jq`, which builds the JSON body.
 # - transfersWebServiceAllowed is on. Without it the account cannot log in to the
 #   End User API, which steps 4 and 5 use, and the login fails with a 401.
+# - Exits 1 when the server refuses the account (a 409 when it is already there).
+# - The account is AR_TEST_ACCOUNT. 00.run_all.sh and 99.cleanup_DELETE.sh take
+#   another name on their command line (AR_RUN_ACCOUNT, see settings.sh).
 # - The account is created with a home folder of AR_HOME_FOLDER. Create the
 #   subfolders outbound-drop and delivered in it, and put some files in
 #   outbound-drop, before running the pull.
@@ -41,8 +44,6 @@ if [ -z "${AR_ACCOUNT_PASSWORD}" ]; then
     exit 1
 fi
 
-REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
-
 BODY=$(jq -n \
   --arg name "${AR_TEST_ACCOUNT}" \
   --arg home "${AR_HOME_FOLDER}" \
@@ -52,6 +53,4 @@ BODY=$(jq -n \
     user: {name: $name, passwordCredentials: {password: $password}}}')
 
 printf "Creating the account %s...\n" "${AR_TEST_ACCOUNT}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" \
-  -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-  -w "\nHTTP %{http_code}\n" -d "${BODY}"
+ar_admin_post "accounts" "${BODY}" || exit 1

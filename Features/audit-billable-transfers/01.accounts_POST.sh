@@ -24,6 +24,7 @@
 # - Requires `jq`, which builds the JSON body.
 # - transfersWebServiceAllowed is on. Without it the account cannot log in to the
 #   End User API, and that login fails with a 401.
+# - Exits 1 as soon as the server refuses an account.
 # - The partners are shared by every test account. One that already exists, from
 #   another test account's run, is reused and not created again.
 #   99.cleanup_DELETE removes a partner only when no other test account's site
@@ -56,10 +57,7 @@ create_account() {
 
 # create_partner NAME HOME: creates a partner, or reuses it when it is there
 create_partner() {
-    local code
-    code=$(curl -s -k -o /dev/null -w "%{http_code}" -u "${ST_USER}:${ST_PASSWORD}" --head \
-      "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/$1" -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT")
-    if [ "${code}" = "200" ]; then
+    if ar_admin_exists "accounts/$1"; then
         printf "The account %s is already there, from another test account's run. Reused.\n" "$1"
         return 0
     fi

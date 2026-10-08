@@ -21,6 +21,8 @@
 # - Which folders is set by AR_CREATE_FOLDERS: outbound-drop, where the pull
 #   finds its files, and delivered, where the push puts them.
 # - Requires `jq`, which builds the JSON body.
+# - Stops at the first folder the server refuses (a 409 when it is already there), logs
+#   out, and exits 1.
 # - The port is AR_ENDUSER_PORT, 8443 by default. It is not the Admin port.
 # - Confirmed directly: an account's home folder stays on disk, with its owner, when the account is
 #   deleted. A new account with ANOTHER uid cannot create a folder directly in it: every such POST is 403
@@ -53,9 +55,15 @@ for folder in ${AR_CREATE_FOLDERS}; do
 
     printf "Creating the folder %s...\n" "${folder}"
     ar_enduser_call POST "files/${folder}" "application/json" "${BODY}"
+    CALL_RC=$?
     printf "%s\nHTTP %s\n" "${AR_EU_BODY}" "${AR_EU_CODE}"
     if [ "${AR_EU_CODE}" = "403" ] && [[ "${AR_EU_BODY}" == *"Error occurred while creating file"* ]]; then
-        printf "Hint: a 403 \"Error occurred while creating file\" for a folder directly in an account's home usually\nmeans the home folder is left over from an earlier run and belongs to another uid (it stays on disk when\nthe account is deleted). Use another AR_TEST_ACCOUNT (in settings.local.sh), so that the account gets a new home folder.\n"
+        printf "Hint: a 403 \"Error occurred while creating file\" for a folder directly in an account's home usually\nmeans the home folder is left over from an earlier run and belongs to another uid (it stays on disk when\nthe account is deleted). Use another account name (./00.run_all.sh ANOTHER_NAME, or AR_TEST_ACCOUNT in settings.local.sh), so that the account gets a new home folder.\n"
+    fi
+    # A refused folder stops the run: the later steps need it
+    if [ "${CALL_RC}" -ne 0 ]; then
+        ar_enduser_logout
+        exit 1
     fi
 done
 

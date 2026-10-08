@@ -21,6 +21,8 @@ REM Notes:
 REM - Run it after 11.transfers_pull_POST.bat.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to read the listing.
+REM - Exits 1 when the server refuses a listing. While it waits for delivered-2 to
+REM   fill, a refused listing is retried like an empty one, and then reported.
 REM - This only shows files. 00.run_all.bat's own analysis step is about the
 REM   billable counts, not this listing; this is a sanity check along the way.
 REM ==============================================================================
@@ -41,6 +43,7 @@ SET EU_ACCOUNT=%BT_PUSH_PARTNER%
 CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 
+SET LISTINGS_REFUSED=
 SET WAITED=0
 :wait_loop
 CALL :count_files "%BT_DELIVERED_2_FOLDER%"
@@ -62,26 +65,12 @@ CALL "%~dp0..\lib\enduser.bat" login
 IF ERRORLEVEL 1 EXIT /B 1
 FOR %%N IN (1,2,3,4,5,6) DO CALL :show_folder "%BT_SUBSCRIPTION_FOLDER%/s%%N"
 CALL "%~dp0..\lib\enduser.bat" logout
-EXIT /B 0
-
-:count_files "%BT_DELIVERED_1_FOLDER%"
-IF %FILE_COUNT% GTR 0 GOTO :show
-IF %WAITED% GEQ %BT_WAIT_SECONDS% GOTO :show
-echo Nothing in %BT_DELIVERED_1_FOLDER% yet. Waiting...
-ping -n 4 127.0.0.1 >NUL
-SET /A WAITED=%WAITED%+3
-GOTO :wait_loop
-
-:show
-FOR %%N IN (1,2,3,4,5,6) DO CALL :show_folder "%BT_SUBSCRIPTION_FOLDER%/s%%N"
-CALL :show_folder "%BT_DELIVERED_1_FOLDER%"
-CALL :show_folder "%BT_DELIVERED_2_FOLDER%"
-
-CALL "%~dp0..\lib\enduser.bat" logout
+IF DEFINED LISTINGS_REFUSED EXIT /B 1
 EXIT /B 0
 
 :count_files
 CALL "%~dp0..\lib\enduser.bat" call GET "files%~1" ""
+SET LIST_RC=%ERRORLEVEL%
 SET FILE_COUNT=0
 FOR /F %%C IN ('powershell -NoProfile -Command "try { @((Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile }).Count } catch { 0 }"') DO SET FILE_COUNT=%%C
 EXIT /B 0
@@ -90,5 +79,7 @@ EXIT /B 0
 CALL :count_files "%~1"
 echo.
 echo %EU_ACCOUNT% %~1: %FILE_COUNT% file^(s^)
+IF NOT "%LIST_RC%"=="0" echo The listing was refused ^(HTTP %EU_CODE%^).
+IF NOT "%LIST_RC%"=="0" SET LISTINGS_REFUSED=1
 powershell -NoProfile -Command "try { (Get-Content -Raw $env:EU_BODY_FILE | ConvertFrom-Json).files | Where-Object { $_.isRegularFile } | ForEach-Object { '    ' + $_.fileName + '  (' + $_.size + ' bytes)' } } catch { }"
 EXIT /B 0

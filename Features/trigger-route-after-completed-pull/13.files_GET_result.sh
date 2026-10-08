@@ -22,7 +22,7 @@
 #   waits up to AR_WAIT_SECONDS for the files in the last folder.
 # - Needs settings.local.sh with AR_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, which reads the listing.
-# - Exits 1 if nothing arrived in the last folder.
+# - Exits 1 if nothing arrived in the last folder, or if the server refused a listing.
 # - This only shows files. The transfer log shows the route runs themselves.
 # ==============================================================================
 
@@ -40,9 +40,11 @@ if [ -z "${AR_ACCOUNT_PASSWORD}" ]; then
     exit 1
 fi
 
-# Print the regular files in a folder, and set FILE_COUNT
+# Print the regular files in a folder, and set FILE_COUNT and LIST_RC (0 unless the
+# server refused the listing)
 list_folder() {
     ar_enduser_call GET "files/$1" ""
+    LIST_RC=$?
     FILE_COUNT=$(printf '%s' "${AR_EU_BODY}" | jq '[(.files // [])[] | select(.isRegularFile)] | length' 2>/dev/null)
     FILE_COUNT=${FILE_COUNT:-0}
 }
@@ -61,13 +63,18 @@ while [ "${FILE_COUNT}" -eq 0 ] && [ "${waited}" -lt "${AR_WAIT_SECONDS}" ]; do
     list_folder "${LAST_FOLDER}"
 done
 
+LISTINGS_REFUSED=0
 for folder in ${AR_CHECK_FOLDERS}; do
     list_folder "${folder}"
     printf "\n%s: %s file(s)\n" "${folder}" "${FILE_COUNT}"
+    if [ "${LIST_RC}" -ne 0 ]; then
+        printf "The listing of %s was refused (HTTP %s).\n" "${folder}" "${AR_EU_CODE}"
+        LISTINGS_REFUSED=1
+    fi
     printf '%s' "${AR_EU_BODY}" | jq -r '(.files // [])[] | select(.isRegularFile) | "    " + .fileName + "  (" + (.size | tostring) + " bytes)"' 2>/dev/null
     [ "${folder}" = "${LAST_FOLDER}" ] && LAST_COUNT="${FILE_COUNT}"
 done
 
 ar_enduser_logout
 
-[ "${LAST_COUNT}" -gt 0 ]
+[ "${LISTINGS_REFUSED}" -eq 0 ] && [ "${LAST_COUNT}" -gt 0 ]

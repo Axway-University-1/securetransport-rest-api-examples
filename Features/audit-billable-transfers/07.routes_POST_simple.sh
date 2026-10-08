@@ -43,6 +43,8 @@
 #   no rename field: the names inside the archive are kept. Neither has been
 #   run against a real server yet.
 # - The ids are saved as BT_ID_SIMPLE_2 to BT_ID_SIMPLE_6 for the later steps.
+# - Stops at the first route the server refuses, and exits 1: run on its own, a
+#   refused first route is not hidden by the ones after it.
 # ==============================================================================
 
 #
@@ -95,25 +97,24 @@ create_simple_route() {
 }
 
 W=$(mktemp -d)
+trap 'rm -rf "${W}"' EXIT
 
 send_to_partner_step "${BT_PUSH_SITE_1}" false > "${W}/s2_1.json"
-create_simple_route 2 "${W}/s2_1.json"
+create_simple_route 2 "${W}/s2_1.json" || exit 1
 
 send_to_partner_step "${BT_PUSH_SITE_1}" false > "${W}/s3_1.json"
 send_to_partner_step "${BT_PUSH_SITE_1}" false > "${W}/s3_2.json"
-create_simple_route 3 "${W}/s3_1.json" "${W}/s3_2.json"
+create_simple_route 3 "${W}/s3_1.json" "${W}/s3_2.json" || exit 1
 
 compress_step "${BT_FILE_COMPRESSED_NAME}" > "${W}/s4_1.json"
 send_to_partner_step "${BT_PUSH_SITE_1}" true > "${W}/s4_2.json"
-create_simple_route 4 "${W}/s4_1.json" "${W}/s4_2.json"
+create_simple_route 4 "${W}/s4_1.json" "${W}/s4_2.json" || exit 1
 
 decompress_step > "${W}/s5_1.json"
 send_to_partner_step "${BT_PUSH_SITE_1}" true > "${W}/s5_2.json"
-create_simple_route 5 "${W}/s5_1.json" "${W}/s5_2.json"
+create_simple_route 5 "${W}/s5_1.json" "${W}/s5_2.json" || exit 1
 
 decompress_step > "${W}/s6_1.json"
 send_to_partner_step "${BT_PUSH_SITE_1}" true > "${W}/s6_2.json"
 send_to_partner_step "${BT_PUSH_SITE_2}" true > "${W}/s6_3.json"
-create_simple_route 6 "${W}/s6_1.json" "${W}/s6_2.json" "${W}/s6_3.json"
-
-rm -rf "${W}"
+create_simple_route 6 "${W}/s6_1.json" "${W}/s6_2.json" "${W}/s6_3.json" || exit 1

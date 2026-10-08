@@ -37,7 +37,11 @@ REM - Each day is a full calendar day, midnight to midnight, in RFC 2822, built
 REM   with PowerShell, with English day names and a +0300 style offset.
 REM - The count is resultSet.totalCount. resultSet.returnCount is capped by limit,
 REM   which is 1 here to keep the response small.
-REM - The last lines are TODAY_COUNT <account>: <count>, one per account, for
+REM - Exits 1 when a count could not be read (the server refused the call, or answered
+REM   without a count): the table shows a ? for it, and a line says so after the
+REM   TODAY_COUNT lines. 00.run_all.bat does not stop for it: it reports the account's
+REM   count as one that could not be read.
+REM - The lines starting TODAY_COUNT <account>: <count>, one per account, are for
 REM   00.run_all.bat to read.
 REM - Uses PowerShell for the date arithmetic and to read the response.
 REM ==============================================================================
@@ -69,6 +73,7 @@ SET /A LAST_OFFSET=%BT_REPORT_DAYS%-1
 SET TODAY_1=
 SET TODAY_2=
 SET TODAY_3=
+SET COUNTS_UNREADABLE=
 FOR /L %%D IN (%LAST_OFFSET%,-1,0) DO CALL :report_day %%D
 
 REM Machine-readable lines, so 00.run_all.bat can diff today's counts before and
@@ -78,6 +83,11 @@ echo TODAY_COUNT %BT_PULL_PARTNER%: %TODAY_1%
 echo TODAY_COUNT %BT_TEST_ACCOUNT%: %TODAY_2%
 echo TODAY_COUNT %BT_PUSH_PARTNER%: %TODAY_3%
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+IF DEFINED COUNTS_UNREADABLE (
+    echo.
+    echo Some counts could not be read ^(shown as ?^): the server refused the call, or answered without a count.
+    EXIT /B 1
+)
 EXIT /B 0
 
 :report_day
@@ -116,4 +126,5 @@ curl -s -k -G -u "%ST_USER%:%ST_PASSWORD%" "https://%ST_SERVER%:%ST_PORT%/api/v2
 SET DAY_COUNT=
 FOR /F "delims=" %%N IN ('powershell -NoProfile -Command "try { (Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).resultSet.totalCount } catch { }"') DO SET DAY_COUNT=%%N
 IF "%DAY_COUNT%"=="" SET DAY_COUNT=?
+IF "%DAY_COUNT%"=="?" SET COUNTS_UNREADABLE=1
 EXIT /B 0

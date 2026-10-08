@@ -20,6 +20,7 @@
 # - Run 01.accounts_POST.sh first.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
 # - Requires `jq`, which builds the JSON body.
+# - Stops at the first site the server refuses, and exits 1.
 # - Only scenario 2.6 (archive pushed to two partners) uses the second site.
 #   Every other scenario that pushes uses the first one.
 # ==============================================================================
@@ -57,5 +58,5 @@ create_push_site() {
     ar_admin_post "sites" "${body}"
 }
 
-create_push_site "${BT_PUSH_SITE_1}" "${BT_DELIVERED_1_FOLDER}"
-create_push_site "${BT_PUSH_SITE_2}" "${BT_DELIVERED_2_FOLDER}"
+create_push_site "${BT_PUSH_SITE_1}" "${BT_DELIVERED_1_FOLDER}" || exit 1
+create_push_site "${BT_PUSH_SITE_2}" "${BT_DELIVERED_2_FOLDER}" || exit 1

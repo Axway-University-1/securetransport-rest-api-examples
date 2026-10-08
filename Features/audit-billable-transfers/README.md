@@ -200,6 +200,24 @@ hint to use another name. Running the scripts by hand has no such check; give
 step 01 and the rest a new name yourself. Every run leaves the empty home
 folders of the names it used on the server: they are harmless.
 
+The probe and the choice of the next name are shared with
+`trigger-route-after-completed-pull`, in `Features/lib/home_folder.sh`.
+
+### Stopping at a refused call, and cleaning up
+
+Every example exits 1 when the server refuses a call, and stops at the first one:
+run on its own, a refused first route is not hidden by the routes after it.
+`00.run_all.sh` also stops on a line starting `HTTP 4` or `HTTP 5` in a step's
+output.
+
+`99.cleanup_DELETE.sh` exits 1 when the server refuses a delete, when a list it
+needs cannot be read, or when it cannot tell whether an account exists. It names
+what is left, keeps `state.local.sh`, and can be run again. Something that is
+already gone (HTTP 404) is not a failure. A partner is never deleted when the
+list of sites that log in as it could not be read. It exits 0, and removes the
+saved ids, only when everything it looked for is gone; and
+`00.run_all.sh --cleanup` ends with the same exit code.
+
 On Windows: `00.run_all.bat`, with the same arguments. See
 [Configuration](../../README.md#configuration) first if you have not set up the
 Admin connection settings yet.

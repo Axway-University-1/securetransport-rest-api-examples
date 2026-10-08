@@ -30,6 +30,7 @@ REM
 REM Notes:
 REM - Run 02.sites_POST_pull.bat and 05.applications_POST.bat first.
 REM - Uses PowerShell to build the JSON bodies.
+REM - Stops at the first subscription the server refuses, and exits 1.
 REM - The ids are saved as BT_ID_SUBSCRIPTION_1 to BT_ID_SUBSCRIPTION_6.
 REM ==============================================================================
 
@@ -46,11 +47,17 @@ SET TRIGGER_FILE_NAME_LOCAL=file_${date('yyyyddMMHHmmss')}.trigger
 SET TRIGGER_CONDITION_LOCAL=${stenv['target'].matches('.*\\.trigger')?1:0}
 
 CALL :create_subscription 1 0
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_subscription 2 0
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_subscription 3 0
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_subscription 4 1
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_subscription 5 0
+IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_subscription 6 0
+IF ERRORLEVEL 1 EXIT /B 1
 EXIT /B 0
 
 :create_subscription
@@ -68,5 +75,6 @@ IF "%WITH_TRIGGER%"=="1" (
 
 echo Creating the subscription for scenario %SCENARIO_N%, on %SUB_FOLDER%...
 CALL "%~dp0..\lib\post_admin.bat" subscriptions "%BODY_FILE%" BT_ID_SUBSCRIPTION_%SCENARIO_N%
+SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
-EXIT /B 0
+EXIT /B %POST_RESULT%

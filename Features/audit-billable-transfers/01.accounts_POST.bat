@@ -24,6 +24,7 @@ REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body.
 REM - transfersWebServiceAllowed is on. Without it the account cannot log in to the
 REM   End User API, and that login fails with a 401.
+REM - Exits 1 as soon as the server refuses an account.
 REM - The partners are shared by every test account. One that already exists, from
 REM   another test account's run, is reused and not created again.
 REM   99.cleanup_DELETE removes a partner only when no other test account's site
@@ -41,9 +42,12 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-CALL :create_account "%BT_TEST_ACCOUNT%" "%BT_HOME_FOLDER%" || EXIT /B 1
-CALL :create_partner "%BT_PULL_PARTNER%" "%BT_PULL_PARTNER_HOME%" || EXIT /B 1
-CALL :create_partner "%BT_PUSH_PARTNER%" "%BT_PUSH_PARTNER_HOME%" || EXIT /B 1
+CALL :create_account "%BT_TEST_ACCOUNT%" "%BT_HOME_FOLDER%"
+IF ERRORLEVEL 1 EXIT /B 1
+CALL :create_partner "%BT_PULL_PARTNER%" "%BT_PULL_PARTNER_HOME%"
+IF ERRORLEVEL 1 EXIT /B 1
+CALL :create_partner "%BT_PUSH_PARTNER%" "%BT_PUSH_PARTNER_HOME%"
+IF ERRORLEVEL 1 EXIT /B 1
 EXIT /B 0
 
 :create_account
@@ -60,9 +64,8 @@ EXIT /B %POST_RESULT%
 
 REM create_partner NAME HOME: creates a partner, or reuses it when it is there
 :create_partner
-SET PARTNER_CODE=
-FOR /F %%C IN ('curl -s -k -o nul -w "%%{http_code}" -u "%ST_USER%:%ST_PASSWORD%" --head "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts/%~1" -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT"') DO SET PARTNER_CODE=%%C
-IF "%PARTNER_CODE%"=="200" (
+CALL "%~dp0..\lib\admin_calls.bat" exists "accounts/%~1"
+IF NOT ERRORLEVEL 1 (
     echo The account %~1 is already there, from another test account's run. Reused.
     EXIT /B 0
 )

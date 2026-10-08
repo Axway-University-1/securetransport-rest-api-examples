@@ -37,9 +37,13 @@
 #   (BSD date) and Linux (GNU date) differ here; both are handled below.
 # - The count is resultSet.totalCount. resultSet.returnCount is capped by limit,
 #   which is 1 here to keep the response small.
-# - The last lines are TODAY_COUNT <account>: <count>, one per account, for
+# - The lines starting TODAY_COUNT <account>: <count>, one per account, are for
 #   00.run_all.sh to read.
 # - Requires `jq`.
+# - Exits 1 when a count could not be read (the server refused the call, or answered
+#   without a count): the table shows a ? for it, and a line says so after the
+#   TODAY_COUNT lines. 00.run_all.sh does not stop for it: it reports the account's
+#   count as one that could not be read.
 # ==============================================================================
 
 #
@@ -91,6 +95,7 @@ for account in "${ACCOUNTS[@]}"; do printf "  %22s" "${account}"; done
 printf "\n"
 
 TODAY_COUNTS=()
+UNREADABLE=0
 for day_offset in $(seq $((BT_REPORT_DAYS - 1)) -1 0); do
     start_epoch=$((TODAY_MIDNIGHT - day_offset * 86400))
     end_epoch=$((start_epoch + 86400))
@@ -102,6 +107,7 @@ for day_offset in $(seq $((BT_REPORT_DAYS - 1)) -1 0); do
     i=0
     for account in "${ACCOUNTS[@]}"; do
         count=$(billable_count "${account}" "${start_rfc}" "${end_rfc}")
+        [ -z "${count}" ] && UNREADABLE=1
         row="${row}$(printf "  %22s" "${count:-?}")"
         [ "${day_offset}" -eq 0 ] && TODAY_COUNTS[i]="${count}"
         i=$((i + 1))
@@ -118,3 +124,8 @@ for account in "${ACCOUNTS[@]}"; do
     printf "TODAY_COUNT %s: %s\n" "${account}" "${TODAY_COUNTS[i]}"
     i=$((i + 1))
 done
+
+if [ "${UNREADABLE}" -ne 0 ]; then
+    printf "\nSome counts could not be read (shown as ?): the server refused the call, or answered without a count.\n"
+    exit 1
+fi

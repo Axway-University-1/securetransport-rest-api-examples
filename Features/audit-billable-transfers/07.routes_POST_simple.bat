@@ -42,6 +42,8 @@ REM   which is a separate field - presumably for renaming the individual inputs
 REM   before they go into the archive, not the archive itself). Decompress needs
 REM   no rename field: the names inside the archive are kept. Neither has been
 REM   run against a real server yet.
+REM - Stops at the first route the server refuses, and exits 1: run on its own, a
+REM   refused first route is not hidden by the ones after it.
 REM - The ids are saved as BT_ID_SIMPLE_2 to BT_ID_SIMPLE_6 for the later steps.
 REM ==============================================================================
 
@@ -56,25 +58,35 @@ SET STEPS_FILE=%TEMP%\bt_steps_%RANDOM%.json
 REM 2.2: one SendToPartner step
 powershell -NoProfile -Command "@(@{ type='SendToPartner'; status='ENABLED'; conditionType='ALWAYS'; autostart=$false; usePrecedingStepFiles=$false; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; transferSiteExpressionType='LIST'; transferSiteExpression=($env:BT_PUSH_SITE_1 + '#!#CVD#!#'); actionOnStepFailure='FAIL' }) | ConvertTo-Json -Depth 10 -Compress" > "%STEPS_FILE%"
 CALL :create_simple_route 2 "%STEPS_FILE%"
+IF ERRORLEVEL 1 GOTO :route_refused
 
 REM 2.3: the same step twice, both to the first partner
 powershell -NoProfile -Command "@(@{ type='SendToPartner'; status='ENABLED'; conditionType='ALWAYS'; autostart=$false; usePrecedingStepFiles=$false; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; transferSiteExpressionType='LIST'; transferSiteExpression=($env:BT_PUSH_SITE_1 + '#!#CVD#!#'); actionOnStepFailure='FAIL' }, @{ type='SendToPartner'; status='ENABLED'; conditionType='ALWAYS'; autostart=$false; usePrecedingStepFiles=$false; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; transferSiteExpressionType='LIST'; transferSiteExpression=($env:BT_PUSH_SITE_1 + '#!#CVD#!#'); actionOnStepFailure='FAIL' }) | ConvertTo-Json -Depth 10 -Compress" > "%STEPS_FILE%"
 CALL :create_simple_route 3 "%STEPS_FILE%"
+IF ERRORLEVEL 1 GOTO :route_refused
 
 REM 2.4: Compress, into one named archive, then push the compressed output
 powershell -NoProfile -Command "@(@{ type='Compress'; status='ENABLED'; conditionType='ALWAYS'; usePrecedingStepFiles=$false; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; singleArchiveEnabled=$true; compressionType='ZIP'; compressionLevel='STORE'; singleArchiveName=$env:BT_FILE_COMPRESSED_NAME; actionOnStepFailure='FAIL' }, @{ type='SendToPartner'; status='ENABLED'; conditionType='ALWAYS'; autostart=$false; usePrecedingStepFiles=$true; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; transferSiteExpressionType='LIST'; transferSiteExpression=($env:BT_PUSH_SITE_1 + '#!#CVD#!#'); actionOnStepFailure='FAIL' }) | ConvertTo-Json -Depth 10 -Compress" > "%STEPS_FILE%"
 CALL :create_simple_route 4 "%STEPS_FILE%"
+IF ERRORLEVEL 1 GOTO :route_refused
 
 REM 2.5: Decompress, then push both decompressed files to the first partner
 powershell -NoProfile -Command "@(@{ type='Decompress'; status='ENABLED'; conditionType='ALWAYS'; usePrecedingStepFiles=$false; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; filenameCollisionResolutionType='OVERWRITE'; actionOnStepFailure='FAIL' }, @{ type='SendToPartner'; status='ENABLED'; conditionType='ALWAYS'; autostart=$false; usePrecedingStepFiles=$true; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; transferSiteExpressionType='LIST'; transferSiteExpression=($env:BT_PUSH_SITE_1 + '#!#CVD#!#'); actionOnStepFailure='FAIL' }) | ConvertTo-Json -Depth 10 -Compress" > "%STEPS_FILE%"
 CALL :create_simple_route 5 "%STEPS_FILE%"
+IF ERRORLEVEL 1 GOTO :route_refused
 
 REM 2.6: Decompress, then push to the first partner, then push to the second
 powershell -NoProfile -Command "@(@{ type='Decompress'; status='ENABLED'; conditionType='ALWAYS'; usePrecedingStepFiles=$false; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; filenameCollisionResolutionType='OVERWRITE'; actionOnStepFailure='FAIL' }, @{ type='SendToPartner'; status='ENABLED'; conditionType='ALWAYS'; autostart=$false; usePrecedingStepFiles=$true; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; transferSiteExpressionType='LIST'; transferSiteExpression=($env:BT_PUSH_SITE_1 + '#!#CVD#!#'); actionOnStepFailure='FAIL' }, @{ type='SendToPartner'; status='ENABLED'; conditionType='ALWAYS'; autostart=$false; usePrecedingStepFiles=$true; fileFilterExpressionType='GLOB'; fileFilterExpression='*'; transferSiteExpressionType='LIST'; transferSiteExpression=($env:BT_PUSH_SITE_2 + '#!#CVD#!#'); actionOnStepFailure='FAIL' }) | ConvertTo-Json -Depth 10 -Compress" > "%STEPS_FILE%"
 CALL :create_simple_route 6 "%STEPS_FILE%"
+IF ERRORLEVEL 1 GOTO :route_refused
 
 IF EXIST "%STEPS_FILE%" DEL "%STEPS_FILE%"
 EXIT /B 0
+
+REM A refused route stops the run
+:route_refused
+IF EXIST "%STEPS_FILE%" DEL "%STEPS_FILE%"
+EXIT /B 1
 
 :create_simple_route
 SET SCENARIO_N=%1
@@ -85,5 +97,6 @@ powershell -NoProfile -Command "@{ type='SIMPLE'; name=$env:ROUTE_NAME; conditio
 
 echo Creating the simple route %ROUTE_NAME%...
 CALL "%~dp0..\lib\post_admin.bat" routes "%BODY_FILE%" BT_ID_SIMPLE_%SCENARIO_N%
+SET POST_RESULT=%ERRORLEVEL%
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
-EXIT /B 0
+EXIT /B %POST_RESULT%

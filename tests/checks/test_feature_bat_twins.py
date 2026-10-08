@@ -33,6 +33,10 @@ ALLOWED_DIFFERENCES = {
     # A bat file SETs EU_ACCOUNT before it CALLs enduser.bat login, to log in as a
     # partner; bash calls bt_login_as ACCOUNT (settings.sh), which sets it
     "EU_ACCOUNT",
+    # bash: the account ar_ensure_usable_home (lib/home_folder.sh) is on while it moves on to
+    # the next name. A batch file cannot call back into the script that called it, so the same
+    # loop is in each feature's 00.run_all.bat, on its own variables (PROBE_N, BT_RUN_ACCOUNT, ...)
+    "AR_HOME_ACCOUNT",
 }
 
 
@@ -95,6 +99,64 @@ for sh in sorted(os.path.join(REPO, f) for f in tracked):
           "only in .sh: %s; only in .bat: %s" % (sorted(only_sh), sorted(only_bat)))
 
 check("found the pairs to compare", pairs >= 15, "pairs: %d" % pairs)
+
+
+# ------------------------------------------------------------------------------
+# The .bat twins cannot run in this test environment, so what makes a refused call stop an
+# example is checked in their source. The behaviour itself is in test_feature_trigger_route_pull.sh
+# and test_feature_billable_transfers.sh, which run the .sh twins.
+# ------------------------------------------------------------------------------
+print()
+print("=== A refused call stops the example: the .bat twins read the code of every call ===")
+
+
+def code_lines(path):
+    """The lines of a file that are not comments or empty, with their number"""
+    out = []
+    for n, line in enumerate(open(path, newline="").read().replace("\r\n", "\n").split("\n"), 1):
+        if line.strip() and not re.match(r"\s*(REM\b|::)", line, re.I):
+            out.append((n, line))
+    return out
+
+
+tracked_all = subprocess.run(["git", "ls-files", "Features"], cwd=REPO, capture_output=True, text=True).stdout.split()
+steps_bat = sorted(f for f in tracked_all
+                   if f.endswith(".bat") and "/lib/" not in f and not os.path.basename(f).startswith("settings"))
+steps_sh = sorted(f for f in tracked_all
+                  if f.endswith(".sh") and "/lib/" not in f and not os.path.basename(f).startswith("settings"))
+
+# A CALL to the shared Admin helpers (post and delete: their ERRORLEVEL is 0 only for a 2xx; exists
+# says 0, 1 or 2) must be followed by a line that reads ERRORLEVEL, before anything else can reset it
+needs_check = re.compile(r'post_admin\.bat"|admin_calls\.bat"\s+(delete|exists)', re.I)
+unchecked = []
+for rel in steps_bat:
+    lines = code_lines(os.path.join(REPO, rel))
+    for i, (n, line) in enumerate(lines):
+        if re.match(r"\s*CALL\b", line, re.I) and needs_check.search(line):
+            following = lines[i + 1][1] if i + 1 < len(lines) else ""
+            if "ERRORLEVEL" not in following.upper():
+                unchecked.append("%s:%d" % (rel, n))
+check("every CALL of post_admin.bat or admin_calls.bat is followed by a line that reads ERRORLEVEL",
+      not unchecked, "unchecked: %s" % unchecked)
+
+# The examples POST through the helper, which reads the code from the response headers. A raw
+# curl with -w "\nHTTP %{http_code}" prints the code and always ends with exit 0
+raw = []
+for rel in steps_bat + steps_sh:
+    base = os.path.basename(rel)
+    if base in ("billable_GET_report.sh", "billable_GET_report.bat", "files_GET_download.sh", "files_GET_download.bat"):
+        continue
+    text = open(os.path.join(REPO, rel), newline="").read().replace("\r\n", "\n")
+    code = "\n".join(l for l in text.split("\n") if not re.match(r"\s*(#|REM\b)", l))
+    # a call may continue on the next lines (^ or \), so look at the joined text
+    joined = re.sub(r"\s*[\\^]\n\s*", " ", code)
+    for m in re.finditer(r"^\s*curl\b[^\n]*", joined, re.M):
+        call = m.group(0)
+        if re.search(r"-X\s+(POST|DELETE)\b", call) or "-w \"\\nHTTP" in call:
+            raw.append("%s: %s" % (rel, call.strip()[:80]))
+check("no numbered example POSTs or DELETEs with a raw curl that prints the code and exits 0",
+      not raw, "raw calls: %s" % raw)
+
 
 print()
 print("test_feature_bat_twins: " + ("PASS" if failed == 0 else "FAIL"))
