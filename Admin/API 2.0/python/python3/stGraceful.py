@@ -46,7 +46,7 @@ def getTransactionManagerStatus(session, stUrl):
     try:
         response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -80,7 +80,7 @@ def stopClusterServices(session, stUrl, service):
     try:
         response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -109,7 +109,7 @@ def getClusterServiceStatus(session, stUrl, service):
     try:
         response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -145,7 +145,7 @@ def stopDaemon(session, stUrl, protocol,gracefultime):
     try:
         response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -198,7 +198,7 @@ def getServerDaemonsStatus(session, stUrl, protocol):
     try:
         response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -240,7 +240,7 @@ def stopTransactionManager(session, stUrl, gtime):
     try:
         response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -283,7 +283,7 @@ def stLogin(basicAuth, session, stUrl):
     try:
         response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -327,14 +327,14 @@ def stLogout(session, stUrl):
     try:
         response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writeLog('I cannot connect to ' + stURL, 'FATAL')
+        writeLog('I cannot connect to ' + stUrl, 'FATAL')
         writeLog(ec,'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         writeLog('HTTP Error','FATAL')
         raise SystemExit(eh)
     except requests.exceptions.Timeout as et:
-        writeLog('Timeout Error:' + et,'FATAL')
+        writeLog('Timeout Error:' + str(e),'FATAL')
         raise SystemExit(et)
     except requests.exceptions.RequestException as e:
         raise SystemExit(e)

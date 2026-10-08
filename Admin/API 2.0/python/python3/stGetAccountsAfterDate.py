@@ -133,7 +133,7 @@ def stGetAccounts(stUrl, session, count, fromDate):
         try:
             response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
         except requests.ConnectionError as ec:   
-            writelog('I cannot connect to ' + stURL, 'FATAL')
+            writeLog('I cannot connect to ' + stUrl, 'FATAL')
             writeLog(str(ec),'FATAL')
             sys.exit(1)
         except requests.exceptions.HTTPError as eh:

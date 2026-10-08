@@ -88,7 +88,7 @@ def stGetConfig(counter, session, token):
         try:
             response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
         except requests.ConnectionError as ec:
-            writelog('I cannot connect to ' + stURL,'FATAL')
+            writeLog('I cannot connect to ' + stUrl,'FATAL')
             writeLog(str(ec),'FATAL')
             sys.exit(1)
         except requests.exceptions.HTTPError as eh:
@@ -140,7 +140,7 @@ def stLogin(basicAuth, session):
     try:
         response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -190,14 +190,14 @@ def stLogout(session, token):
     try:
         response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writeLog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(ec, 'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         writeLog('HTTP Error','FATAL')
         raise SystemExit(eh)
     except requests.exceptions.Timeout as et:
-        writeLog('Timeout Error:' + et,'FATAL')
+        writeLog('Timeout Error:' + str(e),'FATAL')
     except requests.exceptions.RequestException as e:
         raise SystemExit(e)
     else:

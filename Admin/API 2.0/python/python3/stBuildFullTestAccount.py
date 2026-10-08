@@ -152,7 +152,7 @@ def stCreateAccount(token):
     try:
         response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -217,7 +217,7 @@ def stImportKey(token):
     try:
         response = sessionMgt.post(url, data=multipartBytes, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -250,7 +250,7 @@ def stGetKeyId():
     try:
         response = sessionMgt.get(url, headers=headers, verify=False, timeout=stTimeout)   
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -303,7 +303,7 @@ def stCreateSiteFolder(token):
     try:
         response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -371,7 +371,7 @@ def stCreateSiteSFTP(keyId,token):
     try:
         response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -422,7 +422,7 @@ def stCreateSubscription(token):
     try:
         response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -478,7 +478,7 @@ def stCreateSimpleRoute(token):
     try:
         response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -531,7 +531,7 @@ def stCreatePackageRoute(sRouteId,subId, tRouteId, token):
     try:
         response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))
@@ -568,7 +568,7 @@ def stGetTemplateRouteId(name):
     try:
         response = sessionMgt.get(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        print('I cannot connect to ' + urlrl + ' ' + str(ec))
+        print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         print('HTTP Error' + str(eh))

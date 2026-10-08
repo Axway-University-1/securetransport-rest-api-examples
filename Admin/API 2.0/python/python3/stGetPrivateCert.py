@@ -83,7 +83,7 @@ def stExportCert(apiCounter, certId, pkeyfile):
     try:
         response = sessionMgt.get(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stUrl, 'FATAL')
+        writeLog('I cannot connect to ' + stUrl, 'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -143,7 +143,7 @@ def stLogin(basicAuth):
     try:
         response = sessionMgt.post(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writelog('I cannot connect to ' + stURL,'FATAL')
+        writeLog('I cannot connect to ' + stUrl,'FATAL')
         writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
@@ -189,14 +189,14 @@ def stLogout():
     try:
         response = sessionMgt.delete(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
-        writeLog('I cannot connect to ' + stURL, 'FATAL')
+        writeLog('I cannot connect to ' + stUrl, 'FATAL')
         writeLog(ec,'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         writeLog('HTTP Error','FATAL')
         raise SystemExit(eh)
     except requests.exceptions.Timeout as et:
-        writeLog('Timeout Error:' + et,'FATAL')
+        writeLog('Timeout Error:' + str(e),'FATAL')
         raise SystemExit(et)
     except requests.exceptions.RequestException as e:
         raise SystemExit(e)
