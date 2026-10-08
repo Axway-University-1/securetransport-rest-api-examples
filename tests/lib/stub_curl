@@ -26,6 +26,9 @@
 #
 #   sed -n 's/^PAYLOAD_B64: //p' out.txt | while read -r b; do echo "$b" | base64 -d; done
 #
+# -b/--cookie is echoed as COOKIE: file, and -c/--cookie-jar as COOKIE_JAR_WRITE: file,
+# so a test can tell a call that sends a session from one that logs in again.
+#
 # -u/--user is echoed as BASIC_AUTH: user:pass, same as a -H header - this is
 # how a script that logs in with the wrong (for example empty, from a variable
 # that was never set) credentials gets caught: the call shape still looks right.
@@ -48,6 +51,8 @@ while [[ $# -gt 0 ]]; do
     -H|--header)                        echo "HEADER: $2" >&2; shift 2 ;;
     -u|--user)                          echo "BASIC_AUTH: $2" >&2; shift 2 ;;
     -F|--form|--form-string)            echo "FORM: $2" >&2; shift 2 ;;
+    -b|--cookie)                        echo "COOKIE: $2" >&2; shift 2 ;;
+    -c|--cookie-jar)                    echo "COOKIE_JAR_WRITE: $2" >&2; shift 2 ;;
     -w|--write-out)                     write_out="$2"; shift 2 ;;
     -D|--dump-header)                   header_file="$2"; shift 2 ;;
     -o|--output)                        output_file="$2"; shift 2 ;;

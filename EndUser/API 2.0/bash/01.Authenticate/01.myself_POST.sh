@@ -32,7 +32,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # 
 # First we will load the variables into our context.
-# Copy config.example to config and set the values for your own environment.
+# Put the values for your own environment in set_variables.local.sh.
 #
 printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
@@ -54,11 +54,12 @@ http_status=${result: -3}
 
 if [[ $http_status -ne 200 ]] ; then
         echo "Login failure: $http_status"
-        exit
+        exit 1
 fi
 # The last 3 characters of $result are the status code -w appended, not part
-# of the response body, so they are trimmed before printing it.
-echo "${result:0:-3}"
+# of the response body, so they are trimmed before printing it. ${result%???}
+# does it, where a negative substring length would not run on the bash 3.2 of macOS.
+echo "${result%???}"
 echo "Successfully Authenticated to SecureTransport"
 
 #

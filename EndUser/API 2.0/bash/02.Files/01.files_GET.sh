@@ -29,7 +29,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # 
 # First we will load the variables into our context.
-# Copy config.example to config and set the values for your own environment.
+# Put the values for your own environment in set_variables.local.sh.
 #
 printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
@@ -38,10 +38,17 @@ COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 
 #
 # Curl command to list all files under the user's home folder, including the home folder name
-# It is assumed a session login took place prior to this via 01.Authenticate/stLogin.sh
+# It is assumed a session login took place prior to this via 01.Authenticate/01.myself_POST.sh
 # Session cookies are read from a file called myCookie.jar
+# Exits 1 when the server refuses.
 #
-curl -L -b "${COOKIE}" -k -X GET "${ST_URL}/files" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT"
+result=$(curl -L -b "${COOKIE}" -w "\n%{http_code}" -s -k -X GET "${ST_URL}/files" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
+http_status=${result##*$'\n'}
+printf '%s\n' "${result%$'\n'*}"
+if [[ $http_status -ne 200 ]] ; then
+    printf "List failure: %s\n" "${http_status}"
+    exit 1
+fi
 
 printf "Files successfully listed\n"
 

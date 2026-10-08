@@ -258,6 +258,16 @@ else
     pass "no in place sed"
 fi
 
+# bash 3.2, the bash of macOS, has no negative substring length: ${var:0:-3} fails
+# there with "substring expression < 0", while bash 5 on Linux accepts it
+NEGATIVE=$(scan_scripts | xargs -0 grep -nE '\$\{[A-Za-z_][A-Za-z0-9_]*:[0-9]+:-[0-9]+\}' 2>/dev/null)
+if [ -n "${NEGATIVE}" ]; then
+    fail "a negative substring length (bash 4.2 or later), use \${var%???} instead"
+    echo "${NEGATIVE}" | sed 's/^/        /'
+else
+    pass "no negative substring lengths, which bash 3.2 does not have"
+fi
+
 # Config must be resolved from the script, not the working directory
 if scan_scripts | xargs -0 grep -l 'source "\.\./set_variables.sh"' 2>/dev/null | grep -q .; then
     fail "a script sources set_variables relative to the working directory"

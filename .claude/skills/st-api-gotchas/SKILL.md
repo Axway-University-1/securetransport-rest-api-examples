@@ -447,6 +447,21 @@ request body is a safe stand-in for another's.
   gone from the listing immediately. `EndUser/API 2.0/bash/02.Files/07.files_filepath_DELETE.sh`
   now demonstrates it (no `.bat` twin - the EndUser tree has no `bat/` folder
   at all, unlike Admin).
+- **Log out with the session cookie, not with Basic authentication.** Confirmed
+  directly (5.5-20260924): `DELETE /myself` with `-b myCookie.jar` and nothing else
+  answers 200 and that session is refused (401) afterwards. `DELETE /myself` with
+  Basic authentication also answers 200, but it logs a brand new session in and out
+  and leaves the one in the jar open: an earlier `02.myself_DELETE.sh` did exactly
+  that and printed "Successfully Logged out" over a session that kept working. The
+  shipped script now sends the jar, removes it, and check 11 proves the stored
+  session is refused.
+- **Shell traps in the older EndUser scripts, fixed:** `${var:0:-3}` is an error in
+  the bash 3.2 of macOS ("substring expression < 0", the response body is lost), so
+  use `${var%???}`; a bare `exit` after a failure exits 0, so every failure path
+  says `exit 1` (or `exit 2` for a usage error); `base64` of GNU coreutils wraps its
+  output at 76 characters, so the Authorization value is piped through `tr -d '\n'`
+  or a long password gives a two line header; and a script that appends to a
+  git tracked sample file grows it at every run, so 04 uploads a temporary copy.
 
 ## The EndUser API, against its own reference
 

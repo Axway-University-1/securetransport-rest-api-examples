@@ -50,7 +50,7 @@ fi
 # above, so there is normally no reason to change it.
 #
 export ST_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0"
-ST_BASIC_AUTH="$(printf '%s:%s' "${ST_USER}" "${ST_PASSWORD}" | base64)"
+ST_BASIC_AUTH="$(printf '%s:%s' "${ST_USER}" "${ST_PASSWORD}" | base64 | tr -d '\n')"
 export ST_BASIC_AUTH
 
 #

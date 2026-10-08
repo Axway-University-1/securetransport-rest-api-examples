@@ -23,17 +23,20 @@ The end user port defaults to one less than the admin port (8444 -> 8443, or
 444 -> 443, matching this project's own convention), or set st_enduser_port in
 integration.conf to override it.
 
-03.files_filepath_GET.sh downloads a file named "download_file.txt", a
-different name to the "test.txt" that 04.files_filepath_POST.sh uploads - that
-file is not created by anything in this folder. This check uploads it as a
-fixture through EndUserClient before running 03, the same way
-04.accounts_scripts.py creates a throwaway "john" account before running the
-scripts that need one to already exist.
+03.files_filepath_GET.sh downloads the file named in its argument, test.txt by
+default: the one 04.files_filepath_POST.sh uploads, saved in downloaded_files/. This
+check runs it both ways, the second with a fixture uploaded through EndUserClient.
 
-04.files_filepath_POST.sh appends a line to a real, git tracked file next to
-it (test.txt) every time it runs. This check backs that file up before running
-it and restores it afterward, so a test run never leaves the working tree
-dirty.
+04.files_filepath_POST.sh uploads a temporary copy of the git tracked test.txt next
+to it with one more line, and never changes that file (an earlier version appended
+to it at every run). This check still backs it up and restores it, as a safety net,
+and asserts that it is unchanged.
+
+02.myself_DELETE.sh ends the session of the cookie jar. An earlier version logged a
+new session out and printed success while the stored one stayed open: this check
+keeps a copy of the jar, runs the script, and asserts the copy is refused (401).
+The developer's own EndUser myCookie.jar, which the login script overwrites, is
+put back at the end.
 
 Two more things confirmed while building this:
   - Deleting an account does not delete its home folder's files from disk.
@@ -49,7 +52,10 @@ Both are recorded in .claude/skills/st-api-gotchas/SKILL.md.
 """
 import base64
 import os
+import shutil
+import subprocess
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
@@ -87,8 +93,10 @@ if st_client.is_mock(admin):
 created_account = False
 test_txt_backup = None
 test_txt_path = os.path.join(FILES_DIR, "test.txt")
-download_txt_path = os.path.join(FILES_DIR, "download_file.txt")
 downloaded_dir = os.path.join(FILES_DIR, "downloaded_files")
+download_txt_path = os.path.join(downloaded_dir, "download_file.txt")
+COOKIE_JAR = os.path.join(ENDUSER_TREE, "myCookie.jar")
+developers_jar = open(COOKIE_JAR, "rb").read() if os.path.exists(COOKIE_JAR) else None
 
 
 def cleanup_local_files():
@@ -97,13 +105,15 @@ def cleanup_local_files():
             f.write(test_txt_backup)
     elif os.path.exists(test_txt_path):
         os.remove(test_txt_path)
-    if os.path.exists(download_txt_path):
-        os.remove(download_txt_path)
-    for i in (1, 2):
-        for p in (test_txt_path + "_%d" % i,
-                  os.path.join(downloaded_dir, "test.txt_%d" % i)):
-            if os.path.exists(p):
-                os.remove(p)
+    for p in [download_txt_path, os.path.join(downloaded_dir, "test.txt")] + [
+            q for i in (1, 2) for q in (test_txt_path + "_%d" % i, os.path.join(downloaded_dir, "test.txt_%d" % i))]:
+        if os.path.exists(p):
+            os.remove(p)
+    if developers_jar is not None:
+        with open(COOKIE_JAR, "wb") as f:
+            f.write(developers_jar)
+    elif os.path.exists(COOKIE_JAR):
+        os.remove(COOKIE_JAR)
 
 
 try:
@@ -186,6 +196,9 @@ try:
             c.check("04.files_filepath_POST.sh runs without a shell level error",
                     result.returncode == 0, result.stderr.strip()[-300:] if result.returncode else "")
 
+            c.check("04 left the test.txt of the repository as it was",
+                    open(test_txt_path).read() == test_txt_backup if test_txt_backup is not None else True)
+
             listing = euclient.list_files().json() or {}
             names = {f.get("fileName") for f in listing.get("files", [])}
             c.check('"test.txt" is listed after the upload', "test.txt" in names, names)
@@ -210,13 +223,22 @@ try:
             up = euclient.upload("test.txt", b"Append to the file\n")
             c.check("test.txt re-uploaded for the remaining steps", up.status in (200, 201), up.status)
 
-            # -- 03: download download_file.txt, uploaded here as a fixture ---------
+            # -- 03: download test.txt by default, then a named file ---------------
+            result = runner.run(os.path.join(FILES_DIR, "03.files_filepath_GET.sh"))
+            c.check("03.files_filepath_GET.sh runs without a shell level error",
+                    result.returncode == 0, result.stderr.strip()[-300:] if result.returncode else "")
+            saved = os.path.join(downloaded_dir, "test.txt")
+            c.check("03 saved test.txt in downloaded_files, byte for byte what was uploaded",
+                    os.path.exists(saved) and open(saved, "rb").read() == b"Append to the file\n",
+                    open(saved, "rb").read()[:100] if os.path.exists(saved) else "missing")
+            c.check("03 did not overwrite the test.txt of the repository",
+                    test_txt_backup is None or open(test_txt_path).read() == test_txt_backup)
+
             fixture_content = b"fixture content for 03.files_filepath_GET.sh\n"
             up = euclient.upload("download_file.txt", fixture_content)
             c.check("the download_file.txt fixture uploads", up.status in (200, 201), up.status)
-
-            result = runner.run(os.path.join(FILES_DIR, "03.files_filepath_GET.sh"))
-            c.check("03.files_filepath_GET.sh runs without a shell level error",
+            result = runner.run(os.path.join(FILES_DIR, "03.files_filepath_GET.sh"), args=["download_file.txt"])
+            c.check("03 with a file name runs without a shell level error",
                     result.returncode == 0, result.stderr.strip()[-300:] if result.returncode else "")
             if os.path.exists(download_txt_path):
                 with open(download_txt_path, "rb") as f:
@@ -224,7 +246,13 @@ try:
                 c.check("the file the script wrote locally matches what was uploaded",
                         written == fixture_content, written[:100])
             else:
-                c.check("03.files_filepath_GET.sh wrote the file locally", False)
+                c.check("03 wrote the named file locally", False)
+
+            result = runner.run(os.path.join(FILES_DIR, "03.files_filepath_GET.sh"), args=["example_no_such_file.txt"])
+            c.check("03 exits 1 for a file the server does not have",
+                    result.returncode == 1, (result.returncode, result.stdout[-200:]))
+            c.check("and leaves no file behind for it",
+                    not os.path.exists(os.path.join(downloaded_dir, "example_no_such_file.txt")))
 
             # -- 05/06: bulk upload and download, a small count ----------------------
             result = runner.run(os.path.join(FILES_DIR, "05.files_filepath_POST_v2.sh"), args=["2"])
@@ -247,11 +275,30 @@ try:
             # keep in their own cookie jar, so it needs its own logout.
             euclient.logout()
 
+        stored_session = tempfile.mkdtemp(prefix="st_enduser_jar_")
+        stored_jar = os.path.join(stored_session, "jar")
+
+        def stored_session_status():
+            out = subprocess.run(["curl", "-k", "-s", "-o", "/dev/null", "-w", "%{http_code}", "-b", stored_jar,
+                                  "-H", "Referer: THIS_IS_A_RANDOM_TEXT", "-H", "accept: application/json",
+                                  "https://%s:%s/api/v2.0/myself" % (config["st_server"], ENDUSER_PORT)],
+                                 capture_output=True, text=True, timeout=30)
+            return out.stdout.strip()
+
+        shutil.copyfile(COOKIE_JAR, stored_jar)
+        c.check("before the logout, the session of the jar is accepted", stored_session_status() == "200",
+                stored_session_status())
         result = runner.run(os.path.join(AUTH_DIR, "02.myself_DELETE.sh"))
         c.check("02.myself_DELETE.sh runs without a shell level error", result.returncode == 0,
                 result.stderr.strip()[-300:] if result.returncode else "")
         c.check("the script reports a successful logout",
                 "Successfully Logged out" in result.stdout, result.stdout[-200:])
+        c.check("after 02.myself_DELETE.sh, the session that was in the jar is refused (it really ended)",
+                stored_session_status() == "401", stored_session_status())
+        c.check("02 removed the cookie jar", not os.path.exists(COOKIE_JAR))
+        shutil.rmtree(stored_session, ignore_errors=True)
+        result = runner.run(os.path.join(AUTH_DIR, "02.myself_DELETE.sh"))
+        c.check("02 exits 1 when there is no session to end", result.returncode == 1, result.returncode)
 
 finally:
     cleanup_local_files()

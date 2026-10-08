@@ -19,6 +19,7 @@
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
 # - Run 05.files_filepath_POST_v2.sh first, so that the files exist.
+# - Exits 2 without a whole number, and 1 at the first download the server refuses.
 # - The body is written straight to disk with curl's own -o, and the status
 #   code captured separately with -w. Capturing both into one shell variable
 #   and writing that to the file - as an earlier version of this script did -
@@ -33,7 +34,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # 
 # First we will load the variables into our context.
-# Copy config.example to config and set the values for your own environment.
+# Put the values for your own environment in set_variables.local.sh.
 #
 printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
@@ -41,9 +42,9 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 NUMBER_OF_FILES=$1
 
-if [[ -z $NUMBER_OF_FILES ]] ; then
-        echo "Please provide the number of files to download."
-        exit
+if ! [[ "${NUMBER_OF_FILES}" =~ ^[1-9][0-9]*$ ]] ; then
+        echo "Please provide the number of files to download, a whole number above 0."
+        exit 2
 fi
 
 # 
@@ -63,7 +64,7 @@ for i in $(seq 1 "${NUMBER_OF_FILES}") ; do
                 echo "Get File failure: $http_status"
                 cat "${DOWNLOAD_FOLDER}/${FILE_NAME}"
                 rm -f "${DOWNLOAD_FOLDER}/${FILE_NAME}"
-                exit
+                exit 1
         fi
 
         echo "File successfully retrieved and saved as ${DOWNLOAD_FOLDER}/${FILE_NAME}"

@@ -33,7 +33,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 #
 # First we will load the variables into our context.
-# Copy config.example to config and set the values for your own environment.
+# Put the values for your own environment in set_variables.local.sh.
 #
 printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
@@ -53,7 +53,7 @@ http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o /dev/null -X DEL
 
 if [[ $http_status -ne 204 ]] ; then
         echo "Delete File failure: $http_status"
-        exit
+        exit 1
 fi
 
 echo "File ${FILE_NAME} successfully deleted from SecureTransport"

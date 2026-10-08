@@ -1,8 +1,8 @@
 #!/bin/bash
 # ==============================================================================
-# Run the EndUser API examples added from the API reference against a stub
-# curl, and check the calls they make: 03.Myself, 04.FileOperations,
-# 05.Transfers, 06.ServerTime, and 02.Files 09 to 15.
+# Run the EndUser API examples against a stub curl, and check the calls they
+# make: 01.Authenticate, 02.Files, 03.Myself, 04.FileOperations,
+# 05.Transfers and 06.ServerTime.
 #
 # For each one: the method, the URL with its query, the body, the headers that
 # matter (Content-MD5, Content-Range), the answers it acts on, and its exit
@@ -33,7 +33,7 @@ printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sl
 # a cookie jar, as 01.Authenticate/01.myself_POST.sh leaves it
 cp "${EU_TREE}/set_variables.sh" "${WORK}/eu/set_variables.sh"
 cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/eu/set_variables.local.sh"
-for folder in 02.Files 03.Myself 04.FileOperations 05.Transfers 06.ServerTime; do
+for folder in 01.Authenticate 02.Files 03.Myself 04.FileOperations 05.Transfers 06.ServerTime; do
     cp -R "${EU_TREE}/${folder}" "${WORK}/eu/"
 done
 touch "${WORK}/eu/myCookie.jar"
@@ -317,6 +317,112 @@ run 06.ServerTime/01.serverTime_GET.sh
 expect "01 serverTime: GET /serverTime" "${RC}:$(calls)" "0:GET ${BASE}/serverTime"
 has "01 serverTime: compares the clocks, reading the +0300 offset" "second(s) from this machine's."
 GET_BODY=
+
+echo
+echo "=== 01.Authenticate: login and logout ==="
+rm -f "${WORK}/eu/myCookie.jar"
+POST_BODY=$(body login '{"loginName":"apiadmin","type":"admin"}')
+STATUS=200 run 01.Authenticate/01.myself_POST.sh
+expect "01 login: POST /myself, exit 0" "${RC}:$(calls)" "0:POST ${BASE}/myself"
+has "01 login: sends Basic authentication" "HEADER: Authorization: Basic "
+has "01 login: asks curl to write the cookie jar" "COOKIE_JAR_WRITE: "
+has "01 login: prints the response body, without the status code appended" '"loginName":"apiadmin"'
+expect "01 login: no shell error (bash 3.2 has no negative substring length)" "$(printf '%s\n' "${OUT}" | grep -c 'substring expression')" "0"
+STATUS=401 run 01.Authenticate/01.myself_POST.sh
+expect "01 login: refused, exit 1" "${RC}" "1"
+
+touch "${WORK}/eu/myCookie.jar"
+STATUS=200 run 01.Authenticate/02.myself_DELETE.sh
+expect "02 logout: DELETE /myself, exit 0" "${RC}:$(calls)" "0:DELETE ${BASE}/myself"
+expect "02 logout: sends the session cookie of the jar" "$(printf '%s\n' "${OUT}" | grep -c 'COOKIE: .*/myCookie.jar$')" "1"
+expect "02 logout: no Basic authentication, which would end a new session and leave the stored one open" \
+  "$(printf '%s\n' "${OUT}" | grep -c 'Authorization')" "0"
+expect "02 logout: and no cookie jar written over the stored one" "$(printf '%s\n' "${OUT}" | grep -c 'COOKIE_JAR_WRITE')" "0"
+has "02 logout: no shell error, the body is printed" "Successfully Logged out"
+expect "02 logout: the jar is removed once the session has ended" "$([ -f "${WORK}/eu/myCookie.jar" ] && echo there || echo gone)" "gone"
+touch "${WORK}/eu/myCookie.jar"
+STATUS=401 run 01.Authenticate/02.myself_DELETE.sh
+expect "02 logout: refused, exit 1, the jar is kept" "${RC}:$([ -f "${WORK}/eu/myCookie.jar" ] && echo there || echo gone)" "1:there"
+rm -f "${WORK}/eu/myCookie.jar"
+run 01.Authenticate/02.myself_DELETE.sh
+expect "02 logout: no session, exit 1, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "1:0"
+touch "${WORK}/eu/myCookie.jar"
+POST_BODY=
+
+echo
+echo "=== 02.Files: list, upload, download, delete ==="
+GET_BODY=$(body files '{"files":[{"fileName":"test.txt"}]}')
+STATUS_GET=200 run 02.Files/01.files_GET.sh
+expect "01 list: GET /files, exit 0" "${RC}:$(calls)" "0:GET ${BASE}/files"
+has "01 list: prints the listing" '"fileName":"test.txt"'
+STATUS_GET=403 run 02.Files/01.files_GET.sh
+expect "01 list: refused, exit 1, and it does not say it listed the files" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'successfully listed')" "1:0"
+
+GET_BODY=$(body download 'the content of the file')
+rm -rf "${WORK}/eu/02.Files/downloaded_files"
+STATUS_GET=200 run 02.Files/03.files_filepath_GET.sh
+expect "03 download: GET /files/test.txt by default, the file 04 uploads" "${RC}:$(calls)" "0:GET ${BASE}/files/test.txt"
+expect "03 download: saved in downloaded_files, byte for byte, with no status code appended" \
+  "$(cat "${WORK}/eu/02.Files/downloaded_files/test.txt")" "the content of the file"
+expect "03 download: the file of the repository is not overwritten" \
+  "$(cmp -s "${WORK}/eu/02.Files/test.txt" "${EU_TREE}/02.Files/test.txt" && echo same || echo changed)" "same"
+STATUS_GET=200 run 02.Files/03.files_filepath_GET.sh "my file.txt"
+expect "03 download: another name, encoded in the URL" "$(calls)" "GET ${BASE}/files/my%20file.txt"
+expect "03 download: saved under that name" "$([ -f "${WORK}/eu/02.Files/downloaded_files/my file.txt" ] && echo there || echo missing)" "there"
+STATUS_GET=404 run 02.Files/03.files_filepath_GET.sh nosuch.txt
+expect "03 download: refused, exit 1, and no file left" \
+  "${RC}:$([ -f "${WORK}/eu/02.Files/downloaded_files/nosuch.txt" ] && echo there || echo gone)" "1:gone"
+GET_BODY=
+
+STATUS=201 run 02.Files/04.files_filepath_POST.sh
+expect "04 upload: POST /files, exit 0" "${RC}:$(calls)" "0:POST ${BASE}/files"
+has "04 upload: sent under the name of the file" ";filename=test.txt"
+expect "04 upload: the file of the repository is not changed" \
+  "$(cmp -s "${WORK}/eu/02.Files/test.txt" "${EU_TREE}/02.Files/test.txt" && echo same || echo changed)" "same"
+run 02.Files/04.files_filepath_POST.sh nosuch.txt
+expect "04 upload: a file that is not there, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run 02.Files/04.files_filepath_POST.sh ../set_variables.sh
+expect "04 upload: a path outside the folder, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STATUS=500 run 02.Files/04.files_filepath_POST.sh
+expect "04 upload: refused, exit 1" "${RC}" "1"
+
+for bad in abc 0 -1 ""; do
+    run 02.Files/05.files_filepath_POST_v2.sh "${bad}"
+    expect "05 upload many: '${bad}' is not a number of files, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+    run 02.Files/06.files_filepath_GET_v2.sh "${bad}"
+    expect "06 download many: '${bad}' is not a number of files, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS=201 run 02.Files/05.files_filepath_POST_v2.sh 3
+expect "05 upload many: three POSTs, exit 0" "${RC}:$(calls | wc -l | tr -d ' ')" "0:3"
+expect "05 upload many: no copy is left next to the script" "$(ls "${WORK}/eu/02.Files" | grep -c '^test.txt_')" "0"
+STATUS=500 run 02.Files/05.files_filepath_POST_v2.sh 3
+expect "05 upload many: stops at the first refusal, exit 1, and no copy is left" \
+  "${RC}:$(calls | wc -l | tr -d ' '):$(ls "${WORK}/eu/02.Files" | grep -c '^test.txt_')" "1:1:0"
+GET_BODY=$(body many 'x')
+STATUS_GET=200 run 02.Files/06.files_filepath_GET_v2.sh 2
+expect "06 download many: two GETs, exit 0" "${RC}:$(calls)" "0:GET ${BASE}/files/test.txt_1
+GET ${BASE}/files/test.txt_2"
+STATUS_GET=404 run 02.Files/06.files_filepath_GET_v2.sh 2
+expect "06 download many: stops at the first refusal, exit 1" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+GET_BODY=
+
+STATUS=204 run 02.Files/07.files_filepath_DELETE.sh
+expect "07 delete: DELETE /files/test.txt, exit 0" "${RC}:$(calls)" "0:DELETE ${BASE}/files/test.txt"
+STATUS=404 run 02.Files/07.files_filepath_DELETE.sh
+expect "07 delete: refused, exit 1" "${RC}" "1"
+
+echo
+echo "=== set_variables.sh: the Authorization value is one line, however long the password ==="
+# openssl base64 wraps its lines at 64 characters, as base64 of GNU coreutils does at 76
+mkdir -p "${WORK}/b64" "${WORK}/bin_b64"
+printf '#!/bin/bash\nexec openssl base64 "$@"\n' > "${WORK}/bin_b64/base64" && chmod +x "${WORK}/bin_b64/base64"
+cp "${EU_TREE}/set_variables.sh" "${WORK}/b64/set_variables.sh"
+LONG_PASSWORD=$(printf 'p%.0s' $(seq 1 100))
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/b64/set_variables.local.sh"
+printf 'export ST_PASSWORD=%s\n' "${LONG_PASSWORD}" >> "${WORK}/b64/set_variables.local.sh"
+AUTH=$(cd "${WORK}/b64" && PATH="${WORK}/bin_b64:${PATH}" bash -c 'source ./set_variables.sh >/dev/null; printf "%s" "${ST_BASIC_AUTH}"')
+expect "ST_BASIC_AUTH is a single line" "$(printf '%s' "${AUTH}" | wc -l | tr -d ' ')" "0"
+expect "and it decodes to user:password" "$(printf '%s' "${AUTH}" | base64 -d)" "apiadmin:${LONG_PASSWORD}"
 
 echo
 if [ "${FAILED}" -eq 0 ]; then
