@@ -395,9 +395,11 @@ the list doubles as a rough roadmap.
 - Site Templates (the lab has no Connect:Direct, so every create is refused)
 - Cluster Services (not planned: the examples are written against a standalone server)
 
-Some areas are covered by the python examples but not yet by bash or bat:
-changing routes and subscriptions that already exist, and the transaction
-manager. See the python table above.
+Only the following remain uncovered:
+- **siteTemplates:** requires Connect:Direct protocol, not available on this lab
+- **clusterServices** and cluster-only configuration operations: standalone lab
+- Parts of **configurations:** Oracle-only `database/{componentType}`, database connection, replication
+
 
 ## Features by Release
 
