@@ -31,8 +31,9 @@ REM - curl
 REM - PowerShell, used to read JSON in place of jq
 REM
 REM Exit Codes:
-REM 0 - Success
-REM 1 - Error (e.g. missing parameters, API failure)
+REM 0 - Success. A transfer whose outbound transfer is not there yet is left for a later run.
+REM 1 - Error: missing parameters, an API failure, or Acknowledgment.bat failed for at
+REM     least one transfer (the others are still acknowledged).
 REM
 REM Risk: write
 REM
@@ -92,7 +93,7 @@ EXIT /B %EXIT_CODE_ERROR%
 :credentials_ok
 
 REM Set script variables
-FOR /F "tokens=1-2 delims= " %%A IN ('powershell -Command "Get-Date -Format yyyyMMdd HHmm"') DO (
+FOR /F "tokens=1-2 delims= " %%A IN ('powershell -Command "Get-Date -Format 'yyyyMMdd HHmm'"') DO (
     SET YYYYMMDD=%%A
     SET HH=%%B
 )
@@ -111,7 +112,6 @@ CALL :log_message INFO "Starting script execution..."
 
 REM --- Find all transfers ---
 CALL :log_message INFO "Looking for all PeSIT inbound transfers..."
-SET ALL_PESIT_INBOUND=%API_OUTPUTS_DIR%\ALL_PESIT_INBOUND.txt
 
 REM
 REM Build the time window. The API expects RFC 2822, URL encoded.
@@ -129,24 +129,49 @@ IF "%START_TIME_ENCODED%"=="" (
 CALL :log_message INFO "Start time (%START_HOURS_AGO% hours ago), encoded: %START_TIME_ENCODED%"
 CALL :log_message INFO "End time (%END_HOURS_AGO% hours ago), encoded: %END_TIME_ENCODED%"
 
-CALL :execute_API GET "%API_URL%/logs/transfers?protocol=pesit&direction=Incoming&status=Processed&endTimeAfter=%START_TIME_ENCODED%&endTimeBefore=%END_TIME_ENCODED%&fields=coreId,pesitAckStatus" "%ALL_PESIT_INBOUND%"
-
 REM
-REM Select the transfers that have no acknowledgment status yet, and collect
-REM their Core IDs. This is the PowerShell equivalent of the jq select used by
-REM the bash version.
+REM Read the log a page at a time: it answers at most 100 transfers a call. Oldest
+REM first, so that the pages do not move. From each page, select the transfers that
+REM have no acknowledgment status yet and collect their Core IDs (the PowerShell
+REM equivalent of the jq select of the bash version), until a page is not full.
+REM Only the first page was read before: every transfer after the 100th was never
+REM acknowledged.
 REM
 SET CORE_ID_LIST=%API_OUTPUTS_DIR%\CORE_IDS.txt
-powershell -Command "(Get-Content '%ALL_PESIT_INBOUND%' -Raw | ConvertFrom-Json).result | Where-Object { $null -eq $_.pesitAckStatus } | ForEach-Object { $_.coreId } | Set-Content '%CORE_ID_LIST%'"
+TYPE NUL > "%CORE_ID_LIST%"
+SET /A PAGE_SIZE=100
+SET /A OFFSET=0
+
+:next_page
+SET ALL_PESIT_INBOUND=%API_OUTPUTS_DIR%\ALL_PESIT_INBOUND_%OFFSET%.txt
+CALL :execute_API GET "%API_URL%/logs/transfers?protocol=pesit&direction=Incoming&status=Processed&endTimeAfter=%START_TIME_ENCODED%&endTimeBefore=%END_TIME_ENCODED%&fields=coreId,pesitAckStatus&sortByStartTime=ascending&limit=%PAGE_SIZE%&offset=%OFFSET%" "%ALL_PESIT_INBOUND%"
+IF ERRORLEVEL 1 EXIT /B %EXIT_CODE_ERROR%
+
+SET PAGE_COUNT=0
+FOR /F %%N IN ('powershell -Command "$r=(Get-Content '%ALL_PESIT_INBOUND%' -Raw | ConvertFrom-Json).result; if ($null -ne $r) { $r | Where-Object { $null -eq $_.pesitAckStatus } | ForEach-Object { $_.coreId } | Add-Content '%CORE_ID_LIST%'; @($r).Count } else { 0 }"') DO SET PAGE_COUNT=%%N
+IF %PAGE_COUNT% GEQ %PAGE_SIZE% (
+    SET /A OFFSET+=PAGE_SIZE
+    GOTO :next_page
+)
 
 SET /A FOUND=0
 FOR /F "usebackq tokens=*" %%C IN ("%CORE_ID_LIST%") DO SET /A FOUND+=1
 CALL :log_message INFO "Found %FOUND% PeSIT inbound transfers."
 
+SET /A FAILED=0
 FOR /F "usebackq tokens=*" %%C IN ("%CORE_ID_LIST%") DO (
     CALL :log_message INFO "Processing Core ID: %%C"
-    REM Call the Acknowledgment script for each Core ID
+    REM Call the Acknowledgment script for each Core ID. Exit 2 means the outbound
+    REM transfer is not there yet: left for a later run. Any other failure is counted,
+    REM and the loop carries on, so that one bad transfer does not hold back the others.
     CALL "%~dp0Acknowledgment.bat" %%C "%HOST%" MIX 1 FALSE "%ROOT_FOLDER%"
+    SET ACK_RC=!ERRORLEVEL!
+    IF "!ACK_RC!"=="2" (
+        CALL :log_message INFO "No outbound transfer yet for Core ID %%C. Left for a later run."
+    ) ELSE IF NOT "!ACK_RC!"=="0" (
+        CALL :log_message ERROR "Acknowledgment.bat failed for Core ID %%C - exit !ACK_RC!."
+        SET /A FAILED+=1
+    )
 )
 
 IF /I "%CLEAR_API_OUTPUT_FILES%"=="TRUE" (
@@ -154,6 +179,10 @@ IF /I "%CLEAR_API_OUTPUT_FILES%"=="TRUE" (
     DEL /Q "%API_OUTPUTS_DIR%\*.txt"
 )
 
+IF %FAILED% GTR 0 (
+    CALL :log_message ERROR "%FAILED% of %FOUND% transfer(s) could not be acknowledged."
+    EXIT /B %EXIT_CODE_ERROR%
+)
 CALL :log_message INFO "End of script execution"
 EXIT /B %EXIT_CODE_SUCCESS%
 
@@ -161,7 +190,7 @@ REM --- Functions ---
 :log_message
 SET level=%1
 SET msg=%2
-FOR /F "tokens=*" %%A IN ('powershell -Command "Get-Date -Format ''yyyy-MM-dd HH:mm:ss''"') DO SET timestamp=%%A
+FOR /F "tokens=*" %%A IN ('powershell -Command "Get-Date -Format 'yyyy-MM-dd HH:mm:ss'"') DO SET timestamp=%%A
 echo %timestamp% - %level% - %msg% >> "%FILELOG%"
 EXIT /B
 

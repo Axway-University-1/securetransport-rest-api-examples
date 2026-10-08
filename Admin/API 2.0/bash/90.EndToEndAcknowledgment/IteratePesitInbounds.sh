@@ -31,8 +31,9 @@
 # - jq
 #
 # Exit Codes:
-# 0 - Success
-# 1 - Error (e.g., missing parameters, API failure)
+# 0 - Success. A transfer whose outbound transfer is not there yet is left for a later run.
+# 1 - Error: missing parameters, an API failure, or Acknowledgment.sh failed for at least
+#     one transfer (the others are still acknowledged).
 #
 # Risk: write
 #
@@ -156,7 +157,6 @@ log_message "INFO" "CORE_ID: $CORE_ID"
 # --- Find all transfers ---
 #
 log_message "INFO" "Looking for all PeSIT inbound transfers..."
-ALL_PESIT_INBOUND="$API_OUTPUTS_DIR/ALL_PESIT_INBOUND.txt"
 
 if date -v -1H >/dev/null 2>&1; then
     # macOS syntax
@@ -172,20 +172,30 @@ START_TIME_ENCODED=$(url_encode_rfc2822 "$START_TIME")
 END_TIME_ENCODED=$(url_encode_rfc2822 "$END_TIME")
 log_message "INFO" "Start time (${START_HOURS_AGO} hours ago): $START_TIME. Encoded: $START_TIME_ENCODED"
 log_message "INFO" "End time (${END_HOURS_AGO} hours ago): $END_TIME. Encoded: $END_TIME_ENCODED"
-execute_API "GET" "${API_URL}/logs/transfers?protocol=pesit&direction=Incoming&status=Processed&endTimeAfter=${START_TIME_ENCODED}&endTimeBefore=${END_TIME_ENCODED}&fields=coreId,pesitAckStatus" "$ALL_PESIT_INBOUND"
-
-# Extract matching urlrepresentation values into a Bash array
-tmpfile=$(mktemp)
-jq -r '.result[] | select(.pesitAckStatus == null) | .coreId' "$ALL_PESIT_INBOUND" > "$tmpfile"
-
+# The log answers at most 100 transfers a call, so it is read a page at a time,
+# oldest first so that the pages do not move, until a page is not full. Only the
+# first page was read before: every transfer after the 100th was never acknowledged.
+PAGE_SIZE=100
+OFFSET=0
 ids=()
-while IFS= read -r line; do
-  [ -n "$line" ] && ids+=("$line")
-done < "$tmpfile"
+while :; do
+    ALL_PESIT_INBOUND="$API_OUTPUTS_DIR/ALL_PESIT_INBOUND_${OFFSET}.txt"
+    execute_API "GET" "${API_URL}/logs/transfers?protocol=pesit&direction=Incoming&status=Processed&endTimeAfter=${START_TIME_ENCODED}&endTimeBefore=${END_TIME_ENCODED}&fields=coreId,pesitAckStatus&sortByStartTime=ascending&limit=${PAGE_SIZE}&offset=${OFFSET}" "$ALL_PESIT_INBOUND"
 
-rm -f "$tmpfile"
+    # The Core IDs of the transfers that have no acknowledgment status yet
+    while IFS= read -r line; do
+        [ -n "$line" ] && ids+=("$line")
+    done < <(jq -r '.result[] | select(.pesitAckStatus == null) | .coreId' "$ALL_PESIT_INBOUND")
+
+    PAGE_COUNT=$(jq '.result | length' "$ALL_PESIT_INBOUND")
+    if [[ "${PAGE_COUNT}" -lt "${PAGE_SIZE}" ]]; then
+        break
+    fi
+    OFFSET=$((OFFSET + PAGE_SIZE))
+done
 
 log_message "INFO" "Found ${#ids[@]} PeSIT inbound transfers."
+FAILED=0
 for CORE_ID in "${ids[@]}"; do
     log_message "INFO" "Processing Core ID: $CORE_ID"
     # Call the Acknowledgment script for each Core ID, from this script's own
@@ -193,18 +203,25 @@ for CORE_ID in "${ids[@]}"; do
     # the outbound transfer is not there yet: leave it for a later run and carry
     # on with the rest, rather than let set -e end the loop.
     ACK_RC=0
-    "${SCRIPT_DIR}/Acknowledgment.sh" "$CORE_ID" "$HOST" "MIX" 1 FALSE "$ROOT_FOLDER" || ACK_RC=$?
+    "${SCRIPT_DIR}/Acknowledgment.sh" "$CORE_ID" "$HOST" "MIX" 1 FALSE "$ROOT_FOLDER" "${CLEAR_API_OUTPUT_FILES}" || ACK_RC=$?
     case "${ACK_RC}" in
         0) ;;
         2) log_message "INFO" "No outbound transfer yet for Core ID ${CORE_ID}. Left for a later run." ;;
-        *) log_message "ERROR" "Acknowledgment.sh failed for Core ID ${CORE_ID} (exit ${ACK_RC})." ;;
+        *) log_message "ERROR" "Acknowledgment.sh failed for Core ID ${CORE_ID} (exit ${ACK_RC})."
+           FAILED=$((FAILED + 1)) ;;
     esac
 done
 
 if [[ "${CLEAR_API_OUTPUT_FILES}" == "TRUE" && -d "$API_OUTPUTS_DIR" ]]; then
     log_message "INFO" "Clearing API output files in directory: $API_OUTPUTS_DIR"
-    rm -f "$API_OUTPUTS_DIR"/*_"$CORE_ID".txt    
+    rm -f "$API_OUTPUTS_DIR"/*.txt
 fi
 
+# The loop above carries on after a failure so that one bad transfer does not
+# hold back the others; the caller is told at the end
+if [[ "${FAILED}" -gt 0 ]]; then
+    log_message "ERROR" "${FAILED} of ${#ids[@]} transfer(s) could not be acknowledged."
+    exit ${EXIT_CODE_ERROR}
+fi
 log_message "INFO" "End of script execution"
 exit ${EXIT_CODE_SUCCESS}

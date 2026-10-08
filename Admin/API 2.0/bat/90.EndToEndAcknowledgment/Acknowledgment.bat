@@ -52,7 +52,7 @@ IF "%CORE_ID%"=="" (
 )
 
 REM Set script variables
-FOR /F "tokens=1-2 delims= " %%A IN ('powershell -Command "Get-Date -Format yyyyMMdd HHmm"') DO (
+FOR /F "tokens=1-2 delims= " %%A IN ('powershell -Command "Get-Date -Format 'yyyyMMdd HHmm'"') DO (
     SET YYYYMMDD=%%A
     SET HH=%%B
 )
@@ -92,6 +92,7 @@ REM --- Find the corresponding inbound transfer ---
 CALL :log_message INFO "Looking for the corresponding PeSIT inbound transfer..."
 SET GET_PROCESSED_INBOUND_TRANSFER=%API_OUTPUTS_DIR%\FIND_PESIT_INBOUND_%CORE_ID%.txt
 CALL :execute_API GET "%API_URL%/logs/transfers?protocol=pesit&incoming=true&status=Processed&coreId=%CORE_ID%" "%GET_PROCESSED_INBOUND_TRANSFER%"
+IF ERRORLEVEL 1 EXIT /B %EXIT_CODE_ERROR%
 
 FOR /F "tokens=2 delims=:" %%A IN ('findstr "returnCount" "%GET_PROCESSED_INBOUND_TRANSFER%"') DO SET InReturnCount=%%A
 SET InReturnCount=%InReturnCount: =%
@@ -104,11 +105,11 @@ CALL :log_message INFO "Found the corresponding PeSIT inbound transfer."
 REM --- Checking outbound transfer ---
 SET OUTBOUND_TYPE_REQUEST=
 IF /I "%TYPE_OF_OUTBOUND_TRANSFER%"=="MIX" (
-    SET OUTBOUND_TYPE_REQUEST=direction=Outgoing
+    SET "OUTBOUND_TYPE_REQUEST=direction=Outgoing"
 ) ELSE IF /I "%TYPE_OF_OUTBOUND_TRANSFER%"=="PUSH" (
-    SET OUTBOUND_TYPE_REQUEST=direction=Outgoing&serverInitiated=true
+    SET "OUTBOUND_TYPE_REQUEST=direction=Outgoing&serverInitiated=true"
 ) ELSE IF /I "%TYPE_OF_OUTBOUND_TRANSFER%"=="DOWNLOAD" (
-    SET OUTBOUND_TYPE_REQUEST=direction=Outgoing&serverInitiated=false
+    SET "OUTBOUND_TYPE_REQUEST=direction=Outgoing&serverInitiated=false"
 ) ELSE (
     CALL :log_message ERROR "Invalid TYPE_OF_OUTBOUND_TRANSFER: %TYPE_OF_OUTBOUND_TRANSFER%. Valid options are: MIX, PUSH, DOWNLOAD."
     EXIT /B %EXIT_CODE_ERROR%
@@ -117,6 +118,7 @@ IF /I "%TYPE_OF_OUTBOUND_TRANSFER%"=="MIX" (
 SET CHECK_CORE_ID=%API_OUTPUTS_DIR%\CHECK_CORE_ID_%CORE_ID%.txt
 CALL :log_message INFO "Checking for %NUMBER_OF_EXPECTED_OUTBOUND_TRANSFERS% processed outbound transfer(s) with Core ID %CORE_ID%..."
 CALL :execute_API GET "%API_URL%/logs/transfers?%OUTBOUND_TYPE_REQUEST%&status=Processed&coreId=%CORE_ID%" "%CHECK_CORE_ID%"
+IF ERRORLEVEL 1 EXIT /B %EXIT_CODE_ERROR%
 
 FOR /F "tokens=2 delims=:" %%A IN ('findstr "returnCount" "%CHECK_CORE_ID%"') DO SET RETURN_COUNT=%%A
 SET RETURN_COUNT=%RETURN_COUNT: =%
@@ -157,30 +159,38 @@ CALL :log_message INFO "Sending Acknowledgment..."
 SET SUCCESS_CODE=HTTPC=200
 SET ALREADY_SENT_CODE=HTTPC=422
 
+SET ACK_RESULT=FAILED
 FOR /L %%i IN (1,1,%NUMBER_OF_RETRIES%) DO (
     CALL :log_message DEBUG "Retry count: %%i"
+    SET "HTTPC_LINE="
     curl -k -s -u "%ADMIN_USER%:%ADMIN_PWD%" -w "\nHTTPC=%%{http_code}" -X POST "%ACK_NACK_LINK%" ^
       -H "accept: application/json" -H "Referer: %API_URL%" > "%ACK_NACK_OUTPUT%"
 
-    FOR /F "usebackq delims=" %%A IN ("%ACK_NACK_OUTPUT%") DO (
-        SET line=%%A
-        IF "!line!"=="%SUCCESS_CODE%" (
-            CALL :log_message INFO "ACK/NACK sent successfully"
-            GOTO :done
-        ) ELSE IF "!line!"=="%ALREADY_SENT_CODE%" (
-            CALL :log_message WARNING "Attempt %%i/%NUMBER_OF_RETRIES% failed - HTTPC: !line!"
-            CALL :log_message INFO "Acknowledgment already sent."
-            GOTO :done
-        ) ELSE (
-            CALL :log_message WARNING "Attempt %%i/%NUMBER_OF_RETRIES% failed - HTTPC: !line!"
-            TIMEOUT /T %SLEEP_BETWEEN_RETRIES% >nul
-        )
+    REM Only the last line, HTTPC=..., which curl -w wrote, says how the attempt went
+    FOR /F "usebackq delims=" %%A IN (`findstr /B "HTTPC=" "%ACK_NACK_OUTPUT%"`) DO SET "HTTPC_LINE=%%A"
+    IF "!HTTPC_LINE!"=="%SUCCESS_CODE%" (
+        CALL :log_message INFO "ACK/NACK sent successfully"
+        SET ACK_RESULT=OK
+        GOTO :done
     )
+    IF "!HTTPC_LINE!"=="%ALREADY_SENT_CODE%" (
+        CALL :log_message WARNING "Attempt %%i/%NUMBER_OF_RETRIES% failed - HTTPC: !HTTPC_LINE!"
+        CALL :log_message INFO "Acknowledgment already sent."
+        SET ACK_RESULT=OK
+        GOTO :done
+    )
+    CALL :log_message WARNING "Attempt %%i/%NUMBER_OF_RETRIES% failed - HTTPC: !HTTPC_LINE!"
+    TIMEOUT /T %SLEEP_BETWEEN_RETRIES% >nul
 )
 
 :done
 IF /I "%CLEAR_API_OUTPUT_FILES%"=="TRUE" (
     DEL /Q "%API_OUTPUTS_DIR%\*_%CORE_ID%.txt"
+)
+REM Every attempt failed: the transfer is not acknowledged, and the caller must know
+IF "%ACK_RESULT%"=="FAILED" (
+    CALL :log_message ERROR "Every %NUMBER_OF_RETRIES% attempt(s) to send the %ACK_TYPE% failed."
+    EXIT /B %EXIT_CODE_ERROR%
 )
 CALL :log_message INFO "End of script execution"
 EXIT /B %EXIT_CODE_SUCCESS%
@@ -189,14 +199,21 @@ REM --- Functions ---
 :log_message
 SET level=%1
 SET msg=%2
-FOR /F "tokens=*" %%A IN ('powershell -Command "Get-Date -Format yyyy-MM-dd HH:mm:ss"') DO SET timestamp=%%A
+FOR /F "tokens=*" %%A IN ('powershell -Command "Get-Date -Format 'yyyy-MM-dd HH:mm:ss'"') DO SET timestamp=%%A
 echo %timestamp% - %CORE_ID% - %level% - %msg% >> "%FILELOG%"
 EXIT /B
 
 :execute_API
-SET method=%1
-SET url=%2
-SET output_file=%3
+SET "method=%~1"
+SET "url=%~2"
+SET "output_file=%~3"
 curl -k -s -u "%ADMIN_USER%:%ADMIN_PWD%" -w "\nHTTPC=%%{http_code}" -X %method% "%url%" ^
   -H "accept: application/json" -H "Referer: %API_URL%" > "%output_file%"
-EXIT /B
+SET "HTTPC_LINE="
+FOR /F "usebackq delims=" %%H IN (`findstr /B "HTTPC=" "%output_file%"`) DO SET "HTTPC_LINE=%%H"
+CALL :log_message INFO "HTTPC: %HTTPC_LINE%"
+IF NOT "%HTTPC_LINE%"=="HTTPC=200" (
+    CALL :log_message ERROR "API Call Error - HTTPC: %HTTPC_LINE%"
+    EXIT /B %EXIT_CODE_ERROR%
+)
+EXIT /B 0

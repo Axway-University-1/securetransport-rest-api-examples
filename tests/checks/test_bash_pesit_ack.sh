@@ -69,7 +69,7 @@ rules() {
 run() {
     local dir="$1"; shift
     OUT=$(cd "${dir}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_RULES="${RULES}" \
-          STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash "$@" 2>&1)
+          STUB_CURL_STATUS="${STATUS:-200}" STUB_CURL_STATUS_GET="${STATUS_GET:-}" STUB_CURL_PRINT_CODE=1 bash "$@" 2>&1)
     RC=$?
 }
 posts() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); if (m == "POST") print}'; }
@@ -110,6 +110,24 @@ gets | grep -qF "direction=Outgoing&serverInitiated=true&status=Processed&coreId
 run "${ACK_DIR}" ./Acknowledgment.sh CORE1 st.example.com MIX 2 TRUE "${WORK}/logs"
 expect "two outbounds expected, one there: a NACK" "$(posts)" "${BASE}/logs/transfers/in-1/operations?operation=nack"
 
+STATUS=500 STATUS_GET=200 run "${ACK_DIR}" ./Acknowledgment.sh CORE1 st.example.com MIX 1 TRUE "${WORK}/logs" FALSE 2 0
+expect "every ACK attempt refused: it tries twice, then exits 1 (it used to exit 0 with the ACK never sent)" \
+  "${RC}:$(posts | wc -l | tr -d ' ')" "1:2"
+grep -q "attempt(s) to send the ACK failed" "${WORK}"/logs/acks/*/COREID_CORE1.log \
+    && pass "and logs that every attempt failed" || fail "no 'attempt(s) to send the ACK failed' in the log"
+STATUS=422 STATUS_GET=200 run "${ACK_DIR}" ./Acknowledgment.sh CORE1 st.example.com MIX 1 TRUE "${WORK}/logs" FALSE 3 0
+expect "422, already acknowledged: one try, exit 0" "${RC}:$(posts | wc -l | tr -d ' ')" "0:1"
+
+# a curl that cannot connect exits non-zero: that is a failed attempt, and the next one is made
+mkdir -p "${WORK}/bin_fail"
+printf '#!/bin/bash\nfor a in "$@"; do [ "$a" = POST ] && exit 7; done\nexec "%s/bin/curl" "$@"\n' "${WORK}" > "${WORK}/bin_fail/curl"
+chmod +x "${WORK}/bin_fail/curl"
+OUT=$(cd "${ACK_DIR}" && PATH="${WORK}/bin_fail:${WORK}/bin:${PATH}" STUB_CURL_GET_RULES="${RULES}" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 \
+      bash ./Acknowledgment.sh CORE1 st.example.com MIX 1 TRUE "${WORK}/logs" FALSE 3 0 2>&1)
+RC=$?
+ATTEMPTS=$(cat "${WORK}"/logs/acks/*/COREID_CORE1.log | grep -c 'Retry count: 3')
+expect "a curl that cannot connect exits 1, after all three attempts (set -e used to end it at the first)" "${RC}:${ATTEMPTS}" "1:1"
+
 echo
 echo "=== IteratePesitInbounds.sh ==="
 
@@ -132,7 +150,7 @@ RULES=$(rules "fields=coreId,pesitAckStatus" "${WORK}/list.json" \
 rm -rf "${WORK}/iterate_logs"
 run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs"
 expect "run from another folder, it finds Acknowledgment.sh and exits 0" "${RC}" "0"
-gets | head -n 1 | grep -qE "protocol=pesit&direction=Incoming&status=Processed&endTimeAfter=.*&endTimeBefore=.*&fields=coreId,pesitAckStatus$" \
+gets | head -n 1 | grep -qE "protocol=pesit&direction=Incoming&status=Processed&endTimeAfter=.*&endTimeBefore=.*&fields=coreId,pesitAckStatus&sortByStartTime=ascending&limit=100&offset=0$" \
     && pass "it lists the processed PeSIT inbounds in the window" || fail "list query: $(gets | head -n 1)"
 expect "it acknowledges only the unacknowledged transfer whose outbound is there, even after one that is not ready" \
   "$(posts)" "${BASE}/logs/transfers/in-out/operations?operation=ack"
@@ -140,6 +158,35 @@ expect "it never looks at a transfer that is already acknowledged" "$(gets | gre
 ls "${WORK}"/iterate_logs/acks/*/COREID_CORE_OUT.log >/dev/null 2>&1 \
     && pass "Acknowledgment.sh writes its log under the ROOT_FOLDER given to IteratePesitInbounds.sh" \
     || fail "no COREID_CORE_OUT.log under the ROOT_FOLDER given"
+
+# more than one page: a full page of 100, all acknowledged, then a short one with a transfer to acknowledge
+jq -n '{result: [range(0;100) | {coreId: ("DONE_\(.)"), pesitAckStatus: "ack"}]}' > "${WORK}/page1.json"
+printf '{"result":[{"coreId":"CORE_OUT","pesitAckStatus":null}]}\n' > "${WORK}/page2.json"
+RULES=$(rules "offset=100" "${WORK}/page2.json" "offset=0" "${WORK}/page1.json" \
+              "incoming=true&status=Processed&coreId=CORE_OUT" "${WORK}/inbound_out.json" \
+              "direction=Outgoing&status=Processed&coreId=CORE_OUT" "${WORK}/outbound_1.json")
+run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs_pages"
+expect "a full first page: it reads the next one (offset 100) too, and acknowledges what is on it" \
+  "${RC}:$(gets | grep -c 'direction=Incoming'):$(gets | grep -c 'offset=100'):$(posts)" "0:2:1:${BASE}/logs/transfers/in-out/operations?operation=ack"
+expect "the pages are asked oldest first, so that they do not move" "$(gets | grep 'direction=Incoming' | grep -c 'sortByStartTime=ascending&limit=100')" "2"
+
+# one transfer cannot be acknowledged: the other still is, and the exit status says so
+printf '{"result":[{"coreId":"CORE_BAD","pesitAckStatus":null},{"coreId":"CORE_OUT","pesitAckStatus":null}]}\n' > "${WORK}/list_bad.json"
+RULES=$(rules "fields=coreId,pesitAckStatus" "${WORK}/list_bad.json" \
+              "incoming=true&status=Processed&coreId=CORE_BAD" "${WORK}/outbound_0.json" \
+              "incoming=true&status=Processed&coreId=CORE_OUT" "${WORK}/inbound_out.json" \
+              "direction=Outgoing&status=Processed&coreId=CORE_OUT" "${WORK}/outbound_1.json")
+rm -rf "${WORK}/iterate_logs_bad"
+run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs_bad"
+expect "one transfer fails: the other is still acknowledged, and it exits 1 (it used to exit 0)" \
+  "${RC}:$(posts)" "1:${BASE}/logs/transfers/in-out/operations?operation=ack"
+
+# the API output files: kept, or all removed when asked
+files_left() { find "$1" -path '*/API/*.txt' 2>/dev/null | wc -l | tr -d ' '; }
+expect "the API output files are kept by default" "$([ "$(files_left "${WORK}/iterate_logs_bad")" -gt 0 ] && echo kept || echo none)" "kept"
+rm -rf "${WORK}/iterate_logs_clear"
+run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs_clear" TRUE
+expect "with CLEAR_API_OUTPUT_FILES=TRUE none is left, not just the last Core ID's" "$(files_left "${WORK}/iterate_logs_clear")" "0"
 
 echo
 echo "=== The bat twins, read as text (they cannot run here) ==="
@@ -162,6 +209,32 @@ ITER_BAT=$(grep -v '^REM' "${BAT_DIR}/IteratePesitInbounds.bat")
     && pass "IteratePesitInbounds.bat quotes its date format once, as PowerShell needs" \
     || fail "IteratePesitInbounds.bat wraps its date format in '' '', which PowerShell reads as an empty string"
 
+
+# These cannot run here: each line below is a cmd.exe or PowerShell rule, checked in the text
+[[ "${ACK_BAT}" != *'SET OUTBOUND_TYPE_REQUEST=direction=Outgoing&'* ]] \
+    && [[ "${ACK_BAT}" == *'SET "OUTBOUND_TYPE_REQUEST=direction=Outgoing&serverInitiated=true"'* ]] \
+    && pass "Acknowledgment.bat quotes the SET of a query with & (an unquoted & ends the SET, and PUSH and DOWNLOAD lose serverInitiated)" \
+    || fail "Acknowledgment.bat sets OUTBOUND_TYPE_REQUEST with an unquoted &"
+[[ "${ACK_BAT}" == *'SET "url=%~2"'* ]] && [[ "${ACK_BAT}" != *'SET url=%2'* ]] \
+    && pass "Acknowledgment.bat drops the quotes of the URL it is given, so the one pair it adds keeps the & inside" \
+    || fail "Acknowledgment.bat keeps the quotes of the URL, which doubles them and leaves the & outside"
+! printf '%s\n%s\n' "${ACK_BAT}" "${ITER_BAT}" | grep -qE 'Get-Date -Format [A-Za-z]|Get-Date -Format '"''" \
+    && pass "the bat scripts quote the Get-Date format once, with single quotes (PowerShell takes an unquoted one for two arguments)" \
+    || fail "a bat script has an unquoted or double-quoted Get-Date format"
+[[ "${ACK_BAT}" == *'findstr /B "HTTPC="'* ]] && [[ "${ACK_BAT}" != *'IN ("%ACK_NACK_OUTPUT%")'* ]] \
+    && pass "Acknowledgment.bat reads only the HTTPC= line of the answer (it logged a warning and slept for every line of the body)" \
+    || fail "Acknowledgment.bat walks every line of the answer"
+[[ "${ACK_BAT}" == *'IF "%ACK_RESULT%"=="FAILED"'* ]] && [[ "${ACK_BAT}" == *'EXIT /B %EXIT_CODE_ERROR%'* ]] \
+    && pass "Acknowledgment.bat exits 1 when every attempt failed" || fail "Acknowledgment.bat always exits 0"
+[ "$(printf '%s\n' "${ACK_BAT}" | grep -c 'IF ERRORLEVEL 1 EXIT /B %EXIT_CODE_ERROR%')" -eq 2 ] \
+    && pass "Acknowledgment.bat stops when a lookup is refused, as the bash version does" \
+    || fail "Acknowledgment.bat carries on after a refused lookup"
+[[ "${ITER_BAT}" == *'offset=%OFFSET%'* ]] && [[ "${ITER_BAT}" == *'sortByStartTime=ascending&limit=%PAGE_SIZE%'* ]] && [[ "${ITER_BAT}" == *'GOTO :next_page'* ]] \
+    && pass "IteratePesitInbounds.bat reads the log page by page, oldest first" \
+    || fail "IteratePesitInbounds.bat reads only the first page of the log"
+[[ "${ITER_BAT}" == *'SET ACK_RC=!ERRORLEVEL!'* ]] && [[ "${ITER_BAT}" == *'SET /A FAILED+=1'* ]] && [[ "${ITER_BAT}" == *'IF %FAILED% GTR 0'* ]] \
+    && pass "IteratePesitInbounds.bat counts the transfers Acknowledgment.bat failed on, and exits 1" \
+    || fail "IteratePesitInbounds.bat ignores what Acknowledgment.bat returns"
 echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_pesit_ack: PASS"

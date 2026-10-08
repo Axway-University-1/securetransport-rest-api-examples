@@ -35,8 +35,8 @@
 # - curl
 #
 # Exit Codes:
-# 0 - Success
-# 1 - Error (e.g., missing parameters, API failure)
+# 0 - Success (the ACK/NACK was sent, or the transfer had already been acknowledged)
+# 1 - Error (e.g., missing parameters, API failure, or every ACK/NACK attempt failed)
 # 2 - Retry suggested (e.g., outbound transfer not yet available)
 #
 # Risk: write
@@ -214,10 +214,17 @@ log_message "INFO" "Sending Acknowledgment..."
 SUCCESS_CODE="HTTPC=200"
 ALREADY_SENT_CODE="HTTPC=422"
 
+ACK_DONE=0
 for ((i=1; i<=NUMBER_OF_RETRIES; i++)); do
     log_message "DEBUG" "Retry count: $i"
-    curl -k -s -u "$ADMIN_USER:$ADMIN_PWD" -w "\nHTTPC=%{http_code}" -X "POST" "$ACK_NACK_LINK" \
-      -H "accept: application/json" -H "Referer: ${API_URL}" > "$ACK_NACK_OUTPUT"
+    # Nothing left from an earlier attempt, and a curl that cannot connect is an
+    # attempt that failed, not the end of the script (set -e would end it)
+    HTTP_CODE=""
+    RESPONSE_MESSAGE=""
+    if ! curl -k -s -u "$ADMIN_USER:$ADMIN_PWD" -w "\nHTTPC=%{http_code}" -X "POST" "$ACK_NACK_LINK" \
+      -H "accept: application/json" -H "Referer: ${API_URL}" > "$ACK_NACK_OUTPUT"; then
+        : > "$ACK_NACK_OUTPUT"
+    fi
 
     # || [[ -n "$line" ]] keeps the last line, HTTPC=..., which curl's -w writes
     # without a newline after it
@@ -229,11 +236,13 @@ for ((i=1; i<=NUMBER_OF_RETRIES; i++)); do
     case "$HTTP_CODE" in
         "$SUCCESS_CODE")
             log_message "INFO" "ACK/NACK sent successfully"
+            ACK_DONE=1
             break
             ;;
         "$ALREADY_SENT_CODE")
             log_message "WARNING" "Attempt $i/${NUMBER_OF_RETRIES} failed - HTTPC: $HTTP_CODE - Message: ${RESPONSE_MESSAGE}"
             log_message "INFO" "Looks like acknowledgment has already been sent for this transfer."
+            ACK_DONE=1
             break
             ;;
         *)
@@ -246,6 +255,12 @@ done
 
 if [[ "${CLEAR_API_OUTPUT_FILES}" == "TRUE" && -d "$API_OUTPUTS_DIR" ]]; then
     rm -f "$API_OUTPUTS_DIR"/*_"$CORE_ID".txt    
+fi
+
+# Every attempt failed: the transfer is not acknowledged, and the caller must know
+if [[ "${ACK_DONE}" -ne 1 ]]; then
+    log_message "ERROR" "Every ${NUMBER_OF_RETRIES} attempt(s) to send the ${ACK_TYPE} failed."
+    exit ${EXIT_CODE_ERROR}
 fi
 log_message "INFO" "End of script execution"
 exit ${EXIT_CODE_SUCCESS}
