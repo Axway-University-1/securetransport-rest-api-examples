@@ -1,0 +1,59 @@
+#!/bin/bash
+# ==============================================================================
+# A wrapper for stub_curl, for the offline tests of scripts that make several
+# calls with different answers: a POST that is refused and the DELETE that
+# cleans up, a read that is 404 and a write that is 204.
+#
+# Install it as "curl" next to a copy of stub_curl named "stub_curl_real", and
+# put that directory first on PATH. The method it reads from -X (or --head).
+#
+#   STUB_STATUS_GET, _POST, _PUT, _PATCH, _DELETE, _HEAD
+#       the status that method answers (what -w "%{http_code}" prints)
+#   STUB_STATUS_POST_SEQ="201 400"  (also _PUT_SEQ and so on)
+#       the Nth call of that method answers the Nth status, the last repeating
+#   STUB_LOCATION_PREFIX=ID
+#       every POST that asks for the headers (-D) gets a Location header ending
+#       in ID1, ID2, ... by the number of the POST
+#   STUB_COUNTER
+#       a file name to count the calls in (required with SEQ and PREFIX)
+#   STUB_BODY_OTHER=file
+#       the body a PUT, PATCH, DELETE or HEAD answers with (stub_curl serves one for GET and POST only), so that
+#       a test can see a script print why the server refused
+#
+# Everything else is stub_curl's own: STUB_CURL_GET_BODY, _GET_RULES, _GET_SEQUENCE,
+# _POST_BODY, STUB_CURL_PRINT_CODE and the rest.
+# ==============================================================================
+HERE="$(cd "$(dirname "$0")" && pwd)"
+method=GET
+prev=""
+for a in "$@"; do
+    [ "${prev}" = "-X" ] && method="${a}"
+    case "${a}" in --head|-I) method=HEAD ;; esac
+    prev="${a}"
+done
+
+status_var="STUB_STATUS_${method}"
+status="${!status_var}"
+seq_var="STUB_STATUS_${method}_SEQ"
+n=0
+if [ -n "${STUB_COUNTER}" ]; then
+    n=$(( $(cat "${STUB_COUNTER}.${method}" 2>/dev/null || echo 0) + 1 ))
+    echo "${n}" > "${STUB_COUNTER}.${method}"
+fi
+if [ -n "${!seq_var}" ] && [ "${n}" -gt 0 ]; then
+    read -r -a seq <<< "${!seq_var}"
+    i=$(( n - 1 ))
+    [ "${i}" -ge "${#seq[@]}" ] && i=$(( ${#seq[@]} - 1 ))
+    status="${seq[${i}]}"
+fi
+if [ -n "${status}" ]; then
+    if [ "${method}" = "GET" ]; then export STUB_CURL_STATUS_GET="${status}"; else export STUB_CURL_STATUS="${status}"; fi
+fi
+if [ "${method}" = "POST" ] && [ -n "${STUB_LOCATION_PREFIX}" ] && [ "${n}" -gt 0 ]; then
+    export STUB_CURL_LOCATION_ID="${STUB_LOCATION_PREFIX}${n}"
+fi
+case "${method}" in
+    GET|POST) ;;
+    *) [ -n "${STUB_BODY_OTHER}" ] && [ -f "${STUB_BODY_OTHER}" ] && cat "${STUB_BODY_OTHER}" ;;
+esac
+exec "${HERE}/stub_curl_real" "$@"

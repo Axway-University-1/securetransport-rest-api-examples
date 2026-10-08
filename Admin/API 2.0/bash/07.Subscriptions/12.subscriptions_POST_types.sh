@@ -44,7 +44,11 @@
 #   subscriptions.
 # - A HumanSystem subscription takes `rules` (enabled, recipientPattern, fileFilterPattern,
 #   targetFolder); this script sets one.
+# - The status of each call is read with `curl -w "\n%{http_code}"`, not from the first line of a headers file: that line is the one of an
+#   interim `100 Continue` or of a redirect when there is one, and gave the wrong code.
 # - Requires `jq`, which builds the request bodies.
+# - Exit codes: 0 when all four subscriptions were created (201), 1 when the server refuses an application (other than because it exists)
+#   or a subscription (the other types are still tried), 2 when the account is empty or there is more than one argument (nothing sent).
 # ==============================================================================
 
 #
@@ -57,36 +61,57 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/subscriptions"
 ACCOUNT="${1:-john}"
+if [ "$#" -gt 1 ] || [ -z "${ACCOUNT}" ]; then
+    printf "Usage: ./12.subscriptions_POST_types.sh [ACCOUNT]\n"
+    exit 2
+fi
+HEADERS_FILE=$(mktemp)
+trap 'rm -f "${HEADERS_FILE}"' EXIT
 FAILED=0
+
+# The answer to a refused call: the server's own messages, or the text as it is
+show_error() { printf '%s' "$1" | jq -r '(.validationErrors // [.message // empty])[]' 2>/dev/null || printf '%s\n' "$1"; }
 
 for TYPE in Basic HumanSystem MBFT StandardRouter; do
     APPLICATION="Example${TYPE}Application"
     FOLDER="/example_${TYPE}"
 
-    BODY=$(jq -n --arg type "${TYPE}" --arg name "${APPLICATION}" \
+    BODY=$(jq -cn --arg type "${TYPE}" --arg name "${APPLICATION}" \
       '{type: $type, name: $name, notes: "Created by 07.Subscriptions"}')
     printf "Creating the %s application '%s'...\n" "${TYPE}" "${APPLICATION}"
-    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/applications" \
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/applications" \
       -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-      -w "HTTP %{http_code}\n" -d "${BODY}"
+      -d "${BODY}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    printf "HTTP %s\n" "${HTTP_CODE}"
+    if [ "${HTTP_CODE}" != "201" ]; then
+        show_error "${RESPONSE}"
+        if { [ "${HTTP_CODE}" = "400" ] || [ "${HTTP_CODE}" = "409" ]; } && printf '%s' "${RESPONSE}" | grep -q "already exists"; then
+            printf "The application exists already: the subscription goes on it.\n"
+        else
+            FAILED=1
+            continue
+        fi
+    fi
 
     # StandardRouter names the subscriber; HumanSystem may route files by rules
-    BODY=$(jq -n --arg type "${TYPE}" --arg account "${ACCOUNT}" --arg application "${APPLICATION}" --arg folder "${FOLDER}" \
+    BODY=$(jq -cn --arg type "${TYPE}" --arg account "${ACCOUNT}" --arg application "${APPLICATION}" --arg folder "${FOLDER}" \
       '{type: $type, account: $account, application: $application, folder: $folder}
        + (if $type == "StandardRouter" then {subscriberID: "EXAMPLE_SUBSCRIBER"} else {} end)
        + (if $type == "HumanSystem" then {rules: [{enabled: true, recipientPattern: "*", fileFilterPattern: "*.txt", targetFolder: "/example_targets"}]} else {} end)')
     printf "Subscribing the folder '%s' of '%s' to '%s'...\n" "${FOLDER}" "${ACCOUNT}" "${APPLICATION}"
-    response_headers=$(mktemp)
-    curl -s -D "${response_headers}" -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}" \
-      -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "${BODY}"
-    HTTP_CODE=$(head -n 1 "${response_headers}" | awk '{print $2}')
-    LOCATION=$(grep -i '^Location:' "${response_headers}" | awk '{print $2}' | tr -d '\r')
-    rm -f "${response_headers}"
+    RESPONSE=$(curl -s -D "${HEADERS_FILE}" -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}" \
+      -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "${BODY}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
     printf "HTTP %s\n" "${HTTP_CODE}"
     if [ "${HTTP_CODE}" = "201" ]; then
-        printf "New subscription ID: %s\n" "$(basename "${LOCATION}")"
+        LOCATION=$(sed -n 's/^[Ll]ocation: *//p' "${HEADERS_FILE}" | tr -d '\r' | tail -n 1)
+        printf "New subscription ID: %s\n" "${LOCATION##*/}"
     else
+        show_error "${RESPONSE}"
         FAILED=1
     fi
 done
-[ "${FAILED}" = "0" ]
+exit "${FAILED}"

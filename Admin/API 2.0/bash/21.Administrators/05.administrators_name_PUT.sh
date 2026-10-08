@@ -23,7 +23,9 @@
 # - The read-only parts are left out of what is sent: metadata, and the API
 #   keys, which have their own endpoint (08 to 10 in this folder).
 # - Confirmed directly: a success answers 204, with no body.
-# - Requires `jq`, which edits the administrator.
+# - Requires `jq`, which URL-encodes the login name and edits the administrator.
+# - The administrator is read first; one that cannot be read (HTTP other than 200) stops the script with exit 1 and nothing is sent.
+# - Exit codes: 0 when the administrator was unlocked (204), 1 when the server refuses or the administrator cannot be read.
 # ==============================================================================
 
 #
@@ -36,16 +38,24 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/administrators"
 ADMIN="${1:-example_admin}"
+ENCODED=$(jq -rn --arg name "${ADMIN}" '$name | @uri')
 
-ADMIN_JSON=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${ADMIN}" -H "accept: application/json" -H "${REFERER_HEADER}")
-if ! printf '%s' "${ADMIN_JSON}" | jq -e '.loginName' >/dev/null 2>&1; then
-    printf "There is no administrator %s.\n" "${ADMIN}"
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${ENCODED}" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+ADMIN_JSON="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ] || ! printf '%s' "${ADMIN_JSON}" | jq -e '.loginName' >/dev/null 2>&1; then
+    printf "Could not read the administrator %s (HTTP %s).\n" "${ADMIN}" "${HTTP_CODE}"
     exit 1
 fi
 BODY=$(printf '%s' "${ADMIN_JSON}" | jq -c '.locked = false | del(.metadata, .apiKeys)')
 
 printf "Unlocking %s...\n" "${ADMIN}"
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k -u "${ST_USER}:${ST_PASSWORD}" -X PUT "${MAIN_URL}/${ADMIN}" \
-  -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "${BODY}")
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X PUT "${MAIN_URL}/${ENCODED}" \
+  -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "${BODY}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
 printf "HTTP %s\n" "${HTTP_CODE}"
-[ "${HTTP_CODE}" = "204" ]
+if [ "${HTTP_CODE}" != "204" ]; then
+    printf '%s' "${RESPONSE}" | jq -r '(.validationErrors // [.message // empty])[]' 2>/dev/null || printf '%s\n' "${RESPONSE}"
+    exit 1
+fi

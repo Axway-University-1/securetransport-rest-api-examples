@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     262 curl examples, numbered by topic
-    bat/      254 of them, for Windows
+    bash/     263 curl examples, numbered by topic
+    bat/      255 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml

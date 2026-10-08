@@ -18,11 +18,11 @@ confirmed to matter in practice: it does on at least one real server this was
 tested against. A business unit can own accounts and folders on disk; treat
 one that already exists as never disposable. Rather than skip outright in
 that case, this check creates a throwaway "Finance_test" business unit
-instead, and runs a name-substituted copy of 01.businessUnits_POST.sh
-(script_runner.substituted_copy) to create it. That is not the same as
-running the real file - the same request body is sent, under a name and
-baseFolder that do not collide, but it is a modified copy, and is reported as
-such rather than as the literal script.
+instead. The script takes the name and the base folder as arguments (its
+defaults, Finance and /home/fin, are what it creates bare), so this runs the
+real, unmodified file with other arguments: no copy of it is made. The script
+exits 1 on a refusal, so the exit code is checked as well, and so is that a
+second run (the name exists now) is refused with exit 1 and changes nothing.
 """
 import os
 import sys
@@ -70,25 +70,23 @@ try:
             target = None
         else:
             c.info('a business unit named "%s" already exists on this server; '
-                   'using a throwaway "%s" instead and a name-substituted copy '
-                   "of 01.businessUnits_POST.sh - see this check's own "
-                   "docstring for what that does and does not prove." % (NAME, target))
+                   'creating a throwaway "%s" instead, with the script\'s own arguments.' % (NAME, target))
 
     if target:
         with runner.real_credentials(BASH_TREE, config):
             script_path = os.path.join(BU_DIR, "01.businessUnits_POST.sh")
             if fallback:
-                subs = {'"name":"Finance","baseFolder":"/home/fin"':
-                        '"name":"%s","baseFolder":"/home/%s"' % (target, target)}
-                with runner.substituted_copy(script_path, subs) as copy:
-                    result = runner.run(copy)
+                result = runner.run(script_path, [target, "/home/" + target])
             else:
                 result = runner.run(script_path)
-            c.check("01.businessUnits_POST.sh runs without a shell level error",
-                    result.returncode == 0,
-                    result.stderr.strip()[-300:] if result.returncode else "")
+            c.check("01.businessUnits_POST.sh creates it, prints HTTP 201 and exits 0",
+                    result.returncode == 0 and "HTTP 201" in result.stdout,
+                    (result.stdout + result.stderr).strip()[-300:])
+            again = runner.run(script_path, [target, "/home/" + target] if fallback else None)
+            c.check("01.businessUnits_POST.sh run again is refused (HTTP 400), exit 1",
+                    again.returncode == 1 and "HTTP 400" in again.stdout, (again.stdout + again.stderr).strip()[-300:])
 
-        label = " (name-substituted copy)" if fallback else ""
+        label = ""
         response = client.get("businessUnits/" + target)
         created = response.status == 200
         c.check("GET /businessUnits/%s now returns 200%s" % (target, label), created)

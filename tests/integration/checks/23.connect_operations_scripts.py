@@ -18,11 +18,13 @@ stop-the-ssh-daemon true 600`, which are the two stops the bare script made.
 What it checks is unchanged. Run it only on a lab you can restart.
 
 Confirmed directly while building this, and worth knowing before assuming
-the two scripts are equally disruptive: 13.servers_operations_POST.sh is NOT
-a stop script at all - it only starts a server or daemon that is already
-found not running, and does nothing to anything already active. Run on its
-own, against a server where everything is already up, it is a safe no-op
-that only reports status. It correctly starts back up anything 05 just
+the two scripts are equally disruptive: 13.servers_operations_POST.sh, run as
+`--all-stopped start-all-stopped-servers` (what it did when it was run bare,
+before it was guarded), is NOT a stop script at all - it only starts a server
+or daemon that is already found not running, and does nothing to anything
+already active. Against a server where everything is already up, it is a safe
+no-op that only reports status. It now also has `SERVER start` and `SERVER stop
+stop-the-SERVER-server`, which this check does not run. It correctly starts back up anything 05 just
 stopped (http, ssh) - but it does also *attempt* to start this server's own
 AS2 daemon and "As2 Default" server, both intentionally off before this
 check touched anything. Confirmed directly, that attempt cannot succeed
@@ -30,7 +32,9 @@ regardless: `POST /daemons/operations?operation=start&daemon=as2` returns
 `isSuccessful: false`, `"the default server As2 Default is not enabled"` -
 the AS2 listener is disabled at the server's persistent configuration, a
 different and more durable setting than the running/stopped toggle
-start/stop affects, and 13's own script never checks the response to notice.
+start/stop affects. 13 used to ignore the response; it now reads every
+`isSuccessful` and exits 1 for it, so this check accepts exit 1 when the only
+failures are the as2 ones.
 There was accordingly never any real risk of this check leaving AS2 enabled
 - but this check still explicitly puts it back to stopped/inactive in its
 own cleanup regardless, as a defensive belt-and-suspenders measure, using
@@ -132,10 +136,17 @@ try:
             stopped, after_stop)
 
     with runner.real_credentials(BASH_TREE, config):
-        result = runner.run(os.path.join(CONNECT_DIR, "13.servers_operations_POST.sh"), timeout=90)
-        c.check("13.servers_operations_POST.sh runs without a shell level error",
-                result.returncode == 0,
-                result.stderr.strip()[-300:] if result.returncode else "")
+        # 13 no longer starts everything when run bare: that is --all-stopped, which needs its own word. It reads
+        # each result's isSuccessful, so it exits 1 when something could not start: on a lab with AS2 disabled the
+        # as2 server and daemon always say so (see below), and that is the only failure that may be there
+        result = runner.run(os.path.join(CONNECT_DIR, "13.servers_operations_POST.sh"),
+                            ["--all-stopped", "start-all-stopped-servers"], timeout=90)
+        failures = [line for line in result.stdout.splitlines() if "(successful: false)" in line]
+        only_as2 = all("as2" in line.lower() for line in failures)
+        c.check("13.servers_operations_POST.sh --all-stopped runs without a shell level error "
+                "(exit 0, or exit 1 only for the as2 server and daemon that cannot start)",
+                result.returncode == 0 or (result.returncode == 1 and failures and only_as2),
+                (result.stdout + result.stderr).strip()[-400:] if result.returncode else "")
 
     started = wait_until(lambda: all(v == "Running" for k, v in daemon_statuses(client).items()
                                      if original_daemons[k] == "Running"))

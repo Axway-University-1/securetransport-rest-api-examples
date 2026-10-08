@@ -25,6 +25,8 @@ REM   bucket (HEAD /<bucket>). An unknown profile answers 404 "Storage profile
 REM   ... not found."
 REM - tests/integration/lib/dummy_servers.py has a FakeS3 that can stand in for an
 REM   S3 bucket to try these examples against.
+REM - Requires `jq`, which URL-encodes the profile name into the path (a name with a space works; one with a / is refused, exit 2, nothing sent:
+REM   the web server answers 400 to an encoded slash).
 REM ==============================================================================
 
 SETLOCAL
@@ -33,22 +35,26 @@ CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/configurations
-SET PROFILE=%~1
+SET "PROFILE=%~1"
 IF "%PROFILE%"=="" SET PROFILE=example_s3
+IF NOT "%PROFILE:/=%"=="%PROFILE%" (
+    echo PROFILE must not hold a /: such a name cannot be addressed in a path.
+    EXIT /B 2
+)
+SET ENCODED=
+FOR /F "delims=" %%E IN ('powershell -NoProfile -Command "[uri]::EscapeDataString($env:PROFILE)"') DO SET "ENCODED=%%E"
 SET RESPONSE_FILE=%TEMP%\conf_%RANDOM%.json
-SET BODY_FILE=
 
 echo Testing the storage profile %PROFILE%...
 SET HTTP_CODE=
-FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%/storageProfiles/%PROFILE%/operations?operation=test" -H "accept: */*" -H "%REFERER_HEADER%"'') DO SET HTTP_CODE=%%C
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%/storageProfiles/%ENCODED%/operations?operation=test" -H "accept: */*" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
 echo HTTP %HTTP_CODE%
 IF NOT "%HTTP_CODE%"=="204" (
     TYPE "%RESPONSE_FILE%"
     echo.
     IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
-    IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
     EXIT /B 1
 )
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
-IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 echo The bucket can be reached.
+EXIT /B 0

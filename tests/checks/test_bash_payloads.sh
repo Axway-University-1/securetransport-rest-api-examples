@@ -76,7 +76,12 @@ for rel in "06.TransferSites/01.sites_POST.sh" \
     EXTRA_ENV=("STUB_CURL_PRINT_CODE=1" "STUB_CURL_STATUS_GET=200" "STUB_CURL_STATUS=204")
     case "${base}" in
         07.servers_POST.sh|10.servers_name_PUT.sh)
-            GET_BODY="${TESTS_DIR}/fixtures/server_ssh.json" ;;
+            GET_BODY="${TESTS_DIR}/fixtures/server_ssh.json"; EXTRA_ENV+=("STUB_CURL_STATUS=201") ;;
+        02.sites_POST_ssh.sh)
+            # the password of the partner account comes from the environment, and there is no default
+            EXTRA_ENV+=("PARTNER_PASSWORD=example-partner-password" "STUB_CURL_STATUS=201") ;;
+        02.subscriptions_POST.sh)
+            EXTRA_ENV+=("STUB_CURL_STATUS=201") ;;
         05.routes_POST_composite_subscription.sh)
             GET_BODY="${TESTS_DIR}/fixtures/lookup_result.json" ;;
         01.configurations_PATCH.sh)

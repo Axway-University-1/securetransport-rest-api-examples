@@ -20,7 +20,7 @@
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The password itself never comes back: password is empty.
-# - Requires `jq`, which prints the summary.
+# - Requires `jq`, which URL-encodes the login name and prints the summary.
 # ==============================================================================
 
 #
@@ -33,8 +33,9 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/administrators"
 ADMIN="${1:-example_admin}"
+ENCODED=$(jq -rn --arg name "${ADMIN}" '$name | @uri')
 
-RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${ADMIN}" \
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${ENCODED}" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
 HTTP_CODE="${RESPONSE##*$'\n'}"
 RESPONSE="${RESPONSE%$'\n'*}"

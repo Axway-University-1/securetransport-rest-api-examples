@@ -60,7 +60,7 @@ powershell -NoProfile -Command "$tls = [ordered]@{ protocols=@('TLSv1.3','TLSv1.
 
 echo Adding the external store example_vault, %VAULT_URL%...
 SET HTTP_CODE=
-FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%/externalStores" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"'') DO SET HTTP_CODE=%%C
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X POST "%MAIN_URL%/externalStores" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"') DO SET HTTP_CODE=%%C
 echo HTTP %HTTP_CODE%
 IF NOT "%HTTP_CODE%"=="201" (
     TYPE "%RESPONSE_FILE%"

@@ -20,7 +20,9 @@
 # - The other profiles in the registry stay.
 # - Confirmed directly: an empty registry is set with [""]; an empty list
 #   answers 400 "Invalid argument length."
-# - Requires `jq`, which reads the registry.
+# - Requires `jq`, which reads the registry and builds the body.
+# - The registry is read first, and the script stops (exit 1) when it cannot be read: with no answer there is no list to remove the profile from, and a list
+#   left empty would unregister every profile.
 # ==============================================================================
 
 #
@@ -33,13 +35,20 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/configurations"
 PROFILE="example_s3"
-REGISTRY=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/options/StorageProfiles.S3.Registry" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -c --arg profile "${PROFILE}" '[(.values // [])[] | select(. != "" and . != $profile)] | if length == 0 then [""] else . end')
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/options/StorageProfiles.S3.Registry" \
+  -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    printf "Could not read the registry of storage profiles (HTTP %s), so nothing was changed.\n" "${HTTP_CODE}"
+    exit 1
+fi
+REGISTRY=$(printf '%s' "${RESPONSE}" | jq -c --arg profile "${PROFILE}" '[(.values // [])[] | select(. != "" and . != $profile)] | if length == 0 then [""] else . end')
+BODY=$(jq -cn --argjson values "${REGISTRY}" '[{name: "StorageProfiles.S3.Registry", values: $values}]')
 
 printf "Removing %s; the registry becomes %s\n" "${PROFILE}" "${REGISTRY}"
 RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X PUT "${MAIN_URL}/options" -H "accept: */*" -H "${REFERER_HEADER}" \
-  -H "Content-Type: application/json" -d "[{\"name\":\"StorageProfiles.S3.Registry\",\"values\":${REGISTRY}}]" -w "\n%{http_code}")
+  -H "Content-Type: application/json" -d "${BODY}" -w "\n%{http_code}")
 HTTP_CODE="${RESPONSE##*$'\n'}"
 printf "HTTP %s\n" "${HTTP_CODE}"
 if [ "${HTTP_CODE}" != "204" ]; then

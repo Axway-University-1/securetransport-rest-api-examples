@@ -37,9 +37,6 @@ BASE="https://st.example.com:8444/api/v2.0"
 LOOKUP="${TESTS_DIR}/fixtures/lookup_result.json"
 EMPTY="${WORK}/empty.json"
 echo '{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}' > "${EMPTY}"
-# The same object, owned by another account
-OTHER="${WORK}/other_account.json"
-sed 's/"account": "john"/"account": "someone_else"/' "${LOOKUP}" > "${OTHER}"
 
 # run TREE RELATIVE_PATH [ARGS...]
 #   Runs one example with the stub curl. GET_BODY, POST_BODY, STATUS, PRINT_CODE
@@ -69,16 +66,7 @@ expect "sites GET: two calls" "$(calls)" "GET ${BASE}/sites?account=john
 GET ${BASE}/sites?account=john&protocol=ssh"
 has "sites GET: one line per SSH site" "obj-1  SSH_PULL  st.example.com:8022  /outbound-drop"
 
-GET_BODY="${LOOKUP}" run admin "06.TransferSites/04.sites_id_DELETE.sh"
-expect "sites DELETE: looks up each site by account and name" \
-  "$(calls | grep '^GET' | sed 's/.*?//')" "account=john&name=SSH_PULL&fields=id
-account=john&name=SSH_PUSH&fields=id"
-expect "sites DELETE: deletes by the id it found" "$(count_calls "DELETE ${BASE}/sites/obj-1")" "2"
-
-GET_BODY="${EMPTY}" run admin "06.TransferSites/04.sites_id_DELETE.sh"
-expect "sites DELETE: deletes nothing when the lookup finds nothing" "$(count_calls "DELETE")" "0"
-has "sites DELETE: says so" "The account 'john' has no site 'SSH_PULL'."
-
+# 06.TransferSites/04.sites_id_DELETE.sh checks the status of every call now: test_bash_admin_sweep_a.sh covers it
 echo
 echo "=== 07.Subscriptions ==="
 
@@ -87,12 +75,7 @@ expect "subscriptions GET: filters by account, then by type" "$(calls)" "GET ${B
 GET ${BASE}/subscriptions?account=john&type=AdvancedRouting"
 has "subscriptions GET: one line per subscription" "obj-1  /inbox  AdvancedRoutingApplication"
 
-GET_BODY="${LOOKUP}" run admin "07.Subscriptions/04.subscriptions_id_DELETE.sh"
-expect "subscriptions DELETE: deletes only the subscription on a matching folder" \
-  "$(count_calls "DELETE ${BASE}/subscriptions/obj-1")" "1"
-has "subscriptions DELETE: skips a folder with no subscription" "has no subscription on '/inbox-trigger'"
-expect "subscriptions DELETE: deletes the application last" \
-  "$(calls | grep '^DELETE' | tail -n 1)" "DELETE ${BASE}/applications/AdvancedRoutingApplication"
+# 07.Subscriptions/04.subscriptions_id_DELETE.sh checks the status of every call now: test_bash_admin_sweep_a.sh covers it
 
 echo
 echo "=== 09.CompositeRoutes ==="
@@ -102,21 +85,7 @@ has "routes GET: one line per composite route of the account" "obj-1  SSH_PULL  
 has "routes GET: the steps of the simple route" "  Compress  ENABLED"
 expect "routes GET: reads the simple route by the id it found" "$(count_calls "GET ${BASE}/routes/obj-1")" "1"
 
-GET_BODY="${LOOKUP}" run admin "09.CompositeRoutes/07.routes_id_DELETE.sh"
-expect "routes DELETE: deletes six routes by the id it found" "$(count_calls "DELETE ${BASE}/routes/obj-1")" "6"
-expect "routes DELETE: the composite routes go first" \
-  "$(calls | grep '^GET' | sed 's/.*type=\([A-Z]*\).*/\1/' | uniq | paste -sd' ' -)" "COMPOSITE SIMPLE"
-LAST_COMPOSITE_DELETE=$(calls | grep -n '' | grep -E '^[0-9]+:DELETE' | sed -n '3p' | cut -d: -f1)
-FIRST_SIMPLE_GET=$(calls | grep -n 'type=SIMPLE' | head -n 1 | cut -d: -f1)
-if [ -n "${LAST_COMPOSITE_DELETE}" ] && [ -n "${FIRST_SIMPLE_GET}" ] && [ "${LAST_COMPOSITE_DELETE}" -lt "${FIRST_SIMPLE_GET}" ]; then
-    pass "routes DELETE: every composite route is gone before a simple one is looked up"
-else
-    fail "routes DELETE: a simple route was looked up before the composite routes were deleted"
-fi
-
-GET_BODY="${OTHER}" run admin "09.CompositeRoutes/07.routes_id_DELETE.sh"
-expect "routes DELETE: leaves another account's composite route alone" "$(count_calls "DELETE")" "3"
-has "routes DELETE: says so" "There is no COMPOSITE route 'CompositeRoute_Subscription'."
+# 09.CompositeRoutes/07.routes_id_DELETE.sh checks the status of every call now: test_bash_admin_sweep_a.sh covers it
 
 echo
 echo "=== 16.TransferLogs ==="

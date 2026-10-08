@@ -28,7 +28,9 @@
 #   run time; see the option descriptions that mention it.
 # - tests/integration/lib/dummy_servers.py has a FakeVault that can stand in for
 #   a HashiCorp Vault to try these examples against.
-# - Requires `jq`, which prints the outcome.
+# - Requires `jq`, which URL-encodes the name, builds the body and prints the outcome.
+# - The name is URL-encoded into the path (a name with a space works); one with a / is refused with exit 2 (nothing is sent),
+#   as the web server answers 400 to an encoded slash.
 # ==============================================================================
 
 #
@@ -43,10 +45,16 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/configurations"
 SECRET_PATH="$1"
 NAME="${2:-example_vault}"
 [ -n "${SECRET_PATH}" ] || { printf "Usage: ./42.configurations_externalStores_name_operations_POST_test.sh SECRET_PATH [NAME]\n"; exit 2; }
+# A name with a slash cannot be addressed: the web server answers 400 to an encoded slash
+if [[ "${NAME}" == */* ]]; then
+    printf "NAME must not hold a /: such a name cannot be addressed in a path.\n"
+    exit 2
+fi
+ENCODED=$(jq -rn --arg name "${NAME}" '$name | @uri')
 BODY=$(jq -cn --arg path "${SECRET_PATH}" '{secretPath: $path}')
 
 printf "Testing %s with the secret %s...\n" "${NAME}" "${SECRET_PATH}"
-RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}/externalStores/${NAME}/operations?operation=test" \
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}/externalStores/${ENCODED}/operations?operation=test" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" -d "${BODY}" -w "\n%{http_code}")
 HTTP_CODE="${RESPONSE##*$'\n'}"
 RESPONSE="${RESPONSE%$'\n'*}"

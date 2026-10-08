@@ -24,7 +24,9 @@
 #   multipart/mixed, the certificates themselves are exported.
 # - The answer is the same shape 01.accountSetup_POST.sh sends, so it can be
 #   kept as a template for setting up a similar account.
-# - Requires `jq`, which prints the summary.
+# - Requires `jq`, which URL-encodes the account name and prints the summary.
+# - Confirmed directly: an account that does not exist is 404 "Cannot find account with name X or it is not accessible" (a name with a space is
+#   looked for as it is written, so it is encoded in the path); one with a / in it cannot be addressed (404).
 # ==============================================================================
 
 #
@@ -37,8 +39,9 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 ACCOUNT="${1:-example_setup}"
+ENCODED=$(jq -rn --arg name "${ACCOUNT}" '$name | @uri')
 
-RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accountSetup/${ACCOUNT}" \
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accountSetup/${ENCODED}" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
 HTTP_CODE="${RESPONSE##*$'\n'}"
 RESPONSE="${RESPONSE%$'\n'*}"

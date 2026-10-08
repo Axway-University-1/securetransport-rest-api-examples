@@ -100,8 +100,11 @@ try:
             script_path = os.path.join(SITES_DIR, "01.sites_POST.sh")
             with runner.real_credentials(BASH_TREE, config):
                 if fallback:
-                    subs = {'\\"name\\":\\"%s\\"' % NAME: '\\"name\\":\\"%s\\"' % target_name}
+                    subs = {'SITE_NAME="%s"' % NAME: 'SITE_NAME="%s"' % target_name}
                     with runner.substituted_copy(script_path, subs) as copy:
+                        with open(copy) as f:
+                            c.check("the copy of 01.sites_POST.sh names the site %s, not %s" % (target_name, NAME),
+                                    'SITE_NAME="%s"' % target_name in f.read())
                         result = runner.run(copy)
                 else:
                     result = runner.run(script_path)

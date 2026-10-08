@@ -19,7 +19,10 @@
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The AppRole's secret_id comes back masked.
-# - Requires `jq`, which prints the summary.
+# - Requires `jq`, which URL-encodes the name and prints the summary.
+# - The name is URL-encoded into the path (a name with a space works); one with a / is refused with exit 2 (nothing is sent),
+#   as the web server answers 400 to an encoded slash.
+# - Confirmed directly: an unknown store is 404 "Cannot find external store with name 'X' or external store configuration is not accessible".
 # ==============================================================================
 
 #
@@ -32,8 +35,14 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/configurations"
 NAME="${1:-example_vault}"
+# A name with a slash cannot be addressed: the web server answers 400 to an encoded slash
+if [[ "${NAME}" == */* ]]; then
+    printf "NAME must not hold a /: such a name cannot be addressed in a path.\n"
+    exit 2
+fi
+ENCODED=$(jq -rn --arg name "${NAME}" '$name | @uri')
 
-RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/externalStores/${NAME}" -H "accept: application/json" \
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/externalStores/${ENCODED}" -H "accept: application/json" \
   -H "${REFERER_HEADER}" -w "\n%{http_code}")
 HTTP_CODE="${RESPONSE##*$'\n'}"
 RESPONSE="${RESPONSE%$'\n'*}"

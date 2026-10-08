@@ -51,7 +51,7 @@ powershell -NoProfile -Command "foreach ($o in (Get-Content -Raw $env:BODY_FILE 
 echo Setting:
 powershell -NoProfile -Command "foreach ($o in (Get-Content -Raw $env:BODY_FILE | ConvertFrom-Json)) { '  {0} = {1}' -f $o.name, ($o.values -join ', ') }"
 SET HTTP_CODE=
-FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X PUT "%MAIN_URL%/options" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"'') DO SET HTTP_CODE=%%C
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X PUT "%MAIN_URL%/options" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"') DO SET HTTP_CODE=%%C
 echo HTTP %HTTP_CODE%
 IF NOT "%HTTP_CODE%"=="204" (
     TYPE "%RESPONSE_FILE%"

@@ -143,8 +143,9 @@ run "${F}/02.accountSetup_name_GET.sh" other
 expect "02 GET: takes another account" "$(calls)" "GET ${BASE}/accountSetup/other"
 GET_BODY=
 
-STATUS=204 run "${F}/04.accounts_name_DELETE.sh"
-expect "04 DELETE: the account, which takes its sites and profiles with it" "${RC}:$(calls)" "0:DELETE ${BASE}/accounts/example_setup"
+STATUS=204 STATUS_GET=200 run "${F}/04.accounts_name_DELETE.sh"
+expect "04 DELETE: reads the account, then deletes it, which takes its sites and profiles with it" "${RC}:$(calls)" "0:GET ${BASE}/accounts/example_setup?fields=type,homeFolder,uid
+DELETE ${BASE}/accounts/example_setup"
 
 echo
 echo "=== 05.Accounts (02 to 07: made safe to run bare) ==="
@@ -408,11 +409,13 @@ STATUS=204 run "${F}/06.administrativeRoles_name_PATCH.sh"
 expect "06 PATCH: PATCH the role" "${RC}:$(calls)" "0:PATCH ${U}/example_role"
 expect "06 PATCH: appends a menu with /menus/-" "$(payload 1 | jq -c .)" '[{"op":"add","path":"/menus/-","value":"File Tracking"}]'
 
-STATUS=204 run "${F}/07.administrativeRoles_name_DELETE.sh"
-expect "07 DELETE: the role" "${RC}:$(calls)" "0:DELETE ${U}/example_role"
-STATUS=204 run "${F}/07.administrativeRoles_name_DELETE.sh" "Delegated Administrator"
-expect "07 DELETE: moves the members to the target role, the name URL-encoded by curl" "$(calls)" "DELETE ${U}/example_role?targetRoleName=Delegated Administrator"
-STATUS=409 run "${F}/07.administrativeRoles_name_DELETE.sh"
+STATUS=204 STATUS_GET=200 run "${F}/07.administrativeRoles_name_DELETE.sh"
+expect "07 DELETE: reads the role and who holds it, then deletes it" "${RC}:$(calls)" "0:GET ${U}/example_role
+GET ${BASE}/administrators?roleName=example_role&fields=loginName
+DELETE ${U}/example_role"
+STATUS=204 STATUS_GET=200 run "${F}/07.administrativeRoles_name_DELETE.sh" "Delegated Administrator"
+expect "07 DELETE: moves the members to the target role, the name URL-encoded by curl" "$(calls | tail -n 1)" "DELETE ${U}/example_role?targetRoleName=Delegated Administrator"
+STATUS=409 STATUS_GET=200 run "${F}/07.administrativeRoles_name_DELETE.sh"
 expect "07 DELETE: anything but 204 exits 1" "${RC}" "1"
 
 echo
@@ -448,7 +451,7 @@ has "04 GET: the summary line" "  example_admin, role example_role, created by a
 has "04 GET: only the rights it has" "  rights: canReadOnly"
 has "04 GET: never logged in, one key" "  last login never, API keys 1"
 
-STATUS=204 run "${F}/05.administrators_name_PUT.sh"
+STATUS=204 STATUS_GET=200 run "${F}/05.administrators_name_PUT.sh"
 expect "05 PUT: read, then PUT" "${RC}:$(calls)" "0:GET ${U}/example_admin
 PUT ${U}/example_admin"
 expect "05 PUT: unlocked, without metadata and the API keys" \
@@ -464,8 +467,9 @@ expect "06 PATCH: replaces /locked with true" "$(payload 1 | jq -c .)" '[{"op":"
 run "${F}/06.administrators_name_PATCH.sh" apiadmin
 expect "06 PATCH: never locks the administrator it logs in as" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 
-STATUS=204 run "${F}/07.administrators_name_DELETE.sh"
-expect "07 DELETE: example_admin" "${RC}:$(calls)" "0:DELETE ${U}/example_admin"
+STATUS=204 STATUS_GET=200 run "${F}/07.administrators_name_DELETE.sh"
+expect "07 DELETE: reads example_admin, then deletes it" "${RC}:$(calls)" "0:GET ${U}/example_admin
+DELETE ${U}/example_admin"
 
 POST_BODY=$(body key '{"id":"k1","key":"synthetic-key-value","expiresAt":"Thu, 08 Oct 2026 10:00:00 +0300","permissions":["read","write"]}')
 STATUS=201 run "${F}/08.administrators_name_apiKeys_POST.sh" 7 read,write
@@ -1035,7 +1039,7 @@ nothing_sent "38 POST: no AppRole credentials, nothing sent"
 GET_BODY=$(body store "${STORE}")
 run "${F}/39.configurations_externalStores_name_GET.sh"
 has "39 GET: what, where, cached" "  example_vault: GET http://vault.example.com:8200/v1/secret/data, secret at \$.data.data, cached 600s"
-STATUS=204 run "${F}/40.configurations_externalStores_name_PUT.sh" 11
+STATUS=204 STATUS_GET=200 run "${F}/40.configurations_externalStores_name_PUT.sh" 11
 expect "40 PUT: the whole store, readTimeout changed" "${RC}:$(calls | tail -n 1):$(payload 1 | jq -c '[.readTimeout, .cacheTimeout, .name]')" \
   "0:PUT ${U}/externalStores/example_vault:[11,600,\"example_vault\"]"
 STATUS=204 run "${F}/41.configurations_externalStores_name_PATCH.sh" 0 other_store
@@ -1055,13 +1059,14 @@ STATUS=200 run "${F}/43.configurations_externalStores_name_operations_POST_clear
 expect "43 POST: clearCache, with the secret path" "${RC}:$(calls)" "0:POST ${U}/externalStores/example_vault/operations?operation=clearCache"
 has "43 POST: the message" "Cache was cleared successfully"
 POST_BODY=
-STATUS=204 run "${F}/44.configurations_externalStores_name_DELETE.sh"
-expect "44 DELETE: example_vault by default" "${RC}:$(calls)" "0:DELETE ${U}/externalStores/example_vault"
+STATUS=204 STATUS_GET=200 run "${F}/44.configurations_externalStores_name_DELETE.sh"
+expect "44 DELETE: reads example_vault by default, then deletes it" "${RC}:$(calls)" "0:GET ${U}/externalStores/example_vault
+DELETE ${U}/externalStores/example_vault"
 GET_BODY=
 
 REG="${U}/options/StorageProfiles.S3.Registry"
 GET_BODY=$(body registry '{"name":"StorageProfiles.S3.Registry","values":["other_s3"]}')
-STATUS=204 S3_ACCESS_KEY=synthetic-ak S3_SECRET_KEY=synthetic-sk run "${F}/45.configurations_storageProfiles_options_PUT_register.sh" example-bucket eu-west-1 http://s3.example.com:9000
+STATUS=204 STATUS_GET=200 S3_ACCESS_KEY=synthetic-ak S3_SECRET_KEY=synthetic-sk run "${F}/45.configurations_storageProfiles_options_PUT_register.sh" example-bucket eu-west-1 http://s3.example.com:9000
 expect "45 PUT: reads the registry, adds the profile, sets its options" "${RC}:$(calls)" "0:GET ${REG}
 PUT ${U}/options
 PUT ${U}/options"
@@ -1069,7 +1074,7 @@ expect "45 PUT: the registry keeps the other profiles" "$(payload 1 | jq -c .)" 
 expect "45 PUT: the profile's bucket, region, endpoint and keys" "$(payload 2 | jq -c '[.[] | (.name | sub("StorageProfiles.S3.Registry.example_s3."; "")) + "=" + .values[0]]')" \
   '["Bucket=example-bucket","Region=eu-west-1","CustomEndpointUrl=http://s3.example.com:9000","AccessKey=synthetic-ak","SecretKey=synthetic-sk"]'
 GET_BODY=$(body registry_empty '{"name":"StorageProfiles.S3.Registry","values":[]}')
-STATUS=204 run "${F}/45.configurations_storageProfiles_options_PUT_register.sh" example-bucket
+STATUS=204 STATUS_GET=200 run "${F}/45.configurations_storageProfiles_options_PUT_register.sh" example-bucket
 expect "45 PUT: an empty registry gets just the profile; AWS by default" "$(payload 1 | jq -c '.[0].values'):$(payload 2 | jq -c '[.[1].values[0], .[2].values[0]]')" \
   '["example_s3"]:["us-east-1",""]'
 run "${F}/45.configurations_storageProfiles_options_PUT_register.sh"
@@ -1079,10 +1084,10 @@ expect "46 POST: test example_s3" "${RC}:$(calls)" "0:POST ${U}/storageProfiles/
 STATUS=404 run "${F}/46.configurations_storageProfiles_name_operations_POST_test.sh" nope
 expect "46 POST: an unknown profile exits 1" "${RC}" "1"
 GET_BODY=$(body registry_two '{"values":["example_s3","other_s3"]}')
-STATUS=204 run "${F}/47.configurations_storageProfiles_options_PUT_unregister.sh"
+STATUS=204 STATUS_GET=200 run "${F}/47.configurations_storageProfiles_options_PUT_unregister.sh"
 expect "47 PUT: the other profiles stay" "$(payload 1 | jq -c .)" '[{"name":"StorageProfiles.S3.Registry","values":["other_s3"]}]'
 GET_BODY=$(body registry_one '{"values":["example_s3"]}')
-STATUS=204 run "${F}/47.configurations_storageProfiles_options_PUT_unregister.sh"
+STATUS=204 STATUS_GET=200 run "${F}/47.configurations_storageProfiles_options_PUT_unregister.sh"
 expect "47 PUT: the last one leaves [\"\"], not []" "$(payload 1 | jq -c '.[0].values')" '[""]'
 GET_BODY=
 
@@ -2821,14 +2826,14 @@ expect "12 POST types: the MBFT subscription" "$(payload 6 | jq -c .)" \
 expect "12 POST types: the StandardRouter application and subscription, with the subscriber's ID" "$(payload 7 | jq -c .type):$(payload 8 | jq -c .)" \
   '"StandardRouter":{"type":"StandardRouter","account":"example_acct","application":"ExampleStandardRouterApplication","folder":"/example_StandardRouter","subscriberID":"EXAMPLE_SUBSCRIBER"}'
 expect "12 POST types: prints each new id four times" "$(printf '%s\n' "${OUT}" | grep -c 'New subscription ID: newid')" "4"
-run "${F}/12.subscriptions_POST_types.sh"
+STATUS=201 LOCATION=newid run "${F}/12.subscriptions_POST_types.sh"
 expect "12 POST types: john by default" "$(payload 2 | jq -r .account)" "john"
 STATUS=400 run "${F}/12.subscriptions_POST_types.sh" example_acct
-expect "12 POST types: a refused subscription exits 1, the other types are still tried" "${RC}:$(calls | grep -c "POST ${S}$")" "1:4"
+expect "12 POST types: an application the server refuses has its subscription skipped (exit 1); the other types are still tried" "${RC}:$(calls | grep -c "POST ${S}$"):$(calls | grep -c "POST ${BASE}/applications$")" "1:0:4"
 STATUS=
 
 GET_BODY=$(body sub_types '{"result":[{"id":"b1id","application":"ExampleBasicApplication","folder":"/example_Basic"},{"id":"h1id","application":"ExampleHumanSystemApplication","folder":"/example_HumanSystem"},{"id":"m1id","application":"ExampleMBFTApplication","folder":"/example_MBFT"},{"id":"r1id","application":"ExampleStandardRouterApplication","folder":"/example_StandardRouter"}]}')
-STATUS=204 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+STATUS=204 STATUS_GET=200 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
 expect "13 DELETE types: for each type, a lookup, the subscription with purge=true, the application" "${RC}:$(calls)" "0:GET ${S}?account=example_acct&application=ExampleBasicApplication&fields=id,application,folder
 DELETE ${S}/b1id?purge=true
 DELETE ${BASE}/applications/ExampleBasicApplication
@@ -2842,16 +2847,16 @@ GET ${S}?account=example_acct&application=ExampleStandardRouterApplication&field
 DELETE ${S}/r1id?purge=true
 DELETE ${BASE}/applications/ExampleStandardRouterApplication"
 expect "13 DELETE types: prints the code eight times" "$(printf '%s\n' "${OUT}" | grep -c 'HTTP 204')" "8"
-run "${F}/13.subscriptions_id_DELETE_types.sh"
+STATUS=204 STATUS_GET=200 run "${F}/13.subscriptions_id_DELETE_types.sh"
 expect "13 DELETE types: john by default" "$(calls | head -1)" "GET ${S}?account=john&application=ExampleBasicApplication&fields=id,application,folder"
-STATUS=400 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+STATUS=400 STATUS_GET=200 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
 expect "13 DELETE types: a refused delete exits 1" "${RC}" "1"
 GET_BODY=$(body sub_none "${NO_SUB}")
-STATUS=204 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+STATUS=204 STATUS_GET=200 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
 expect "13 DELETE types: no subscription found: only the applications are deleted, exit 0" "${RC}:$(calls | grep -c '^DELETE .*/applications/'):$(calls | grep -c '^DELETE .*/subscriptions/')" "0:4:0"
 has "13 DELETE types: says none was deleted" "none deleted"
 GET_BODY=$(body sub_two '{"result":[{"id":"b1id","application":"ExampleBasicApplication","folder":"/example_Basic"},{"id":"b2id","application":"ExampleBasicApplication","folder":"/example_Basic"}]}')
-run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+STATUS_GET=200 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
 expect "13 DELETE types: two matches: nothing deleted, exit 1" "${RC}:$(calls | grep -c '^DELETE .*/subscriptions/')" "1:0"
 GET_BODY=
 STATUS=

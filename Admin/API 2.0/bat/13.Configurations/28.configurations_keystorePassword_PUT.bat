@@ -43,7 +43,7 @@ powershell -NoProfile -Command "@{ oldPassword=$env:OLD_KEYSTORE_PASSWORD; newPa
 
 echo Changing the keystore password...
 SET HTTP_CODE=
-FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X PUT "%MAIN_URL%/keystorePassword" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"'') DO SET HTTP_CODE=%%C
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X PUT "%MAIN_URL%/keystorePassword" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"') DO SET HTTP_CODE=%%C
 echo HTTP %HTTP_CODE%
 IF NOT "%HTTP_CODE%"=="204" (
     TYPE "%RESPONSE_FILE%"

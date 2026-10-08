@@ -25,6 +25,8 @@
 #   ... not found."
 # - tests/integration/lib/dummy_servers.py has a FakeS3 that can stand in for an
 #   S3 bucket to try these examples against.
+# - Requires `jq`, which URL-encodes the profile name into the path (a name with a space works; one with a / is refused, exit 2, nothing sent:
+#   the web server answers 400 to an encoded slash).
 # ==============================================================================
 
 #
@@ -37,9 +39,15 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/configurations"
 PROFILE="${1:-example_s3}"
+# A name with a slash cannot be addressed: the web server answers 400 to an encoded slash
+if [[ "${PROFILE}" == */* ]]; then
+    printf "PROFILE must not hold a /: such a name cannot be addressed in a path.\n"
+    exit 2
+fi
+ENCODED=$(jq -rn --arg name "${PROFILE}" '$name | @uri')
 
 printf "Testing the storage profile %s...\n" "${PROFILE}"
-RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}/storageProfiles/${PROFILE}/operations?operation=test" \
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}/storageProfiles/${ENCODED}/operations?operation=test" \
   -H "accept: */*" -H "${REFERER_HEADER}" -w "\n%{http_code}")
 HTTP_CODE="${RESPONSE##*$'\n'}"
 printf "HTTP %s\n" "${HTTP_CODE}"

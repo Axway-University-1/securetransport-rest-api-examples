@@ -1,34 +1,33 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 02.routes_POST.sh
+# Script Name: 03.routes_DELETE_all.sh
 # Author: Plamen Milenkov
-# Created: 2025-09-15
+# Created: 2026-10-08
 # Location: Sofia
 # ==============================================================================
 # Description:
-# This script creates route templates using the `/routes` endpoint.
-# It demonstrates creating many objects in a loop, using a list of names that
-# follow the structure RouteFromX.
+# This script deletes the 163 route templates that 02.routes_POST.sh creates, using the `/routes/{id}` endpoint.
+# A route is deleted by its id, not its name, so it demonstrates:
+# - Reading the route templates once and looking each name of the list up in that answer, by its exact name
+# - Deleting each template found by its id, with a count (`[12/163]`) and the HTTP code of each
 #
 # Usage:
-# ./02.routes_POST.sh
+# ./03.routes_DELETE_all.sh
 #
 # Risk: write
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - The names must be unique, as ST rejects a duplicate route template name.
-# - This creates 163 route templates. A large number of templates slows the
-#   admin UI down noticeably, so consider trimming the list below.
-# - 03.routes_DELETE_all.sh removes exactly these 163 again, by name (and only templates, never a route that is not one).
-# - One call to read the templates that exist already comes first, and a name that is there is skipped, so a run that was
-#   stopped halfway can be run again and goes on from where it stopped. Then one POST per name, with a count (`[12/163]`) and the
-#   HTTP code of each. THE FIRST REFUSAL STOPS THE SCRIPT (exit 1), with the server's message: there is no point sending 160
-#   more after a 403 or a 500.
-# - Requires `jq`, which builds each body and reads the names that exist.
-# - Confirmed directly: each template is 201 with no body (the 163 took about a minute on the lab); `GET /routes?type=TEMPLATE` takes `limit=200` and
-#   pages with `offset`; run twice, the second run reads the 163 and creates none.
-# - Exit codes: 0 when every template was created or was there already, 1 when the server refuses the read or a creation. It takes no argument.
+# - It deletes ONLY the templates whose name is one of the 163 names of the list below (the same list as 02.routes_POST.sh), compared
+#   exactly, and only among routes of type TEMPLATE: a template of your own, even one called RouteFromSomething that is not in the list,
+#   is not touched, and neither is a simple or a composite route. A name that is not there is skipped.
+# - A template that a composite route inherits cannot be deleted: delete those composite routes first
+#   (09.CompositeRoutes/07.routes_id_DELETE.sh). THE FIRST REFUSAL STOPS THE SCRIPT (exit 1), with the server's message and how many were
+#   deleted so far; run it again after fixing the cause and it goes on with what is left.
+# - Requires `jq`, which reads the ids and shows the server's own message.
+# - Confirmed directly: each delete is 204 with no body (the 163 took about a minute on the lab); with two templates of its own on the lab, one
+#   called RouteFromSomethingOfMine and one routefromclient (a name of the list in another case), only the 163 were deleted and those two stayed.
+# - Exit codes: 0 when every template was deleted or was not there, 1 when the server refuses the read or a delete. It takes no argument.
 # ==============================================================================
 
 #
@@ -42,12 +41,11 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes"
 
 if [ "$#" -ne 0 ]; then
-    printf "Usage: ./02.routes_POST.sh\n"
+    printf "Usage: ./03.routes_DELETE_all.sh\n"
     exit 2
 fi
 
-# Generate a list of route template names following the structure RouteFromX
-# The names must be unique, as ST rejects a duplicate route template name.
+# The route template names 02.routes_POST.sh creates, and nothing else is ever deleted
 declare -a TEMPLATE_NAMES=(
         "RouteFromEngineer" "RouteFromGovernment" "RouteFromManager" "RouteFromClient" "RouteFromVendor" "RouteFromSupplier"
         "RouteFromCustomer" "RouteFromPartner" "RouteFromDistributor" "RouteFromRetailer" "RouteFromWholesaler" "RouteFromAgent"
@@ -82,13 +80,13 @@ declare -a TEMPLATE_NAMES=(
 # The answer to a refused call: the server's own messages, or the text as it is
 show_error() { printf '%s' "$1" | jq -r '(.validationErrors // [.message // empty])[]' 2>/dev/null || printf '%s\n' "$1"; }
 
-# The route templates that exist already, one name per line (the filter ignores case and takes a *, so the exact name is compared below)
-printf "Reading the route templates that exist already...\n"
+# The route templates that exist, one line each: the name, a tab, the id (the filter is not exact, so the names are compared below)
+printf "Reading the route templates...\n"
 EXISTING=""
 OFFSET=0
 while :; do
     RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" \
-      --data-urlencode "type=TEMPLATE" --data-urlencode "fields=name" --data-urlencode "limit=200" --data-urlencode "offset=${OFFSET}" \
+      --data-urlencode "type=TEMPLATE" --data-urlencode "fields=id,name" --data-urlencode "limit=200" --data-urlencode "offset=${OFFSET}" \
       -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
     HTTP_CODE="${RESPONSE##*$'\n'}"
     RESPONSE="${RESPONSE%$'\n'*}"
@@ -97,36 +95,39 @@ while :; do
         show_error "${RESPONSE}"
         exit 1
     fi
-    PAGE=$(printf '%s' "${RESPONSE}" | jq -r '(.result // [])[] | .name')
+    PAGE=$(printf '%s' "${RESPONSE}" | jq -r '(.result // [])[] | select(.type == null or .type == "TEMPLATE") | "\(.name)\t\(.id)"')
     EXISTING="${EXISTING}${PAGE}"$'\n'
     if [ "$(printf '%s' "${RESPONSE}" | jq '(.result // []) | length')" -lt 200 ]; then break; fi
     OFFSET=$((OFFSET + 200))
 done
 
-# Loop through TEMPLATE_NAMES array and use each name as is
 TOTAL=${#TEMPLATE_NAMES[@]}
 COUNT=0
-CREATED=0
+DELETED=0
 SKIPPED=0
 for TEMPLATE_NAME in "${TEMPLATE_NAMES[@]}"; do
     COUNT=$((COUNT + 1))
-    if printf '%s' "${EXISTING}" | grep -qxF -- "${TEMPLATE_NAME}"; then
-        printf "[%d/%d] %s exists already: skipped\n" "${COUNT}" "${TOTAL}" "${TEMPLATE_NAME}"
+    IDS=$(printf '%s' "${EXISTING}" | awk -F'\t' -v name="${TEMPLATE_NAME}" '$1 == name {print $2}')
+    FOUND=$(printf '%s' "${IDS}" | grep -c .)
+    if [ "${FOUND}" -eq 0 ]; then
+        printf "[%d/%d] %s is not there: skipped\n" "${COUNT}" "${TOTAL}" "${TEMPLATE_NAME}"
         SKIPPED=$((SKIPPED + 1))
         continue
     fi
-    BODY=$(jq -cn --arg name "${TEMPLATE_NAME}" \
-      '{name: $name, description: ("Random text for " + $name), type: "TEMPLATE", conditionType: "MATCH_ALL"}')
-    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}" -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-      -d "${BODY}" -w "\n%{http_code}")
-    HTTP_CODE="${RESPONSE##*$'\n'}"
-    RESPONSE="${RESPONSE%$'\n'*}"
-    printf "[%d/%d] %s HTTP %s\n" "${COUNT}" "${TOTAL}" "${TEMPLATE_NAME}" "${HTTP_CODE}"
-    if [ "${HTTP_CODE}" != "201" ]; then
-        show_error "${RESPONSE}"
-        printf "Stopped at the first refusal: %d created, %d skipped, %d not tried.\n" "${CREATED}" "${SKIPPED}" "$((TOTAL - COUNT))"
+    if [ "${FOUND}" -gt 1 ]; then
+        printf "[%d/%d] %s: %s templates have this name; none deleted. Stopped: %d deleted so far.\n" "${COUNT}" "${TOTAL}" "${TEMPLATE_NAME}" "${FOUND}" "${DELETED}"
         exit 1
     fi
-    CREATED=$((CREATED + 1))
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X DELETE "${MAIN_URL}/$(jq -rn --arg n "${IDS}" '$n|@uri')" \
+      -H "accept: */*" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    printf "[%d/%d] %s (%s) HTTP %s\n" "${COUNT}" "${TOTAL}" "${TEMPLATE_NAME}" "${IDS}" "${HTTP_CODE}"
+    if [ "${HTTP_CODE}" != "204" ]; then
+        show_error "${RESPONSE}"
+        printf "Stopped at the first refusal: %d deleted, %d skipped, %d not tried.\n" "${DELETED}" "${SKIPPED}" "$((TOTAL - COUNT))"
+        exit 1
+    fi
+    DELETED=$((DELETED + 1))
 done
-printf "Done: %d route templates created, %d already there.\n" "${CREATED}" "${SKIPPED}"
+printf "Done: %d route templates deleted, %d were not there.\n" "${DELETED}" "${SKIPPED}"

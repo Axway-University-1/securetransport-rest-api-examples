@@ -61,6 +61,7 @@ c = st_client.Checker("RouteTemplates (trimmed) and CompositeRoutes, run for rea
 
 BASH_TREE = runner.path("Admin", "API 2.0", "bash")
 RT_SCRIPT = os.path.join(BASH_TREE, "08.RouteTemplates", "02.routes_POST.sh")
+RT_DELETE_SCRIPT = os.path.join(BASH_TREE, "08.RouteTemplates", "03.routes_DELETE_all.sh")
 CR_SCRIPT = os.path.join(BASH_TREE, "09.CompositeRoutes", "02.routes_POST.sh")
 
 TEMPLATE_NAMES = ["RouteFromAccountant", "RouteFromEngineer", "RouteFromGovernment"]
@@ -123,6 +124,24 @@ try:
         for n in COMPOSITE_NAMES:
             c.check("%s exists after 09.CompositeRoutes/02.routes_POST.sh" % n,
                     bool((client.get("routes", params={"name": n}).json() or {}).get("result")))
+
+        # The composite routes inherit RouteFromAccountant, which cannot be deleted while they exist: remove
+        # them through the API, then run the cleanup script of the templates (a trimmed copy, the same 3 names)
+        for n in COMPOSITE_NAMES:
+            for item in (client.get("routes", params={"name": n, "fields": "id"}).json() or {}).get("result", []):
+                client.delete("routes/" + item["id"])
+        with open(RT_DELETE_SCRIPT) as f:
+            delete_match = re.search(r"declare -a TEMPLATE_NAMES=\(.*?\n\)", f.read(), re.S)
+        c.check("found the TEMPLATE_NAMES array in 03.routes_DELETE_all.sh to trim it", bool(delete_match))
+        if delete_match:
+            with runner.substituted_copy(RT_DELETE_SCRIPT, {delete_match.group(0): trimmed_array}) as copy:
+                result = runner.run(copy, timeout=60)
+            c.check("08.RouteTemplates/03.routes_DELETE_all.sh runs without a shell level error "
+                    "(name/count-trimmed copy, 3 of 163)", result.returncode == 0,
+                    (result.stdout + result.stderr).strip()[-300:] if result.returncode else "")
+            for n in TEMPLATE_NAMES:
+                c.check("route template %s is gone after the delete script" % n,
+                        not (client.get("routes", params={"name": n}).json() or {}).get("result"))
 
 finally:
     for n in (COMPOSITE_NAMES if created_composites else []) + \

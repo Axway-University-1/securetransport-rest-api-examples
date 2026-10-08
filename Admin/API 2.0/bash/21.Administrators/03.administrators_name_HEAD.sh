@@ -19,6 +19,7 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Requires `jq`, which URL-encodes the login name.
 # ==============================================================================
 
 #
@@ -31,8 +32,9 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/administrators"
 ADMIN="${1:-example_admin}"
+ENCODED=$(jq -rn --arg name "${ADMIN}" '$name | @uri')
 
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k -u "${ST_USER}:${ST_PASSWORD}" --head "${MAIN_URL}/${ADMIN}" \
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -k -u "${ST_USER}:${ST_PASSWORD}" --head "${MAIN_URL}/${ENCODED}" \
   -H "accept: */*" -H "${REFERER_HEADER}")
 if [ "${HTTP_CODE}" = "200" ]; then
     printf "The administrator %s exists.\n" "${ADMIN}"

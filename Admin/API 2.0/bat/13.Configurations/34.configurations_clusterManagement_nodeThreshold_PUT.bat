@@ -44,7 +44,7 @@ SET BODY_FILE=%TEMP%\conf_body_%RANDOM%.json
 powershell -NoProfile -Command "[ordered]@{ numberOfNodes=[int]$env:NODES; sendNotification=$true; subject='SecureTransport: fewer nodes than expected'; notification=('Fewer than ' + $env:NODES + ' SecureTransport node(s) are running.') } | ConvertTo-Json -Compress | Set-Content -Encoding ASCII $env:BODY_FILE"
 echo Expecting %NODES% node(s), with an email when fewer run...
 SET HTTP_CODE=
-FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X PUT "%MAIN_URL%/clusterManagement/nodeThreshold" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"'') DO SET HTTP_CODE=%%C
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X PUT "%MAIN_URL%/clusterManagement/nodeThreshold" -H "accept: */*" -H "%REFERER_HEADER%" -H "Content-Type: application/json" -d "@%BODY_FILE%"') DO SET HTTP_CODE=%%C
 echo HTTP %HTTP_CODE%
 IF NOT "%HTTP_CODE%"=="204" (
     TYPE "%RESPONSE_FILE%"

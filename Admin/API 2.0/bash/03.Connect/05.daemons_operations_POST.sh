@@ -32,7 +32,7 @@
 # - THIS STOPS A DAEMON of the whole server. There is no default daemon and no environment variable that stands in for the confirmation word:
 #   the daemon and the operation are arguments, and a stop needs `stop-the-DAEMON-daemon` as well. The arguments are checked before anything is sent: a bad one exits 2.
 # - It prints the daemon's status first, and the command that undoes the operation. Starting a daemon again with this script is the way back; a protocol server
-#   that was running on it may then need its own start (13.servers_operations_POST.sh starts every server and daemon found not running).
+#   that was running on it may then need its own start (13.servers_operations_POST.sh --all-stopped start-all-stopped-servers starts every server and daemon found not running).
 # - A graceful stop with a timeout keeps running on the server after this script is gone: never kill the script before it returns, and do not start the daemon again
 #   while a delayed stop may still be pending (see st-api-gotchas).
 # - THIS WAS NOT RUN against a server while the script was made safe: no daemon of the lab was stopped or started, by this change. What follows is from the reference and from

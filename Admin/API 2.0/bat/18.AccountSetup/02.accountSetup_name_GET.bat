@@ -24,7 +24,9 @@ REM - With accept: application/json the certificates' properties come back; with
 REM   multipart/mixed, the certificates themselves are exported.
 REM - The answer is the same shape 01.accountSetup_POST.bat sends, so it can be
 REM   kept as a template for setting up a similar account.
-REM - PowerShell is used to print the summary, in place of jq.
+REM - PowerShell is used to URL-encode the account name and print the summary, in place of jq.
+REM - Confirmed directly: an account that does not exist is 404 "Cannot find account with name X or it is not accessible" (a name with a space is
+REM   looked for as it is written, so it is encoded in the path); one with a / in it cannot be addressed (404).
 REM ==============================================================================
 
 SETLOCAL
@@ -33,12 +35,14 @@ CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 
-SET ACCOUNT=%~1
+SET "ACCOUNT=%~1"
 IF "%ACCOUNT%"=="" SET ACCOUNT=example_setup
+SET ENCODED=
+FOR /F "delims=" %%E IN ('powershell -NoProfile -Command "[uri]::EscapeDataString($env:ACCOUNT)"') DO SET "ENCODED=%%E"
 SET RESPONSE_FILE=%TEMP%\setup_%RANDOM%.json
 
 SET HTTP_CODE=
-FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accountSetup/%ACCOUNT%" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accountSetup/%ENCODED%" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
 
 IF NOT "%HTTP_CODE%"=="200" (
     echo Could not read the setup of %ACCOUNT% ^(HTTP %HTTP_CODE%^):
@@ -51,3 +55,4 @@ echo.
 echo In short:
 powershell -NoProfile -Command "$s = (Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).accountSetup; '  account            {0} ({1}), home {2}' -f $s.account.name, $s.account.type, $s.account.homeFolder; '  certificates       {0}' -f (@($s.certificates.login) + @($s.certificates.partner) + @($s.certificates.private)).Count; '  sites              {0}' -f ((@($s.sites) | ForEach-Object { $_.name }) -join ', '); '  transfer profiles  {0}' -f ((@($s.transferProfiles) | ForEach-Object { $_.name }) -join ', '); '  routes             {0}' -f @($s.routes).Count; '  subscriptions      {0}' -f ((@($s.subscriptions) | ForEach-Object { $_.folder }) -join ', ')"
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+EXIT /B 0

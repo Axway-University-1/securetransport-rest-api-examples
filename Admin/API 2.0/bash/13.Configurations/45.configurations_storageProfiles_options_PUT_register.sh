@@ -36,6 +36,9 @@
 # - tests/integration/lib/dummy_servers.py has a FakeS3 that can stand in for an
 #   S3 bucket to try these examples against.
 # - Requires `jq`, which reads the registry and builds the bodies.
+# - The registry is read first, and the script stops (exit 1) when it cannot be read: sending a registry made of this one profile alone would drop the
+#   others. Confirmed directly: when the settings of the profile are then refused (400, a bucket that cannot be reached), the name is in the registry all the
+#   same, with every one of its options empty: the script says so, and 47.configurations_storageProfiles_options_PUT_unregister.sh takes it out.
 # ==============================================================================
 
 #
@@ -54,11 +57,19 @@ PROFILE="example_s3"
 [ -n "${BUCKET}" ] || { printf "Usage: ./45.configurations_storageProfiles_options_PUT_register.sh BUCKET [REGION [ENDPOINT]]\n"; exit 2; }
 
 # The profiles already registered, plus this one
-REGISTRY=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/options/StorageProfiles.S3.Registry" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -c --arg profile "${PROFILE}" '[(.values // [])[] | select(. != "")] + [$profile] | unique')
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/options/StorageProfiles.S3.Registry" \
+  -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    printf "Could not read the registry of storage profiles (HTTP %s), so nothing was changed.\n" "${HTTP_CODE}"
+    exit 1
+fi
+REGISTRY=$(printf '%s' "${RESPONSE}" | jq -c --arg profile "${PROFILE}" '[(.values // [])[] | select(. != "")] + [$profile] | unique')
+BODY=$(jq -cn --argjson values "${REGISTRY}" '[{name: "StorageProfiles.S3.Registry", values: $values}]')
 printf "Registering %s; the registry becomes %s\n" "${PROFILE}" "${REGISTRY}"
 RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X PUT "${MAIN_URL}/options" -H "accept: */*" -H "${REFERER_HEADER}" \
-  -H "Content-Type: application/json" -d "[{\"name\":\"StorageProfiles.S3.Registry\",\"values\":${REGISTRY}}]" -w "\n%{http_code}")
+  -H "Content-Type: application/json" -d "${BODY}" -w "\n%{http_code}")
 HTTP_CODE="${RESPONSE##*$'\n'}"
 printf "HTTP %s\n" "${HTTP_CODE}"
 if [ "${HTTP_CODE}" != "204" ]; then
@@ -81,5 +92,6 @@ HTTP_CODE="${RESPONSE##*$'\n'}"
 printf "HTTP %s\n" "${HTTP_CODE}"
 if [ "${HTTP_CODE}" != "204" ]; then
     printf '%s\n' "${RESPONSE%$'\n'*}"
+    printf "%s is in the registry all the same, without its settings: 47.configurations_storageProfiles_options_PUT_unregister.sh removes it.\n" "${PROFILE}"
     exit 1
 fi
