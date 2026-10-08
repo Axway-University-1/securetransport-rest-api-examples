@@ -400,6 +400,37 @@ try:
     check("an unknown option is refused", result.returncode == 2, result.returncode)
 finally:
     _shutil.rmtree(work, ignore_errors=True)
+
+print("=== the mock leaves nothing behind ===")
+import glob as _glob  # noqa: E402
+import socket as _socket  # noqa: E402
+import time as _time  # noqa: E402
+
+tmp_root = _tempfile.gettempdir()
+before = set(_glob.glob(os.path.join(tmp_root, "mock_st_*")))
+probe = _socket.socket()
+probe.bind(("127.0.0.1", 0))
+mock_port = probe.getsockname()[1]
+probe.close()
+mock = _subprocess.Popen([sys.executable, os.path.join(REPO, "tests", "integration", "mock", "mock_st.py"), "--port", str(mock_port)],
+                         stdout=_subprocess.DEVNULL, stderr=_subprocess.DEVNULL)
+try:
+    up = False
+    for _ in range(100):
+        try:
+            _socket.create_connection(("127.0.0.1", mock_port), timeout=0.2).close()
+            up = True
+            break
+        except OSError:
+            _time.sleep(0.1)
+    check("the mock starts", up)
+    check("and no mock_st_* folder (its key) is left in the temp folder while it runs",
+          set(_glob.glob(os.path.join(tmp_root, "mock_st_*"))) == before,
+          sorted(set(_glob.glob(os.path.join(tmp_root, "mock_st_*"))) - before))
+finally:
+    mock.terminate()
+    mock.wait(timeout=10)
+check(".gitignore covers the name substituted copies a killed check leaves", ".zztest_*" in open(os.path.join(REPO, ".gitignore")).read())
 print()
 if failed:
     print("test_integration_helpers: FAIL (%d)" % failed)

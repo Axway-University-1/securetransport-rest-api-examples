@@ -32,6 +32,7 @@ import re
 import ssl
 import subprocess
 import sys
+import shutil
 import tempfile
 import threading
 import os
@@ -396,6 +397,9 @@ def serve(port, ready=None):
     httpd = HTTPServer(("127.0.0.1", port), Handler)
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(crt, key)
+    # Loaded into the context: the files are not needed again, and the runner ends this
+    # process with a kill that would never get to remove them
+    shutil.rmtree(directory, ignore_errors=True)
     httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
 
     if ready:

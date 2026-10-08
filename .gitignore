@@ -131,3 +131,6 @@ id_rsa
 id_rsa.pub
 testsshkey
 testsshkey.pub
+
+# Name substituted copies of an example that the integration checks run (script_runner.substituted_copy)
+.zztest_*
