@@ -4,37 +4,56 @@ WRITES TO THE SERVER. Checks that a login restriction policy does what it says:
 a policy that denies every address, assigned to a business unit, stops the
 accounts of that unit logging in, and only them.
 
+SFTP and HTTP (the EndUser API) are the CORE protocols, run first; FTP is legacy and
+is an additional, labelled part ("FTP (legacy): ..."). The same steps for each:
+
   1. Two throwaway end user accounts: one in a throwaway business unit, one in
-     none. Both log in, over the EndUser API and over FTP, before any policy.
+     none. Both log in before any policy.
   2. The real 26.LoginRestrictionPolicies examples create the policy
      (DENY_THEN_ALLOW), add the rule that denies every address, and assign the
-     policy to the business unit.
-  3. The account in the unit must now be REFUSED, over both protocols, and the
-     account outside it must still get in.
+     policy to the business unit (once, for all the protocols).
+  3. The account in the unit must now be REFUSED, and the account outside it must
+     still get in.
   4. The real example takes the unit away again, and the first account logs in.
 
 THIS CHECK FAILS, BY DESIGN, ON THE LAB THE EXAMPLES WERE WRITTEN AGAINST. There,
-step 3 does not hold: the account of the unit keeps logging in over FTP and the
-EndUser API, immediately and two minutes later, with either policy type. The check
-is here so that this is not forgotten: it fails until enforcement works, and then
-it passes by itself. 45.login_restriction_policies_scripts.py covers the API
-and stays green. Whatever makes a policy take effect on a server (a setting, a
-restart) belongs in this check's set up, once it is known.
+step 3 does not hold, for any of the three protocols (measured 2026-10-08 on
+5.5-20260924, policy type DENY_THEN_ALLOW, one rule DENY *, assigned to the unit):
+  - SFTP (the system sftp client, a login proved by answering `pwd`): the account of
+    the unit is NOT refused. It keeps logging in, on every try for the 20 seconds the
+    check waits (8 tries over 21 seconds, every one `ok`).
+  - HTTP (an EndUser API login, POST /myself): NOT refused either; the answer is 200
+    on every try (8 tries over 20 seconds).
+  - FTP (ftplib): NOT refused; 230 on every try (10 tries over 21 seconds).
+Earlier probes of FTP and HTTP waited two minutes, with either policy type, and saw the same
+(SFTP was not waited on that long). The account
+outside the unit gets in over all three (as it must), and with the unit taken away the
+account of the unit logs in over all three. So the lab's failures are exactly three:
+"SFTP: THE POLICY ENFORCES ...", "HTTP: THE POLICY ENFORCES ..." and "FTP (legacy): THE
+POLICY ENFORCES ...", and nothing else. The wait per protocol is capped at 20 seconds, so
+the whole failing run takes about 80 seconds. The check is here so that this is not
+forgotten: it fails until enforcement works, and then it passes by itself.
+45.login_restriction_policies_scripts.py covers the API and stays green. Whatever makes a
+policy take effect on a server (a setting, a restart) belongs in this check's set up, once
+it is known. The assertions are never weakened or skipped for a protocol that does not
+enforce: that is the finding.
 
-FTP needs the FTP daemon running (its port is read from the server list); without
-it only the EndUser API is tried. Needs --write and st_allow_writes="yes". Refuses
-to start when its example_lre* objects exist, and removes everything in a finally
-block. No policy is ever made the default.
+SFTP needs the SSH daemon and an `sftp` client on this machine; FTP needs the FTP daemon
+(a missing one is only mentioned). Needs --write and st_allow_writes="yes". Refuses to
+start when its example_lre* objects exist, and removes everything in a finally block,
+whatever the assertions found: no policy, unit or account is left. No policy is ever made
+the default.
 """
 import base64
-import ftplib
 import os
+import shutil
 import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
 import script_runner as runner  # noqa: E402
+import protocol_logins  # noqa: E402
 
 config = st_client.load_config()
 if not config:
@@ -63,36 +82,16 @@ def script(name, args=None, expect_rc=0):
     return out
 
 
-def endpoint_login(account):
-    """'ok', or a description of the refusal."""
-    client = st_client.EndUserClient(HOST, ENDUSER_PORT, account, PASSWORD)
-    response = client._request("POST", "myself", headers={"Authorization": "Basic " + client._auth})
-    if response.status == 200:
-        client.logout()
-        return "ok"
-    return "refused (HTTP %s)" % response.status
-
-
-def ftp_login(account):
-    try:
-        ftp = ftplib.FTP()
-        ftp.connect(HOST, ftp_port, timeout=15)
-        ftp.login(account, PASSWORD)
-        ftp.quit()
-        return "ok"
-    except ftplib.error_perm as e:
-        return "refused (%s)" % str(e)[:40]
-    except (OSError, EOFError, ftplib.Error) as e:
-        return "error (%s)" % type(e).__name__
-
-
-def login_until(account, how, wanted, seconds=WAIT_SECONDS):
-    """The login's outcome, waiting up to `seconds` for it to become `wanted` ('ok' or 'refused')."""
-    deadline = time.time() + seconds
+def login_until(account, proto, wanted, seconds=WAIT_SECONDS):
+    """(the outcome, the tries made, the seconds spent): the login is tried again every 2 seconds until its outcome
+    starts with `wanted` ('ok' or 'refused') or `seconds` have passed (the cap per protocol)."""
+    start = time.time()
+    tries = 0
     while True:
-        outcome = how(account)
-        if outcome.startswith(wanted) or time.time() >= deadline:
-            return outcome
+        outcome = logins.try_login(proto, account)
+        tries += 1
+        if outcome.startswith(wanted) or time.time() - start >= seconds:
+            return outcome, tries, int(time.time() - start)
         time.sleep(2)
 
 
@@ -103,15 +102,28 @@ if st_client.is_mock(admin):
     sys.exit(c.done())
 
 servers = admin.get("servers").json()
-ftp_servers = [s for s in (servers if isinstance(servers, list) else servers.get("result", [])) if s.get("protocol") == "ftp" and s.get("port")]
-ftp_port = ftp_servers[0]["port"] if ftp_servers and admin.get("daemons").json().get("ftpStatus") == "Running" else None
-protocols = [("the EndUser API", endpoint_login)] + ([("FTP", ftp_login)] if ftp_port else [])
+servers = servers if isinstance(servers, list) else servers.get("result", [])
+daemons = admin.get("daemons").json()
+ports = {}
+for protocol in ("ftp", "ssh"):
+    found_ports = [x["port"] for x in servers if x.get("protocol") == protocol and x.get("port")]
+    ports[protocol] = found_ports[0] if found_ports else None
+ftp_port = ports["ftp"] if daemons.get("ftpStatus") == "Running" else None
+ssh_port = ports["ssh"] if daemons.get("sshStatus") == "Running" else None
+if not ssh_port or not shutil.which("sftp"):
+    c.check("SFTP, a core protocol, can be exercised", False, "the SSH daemon is not running, or there is no sftp client on this machine")
+    admin.logout()
+    sys.exit(c.done())
+logins = protocol_logins.Logins(HOST, ssh_port, ENDUSER_PORT, ftp_port, PASSWORD)
+LABELS = {"SFTP": "SFTP", "HTTP": "HTTP", "FTP": "FTP (legacy)"}
+protocols = ["SFTP", "HTTP"] + (["FTP"] if ftp_port else [])
 if not ftp_port:
-    c.info("the FTP daemon is not running or has no port: only the EndUser API is tried")
+    c.info("the FTP daemon is not running or has no port: the legacy FTP part is left out")
 
 exists = admin.get("loginRestrictionPolicies", params={"name": POLICY}).json().get("result")
 if exists or admin.exists("businessUnits/" + UNIT) or admin.exists("accounts/" + IN_UNIT) or admin.exists("accounts/" + OUTSIDE):
     c.check("no example_lre* policy, business unit or account exists yet", False, "remove them first; this check will not touch them")
+    logins.cleanup()
     admin.logout()
     sys.exit(c.done())
 
@@ -126,9 +138,12 @@ try:
         made = admin.post("accounts", body)
         c.check("set up: the account %s%s" % (account, " in the business unit" if unit else ", in no unit"), made.status == 201, made.text[:200])
 
-    for label, how in protocols:
-        c.check("before any policy, the account in the unit logs in over %s" % label, how(IN_UNIT) == "ok", how(IN_UNIT))
-        c.check("before any policy, the account outside the unit logs in over %s" % label, how(OUTSIDE) == "ok", how(OUTSIDE))
+    for proto in protocols:
+        label = LABELS[proto]
+        got = logins.try_login(proto, IN_UNIT)
+        c.check("%s: before any policy, the account in the unit logs in" % label, got == "ok", got)
+        got = logins.try_login(proto, OUTSIDE)
+        c.check("%s: before any policy, the account outside the unit logs in" % label, got == "ok", got)
 
     with runner.real_credentials(ADMIN_TREE, config):
         script("02.loginRestrictionPolicies_POST.sh", [POLICY, "DENY_THEN_ALLOW", "denies every address"])
@@ -139,16 +154,21 @@ try:
                 (made["type"], [(r["type"], r["clientAddress"], r["isEnabled"]) for r in made["rules"]], made["businessUnits"], made["isDefault"])
                 == ("DENY_THEN_ALLOW", [("DENY", "*", True)], [UNIT], False), made)
 
-        for label, how in protocols:
-            outcome = login_until(IN_UNIT, how, "refused")
-            c.check("THE POLICY ENFORCES: the account in the unit is refused over %s" % label, outcome.startswith("refused"),
-                    "%s; a DENY * policy is assigned to its business unit" % outcome)
-            c.check("and the account outside the unit still logs in over %s" % label, how(OUTSIDE) == "ok", how(OUTSIDE))
+        for proto in protocols:
+            label = LABELS[proto]
+            outcome, tries, spent = login_until(IN_UNIT, proto, "refused")
+            c.info("%s: the account in the unit was %s after %d tries over %d seconds" % (label, outcome, tries, spent))
+            c.check("%s: THE POLICY ENFORCES: the account in the unit is refused" % label, outcome.startswith("refused"),
+                    "%s after %d tries over %d seconds; a DENY * policy is assigned to its business unit" % (outcome, tries, spent))
+            got = logins.try_login(proto, OUTSIDE)
+            c.check("%s: and the account outside the unit still logs in" % label, got == "ok", got)
 
         script("09.loginRestrictionPolicies_name_PATCH_businessUnit.sh", [POLICY, UNIT, "remove"])
-        for label, how in protocols:
-            c.check("with the unit taken away, the account logs in again over %s" % label, login_until(IN_UNIT, how, "ok") == "ok", how(IN_UNIT))
+        for proto in protocols:
+            outcome, tries, spent = login_until(IN_UNIT, proto, "ok")
+            c.check("%s: with the unit taken away, the account logs in again" % LABELS[proto], outcome == "ok", outcome)
 finally:
+    logins.cleanup()
     admin.delete("loginRestrictionPolicies/" + POLICY)
     for account in (IN_UNIT, OUTSIDE):
         admin.delete("accounts/" + account)

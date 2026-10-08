@@ -8,8 +8,9 @@ take away a business unit, delete, and every argument each example refuses.
 
 It checks the API, not what a policy does to a login: on the lab these examples
 were written against, a policy that denied every address, assigned to a business
-unit, did not stop an account of that unit logging in over FTP or the EndUser API,
-so this check makes no claim about enforcement. No policy is ever made the
+unit, did not stop an account of that unit logging in over SFTP, the EndUser API (HTTP)
+or FTP (measured with 46.login_restriction_enforcement.py, which fails on that lab for
+all three), so this check makes no claim about enforcement. No policy is ever made the
 default, which would apply it to every account that has none of its own.
 
 Needs --write and st_allow_writes="yes". Refuses to start when its example_lrp*

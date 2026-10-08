@@ -34,6 +34,13 @@ REM   script sends; a comma list finds nothing. A value that does not exist find
 REM - Confirmed directly: message= is a part of the message, with case; * is not a wildcard.
 REM - Confirmed directly: accountName= is IGNORED: any value answers every entry. Search the
 REM   message for the account name instead.
+REM - Confirmed directly (5.5-20260924): what a login writes depends on the protocol. SFTP: component SSHD, INFO
+REM   "User NAME login success." and, for a wrong password, INFO (not WARN) "User NAME login failed.". HTTP (EndUser
+REM   API): component HTTPD, INFO "User NAME login success."; a failed login names NO account: INFO "Denying access to
+REM   unknown user from address ADDRESS" (also for a known account with a wrong password), so search for that text; an
+REM   HTTP login also WARNs "virtual user NAME does not have email associated", which is not a failure. FTP: component
+REM   FTPD, INFO "virtual user NAME logged in from" and WARN "Failed login for user NAME from". Component TM also
+REM   writes INFO "User with login name 'NAME' ... successfully authenticated over SSH, HTTP or FTP".
 REM - PowerShell is used to print one entry per line, in place of jq.
 REM ==============================================================================
 

@@ -259,11 +259,13 @@ is **not** (`${nonsense(` is accepted). A business unit is assigned with
 its position. A PUT with another `name` renames the policy; a PUT with no rules and no business
 units empties both. `businessUnits?assignedToLoginRestrictionPolicies=`, the filter the
 server links to, filters nothing. **Enforcement was not observed**: on the lab a policy denying
-`*`, assigned to a business unit, did not stop that unit's accounts logging in over FTP or the
-EndUser API, immediately or two minutes later, with either type. Do not make a policy the
+`*`, assigned to a business unit, did not stop that unit's accounts logging in over SFTP, the
+EndUser API (HTTP) or FTP: each kept getting in on every try for 20 seconds (check 46, 2026-10-08, 5.5-20260924), and for FTP and
+HTTP also two minutes later, with either type. Do not make a policy the
 default to try it: that applies it to every account that has none.
-`tests/integration/checks/46.login_restriction_enforcement.py` asserts the refusal (and that an
-account outside the unit still gets in) and fails on that lab until enforcement works.
+`tests/integration/checks/46.login_restriction_enforcement.py` asserts the refusal for SFTP and HTTP (the core
+protocols) and FTP (legacy), and that an account outside the unit still gets in, and fails on that lab (exactly the three "THE POLICY
+ENFORCES" checks) until enforcement works.
 
 ## A certificate's caPassword is one real secret, shared by generation, import and nothing else
 
@@ -654,7 +656,16 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   covers both. `GET /logs/transfers` has NO default order: pass `sortByStartTime=descending`
   (newest first; `ascending` oldest first; any value sorts descending) or "latest" is a guess. `verify` needs an AS2 receipt; `ack` and
   `nack` need a PeSIT transfer; any other operation is 403 with an unhelpful message. Logs are
-  never cleaned up by deleting the account: its entries stay.
+  never cleaned up by deleting the account: its entries stay. **What a login writes to the server log depends on the
+  protocol** (confirmed by check 47, 5.5-20260924): SFTP is component `sshd`, INFO "User NAME login success." and, for a
+  wrong password, INFO (not WARN) "User NAME login failed."; HTTP (EndUser API) is `httpd` INFO "User NAME login success.",
+  but a FAILED HTTP login names no account: `httpd` INFO "Denying access to unknown user from address IP" (said for a
+  known account with a wrong password too) and `tm` INFO "Authentication failed using local."; an unknown login name
+  there is also added to the Denied Users list (`tm` INFO "Login name X is added to the Denied Users list until ...").
+  `httpd` WARNs "virtual user NAME does not have email associated" on every successful HTTP login: not a failure. FTP is
+  `ftpd` INFO "virtual user NAME logged in from" and WARN "Failed login for user NAME from". `tm` INFO "User with login
+  name "NAME" ... successfully authenticated over SSH|HTTP|FTP" holds the name for all three. Three wrong passwords on
+  an account is its limit ("Maximum failed auth attempts=3").
 
 - **Mail templates** (`/mailTemplates`): a template is an XHTML file stored under a name that
   must end in `.xhtml`, and the server ships eight of its own (the notification e-mails are

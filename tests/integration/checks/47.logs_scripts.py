@@ -9,10 +9,21 @@ not depend on each other. Each makes something happen, and then finds it in the 
    the user and the address the server saw; the CSV export holds them; and an attempt
    to edit an entry's description is answered 204 and changes nothing.
 
-2. The server log. A throwaway account logs in over FTP, and fails to log in once. The
-   examples find the "logged in" entry and the "Failed login" warning by message,
-   component, level and date, read one entry by its id, and export them as CSV.
-   Skipped when the FTP daemon is not running.
+2. The server log, for each protocol: SFTP and HTTP (the EndUser API) are the core ones,
+   FTP is the legacy, additional one. A throwaway account (a fresh name and uid on every
+   run) logs in, and fails to log in once. The examples find the login and the failure by
+   message, component, level and date, read one entry by its id, and export them as CSV.
+   What each protocol writes differs, and is asserted as the lab does it (5.5-20260924):
+     SFTP  component sshd: INFO "User <name> login success." and INFO (not WARN)
+           "User <name> login failed."; tm INFO "User with login name ... over SSH".
+     HTTP  component httpd: INFO "User <name> login success." A failed login names NO
+           account: INFO "Denying access to unknown user from address <ip>" (also for a
+           known account with a wrong password), found by that text, one more than before.
+           httpd also WARNs "virtual user <name> does not have email associated" on every
+           login: that is no failure.
+     FTP   component ftpd: INFO "virtual user <name> logged in from", WARN "Failed login
+           for user <name> from".
+   FTP is skipped when its daemon is not running; SFTP needs the SSH daemon and an sftp client.
 
 3. The transfer log. A throwaway account uploads a file and pulls it from ST's own SSH
    server: the log then holds the upload, the file served, and the pull. The examples
@@ -25,14 +36,15 @@ not depend on each other. Each makes something happen, and then finds it in the 
 The logs cannot be cleaned up: the entries of the throwaway objects stay, with names
 nobody else uses. The objects themselves are removed in finally blocks.
 
-Needs --write and st_allow_writes="yes". The FTP part needs the daemon running.
+Needs --write and st_allow_writes="yes".
 """
 import base64
 import csv
-import ftplib
 import io
 import os
+import random
 import re
+import shutil
 import sys
 import tempfile
 import time
@@ -40,6 +52,7 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
 import script_runner as runner  # noqa: E402
+import protocol_logins  # noqa: E402
 
 config = st_client.load_config()
 if not config:
@@ -138,74 +151,129 @@ finally:
     admin.delete("businessUnits/" + UNIT)
 
 # ---------------------------------------------------------------- 2. the server log
-FTP_ACCOUNT = "example_log_ftp"
-servers = admin.get("servers").json()
-ftp_servers = [s for s in (servers if isinstance(servers, list) else servers.get("result", [])) if s.get("protocol") == "ftp" and s.get("port")]
-ftp_port = ftp_servers[0]["port"] if ftp_servers and admin.get("daemons").json().get("ftpStatus") == "Running" else None
+# SFTP and HTTP (the EndUser API) are the core protocols, FTP is the legacy, additional one. What each writes to the server log
+# differs (measured on 5.5-20260924), and is asserted here as it is:
+#   SFTP  component sshd: INFO "User <name> login success." and INFO "User <name> login failed." (a failed login is INFO, not WARN);
+#         tm INFO "User with login name "<name>" ... successfully authenticated over SSH"
+#   HTTP  component httpd: INFO "User <name> login success."  A failed login names NO account: httpd INFO "Denying access to unknown
+#         user from address <ip>" (said even for a known account with a wrong password) and tm INFO "Authentication failed using
+#         local."; httpd also WARNs "virtual user <name> does not have email associated" on every login, which is no failure.
+#   FTP   component ftpd: INFO "virtual user <name> logged in from", WARN "Failed login for user <name> from"
+SERVERS = admin.get("servers").json()
+SERVERS = SERVERS if isinstance(SERVERS, list) else SERVERS.get("result", [])
+DAEMONS = admin.get("daemons").json()
+
+
+def server_port(protocol, daemon):
+    ports = [s["port"] for s in SERVERS if s.get("protocol") == protocol and s.get("port")]
+    return ports[0] if ports and DAEMONS.get(daemon) == "Running" else None
+
+
+PROTOCOLS = {
+    "SFTP": {"component": "SSHD", "token": "sshd", "ok": "User %s login success", "ok_re": r"INFO  sshd  .*User %s login success",
+             "fail": "User %s login failed", "fail_re": r"INFO  sshd  .*User %s login failed", "fail_level": "INFO", "fail_names_account": True},
+    "HTTP": {"component": "HTTPD", "token": "httpd", "ok": "User %s login success", "ok_re": r"INFO  httpd  .*User %s login success",
+             "fail": "Denying access to unknown user from address", "fail_re": r"INFO  httpd  .*Denying access to unknown user from address",
+             "fail_level": "INFO", "fail_names_account": False},
+    "FTP": {"component": "FTPD", "token": "ftpd", "ok": "virtual user %s logged in", "ok_re": r"INFO  ftpd  .*virtual user %s logged in from",
+            "fail": "Failed login for user %s", "fail_re": r"WARN  ftpd  .*Failed login for user %s from", "fail_level": "WARN", "fail_names_account": True},
+}
+ssh_port, ftp_port = server_port("ssh", "sshStatus"), server_port("ftp", "ftpStatus")
+logins = protocol_logins.Logins(config["st_server"], ssh_port, ENDUSER_PORT, ftp_port, PASSWORD)
+usable = ["SFTP", "HTTP"] + (["FTP"] if ftp_port else [])
+if not ssh_port or not shutil.which("sftp"):
+    c.check("SFTP, a core protocol, can be exercised", False, "the SSH daemon is not running, or there is no sftp client on this machine")
+    usable.remove("SFTP")
 if not ftp_port:
-    c.info("the FTP daemon is not running: part 2, the server log, is skipped")
-elif admin.exists("accounts/" + FTP_ACCOUNT):
-    c.check("no %s account exists yet" % FTP_ACCOUNT, False, "remove it first; this check will not touch it")
-else:
-    try:
-        c.check("set up: an account to log in as", admin.post("accounts", account_body(FTP_ACCOUNT, "1131")).status == 201)
-        ftp = ftplib.FTP()
-        ftp.connect(config["st_server"], ftp_port, timeout=15)
-        ftp.login(FTP_ACCOUNT, PASSWORD)
-        ftp.quit()
-        refused = False
-        try:
-            ftp = ftplib.FTP()
-            ftp.connect(config["st_server"], ftp_port, timeout=15)
-            ftp.login(FTP_ACCOUNT, "not-the-password")
-        except ftplib.error_perm:
-            refused = True
-        c.check("the account logs in over FTP, and a wrong password is refused", refused)
+    c.info("the FTP daemon is not running: the legacy FTP part of part 2 is left out")
+created = []
+try:
+    for number, proto in enumerate(usable):
+        spec = PROTOCOLS[proto]
+        label = proto + (" (legacy)" if proto == "FTP" else "") + ": "
+        account = "example_log_%s_%s" % (proto.lower(), RUN)
+        uid = str(random.randint(50000, 58000))
+        comp = spec["component"]
+        if proto == "FTP":
+            c.info("--- FTP: the legacy protocol, as an additional part")
+        made = admin.post("accounts", account_body(account, uid))
+        created.append(account)
+        c.check(label + "set up: an account to log in as (fresh name and uid)", made.status == 201, made.text[:200])
+        since_before = time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(time.time() - 600))
+        failures_before = admin.get("logs/server", params={"fromDate": since_before, "component": comp, "message": spec["fail"] % account if spec["fail_names_account"] else spec["fail"], "limit": 1}).json()["resultSet"]["totalCount"]
+        got = logins.try_login(proto, account)
+        c.check(label + "the account logs in", got == "ok", got)
+        got = logins.try_login(proto, account, "not-the-password")
+        c.check(label + "and a wrong password is refused", got.startswith("refused"), got)
         time.sleep(3)
+        fail_msg = spec["fail"] % account if spec["fail_names_account"] else spec["fail"]
+        ok_msg = spec["ok"] % account
         with runner.real_credentials(ADMIN_TREE, config):
-            out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", FTP_ACCOUNT, "FTPD"])
-            c.check("28/01 finds the login in the server log, by message, component and date",
-                    re.search(r"INFO  ftpd  .*virtual user %s logged in from" % FTP_ACCOUNT, out) is not None, out[-600:])
-            c.check("28/01 and the failed one as a warning", re.search(r"WARN  ftpd  .*Failed login for user %s from" % FTP_ACCOUNT, out) is not None, out[-600:])
-            out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", FTP_ACCOUNT, "FTPD", "WARN"])
-            part = out.split("The first 20 that match the filters")[-1]
-            c.check("28/01 with the level WARN only the failed login is left",
-                    "Failed login for user %s" % FTP_ACCOUNT in part and "logged in from" not in part, part)
-            out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", FTP_ACCOUNT, "FTPD,HTTPD", "INFO,WARN"])
-            c.check("28/01 two components and two levels are separate parameters, and both levels come back",
-                    "INFO  ftpd" in out and "WARN  ftpd" in out, out[-600:])
-            out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", FTP_ACCOUNT.upper(), "FTPD"])
-            c.check("28/01 the message is matched with case: the upper case name finds nothing", "logged in from" not in out, out[-400:])
-            script("28.ServerLogs", "01.logs_server_GET.sh", ["60", "", "ftpd"], expect_rc=2)
-            script("28.ServerLogs", "01.logs_server_GET.sh", ["60", "", "FTPD", "loud"], expect_rc=2)
+            out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", account, comp])
+            c.check(label + "28/01 finds the login in the server log, by message, component and date",
+                    re.search(spec["ok_re"] % re.escape(account), out) is not None, out[-600:])
+            if spec["fail_names_account"]:
+                c.check(label + "28/01 and the failed login, as %s, by the account's name" % spec["fail_level"],
+                        re.search(spec["fail_re"] % re.escape(account), out) is not None, out[-600:])
+            else:
+                c.check(label + "28/01 the account's name is not in a failed login's entry: it is not found by it", re.search(spec["fail_re"], out) is None, out[-600:])
+                out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", fail_msg, comp, "INFO"])
+                after = admin.get("logs/server", params={"fromDate": since_before, "component": comp, "message": fail_msg, "limit": 1}).json()["resultSet"]["totalCount"]
+                c.check(label + "28/01 the failed login is found by its message, an INFO, with no account in it: one more than before",
+                        re.search(spec["fail_re"], out) is not None and after == failures_before + 1, (failures_before, after, out[-400:]))
+            if spec["fail_names_account"]:
+                out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", fail_msg, comp, spec["fail_level"]])
+                part = out.split("The first 20 that match the filters")[-1]
+                c.check(label + "28/01 with the level %s the failed login is found, and not the login" % spec["fail_level"],
+                        re.search(spec["fail_re"] % re.escape(account), part) is not None and ok_msg not in part, part)
+            if spec["fail_level"] == "INFO":
+                out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", account, comp, "WARN"])
+                part = out.split("The first 20 that match the filters")[-1]
+                c.check(label + "28/01 a failed %s login is NOT a warning: with the level WARN the login and the failure are both missing" % proto,
+                        ok_msg not in part and "login failed" not in part, part)
+                if proto == "HTTP":
+                    c.check(label + "28/01 the only WARN with the account's name is the missing-email notice, which is no failure",
+                            "WARN  httpd  " in part and "virtual user %s does not have email associated" % account in part, part)
+            out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", account, comp + ",TM", "INFO,WARN"])
+            c.check(label + "28/01 two components and two levels are separate parameters: this component and tm both come back",
+                    ("INFO  %s" % spec["token"]) in out and "INFO  tm" in out, out[-600:])
+            out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", account.upper(), comp])
+            c.check(label + "28/01 the message is matched with case: the upper case name finds nothing", ok_msg.replace(account, account.upper()) not in out and ok_msg not in out, out[-400:])
+            script("28.ServerLogs", "01.logs_server_GET.sh", ["60", "", comp.lower()], expect_rc=2)
+            script("28.ServerLogs", "01.logs_server_GET.sh", ["60", "", comp, "loud"], expect_rc=2)
 
             since = time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(time.time() - 600))
-            everything = admin.get("logs/server", params={"fromDate": since, "component": "FTPD", "limit": 1}).json()["resultSet"]["totalCount"]
-            ignored = admin.get("logs/server", params={"fromDate": since, "component": "FTPD", "accountName": "no_such_account_%s" % RUN, "limit": 1}).json()["resultSet"]["totalCount"]
-            c.check("the accountName= filter is ignored by the server: any account name answers every entry", everything > 0 and ignored == everything, (everything, ignored))
+            if number == 0:
+                everything = admin.get("logs/server", params={"fromDate": since, "component": comp, "limit": 1}).json()["resultSet"]["totalCount"]
+                ignored = admin.get("logs/server", params={"fromDate": since, "component": comp, "accountName": "no_such_account_%s" % RUN, "limit": 1}).json()["resultSet"]["totalCount"]
+                c.check("the accountName= filter is ignored by the server: any account name answers every entry", everything > 0 and ignored == everything, (everything, ignored))
 
-            found = admin.get("logs/server", params={"fromDate": since, "component": "FTPD", "message": "virtual user %s logged in" % FTP_ACCOUNT, "limit": 5}).json()["result"]
+            found = admin.get("logs/server", params={"fromDate": since, "component": comp, "message": ok_msg, "limit": 5}).json()["result"]
             if found:
                 out = script("28.ServerLogs", "02.logs_server_id_GET.sh", [found[0]["id"]["urlrepresentation"]])
-                c.check("28/02 reads that entry by its id", "  INFO  ftpd  thread" in out and "virtual user %s logged in" % FTP_ACCOUNT in out, out[-500:])
+                c.check(label + "28/02 reads that entry by its id", "  INFO  %s  thread" % spec["token"] in out and ok_msg in out, out[-500:])
             else:
-                c.check("the login entry can be found through the API", False, since)
+                c.check(label + "the login entry can be found through the API", False, since)
             script("28.ServerLogs", "02.logs_server_id_GET.sh", ["not-base64"], expect_rc=1)
-            out = script("28.ServerLogs", "02.logs_server_id_GET.sh")
-            c.check("28/02 with no id it reads the newest entry (the log is oldest first)", "  written by " in out, out[-300:])
+            if number == 0:
+                out = script("28.ServerLogs", "02.logs_server_id_GET.sh")
+                c.check("28/02 with no id it reads the newest entry (the log is oldest first)", "  written by " in out, out[-300:])
 
-            target = os.path.join(WORK, "server.csv")
-            script("28.ServerLogs", "03.logs_server_GET_csv.sh", [target, "10", "FTPD"])
+            target = os.path.join(WORK, "server_%s.csv" % proto.lower())
+            script("28.ServerLogs", "03.logs_server_GET_csv.sh", [target, "10", comp])
             with open(target, newline="") as f:
                 table = list(csv.reader(f, skipinitialspace=True))
             header = table[0]
             messages = [r[header.index("Message")] for r in table[1:] if len(r) == len(header)]
-            c.check("28/03 the CSV has the header and the login, and only FTPD lines",
-                    header[:5] == ["Time", "Level", "Component", "Thread", "Message"] and any("virtual user %s logged in" % FTP_ACCOUNT in m for m in messages)
-                    and {r[header.index("Component")] for r in table[1:] if len(r) == len(header)} == {"FTPD"}, (header[:5], len(messages)))
-            script("28.ServerLogs", "03.logs_server_GET_csv.sh", [target, "0"], expect_rc=2)
-    finally:
-        admin.delete("accounts/" + FTP_ACCOUNT)
+            c.check(label + "28/03 the CSV has the header and the login, and only %s lines" % comp,
+                    header[:5] == ["Time", "Level", "Component", "Thread", "Message"] and any(ok_msg in m for m in messages)
+                    and {r[header.index("Component")] for r in table[1:] if len(r) == len(header)} == {comp}, (header[:5], len(messages)))
+            if number == 0:
+                script("28.ServerLogs", "03.logs_server_GET_csv.sh", [target, "0"], expect_rc=2)
+finally:
+    logins.cleanup()
+    for account in created:
+        admin.delete("accounts/" + account)
 
 # ---------------------------------------------------------------- 3. the transfer log
 ACCOUNT, SITE = "example_log_tl", "example_log_site"
@@ -247,7 +315,12 @@ else:
             c.check("16/05 an index nobody used is not an error: all counts are 0", "  0 file(s): 0 pulled, 0 failed, 0 to retry, 0 in progress, 0 on hold" in out, out[-300:])
             script("16.TransferLogs", "05.logs_transfers_pullSummary_GET.sh", expect_rc=2)
 
-            entries = [x for x in admin.get("logs/transfers", params={"account": ACCOUNT, "limit": 50}).json()["result"] if x["filename"] == FILE_NAME]
+            entries = []
+            for _ in range(15):   # the transfer log is written a little after the transfer ends: wait for the three entries
+                entries = [x for x in admin.get("logs/transfers", params={"account": ACCOUNT, "limit": 50, "sortByStartTime": "descending"}).json()["result"] if x["filename"] == FILE_NAME]
+                if len(entries) >= 3:
+                    break
+                time.sleep(2)
             pull = next((x for x in entries if x.get("serverInitiated")), None)
             upload_entry = next((x for x in entries if x["protocol"] == "http"), None)
             c.check("the log holds the upload, the file served over SSH, and the pull; only the pull carries the operation index",
@@ -290,7 +363,7 @@ else:
         admin.delete("accounts/" + ACCOUNT)
 
 c.check("nothing is left behind but log entries: no business unit, account or site",
-        not admin.exists("businessUnits/" + UNIT) and not admin.exists("accounts/" + FTP_ACCOUNT) and not admin.exists("accounts/" + ACCOUNT)
+        not admin.exists("businessUnits/" + UNIT) and not any(admin.exists("accounts/" + a) for a in created) and not admin.exists("accounts/" + ACCOUNT)
         and not (admin.get("sites", params={"name": SITE}).json().get("result")))
 admin.logout()
 sys.exit(c.done())

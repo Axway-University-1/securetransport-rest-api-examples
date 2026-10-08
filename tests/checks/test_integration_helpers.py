@@ -145,6 +145,51 @@ check("and 54.sites_scripts.py names each one it is said to run", all(os.path.ba
       [f for f in BY_54 if os.path.basename(f) not in text_54])
 
 print()
+print("=== protocol_logins: a login that cannot be tried is an error, never an ok ===")
+import shutil  # noqa: E402
+import socket  # noqa: E402
+import tempfile  # noqa: E402
+import protocol_logins  # noqa: E402
+closed = socket.socket()
+closed.bind(("127.0.0.1", 0))
+free_port = closed.getsockname()[1]
+closed.close()
+tried = protocol_logins.Logins("127.0.0.1", free_port, free_port, free_port, "x")
+try:
+    for proto in protocol_logins.PROTOCOLS:
+        got = tried.try_login(proto, "nobody")
+        check("%s to a closed port is not ok" % proto, got != "ok" and got.split(" ")[0] in ("error", "refused"), got)
+    check("SFTP to a closed port is an error, never a refusal (a dead SSH daemon must not pass a 'refused' check)",
+          tried.try_login("SFTP", "nobody").startswith("error"), tried.try_login("SFTP", "nobody"))
+    for proto in ("HTTP", "FTP"):
+        check("%s to a closed port is an error, not a refusal" % proto, tried.try_login(proto, "nobody").startswith("error"), tried.try_login(proto, "nobody"))
+    quoted = protocol_logins.Logins("127.0.0.1", free_port, free_port, free_port, "x")
+    try:
+        import subprocess  # noqa: E402
+        for pw in ("it's", 'a"b$c`d\\e', "plain"):
+            printed = subprocess.run([quoted._askpass()], env=quoted._env(pw), capture_output=True, text=True).stdout
+            check("the askpass script prints the password exactly: %r" % pw, printed == pw + "\n", printed)
+    finally:
+        quoted.cleanup()
+    stubs = tempfile.mkdtemp(prefix="sftp_stub_")
+    old_path = os.environ["PATH"]
+    try:
+        for message, want in (("Permission denied (publickey,password).", "refused"), ("ssh: connect to host x port 22: Connection refused", "error"),
+                              ("Connection timed out", "error"), ("Could not resolve hostname x", "error")):
+            with open(os.path.join(stubs, "sftp"), "w") as f:
+                f.write("#!/bin/sh\ncat >/dev/null\necho '%s' >&2\nexit 255\n" % message)
+            os.chmod(os.path.join(stubs, "sftp"), 0o755)
+            os.environ["PATH"] = stubs + os.pathsep + old_path
+            got = tried.try_login("SFTP", "nobody")
+            check("sftp saying %r is %s" % (message[:30], want), got.startswith(want), got)
+    finally:
+        os.environ["PATH"] = old_path
+        shutil.rmtree(stubs, ignore_errors=True)
+    check("SFTP is core, FTP is the legacy one, listed last", protocol_logins.PROTOCOLS == ("SFTP", "HTTP", "FTP"))
+finally:
+    tried.cleanup()
+
+print()
 if failed:
     print("test_integration_helpers: FAIL (%d)" % failed)
     sys.exit(1)

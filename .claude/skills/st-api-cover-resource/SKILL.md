@@ -69,10 +69,11 @@ partly covered resources, and when a new release adds a tag or an operation, add
 **An open question:** for loginRestrictionPolicies no behaviour test was possible. On the lab
 a policy denying `*`, assigned to a business unit (and also tried with each of the two types, rules
 disabled, an expression, a network, a delay of two minutes), did not stop an account of that unit
-logging in over FTP (8021) or the EndUser API; SFTP login failed for other reasons. No server option
+logging in over SFTP, the EndUser API (HTTP) or FTP: check 46 measured all three on 2026-10-08, SFTP
+and HTTP being the core protocols and FTP the legacy one, each account getting in on every try for 20 seconds. No server option
 turns it on, and `isDefault` was not tried: it would apply to every account. If you learn what makes
 a policy take effect (perhaps the default policy, or a restart), put it in the set up of check 46, which
-already asserts the refusal and FAILS on that lab until then; check 45 covers the API and stays green.
+already asserts the refusal for each of the three protocols and FAILS on that lab (the three "THE POLICY ENFORCES" checks, nothing else) until then; check 45 covers the API and stays green.
 
 ## The procedure
 

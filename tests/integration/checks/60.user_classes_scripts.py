@@ -35,19 +35,16 @@ it made in a finally block and ends by comparing the whole list of classes (with
 VirtClass and RealClass, and their order) with the one saved before.
 """
 import base64
-import ftplib
 import os
 import random
 import shutil
-import stat
-import subprocess
 import sys
-import tempfile
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
 import script_runner as runner  # noqa: E402
+import protocol_logins  # noqa: E402
 
 config = st_client.load_config()
 if not config:
@@ -141,65 +138,11 @@ def sessions():
     return response.json() if response.status == 200 and isinstance(response.json(), list) else []
 
 
-PROTOCOLS = ("SFTP", "HTTP", "FTP")   # FTP is the legacy one, kept as an additional, labelled part
-SESSION_PROTOCOL = {"SFTP": "SSH", "HTTP": "HTTP", "FTP": "FTP"}
+PROTOCOLS = protocol_logins.PROTOCOLS               # SFTP, HTTP, then FTP, the legacy one, as a labelled additional part
+SESSION_PROTOCOL = protocol_logins.SESSION_PROTOCOL
 PROTO = "SFTP"
-SSH_PORT = ENDUSER_PORT = FTP_PORT = None
-WORK = tempfile.mkdtemp(prefix="userclasses_check_")
-
-
-class Holder:
-    """One open login: alive() says whether the client is still connected, close() ends it."""
-
-    def __init__(self, alive, close):
-        self.alive, self.close = alive, close
-
-
-def open_login(proto, account):
-    """Log in over the protocol and keep the connection open; return its Holder. Logins only: no file is sent."""
-    if proto == "FTP":
-        client = ftplib.FTP()
-        client.connect(HOST, FTP_PORT, timeout=30)
-        client.login(account, PASSWORD)
-
-        def alive():
-            try:
-                client.voidcmd("NOOP")
-                return True
-            except (OSError, EOFError, ftplib.Error):
-                return False
-        return Holder(alive, client.close)
-    if proto == "HTTP":
-        client = st_client.EndUserClient(HOST, ENDUSER_PORT, account, PASSWORD)
-        login = client._request("POST", "myself", headers={"Authorization": "Basic " + client._auth})
-        if login.status != 200:
-            raise st_client.STError("EndUser login of %s answered %s" % (account, login.status))
-        return Holder(lambda: client._request("GET", "myself").status == 200, lambda: client.logout())
-    askpass = os.path.join(WORK, "askpass.sh")
-    if not os.path.exists(askpass):
-        with open(askpass, "w") as f:
-            f.write("#!/bin/sh\necho '%s'\n" % PASSWORD)
-        os.chmod(askpass, stat.S_IRWXU)
-    # a real SFTP client, kept open by its standard input, the password given by SSH_ASKPASS (no terminal, no extra module)
-    proc = subprocess.Popen(["sftp", "-P", str(SSH_PORT), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-                             "-o", "PreferredAuthentications=password", "-o", "NumberOfPasswordPrompts=1", "%s@%s" % (account, HOST)],
-                            env=dict(os.environ, SSH_ASKPASS=askpass, SSH_ASKPASS_REQUIRE="force", DISPLAY="x"),
-                            stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-    open_procs.append(proc)
-
-    def close():
-        try:
-            proc.stdin.close()
-        except OSError:
-            pass
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.terminate()
-    return Holder(lambda: proc.poll() is None, close)
-
-
-open_procs = []
+ENDUSER_PORT = None
+logins = None                                       # the shared protocol_logins.Logins, made once the ports are known
 
 
 def login(account, hold=False, proto=None):
@@ -207,7 +150,7 @@ def login(account, hold=False, proto=None):
     login is closed). The session is the one whose id was not there before: the list is unstable and a closed session lingers."""
     proto = proto or PROTO
     before = {s["id"] for s in sessions() if s["userName"] == account}
-    holder = open_login(proto, account)
+    holder = logins.open_login(proto, account)
     found = []
 
     def seen():
@@ -280,6 +223,7 @@ if missing:
     admin.logout()
     sys.exit(c.done())
 
+logins = protocol_logins.Logins(HOST, SSH_PORT, ENDUSER_PORT, FTP_PORT, PASSWORD)
 saved = {k["id"]: k for k in classes()}
 c.check("set up: the server has VirtClass and RealClass, and they are saved to compare with at the end",
         all(any(k["className"] == b for k in saved.values()) for b in BUILTIN), sorted(k["className"] for k in saved.values()))
@@ -559,15 +503,12 @@ try:
         admin.delete("userClasses/" + find("example_expr")["id"])
         c.check("deleting it puts the order of VirtClass and RealClass back", wait_until(lambda: names_by_order() == ["VirtClass", "RealClass"]), names_by_order())
 finally:
-    for proc in open_procs:
-        if proc.poll() is None:
-            proc.terminate()
-    shutil.rmtree(WORK, ignore_errors=True)
     for client in open_clients:
         try:
             client.close()
         except Exception:
             pass
+    logins.cleanup()
     for k in classes():
         if k["className"] in tracked or k["className"].lower().startswith("example_"):
             admin.delete("userClasses/" + k["id"])

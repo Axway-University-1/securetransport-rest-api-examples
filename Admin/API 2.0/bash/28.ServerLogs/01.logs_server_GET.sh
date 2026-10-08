@@ -34,6 +34,13 @@
 # - Confirmed directly: message= is a part of the message, with case; * is not a wildcard.
 # - Confirmed directly: accountName= is IGNORED: any value answers every entry. Search the
 #   message for the account name instead.
+# - Confirmed directly (5.5-20260924): what a login writes depends on the protocol. SFTP: component SSHD, INFO
+#   "User NAME login success." and, for a wrong password, INFO (not WARN) "User NAME login failed.". HTTP (EndUser
+#   API): component HTTPD, INFO "User NAME login success."; a failed login names NO account: INFO "Denying access to
+#   unknown user from address ADDRESS" (also for a known account with a wrong password), so search for that text; an
+#   HTTP login also WARNs "virtual user NAME does not have email associated", which is not a failure. FTP: component
+#   FTPD, INFO "virtual user NAME logged in from" and WARN "Failed login for user NAME from". Component TM also
+#   writes INFO "User with login name 'NAME' ... successfully authenticated over SSH, HTTP or FTP".
 # - Requires `jq`, which prints one entry per line.
 # ==============================================================================
 
