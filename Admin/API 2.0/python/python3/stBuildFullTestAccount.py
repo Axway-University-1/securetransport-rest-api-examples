@@ -145,7 +145,7 @@ def stCreateAccount(token):
                 "name": accName,
                 "homeFolder": homeFolder,
                 "user": { "name": accName,
-                          "passwordCredentials": {"password": "axway"}
+                          "passwordCredentials": {"password": "change_me"}
                         }
               }
 
@@ -183,10 +183,10 @@ def stImportKey(token):
 
     jsonIn = {"name": "PrivateSSHKey",
             "subject": "C=US,CN=sshKey",
-            "caPassword": "Axway123",
+            "caPassword": "change_me",
             "account" : accName,
             "type" : "ssh",
-            "password": "12345678",
+            "password": "change_me",
             "usage": "private",
             "keySize": "2048",
             "validityPeriod": "720"
@@ -349,7 +349,7 @@ def stCreateSiteSFTP(keyId,token):
               "host": "<SERVER>",
               "port": "22",
               "userName": "stapp",
-              "password": "Alfisreal132$",
+              "password": "change_me",
               "usePassword": True
               }
     # Use this to add Key based access

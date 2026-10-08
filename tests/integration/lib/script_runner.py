@@ -8,9 +8,12 @@ script's own directory, picking up credentials from set_variables.local.sh.
 A bug in the curl invocation itself - bad quoting, a stale field name, a
 broken jq filter - is what this catches that a reimplemented client cannot.
 """
+import atexit
 import contextlib
 import os
 import re
+import shutil
+import signal
 import subprocess
 
 REPO_ROOT = os.path.abspath(
@@ -22,6 +25,40 @@ def path(*parts):
     return os.path.join(REPO_ROOT, *parts)
 
 
+def _restore_config_file(target, backup_file, existed):
+    """Restore a config file from disk backup, or remove it if it didn't exist."""
+    try:
+        if existed and os.path.exists(backup_file):
+            shutil.copy(backup_file, target)
+            os.remove(backup_file)
+        elif not existed and os.path.exists(target):
+            os.remove(target)
+    except OSError:
+        pass
+
+
+def _restore_all_backups():
+    """Restore any stale config file backups from a previous run that was killed."""
+    backup_dir = os.path.join(REPO_ROOT, "tests", ".harness_backups")
+    if not os.path.isdir(backup_dir):
+        return
+    for backup_file in os.listdir(backup_dir):
+        if backup_file.endswith(".backup"):
+            try:
+                with open(os.path.join(backup_dir, backup_file), "r") as f:
+                    meta = f.readline().rstrip()  # "EXISTED:TARGET"
+                if ":" in meta:
+                    existed, target = meta.split(":", 1)
+                    existed = existed == "1"
+                    backup_path = os.path.join(backup_dir, backup_file)
+                    _restore_config_file(target, backup_path, existed)
+            except OSError:
+                pass
+
+
+_restore_all_backups()
+
+
 @contextlib.contextmanager
 def real_credentials(tree_dir, config):
     """
@@ -29,13 +66,24 @@ def real_credentials(tree_dir, config):
     credentials from config, so the scripts in that tree pick them up exactly
     as they would for a person who has configured them by hand.
 
-    Backs up and restores whatever was already there - including nothing at
-    all - so this never overwrites a real working configuration, whether that
-    belongs to you or to whoever runs this next.
+    Backs up to disk (not just memory) and restores whatever was already there -
+    including nothing at all - so this never overwrites a real working
+    configuration, even if the process is killed.
     """
     target = os.path.join(tree_dir, "set_variables.local.sh")
     existed = os.path.exists(target)
-    backup = open(target).read() if existed else None
+    backup_dir = os.path.join(REPO_ROOT, "tests", ".harness_backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    backup_file = os.path.join(backup_dir, os.path.basename(target) + ".backup")
+
+    if existed:
+        shutil.copy(target, backup_file)
+        with open(backup_file + ".meta", "w") as f:
+            f.write("1:%s" % target)
+    else:
+        with open(backup_file + ".meta", "w") as f:
+            f.write("0:%s" % target)
 
     content = (
         "#!/bin/bash\n"
@@ -50,14 +98,22 @@ def real_credentials(tree_dir, config):
     with open(target, "w") as f:
         f.write(content)
 
+    def cleanup_credentials():
+        _restore_config_file(target, backup_file, existed)
+        try:
+            os.remove(backup_file + ".meta")
+        except OSError:
+            pass
+
+    # Register cleanup for normal exit, SIGTERM, and SIGINT
+    atexit.register(cleanup_credentials)
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, lambda s, f: (cleanup_credentials(), exit(128 + sig)))
+
     try:
         yield
     finally:
-        if existed:
-            with open(target, "w") as f:
-                f.write(backup)
-        else:
-            os.remove(target)
+        cleanup_credentials()
 
 
 def run(script_path, args=None, timeout=60):
@@ -104,12 +160,22 @@ def real_credentials_python(tree_dir, config):
     read st_server/st_port/st_user/st_password (and optionally
     st_edge_server, only stGraceful.py uses it) from a file named 'config'
     one directory above themselves - not set_variables.local.sh. Backs up
-    and restores whatever was already there, including nothing at all, the
-    same way real_credentials() does.
+    to disk and restores whatever was already there, including nothing at all.
     """
     target = os.path.join(tree_dir, "config")
     existed = os.path.exists(target)
-    backup = open(target).read() if existed else None
+    backup_dir = os.path.join(REPO_ROOT, "tests", ".harness_backups")
+    os.makedirs(backup_dir, exist_ok=True)
+
+    backup_file = os.path.join(backup_dir, "python_config.backup")
+
+    if existed:
+        shutil.copy(target, backup_file)
+        with open(backup_file + ".meta", "w") as f:
+            f.write("1:%s" % target)
+    else:
+        with open(backup_file + ".meta", "w") as f:
+            f.write("0:%s" % target)
 
     lines = [
         'st_server="%s"' % config["st_server"],
@@ -123,14 +189,19 @@ def real_credentials_python(tree_dir, config):
     with open(target, "w") as f:
         f.write("\n".join(lines) + "\n")
 
+    def cleanup_python_config():
+        _restore_config_file(target, backup_file, existed)
+        try:
+            os.remove(backup_file + ".meta")
+        except OSError:
+            pass
+
+    atexit.register(cleanup_python_config)
+
     try:
         yield
     finally:
-        if existed:
-            with open(target, "w") as f:
-                f.write(backup)
-        else:
-            os.remove(target)
+        cleanup_python_config()
 
 
 def run_python(script_path, args=None, timeout=60):

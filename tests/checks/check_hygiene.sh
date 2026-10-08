@@ -37,9 +37,13 @@ fi
 # Plaintext credential assignments outside the example config files
 HITS=$(scan_scripts | xargs -0 grep -nE '(ADMIN_PWD|ADMIN_USER|ST_PASSWORD|ST_USER)=("?[A-Za-z0-9])' 2>/dev/null \
        | grep -v "local.example" | grep -v "^${CRED_EXEMPT}:" | grep -v '%ST_\|${ST_')
-if [ -n "${HITS}" ]; then
+# Also check Python files for password literals
+HITS_PY=$(git ls-files -z | tr '\0' '\n' | grep -iE '\.py$' | xargs -0 grep -nE '"password"\s*:\s*"[^"]*"' 2>/dev/null \
+       | grep -v "change_me" | grep -v "local.example")
+if [ -n "${HITS}" ] || [ -n "${HITS_PY}" ]; then
     fail "plaintext credentials in a script"
-    echo "${HITS}" | sed 's/^/        /'
+    [ -n "${HITS}" ] && echo "${HITS}" | sed 's/^/        /'
+    [ -n "${HITS_PY}" ] && echo "${HITS_PY}" | sed 's/^/        /'
 else
     pass "no plaintext credentials in scripts"
 fi
