@@ -93,7 +93,7 @@ def stExportCert(apiCounter, certId, pkeyfile):
         writeLog('Timeout Error:' + str(et),'FATAL')
         sys.exit(1)
     except requests.exceptions.RequestException as e:
-        writeLog('Unknown Error:' + str(et),'FATAL')
+        writeLog('Unknown Error:' + str(e),'FATAL')
         sys.exit(1)
     else:
         apiCounter.value+=1
@@ -190,13 +190,13 @@ def stLogout():
         response = sessionMgt.delete(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
         writeLog('I cannot connect to ' + stUrl, 'FATAL')
-        writeLog(ec,'FATAL')
+        writeLog(str(ec),'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         writeLog('HTTP Error','FATAL')
         raise SystemExit(eh)
     except requests.exceptions.Timeout as et:
-        writeLog('Timeout Error:' + str(e),'FATAL')
+        writeLog('Timeout Error:' + str(et),'FATAL')
         raise SystemExit(et)
     except requests.exceptions.RequestException as e:
         raise SystemExit(e)

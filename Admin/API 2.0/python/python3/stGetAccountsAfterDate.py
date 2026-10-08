@@ -37,6 +37,12 @@
 #
 # This is the ST /myself DELETE method
 
+def writeLog(logString, severity):
+    # No log file in this example: the message goes to the screen. print only,
+    # because this can run in a worker process that has not imported sys
+    print(severity + ' ' + logString)
+
+
 def stLogout(session):
 
     url = stUrl + 'myself'
@@ -141,6 +147,7 @@ def stGetAccounts(stUrl, session, count, fromDate):
             sys.exit(1)
         except requests.exceptions.Timeout as et:
             writeLog('Timeout Error:' + str(et),'FATAL')
+            sys.exit(1)
         except requests.exceptions.RequestException as e:
             sys.exit(1)
         else:

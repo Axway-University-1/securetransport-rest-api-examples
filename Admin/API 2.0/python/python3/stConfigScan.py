@@ -191,13 +191,13 @@ def stLogout(session, token):
         response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
     except requests.ConnectionError as ec:
         writeLog('I cannot connect to ' + stUrl,'FATAL')
-        writeLog(ec, 'FATAL')
+        writeLog(str(ec), 'FATAL')
         sys.exit(1)
     except requests.exceptions.HTTPError as eh:
         writeLog('HTTP Error','FATAL')
         raise SystemExit(eh)
     except requests.exceptions.Timeout as et:
-        writeLog('Timeout Error:' + str(e),'FATAL')
+        writeLog('Timeout Error:' + str(et),'FATAL')
     except requests.exceptions.RequestException as e:
         raise SystemExit(e)
     else:
