@@ -24,12 +24,14 @@ It implements the parts of the protocol that are easy to get wrong:
 See .claude/skills/st-api-gotchas/SKILL.md for why each of those matters.
 """
 import base64
+import datetime
 import http.cookiejar
 import json
 import os
 import re
 import ssl
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -521,6 +523,26 @@ def server_release_at_least(client, release):
     """release_at_least() for the server client is connected to."""
     return release_at_least((client.get("version").json() or {}).get("version"), release)
 
+
+
+def seconds_to_wait_for_midnight(now, margin=90):
+    """
+    How long to wait so that a check which compares days is not split by midnight:
+    the check lists the days first, and the script it runs lists them again a moment
+    later, and across midnight the two lists differ. Zero unless midnight is less
+    than `margin` seconds away, when it is the time left plus a few seconds.
+    """
+    midnight = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    left = (midnight - now).total_seconds()
+    return left + 5 if left < margin else 0
+
+
+def avoid_midnight(margin=90):
+    """Wait out midnight, if it is closer than `margin` seconds, before a check that compares days."""
+    wait = seconds_to_wait_for_midnight(datetime.datetime.now(), margin)
+    if wait:
+        print("  ..    midnight is close: waiting %d s for it to pass, so that no day changes during this check" % wait)
+        time.sleep(wait)
 
 def skip(reason):
     """Exit cleanly, so a missing server is a skip and not a failure."""

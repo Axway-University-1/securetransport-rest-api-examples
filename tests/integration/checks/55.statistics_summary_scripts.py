@@ -26,6 +26,10 @@ The server's transfer log keeps the account's four entries (the upload, two down
 keeps the account's name: neither can be removed. Needs --write and st_allow_writes="yes".
 Refuses to start when example_stat_user exists. Counts of other transfers on the server
 are read as they are, so a busy lab can make the exact-count checks fail: run it again.
+
+It takes the date of the machine it runs on as the date of the server, so the two must be in
+the same time zone; and it waits out midnight (st_client.avoid_midnight) so the day does not
+change under it.
 """
 import base64
 import datetime
@@ -143,6 +147,7 @@ if admin.exists("accounts/" + USER):
     admin.logout()
     sys.exit(c.done())
 
+st_client.avoid_midnight()
 saved_auth = admin.get("configurations/options/" + AUTH_OPTION).json()
 enduser = None
 try:

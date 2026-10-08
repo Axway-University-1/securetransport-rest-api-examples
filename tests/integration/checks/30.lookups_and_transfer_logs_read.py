@@ -102,6 +102,7 @@ def billable_count(day, account=None):
 
 def check_daily_counts(label, run_script, days, account=None):
     """Run a per-day billable report, and compare each day with the API."""
+    st_client.avoid_midnight()
     today = datetime.date.today()
     window = [today - datetime.timedelta(days=n) for n in range(days - 1, -1, -1)]
     before = [billable_count(d, account) for d in window]

@@ -431,6 +431,21 @@ finally:
     mock.terminate()
     mock.wait(timeout=10)
 check(".gitignore covers the name substituted copies a killed check leaves", ".zztest_*" in open(os.path.join(REPO, ".gitignore")).read())
+
+print("=== a check that compares days waits out midnight ===")
+import datetime as _datetime  # noqa: E402
+D = _datetime.datetime
+wait = st_client.seconds_to_wait_for_midnight
+check("at noon it does not wait", wait(D(2026, 10, 8, 12, 0, 0)) == 0)
+check("two minutes before midnight it does not wait", wait(D(2026, 10, 8, 23, 58, 0)) == 0)
+check("a minute before midnight it waits for it, and a few seconds more", wait(D(2026, 10, 8, 23, 59, 0)) == 65, wait(D(2026, 10, 8, 23, 59, 0)))
+check("a second before midnight it waits 6 seconds", wait(D(2026, 10, 8, 23, 59, 59)) == 6, wait(D(2026, 10, 8, 23, 59, 59)))
+check("just after midnight it does not wait", wait(D(2026, 10, 9, 0, 0, 3)) == 0)
+check("the last day of a month and of a year are no different",
+      wait(D(2026, 12, 31, 23, 59, 30)) == 35 and wait(D(2026, 2, 28, 23, 59, 30)) == 35)
+check("the two checks that compare days call it",
+      all("avoid_midnight" in open(os.path.join(REPO, "tests", "integration", "checks", f)).read()
+          for f in ("30.lookups_and_transfer_logs_read.py", "55.statistics_summary_scripts.py")))
 print()
 if failed:
     print("test_integration_helpers: FAIL (%d)" % failed)
