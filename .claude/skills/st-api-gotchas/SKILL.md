@@ -860,6 +860,38 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
     record length announced twice different). Check 59 cuts the connection after every pull; do the same (or wait for it to close)
     before believing a test of a changed profile.
 
+- **User classes** (`/userClasses`; examples `36.UserClasses`, check 60): a class is the rule that decides which class an account
+  is in when it LOGS IN; the class of a login is the `userClass` of its session (`GET /sessions?fields=userName,userClass`), and it is the same over SFTP (SSH session), the EndUser API (HTTP session) and FTP: every behaviour below (match, disabled, expression, userName, userType, address, rename, order, delete with a session open) was repeated over all three in check 60 and none differed; and
+  the next login after any change is already in the new state (a session that is open keeps the class it had, even a deleted one's
+  name, and keeps working). The server tries the classes in `order` and the first ENABLED one that fits wins; fitting means
+  `userType` (`*`, `real` or `virtual`; a local account is virtual), `userName` (a pattern with `*`, case sensitive: `example_*`,
+  `*_ab12`), `group`, `address` (the client's address, exact or ending in `*`) and an `expression`. VirtClass and RealClass fit
+  every login of their type, so a class of your own only ever wins by being tried first, and **a new class is put FIRST** (a POST's
+  `order` is ignored), VirtClass and RealClass moving to 2 and 3 (they move back when it is deleted); an enabled class with a
+  `userName` of `*` would take every login on the server, so give a throwaway class the exact name of a throwaway account and
+  create it disabled. `order` of a PUT or PATCH moves a class and shifts the others (0 or 1 first; past the last, or negative, is
+  400 "Order is not valid."). **The list is not in the order of `order`**: sort it. Required in a POST: `className`, `userType`,
+  `userName`, `group`, `address` (the 400 lists each missing one); the reference's text says `host`, the field is `address` (`host`
+  is 400 "Unsupported parameter"); `enabled` defaults to false and `expression` to the empty text. Names are case sensitive (two
+  classes `x` and `X`), a space is 400, 33 characters are accepted (the reference says 32), a duplicate is 409. **The expression is
+  checked when saved**, 400 "expression X is not valid.", but it is the server's own dialect, not the `${...}` of a route: `==`, `&&`,
+  `||`, `!`, `gt` and a method on a string literal are refused; `true`, `false`, `and`, `or`, `>`, `isset("A") ? a : b`,
+  `memberof("CN=..",LDAP_DIR_memberOf$collection)` and any bare name or `user.name.startsWith("a")` are accepted (syntax only: an
+  unknown name is not an error). On a login `true`, `1 > 0` and `true or false` match; `false`, `2 > 3`, `not true`, a bare name and
+  every attribute test do not, because a local account has no directory attributes (its `additionalAttributes` are not seen). So
+  membership by an LDAP attribute was **never seen**: it needs a login through a directory. PUT replaces the whole class: the five
+  required fields alone answer 204 and reset `expression` to the empty text and `enabled` to false (`order` is kept); an `id` in the
+  body is ignored. PATCH: `replace` works on every field, `remove` of `/expression` gives the empty text, `remove` of any other is 400,
+  `replace` of `/id` is 204 and does nothing, a path that does not exist is 400 `Missing field`, an empty patch is 204. **An unknown id
+  is 404 for GET and HEAD and 400 for PUT, PATCH and DELETE** ("User Class with ID X does not exist."); the NAME is not an id. The
+  `className=` filter ignores case and takes `*` (pick the exact name yourself), the other filters are exact (`userName=nobody*`
+  finds only a class whose text IS `nobody*`), `enabled=` takes true or false and anything else means false, `userType=*` finds the
+  class typed `*` only, `limit=0` lists all, negative or text is 400. **A delete is never refused**: not for a class with a session
+  open in it, and not for one a template account names. **A template account's `templateClass` is not looked up**: a class that does
+  not exist is 201, a deleted class's name stays in the template, and it is only readable with `type=template`
+  (`GET /accounts/X?type=template&fields=templateClass`; without the type, 400 "Field templateClass does not exist."). A template
+  with no `templateClass` is 400. The session list keeps a just closed session for a moment, so to read the class of a login, take
+  the session whose id was not there before it (check 60 does).
 - **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
   the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
   An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST
@@ -976,6 +1008,8 @@ documented pairing first, but confirm the end user port rather than assume it,
 particularly against a server you did not configure yourself.
 
 ## Expression Language: which fields carry it, and how it is escaped
+
+A user class's `expression` is another dialect again (no `${}`, `and`/`or`, no `==`): see "User classes" under "The Admin API, against its own reference".
 
 See `Admin/API 2.0/bash/14.ExpressionLanguage/` and its python3 twin for
 worked, server-verified examples of everything below.

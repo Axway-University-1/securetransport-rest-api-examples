@@ -301,6 +301,7 @@ already exists.
 | 33. Statistics Summary | `/statisticsSummary`, the usage report: the transfers in and out for each day of a period, the users who have logged in, and a test of the connection to the Amplify Platform it is sent to (read only) | 3 | 3 |
 | 34. Transaction Manager | `/transactionManager`, the status of the Transaction Manager (read only), and `/transactionManager/operations`, the stop: server wide, no start to undo it, needs a confirmation word on the command line (disruptive, written from the reference and not run on a server) | 2 | 2 |
 | 35. Transfer Profiles | `/transferProfiles`, the PeSIT profiles of an account that say which file to send, what to call the file received and how it is labelled: list, create, HEAD, read, replace, patch and delete | 7 | 7 |
+| 36. User Classes | `/userClasses`, the classes that decide which class an account is in when it logs in (a user name pattern, a type, a membership expression, an order): list, create, HEAD, read, replace, patch and delete | 7 | 7 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same

@@ -2638,6 +2638,220 @@ for args in "" "example_acct"; do
 done
 
 echo
+echo "=== 36.UserClasses ==="
+F=36.UserClasses
+U="${BASE}/userClasses"
+ULOOK="${U}?className=example_userclass&fields=id,className"
+ONE_CLASS='{"resultSet":{"returnCount":1,"totalCount":1},"result":[{"id":"u1id","className":"example_userclass"}]}'
+# the name filter ignores case and takes a *, so other classes come back too: only the exact name counts
+LONGER_CLASS='{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"id":"u2id","className":"EXAMPLE_USERCLASS"},{"id":"u1id","className":"example_userclass"},{"id":"u3id","className":"example_userclass2"}]}'
+TWO_SAME_CLASS='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"id":"u1id","className":"example_userclass"},{"id":"u4id","className":"example_userclass"}]}'
+NO_CLASS='{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}'
+CLASS_FULL='{"id":"u1id","className":"example_userclass","userType":"*","userName":"example_nobody","group":"*","address":"*","expression":"true","enabled":true,"order":1}'
+CLASS_OFF='{"id":"u1id","className":"example_userclass","userType":"*","userName":"example_nobody","group":"*","address":"*","expression":"","enabled":false,"order":2}'
+# the server's list is not in the order of `order`: the script sorts
+CLASS_LIST='{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"id":"r1","className":"RealClass","userType":"real","userName":"*","group":"*","address":"*","expression":"","enabled":true,"order":3},{"id":"v1","className":"VirtClass","userType":"virtual","userName":"*","group":"*","address":"*","expression":"","enabled":true,"order":2},{"id":"u1id","className":"example_userclass","userType":"*","userName":"example_nobody","group":"*","address":"*","expression":"true","enabled":false,"order":1}]}'
+
+GET_BODY=$(body uc_list "${CLASS_LIST}")
+run "${F}/01.userClasses_GET.sh"
+expect "01 GET: the count, the classes, then only the enabled ones (limit=0 lists all)" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=id
+GET ${U}?className=*&limit=0
+GET ${U}?className=*&limit=0&enabled=true"
+has "01 GET: the first line is the class with order 1 though the server listed it last" "  1  example_userclass  *  user example_nobody  group *  address *  disabled  expression true"
+has "01 GET: then order 2" "  2  VirtClass  virtual  user *  group *  address *  enabled  expression -"
+expect "01 GET: the lines come in the order of order, not the server's order" "$(printf '%s\n' "${OUT}" | grep '^  [0-9]  ' | head -3 | awk '{print $2}' | tr '\n' ' ')" "example_userclass VirtClass RealClass "
+run "${F}/01.userClasses_GET.sh" "example*" real
+expect "01 GET: a type and a pattern go into the query" "$(calls | tail -2)" "GET ${U}?userType=real&className=example*&limit=0
+GET ${U}?userType=real&className=example*&limit=0&enabled=true"
+run "${F}/01.userClasses_GET.sh" "*" '*'
+expect "01 GET: the * type is sent as the type (it is not a wildcard)" "$(calls | sed -n 2p)" "GET ${U}?userType=*&className=*&limit=0"
+expect "01 GET: sends the Referer" "$(has_header 'Referer: THIS_IS_A_RANDOM_TEXT' | head -1)" "3"
+run "${F}/01.userClasses_GET.sh" "*" bogus
+expect "01 GET: a bad type, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=
+
+STATUS=201 LOCATION=newid run "${F}/02.userClasses_POST.sh"
+expect "02 POST: POST /userClasses" "${RC}:$(calls)" "0:POST ${U}"
+expect "02 POST: by default a DISABLED class of type * for example_nobody, group and address *, no expression" "$(payload 1 | jq -c .)" \
+  '{"className":"example_userclass","userType":"*","userName":"example_nobody","group":"*","address":"*","enabled":false}'
+has "02 POST: says what it creates" "Creating the user class example_userclass for the login names example_nobody..."
+has "02 POST: prints the code" "HTTP 201"
+has "02 POST: prints the address from Location" "It is at ${U}/newid"
+STATUS=201 run "${F}/02.userClasses_POST.sh" example_c 'example_a*' 'isset("x") ? true : false' true virtual
+expect "02 POST: the name, user name pattern, expression, enabled and type" "$(payload 1 | jq -c .)" \
+  '{"className":"example_c","userType":"virtual","userName":"example_a*","group":"*","address":"*","enabled":true,"expression":"isset(\"x\") ? true : false"}'
+STATUS=201 run "${F}/02.userClasses_POST.sh" 'example_q' 'a "b" \ c' 'x.equals("a\\b")'
+expect "02 POST: quotes and a backslash stay valid JSON (user name)" "$(payload 1 | jq -r .userName)" 'a "b" \ c'
+expect "02 POST: and in the expression" "$(payload 1 | jq -r .expression)" 'x.equals("a\\b")'
+STATUS=201 run "${F}/02.userClasses_POST.sh" example_c example_nobody none false '*'
+expect "02 POST: the word none leaves the expression out" "$(payload 1 | jq -c 'has("expression")')" "false"
+run "${F}/02.userClasses_POST.sh" example_c '*' none true
+expect "02 POST: an enabled class for every user name, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+has "02 POST: and says why" "Refused."
+STATUS=201 run "${F}/02.userClasses_POST.sh" example_c '*' none false
+expect "02 POST: a DISABLED class for * is allowed" "${RC}:$(payload 1 | jq -c '[.userName, .enabled]')" '0:["*",false]'
+for args in "a_b_c_d example_nobody none true bogus" "example_c example_nobody none maybe" "example_c example_nobody none True"; do
+    # shellcheck disable=SC2086
+    run "${F}/02.userClasses_POST.sh" ${args}
+    expect "02 POST: bad arguments (${args}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+run "${F}/02.userClasses_POST.sh" "a b"
+expect "02 POST: a name with a space, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+LONG_EXPRESSION=$(printf 'a%.0s' $(seq 1 1025))
+run "${F}/02.userClasses_POST.sh" example_c example_nobody "${LONG_EXPRESSION}"
+expect "02 POST: an expression over 1024 characters, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+POST_BODY=$(body uc_bad_expr '{"message":"Error validating request","validationErrors":["expression 1==1 is not valid."]}')
+STATUS=400 run "${F}/02.userClasses_POST.sh" example_c example_nobody "1==1"
+expect "02 POST: a refusal exits 1" "${RC}" "1"
+has "02 POST: and prints the server's reason" "expression 1==1 is not valid."
+POST_BODY=$(body uc_dup '{"message":"Error validating request","validationErrors":["User class with this name already exists."]}')
+STATUS=409 run "${F}/02.userClasses_POST.sh"
+expect "02 POST: a duplicate name, 409, exit 1" "${RC}" "1"
+has "02 POST: with the code" "HTTP 409"
+POST_BODY=
+STATUS=
+
+GET_BODY=$(body uc_one "${ONE_CLASS}")
+run "${F}/03.userClasses_id_HEAD.sh" example_userclass
+expect "03 HEAD: looks the id up by name, then HEADs the id" "${RC}:$(calls)" "0:GET ${ULOOK}
+HEAD ${U}/u1id"
+has "03 HEAD: says the class exists, with its id" "The user class example_userclass exists, id u1id."
+run "${F}/03.userClasses_id_HEAD.sh"
+expect "03 HEAD: example_userclass by default" "$(calls | head -1)" "GET ${ULOOK}"
+STATUS=404 run "${F}/03.userClasses_id_HEAD.sh" example_userclass
+expect "03 HEAD: 404 is 'does not exist', exit 1" "${RC}" "1"
+GET_BODY=$(body uc_longer "${LONGER_CLASS}")
+run "${F}/03.userClasses_id_HEAD.sh" example_userclass
+expect "03 HEAD: other names the filter matched are not counted, the exact one is used" "${RC}:$(calls | tail -1)" "0:HEAD ${U}/u1id"
+GET_BODY=$(body uc_same "${TWO_SAME_CLASS}")
+run "${F}/03.userClasses_id_HEAD.sh" example_userclass
+expect "03 HEAD: two classes of one name, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+GET_BODY=$(body uc_none "${NO_CLASS}")
+run "${F}/03.userClasses_id_HEAD.sh" example_userclass
+expect "03 HEAD: no such class, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+has "03 HEAD: and says how many were found" "Found 0 user classes named example_userclass"
+run "${F}/03.userClasses_id_HEAD.sh" "example class"
+expect "03 HEAD: a name with a space goes into the query for curl to encode" "$(calls)" "GET ${U}?className=example class&fields=id,className"
+
+SEQUENCE=$(sequence uc_get "${ONE_CLASS}" "${CLASS_FULL}" '{"className":"example_userclass","enabled":true}')
+run "${F}/04.userClasses_id_GET.sh" example_userclass
+expect "04 GET: looks the id up, reads the class, then reads only some fields" "${RC}:$(calls)" "0:GET ${ULOOK}
+GET ${U}/u1id
+GET ${U}/u1id?fields=className,enabled"
+has "04 GET: the order" "  order:      1"
+has "04 GET: the type" "  type:       *"
+has "04 GET: the user name" "  user name:  example_nobody"
+has "04 GET: enabled" "  enabled:    true"
+has "04 GET: the expression" "  expression: true"
+SEQUENCE=$(sequence uc_get_off "${ONE_CLASS}" "${CLASS_OFF}" '{}')
+run "${F}/04.userClasses_id_GET.sh" example_userclass
+has "04 GET: an empty expression prints as -" "  expression: -"
+has "04 GET: disabled" "  enabled:    false"
+SEQUENCE=$(sequence uc_get_unknown "${ONE_CLASS}" '{"message":"Error validating request","validationErrors":["User Class with ID \"u1id\" does not exist."]}')
+run "${F}/04.userClasses_id_GET.sh" example_userclass
+expect "04 GET: an answer with no id, exit 1" "${RC}" "1"
+SEQUENCE=
+
+SEQUENCE=$(sequence uc_put "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/05.userClasses_id_PUT.sh" example_userclass
+expect "05 PUT: looks the id up, reads the class, PUTs it" "${RC}:$(calls)" "0:GET ${ULOOK}
+GET ${U}/u1id
+PUT ${U}/u1id"
+expect "05 PUT: the expression false by default, the whole class back, enabled left alone, the id dropped" "$(payload 1 | jq -c .)" \
+  '{"className":"example_userclass","userType":"*","userName":"example_nobody","group":"*","address":"*","expression":"false","enabled":true,"order":1}'
+has "05 PUT: prints the values before" "The expression of example_userclass is now 'true', enabled is true."
+has "05 PUT: prints the code" "HTTP 204"
+SEQUENCE=$(sequence uc_put2 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/05.userClasses_id_PUT.sh" example_userclass - false
+expect "05 PUT: - leaves the expression alone and enabled false is sent" "$(payload 1 | jq -c '[.expression, .enabled]')" '["true",false]'
+SEQUENCE=$(sequence uc_put3 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/05.userClasses_id_PUT.sh" example_userclass none true
+expect "05 PUT: none empties the expression" "$(payload 1 | jq -c '[.expression, .enabled]')" '["",true]'
+SEQUENCE=$(sequence uc_put4 "${ONE_CLASS}" "${CLASS_OFF}")
+STATUS=204 run "${F}/05.userClasses_id_PUT.sh" example_userclass 'a "b" \ c' true
+expect "05 PUT: quotes and a backslash stay valid JSON" "$(payload 1 | jq -c '[.expression, .enabled, .order]')" '["a \"b\" \\ c",true,2]'
+SEQUENCE=$(sequence uc_put5 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=403 run "${F}/05.userClasses_id_PUT.sh" example_userclass
+expect "05 PUT: a refusal exits 1" "${RC}" "1"
+has "05 PUT: and prints the code" "HTTP 403"
+SEQUENCE=$(sequence uc_put6 "${ONE_CLASS}" "${CLASS_FULL}")
+run "${F}/05.userClasses_id_PUT.sh" example_userclass - -
+expect "05 PUT: nothing to change, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run "${F}/05.userClasses_id_PUT.sh" example_userclass true maybe
+expect "05 PUT: bad ENABLED, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run "${F}/05.userClasses_id_PUT.sh" example_userclass "${LONG_EXPRESSION}"
+expect "05 PUT: an expression over 1024 characters, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=$(body uc_none "${NO_CLASS}")
+SEQUENCE=
+run "${F}/05.userClasses_id_PUT.sh" example_userclass
+expect "05 PUT: no such class, exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+GET_BODY=
+
+SEQUENCE=$(sequence uc_patch "${ONE_CLASS}" "${CLASS_OFF}")
+STATUS=204 run "${F}/06.userClasses_id_PATCH.sh" example_userclass
+expect "06 PATCH: looks the id up, reads the class, PATCHes the id" "${RC}:$(calls)" "0:GET ${ULOOK}
+GET ${U}/u1id
+PATCH ${U}/u1id"
+expect "06 PATCH: replaces enabled with the boolean true by default" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/enabled","value":true}]'
+has "06 PATCH: prints the value before" "The enabled of example_userclass is now 'false'."
+has "06 PATCH: prints the code" "HTTP 204"
+SEQUENCE=$(sequence uc_patch2 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/06.userClasses_id_PATCH.sh" example_userclass order 2
+expect "06 PATCH: order is a number" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/order","value":2}]'
+has "06 PATCH: prints the order before" "The order of example_userclass is now '1'."
+SEQUENCE=$(sequence uc_patch3 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/06.userClasses_id_PATCH.sh" example_userclass expression 'x.equals("a\\b")'
+expect "06 PATCH: a text with quotes and a backslash stays valid JSON" "$(payload 1 | jq -r '.[0].value')" 'x.equals("a\\b")'
+has "06 PATCH: prints the expression before" "The expression of example_userclass is now 'true'."
+SEQUENCE=$(sequence uc_patch4 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/06.userClasses_id_PATCH.sh" example_userclass expression none
+expect "06 PATCH: none empties the expression" "$(payload 1 | jq -c '.[0].value')" '""'
+SEQUENCE=$(sequence uc_patch5 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/06.userClasses_id_PATCH.sh" example_userclass userName 'example_*_x'
+expect "06 PATCH: userName goes in as a text" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/userName","value":"example_*_x"}]'
+SEQUENCE=$(sequence uc_patch6 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=204 run "${F}/06.userClasses_id_PATCH.sh" example_userclass enabled false
+expect "06 PATCH: false is a boolean" "$(payload 1 | jq -c '.[0].value')" "false"
+SEQUENCE=$(sequence uc_patch7 "${ONE_CLASS}" "${CLASS_FULL}")
+STATUS=400 run "${F}/06.userClasses_id_PATCH.sh" example_userclass expression "1==1"
+expect "06 PATCH: a refusal exits 1" "${RC}" "1"
+has "06 PATCH: and prints the code" "HTTP 400"
+for args in "example_userclass nope x" "example_userclass enabled maybe" "example_userclass order 0" "example_userclass order x" "example_userclass order -3" "example_userclass order 1.5"; do
+    # shellcheck disable=SC2086
+    run "${F}/06.userClasses_id_PATCH.sh" ${args}
+    expect "06 PATCH: bad arguments (${args}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+SEQUENCE=
+
+GET_BODY=$(body uc_one "${ONE_CLASS}")
+STATUS=204 run "${F}/07.userClasses_id_DELETE.sh" example_userclass
+expect "07 DELETE: looks the id up by name, then DELETEs the id" "${RC}:$(calls)" "0:GET ${ULOOK}
+DELETE ${U}/u1id"
+has "07 DELETE: prints the code" "HTTP 204"
+STATUS=400 run "${F}/07.userClasses_id_DELETE.sh" example_userclass
+expect "07 DELETE: a refusal exits 1" "${RC}" "1"
+GET_BODY=$(body uc_longer "${LONGER_CLASS}")
+STATUS=204 run "${F}/07.userClasses_id_DELETE.sh" example_userclass
+expect "07 DELETE: of the classes the filter matched, only the exact name goes" "$(calls | grep -c DELETE):$(calls | tail -1)" "1:DELETE ${U}/u1id"
+GET_BODY=$(body uc_same "${TWO_SAME_CLASS}")
+run "${F}/07.userClasses_id_DELETE.sh" example_userclass
+expect "07 DELETE: two classes of one name, exit 1, no DELETE" "${RC}:$(calls | grep -c DELETE)" "1:0"
+GET_BODY=$(body uc_none "${NO_CLASS}")
+run "${F}/07.userClasses_id_DELETE.sh" example_userclass
+expect "07 DELETE: no such class, exit 1, no DELETE" "${RC}:$(calls | grep -c DELETE)" "1:0"
+GET_BODY=$(body uc_builtin '{"resultSet":{"returnCount":1,"totalCount":1},"result":[{"id":"v1","className":"VirtClass"}]}')
+for builtin in VirtClass RealClass; do
+    run "${F}/07.userClasses_id_DELETE.sh" "${builtin}"
+    expect "07 DELETE: ${builtin} is refused, exit 2, nothing sent (not even the lookup)" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+run "${F}/07.userClasses_id_DELETE.sh" virtclass
+expect "07 DELETE: the refusal is for the exact name: virtclass in small letters is looked up like any other" "$(calls | head -1)" "GET ${U}?className=virtclass&fields=id,className"
+GET_BODY=
+STATUS=
+run "${F}/07.userClasses_id_DELETE.sh"
+expect "07 DELETE: no name, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else
