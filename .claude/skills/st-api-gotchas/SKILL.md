@@ -1082,6 +1082,20 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   exist"; a rule patched without `clientAddress`, or with a type other than ALLOW or DENY, is 400 with the reasons in
   `validationErrors`; a duplicate login restriction policy is 409.
 
+- **Read examples that never looked at the status, now checked** (about 58 scripts, `01.Authentication` to `37.Zones`; checks
+  01, 02, 09, 10, 12, 15, 24, 30, 57). Seen on the lab, 5.5-20260924: **refused credentials answer 401 `Authentication
+  required.` as `text/html`, not JSON**, for a GET list, `POST /myself` and a HEAD alike, so a script that pipes a list into jq
+  printed nothing and exited 0; a 500 is an HTML page. `POST /myself` answers 200 `{"message": "Logged in"}` (not the
+  account), `DELETE /myself` 200 `{"message": "Logged out"}`, and a `GET /myself` with the old jar afterwards is 401 (an
+  example may demand a 401 or 403 there). A HEAD of a missing server is a **bodiless 400**, a GET of it (with or without `fields=`) a
+  404 HTML page from Tomcat; `GET /daemons/nope` is 400 "Invalid value for parameter name, expected (ssh)"; a missing
+  administrative role is 404 "No such administrative role.". **`/certificates?usage=` is not validated the way it looks**: `ca`,
+  `signer` and `server` are 403 "Insufficient permissions to perform the operation" (which says nothing about usage), the accepted
+  values are `local`, `private`, `partner`, `login` and `trusted`, matched ignoring case, and `/certificates/requests?usage=nonsense`
+  returns all requests. `grep "os"` on the version answer matches `os` and `osDistribution`; lab bodies end with `}` and no newline.
+  Two wrong passwords on `admin` did not lock it. A bash script's exit code is that of its last command: an example that ends in a
+  `grep` exits 1 when the grep finds nothing, whatever the call did.
+
 - **Features: what the failure handling run on the lab showed** (`audit-billable-transfers`, `trigger-route-after-completed-pull`,
   `Features/lib`; 5.5-20260924). A `#` in an unencoded file path cuts the URL: `DELETE /files/dir/a#1.txt` asks for
   `/dir/a` and answers 404 "Unable to delete file: /dir/a. (file not found)"; a space makes curl send nothing (code 000);

@@ -18,28 +18,24 @@ things. This is the ledger. Delete it when the open list is empty.
 | Admin bash | `14.ExpressionLanguage` tested and made refuse to touch what exists | `test_bash_expression_language.sh` |
 | Acknowledgment | Exit codes, paging past 100 transfers, the bat twins | `90.EndToEndAcknowledgment`, `test_bash_pesit_ack.sh` |
 | EndUser | Logout ended the wrong session, bash 3.2, exit 0 on failure, the tracked `test.txt`, base64 wrapping | `EndUser/API 2.0/bash`, `test_bash_enduser_api.sh` |
+| Admin bash and bat | About 58 read scripts that never looked at the HTTP status (a 401 printed nothing and exited 0), the `change_me` passwords of `18.AccountSetup`, `01.myself_POST` made the login its name says | `test_bash_admin_sweep_c.sh` |
+| Features | A refused call stops the run in both; the trigger feature heals a stale home folder like the billable one; clean-ups exit 1 and keep their state file; paths are encoded; shared code in `Features/lib` (`home_folder`, `admin_calls`) | `test_feature_*.sh`, `test_feature_bat_twins.py` |
+| Skills | The orientation index in folder order, the covered tags as a table | `.claude/skills` |
 | Repository | `.gitattributes` (CRLF for `.bat`) and the hygiene check that reads CRLF | `.gitattributes` |
 | Docs | The gotchas entries later findings contradicted; an index; README, Features README, CLAUDE.md, tests README (every check named, guarded by `check_docs_match_repo.py`) | |
 
 ## Open
 
-1. **The 33 read scripts** that pipe a list into jq and never look at the status (`01.Authentication`,
-   `02.Introduction` 01 to 03 and 05, `03.Connect` 01, 02, 06, 08, 09, `04.Applications/01`, `05.Accounts/01`, the
-   `01.*_GET` of folders 06 to 37). A 401 prints nothing and exits 0. `03.Connect` 08 (HEAD) and 09 say a missing
-   server is a 404: the lab says 400.
-2. **Leftovers of the sweeps:** `change_me` default passwords in `18.AccountSetup` 01 and 03 (bash and bat);
-   `20.AdministrativeRoles/05` checks its GET with `jq -e` only; `09.CompositeRoutes` 02 and 05.
-3. **Harness:** `script()`, `wait_until` and the port lookups are copied into dozens of checks
-   (`tests/integration/lib`); fixed sleeps stand in for a wait in checks 43, 48 and 56; checks 41, 53 and 55 assume a quiet
-   server; `mkdtemp` without cleanup in 31, 32, 33, 47, 48, 49 and 52; no per-check timeout; the stub curl has grown by
-   accident. Two runs at once delete each other's `tests/output`.
-4. **Consistency:** 31 scripts need the account `john`; port 8022 is hard coded in several; some objects are not
-   named `example_*` (`SSH_TEST_SERVER_*`, `RouteFrom*`, `SimpleRouteName`, `Finance`); the trigger-route feature lacks the
-   self healing account and the exit codes of the billable one; the EndUser tree has no bat twins (decide: add them, or
-   say so plainly).
-5. **The bat twins have never run:** none of the bat changes could be run (no Windows here).
-6. **Docs:** the 550 line per resource list in the gotchas is still one list; incident and history entries belong in a
-   changelog; the orientation task index is out of order.
-7. **For the owner:** the password that was in `stBuildFullTestAccount.py` is still in git history (rotate it if it was ever
+1. **Harness (in progress):** the copied helpers (`script()`, `wait_until`, the port lookups), the fixed sleeps in checks 43, 48
+   and 56, the quiet-server assumptions of 41, 53 and 55, `mkdtemp` without cleanup, a per-check timeout, and a private output
+   folder per run so that two runs do not delete each other's.
+2. **Consistency:** 31 scripts need the account `john`; port 8022 is hard coded in several; some objects are not named
+   `example_*` (`SSH_TEST_SERVER_*`, `RouteFrom*`, `SimpleRouteName`, `Finance`); the EndUser tree has no bat twins (decide: add
+   them, or say so plainly).
+3. **The bat twins have never run:** none of the bat changes could be run (no Windows here). A short run of the ones with
+   PowerShell in them (`Features/lib/admin_calls.bat`, the acknowledgment scripts, `03.Connect/11`) would be worth it.
+4. **Docs:** the 550 line per resource list in the gotchas is still one list; incident and history entries belong in a changelog.
+5. **For the owner:** the password that was in `stBuildFullTestAccount.py` is still in git history (rotate it if it was ever
    real); `st_callback_host` in `tests/local/integration.conf` is stale, so checks 40 and 47 fail on it; the trainer kit needs
-   the new arguments of the changed scripts and a new `python.tsv`.
+   the new arguments of the changed scripts and a new `python.tsv`; `stLinkSimpleRoute` replaces all of a route's steps with one
+   `ExecuteRoute` step (data loss, or intended?).
