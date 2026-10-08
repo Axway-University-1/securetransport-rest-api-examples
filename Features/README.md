@@ -43,16 +43,25 @@ release, so it counts as older than every dated `5.5-...` update.
 
 ## Running an example
 
-Features use the same connection settings as the Admin examples, so there is
-nothing extra to configure. If you have not done that yet, see
-[Configuration](../README.md#configuration) in the main README.
+A feature connects with the same settings as the Admin examples
+([Configuration](../README.md#configuration) in the main README) and also has a
+settings file of its own, because it creates accounts and needs a password for them.
+Copy `settings.local.example.sh` to `settings.local.sh` in the feature's folder
+(`.bat` on Windows) and set the password it names: `BT_ACCOUNT_PASSWORD` for
+`audit-billable-transfers`, `AR_ACCOUNT_PASSWORD` for
+`trigger-route-after-completed-pull`. `settings.local.sh` and `state.local.sh`
+(what a run has created, so that a clean-up can remove it) are git ignored.
 
 ```
 cd Features/<feature-folder>
-./01.<name>.sh
+./00.run_all.sh                # the whole scenario, in order
+./00.run_all.sh --cleanup      # the same, and everything it made is removed at the end
+./99.cleanup_DELETE.sh         # remove what an earlier run left
 ```
 
-Each example comes as a `.sh` for bash and a `.bat` for Windows, side by side.
+`00.run_all` runs the numbered scripts in order and checks what each one did; you can
+also run a numbered script on its own. Each example comes as a `.sh` for bash and a
+`.bat` for Windows, side by side.
 
 ## Adding a feature
 
@@ -61,9 +70,14 @@ Each example comes as a `.sh` for bash and a `.bat` for Windows, side by side.
 2. Add a `README.md` to it: what the feature does, the release that introduced
    it, the scripts in run order, and anything to check first.
 3. Number the scripts in the order they should be run. Write a `.sh` and a
-   `.bat` for each, with the same name.
+   `.bat` for each, with the same name. Add `00.run_all` (the whole scenario, with
+   `--cleanup`), `99.cleanup_DELETE` (removes what the others made), `settings.sh`
+   with its `settings.local.example.sh` and `.bat` twins, and use the shared helpers
+   in `Features/lib/` (`post_admin`, `enduser`) so a refused call stops the run.
 4. Start every script with the version check above, using the release that
    introduced the feature.
 5. Add the feature to the list in this file, under its release. Create a new
    release heading above the existing ones if needed.
-6. Add tests. See [tests/README.md](../tests/README.md).
+6. Add tests: a `tests/checks/test_feature_<name>.sh` for the scripts (stub curl), the
+   feature's bat twins in `test_feature_bat_twins.py`, and its version check in
+   `test_feature_version_check.sh`. See [tests/README.md](../tests/README.md).

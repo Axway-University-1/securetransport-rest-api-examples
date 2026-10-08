@@ -4,10 +4,15 @@
 
 No script or behaviour change is done until a test covers it.
 
-- **New script**: add coverage in `tests/checks/` (offline) in the same change.
-  Bash examples go through `test_bash_payloads.sh` (stub curl), python examples
-  through `test_python_logic.py` (fake ST). Extend the fixtures in
-  `tests/fixtures/` rather than using real data.
+- **New script**: add coverage in `tests/checks/` (offline) in the same change,
+  in the file for its tree: Admin bash examples in `test_bash_admin_api.sh`,
+  EndUser in `test_bash_enduser_api.sh`, Features in `test_feature_*.sh`, the
+  acknowledgment loop in `test_bash_pesit_ack.sh`, Expression Language in
+  `test_bash_expression_language.sh` (all with the stub curl), python examples in
+  `test_python_*.py` (whole scripts run against `tests/lib/fake_requests`, a stand-in
+  server that refuses a write without a csrfToken). `test_bash_payloads.sh` runs
+  every Admin example generically: give it the arguments a new one needs. Extend
+  the fixtures in `tests/fixtures/` rather than using real data.
 - **Changed script**: add or update a test that would have failed before the
   change. A bug fix starts with the test that reproduces it.
 - **New endpoint behaviour the examples rely on**: add an integration check in
@@ -18,20 +23,25 @@ No script or behaviour change is done until a test covers it.
   captured data belongs in `tests/local/`, which git ignores.
 
 CI (`.github/workflows/tests.yml`) runs `tests/run_all.sh` on **Linux** on every
-push and pull request; check it after a push. Also follow
+push and pull request; check it after a push. `.gitattributes` gives `.bat` files
+CRLF on a checkout, which a macOS working tree does not show: before a push, run
+the suite in a fresh `git clone` of the commit. Parallel runs share `tests/output`,
+so a full run next to another one can fail oddly: use a clone for it. Also follow
 `.claude/skills/st-api-add-example` for house style.
 
 ## Admin API coverage
 
-Examples are being added one Admin API resource at a time, in the order of the
-API reference. `.claude/skills/st-api-cover-resource` is the procedure, the
-list of what is done and what is next, and the tools (spec, coverage, lab,
-generators, docs sync). Follow it step by step; update its list when a
-resource is done.
+Every resource of the Admin API reference has examples, except by design
+`siteTemplates` (the lab has no Connect:Direct), `clusterServices` and the
+cluster-only configuration operations (the lab is standalone), and the
+database, replication and Oracle-only configuration operations.
+`.claude/skills/st-api-cover-resource` is the procedure for a resource a new
+release adds, with the list of what is covered and the tools (spec, coverage,
+lab, generators, docs sync). Update its list when a resource is added.
 
 ## Which model
 
-- **Sonnet** for covering the next resource by that procedure: reading the
+- **Sonnet** for covering a new resource by that procedure: reading the
   reference, probing the lab, writing the scripts, bat twins, tests and docs.
   `.claude/agents/st-api-resource-author.md` runs it as a subagent.
 - **Opus** for what the procedure does not cover: a new kind of stand-in

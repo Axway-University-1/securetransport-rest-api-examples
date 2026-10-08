@@ -19,8 +19,7 @@
 11. [License and Support](#license-and-support)
 
 ## Introduction
-SecureTransport 5.5 (current), introduces REST API 2.0. The prior API release is version 1.4.
-Currently supported APIs are V1.4 and V2.0 – both are available in ST release V5.5.
+These examples are for REST API 2.0 of SecureTransport 5.5, and were verified on release 5.5-20260924. The older API 1.4 is also served by 5.5 but is not covered here.
 
 This github project looks at use cases from a specific viewpoint. Many clients and Axway themselves have implemented mechanisms to on-board clients and file transfer flows in an automated manner using APIs, rather than the alternative method of manual setups via the admin GUI of ST. Automation brings a reduced risk of introducing errors and also assists in adhering to any standards enforced by the owning institution in naming standards, security profiles etc.
 Many other automation tasks such as certificate expiry monitoring, configuration drift from baseline, etc are all possible via API based scripts or programs.
@@ -200,25 +199,27 @@ The following table shows a list of terms and acronyms used throughout this proj
 
 | Definition | Description |
 | ---------- | ----------- |
-| API | Application Programming Interface |
-| CRUDL | Create Read Update Delete List |
-| HTTPS | Hypertext Transfer Protocol Secure |
-| JSON | JavaScript Object Notation |
-| MFT | Managed File Transfer |
-| PGP | Pretty Good Privacy |
-| ReST | Representational State Transfer |
-| SaaS | Software as a Service |
-| SFTP | SSH File Transfer Protocol |
+| Admin API, EndUser API | The administrator's API (port 444, or 8444 on a non root install) and the smaller user level API (port 443, or 8443) |
+| Advanced Routing | The SecureTransport feature that moves and transforms files by routes |
+| Account | A user, service or template account; the owner of a home folder, sites and subscriptions |
+| AS2, PeSIT, SFTP | File transfer protocols the server speaks (as listener and as client through a site) |
+| Business unit | A group of accounts with its own settings and, optionally, a network zone |
+| coreId | The id that ties the transfers of one file's journey through the server together |
+| CSRF token | A header, returned by the login, that a session must send back on writes; see the gotchas |
+| DMZ, zone, edge | A network zone and its edge server that sits between the outside and the core |
+| EL | The Expression Language: `${...}` in route conditions, filters, rename patterns and login rules |
+| ICAP | A protocol for passing files to a virus scanner |
+| Route | A template, a simple or a composite route of Advanced Routing, run by a subscription |
+| Site (transfer site) | A remote partner the server connects to, to pull or push files |
+| Subscription | What links an account's folder to an application: a route or a trigger |
 | ST | SecureTransport |
-| TLS | Transport Layer Security |
-| UI | User Interface |
-| XML | eXtensible Markup Language |
+| MFT, TLS, JSON | Managed File Transfer, Transport Layer Security, JavaScript Object Notation |
 
 ## OpenAPI
 
-SecureTransport provides an Open API (a.k.a. Swagger UI) which allows you to interactively explore its APIs.
+SecureTransport provides an OpenAPI description of its APIs, with a Swagger UI on top of it, which allows you to explore them interactively.
 
-In any browser enter as below, substituting your server’s IP and port used for the admin GUI. For example the default for a non root install would be: https://<<SERVER_IP>>:8444/api/v2.0/docs/index.html for version 2.0 or https://<<SERVER_IP>>:8444/api/v1.4/docs/index.html for version 1.4.
+In any browser enter as below, substituting your server’s IP and port used for the admin GUI. For example the default for a non root install would be: https://<SERVER>:8444/api/v2.0/docs/index.html for version 2.0 or https://<SERVER>:8444/api/v1.4/docs/index.html for version 1.4.
 
 The above URLs all provide access to the ADMIN level APIS.  There is a smaller set of user level APIs available at the 8443 or 443 port.
 
@@ -238,26 +239,32 @@ The Open API provides a curl command equivalent that it is using to fetch the da
 
 The HTTP success code of 200 is shown next to the response assuming all worked correctly. Finally, if you wish to download the response there is an option to download the output json to your PC.
 
-By default, the system will only return up to (by default) 100 objects. This value can be changed via the Server Configuration Option Webservices.EntriesPerPage.
+A list answers at most 100 objects by default; ask for more with `limit` and `offset`, or change the default with the Server Configuration Option Webservices.EntriesPerPage.
 
 
 ## ST API 2.0 Methods
 
-When designing a RESTful API, it's crucial to use HTTP methods correctly to ensure clarity and consistency in your API's behavior. Here's a brief overview of the commonly used HTTP methods and their appropriate usage:
+How the methods behave on SecureTransport. The details, and the surprises, are in the
+[gotchas](.claude/skills/st-api-gotchas/SKILL.md); each was confirmed on a real server.
 
-**GET**: Use GET to retrieve resource representations without modifying the server's state. It's safe and idempotent, meaning repeated requests should yield the same result.
+**GET** reads, and changes nothing. A list answers at most 100 objects, in no fixed order
+unless you ask; page it with `limit` and `offset`.
 
-**POST**: Employ POST to create new resources. The server assigns a unique identifier to the newly created resource. POST is not idempotent, as multiple identical requests may result in multiple resource creations.
+**POST** creates an object (201, with its URL in the `Location` header: the created object
+is not returned), or performs an operation: `POST .../operations?operation=X`, which
+answers 200 or 202, so read the body, a 200 can carry a failure. `POST /myself` is a login.
 
-**PUT**: Use PUT to update existing resources by replacing their entire content. It's idempotent, as repeated requests should have the same effect as a single request.
+**PUT** replaces the whole object (204). A field you leave out is reset, so send back the
+object you read with your change applied. On a mail template a PUT creates it.
 
-**PATCH**: Apply PATCH for partial updates to existing resources. It's more efficient than PUT when only a few fields need to be updated in a large resource.
+**PATCH** changes part of an object (204). The body is a JSON Patch: an array of
+`{"op": "add" | "replace" | "remove", "path": "/field", "value": ...}`. A path addresses
+an array element by its position (`/steps/1/...`), `-` appends, `replace` of a path the
+object does not have is a 400 `Missing field`.
 
-**DELETE**: Utilize DELETE to remove resources from the server. It's idempotent, as the result remains the same whether you delete a resource once or multiple times. 
-*Note*: The DELETE method is considered idempotent despite potentially returning different responses because idempotency in REST APIs focuses on the server-side effect rather than the client-side response.
+**DELETE** removes an object (204). A missing object may be a 400, not a 404.
 
-**HEAD**: Similar to GET, but only retrieves headers without the response body. Use it to check resource metadata or determine the size of a potential GET response.
-
+**HEAD** is the cheap existence check: 200 or 404, no body (a few resources answer 405).
 
 ## What Is Covered
 

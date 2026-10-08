@@ -1,27 +1,39 @@
 ---
 name: st-api-gotchas
-description: The non-obvious traps in the SecureTransport REST API 2.0 and in scripting against it, collected from real debugging. Use this skill whenever writing, reviewing or debugging any call to the ST API, and whenever a call returns 401, 403, 422 or a silent partial success, whenever a PATCH is rejected, whenever a field does not change, or whenever a bash or bat script behaves differently from how it reads. Also trigger on questions about PATCH versus PUT, JSON Patch paths, adding or inserting route steps, CSRF tokens, the Referer header, paging, editing JSON in a shell script, jq, PowerShell ConvertFrom-Json, batch delayed expansion, or portability between macOS and Linux. Read this before writing a call, not after it fails.
+description: The non-obvious traps in the SecureTransport REST API 2.0 and in scripting against it, collected from real debugging. Use this skill whenever writing, reviewing or debugging any call to the ST API, and whenever a call returns 401, 403, a 400 'Missing field' or a silent partial success, whenever a PATCH is rejected, whenever a field does not change, or whenever a bash or bat script behaves differently from how it reads. Also trigger on questions about PATCH versus PUT, JSON Patch paths, adding or inserting route steps, CSRF tokens, the Referer header, paging, editing JSON in a shell script, jq, PowerShell ConvertFrom-Json, batch delayed expansion, or portability between macOS and Linux. Read this before writing a call, not after it fails.
 ---
 
 # SecureTransport API and scripting gotchas
 
-Each of these cost real debugging time. They are ordered by how likely they are
-to bite you.
+Each of these cost real debugging time. Part 1 is the API: the rules that hold
+everywhere come first, then one entry per resource of the reference, each with what
+was confirmed directly (and on which release); Part 2 is scripting traps; Part 3 is
+habits. Where an early entry and a later one seem to disagree, the later one is the
+newer finding and the early entry was rewritten to match.
+
+**Index.** Rules for every call: [Referer](#the-referer-header), [CSRF](#csrf-tokens-from-the-20230525-release-onwards),
+[PATCH, PUT and arrays](#patch-can-insert-into-an-array-put-is-still-the-safest-for-many-changes),
+[paging](#paging-ask-for-a-page-size-and-walk-the-offset), [status codes](#expected-status-codes),
+[duplicate names](#duplicate-names-the-answer-differs-by-resource). Then, by resource,
+[the Admin API against its own reference](#the-admin-api-against-its-own-reference),
+[the EndUser API](#the-enduser-api-against-its-own-reference),
+[Expression Language](#expression-language-which-fields-carry-it-and-how-it-is-escaped).
+Then [scripting traps](#part-2-scripting-traps).
 
 # Part 1: the API
 
-## The Referer header is not optional
+## The Referer header
 
-ST rejects API calls that arrive without a `Referer` header. The value does not
-matter, but it must be **the same on every call in a session**, including login
-and logout. The examples use `THIS_IS_A_RANDOM_TEXT`. If you get an unexplained 403 on a
-call that looks correct, check the header.
+Send a `Referer` header on every call, with the same value throughout a session
+(the examples define it once as `REFERER_HEADER`, `THIS_IS_A_RANDOM_TEXT`). It is
+the documented contract, and an unexplained 403 on a call that looks right is the
+first thing to check.
 
-That said, one lab server (5.5-20260827) accepted a call with no `Referer` at
-all, over several separate integration runs and for both reads and writes.
-Treat "no Referer means rejected" as the documented and safest assumption to
-code against, not as something every server enforces - a script that omits the
-header may still work on some servers and fail hard on others.
+Not every server enforces it: one lab (5.5-20260827) accepted calls with none, reads
+and writes, over several runs. Code against the contract, not the leniency. The
+bundled mock enforces it on every call, so a script that forgets it fails there and
+not on a lenient lab; that is how 49 of the 52 Admin bash examples, which sent none,
+were found. Every Admin bash and bat example sends it now.
 
 ## /logs/transfers ignores accountName= - filter with account=
 
@@ -55,28 +67,6 @@ sharing one `coreId`. Confirmed directly by
 - A file **deleted through the End User API** is logged as an outgoing
   transfer under its `coreId`, and is not billable.
 
-**This was not theoretical - it was a real, confirmed gap, now fixed.** As of
-this project's own history, 49 of the 52 `Admin/API 2.0/bash/*.sh` examples
-(and the 40 `.bat` twins of the ones that have one) never sent a `Referer`
-header at all - only `01.myself_cookie_POST.sh`,
-`02.Introduction/06.myself_DELETE.sh` and `90...Acknowledgment.sh` did
-(confirmed directly by grepping the tree, not by memory). They worked against
-a lenient lab server, which is exactly why nobody building or running them
-noticed - point them at a server that enforces the documented contract and
-they would have failed. All 89 files were fixed the same mechanical way:
-a `REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"` variable (`set
-REFERER_HEADER=...` in `.bat`) defined right after sourcing
-`set_variables.sh`/`.bat`, and `-H "${REFERER_HEADER}"` (`-H
-"%REFERER_HEADER%"` in `.bat`) appended after every existing `accept:` header
-- confirmed, before touching anything, that every single curl invocation in
-every affected file already had an `accept:` header to anchor on, so the
-fix is a precise append next to a known, unique substring, never a blind
-`sed`-style pattern match. The bundled integration mock (see
-`tests/integration/`) enforces `Referer` on every call, matching the
-documented behaviour rather than this one lab's leniency, so this fix is
-what makes the bash checks agree between `--mock` and a real, less lenient
-server rather than only passing against this one lab's leniency.
-
 ## CSRF tokens, from the 20230525 release onwards
 
 `Webservices.Admin.CsrfToken.enabled` defaults to `true` from that release. When
@@ -97,67 +87,64 @@ one than the login's, and a call with no timeout. Any script written before the
 20230525 release will fail against a current server until it is updated. This is
 the single most common reason an old script stops working.
 
-**Confirmed directly against a real, CSRF-enabled server: this only applies to
-session-cookie authentication.** A bare call carrying a fresh `Authorization:
-Basic` header - no cookie, no csrfToken - succeeds on its own, including for
-writes. This is why almost every bash example works without ever handling
-CSRF: none of them log in and keep a session, they pass `-u user:pass` on
-every single curl call, and that turns out to be exempt from the CSRF check
-entirely. It makes sense once you consider what CSRF protects against - a
-browser silently attaching a cookie to a request the user did not intend.
-That risk does not exist when the credential is put on the request explicitly
-and afresh every time.
+**What the lab does (5.5-20260924), as against the contract above:**
 
-Exactly two bash examples are the exception, because they are the only two
-that actually keep a session: `01.Authentication/01.myself_cookie_POST.sh`
-and `02.Introduction/06.myself_DELETE.sh` (and their `.bat` twins) log in once
-with a cookie jar and reuse it. Both were found, the same way the missing
-`Referer` header was, to never send a `csrfToken` back on the later calls in
-that same session - a real, confirmed bug, silently masked by this project's
-own lab server, which was confirmed directly to accept a cookie-based GET
-with no `csrfToken` at all (200, not 403) even with CSRF enforcement
-notionally on. The bundled integration mock enforces the documented contract
-strictly and caught this immediately with a 403 `"invalid csrfToken"` once
-the (separately real) missing-`Referer` bug was fixed and stopped masking it.
-Fixed the same way the python examples already did it: capture the
-`csrfToken` response header from the login call (`curl -D headerfile`, then
-read it back out), and send that same value back as a `csrfToken` header on
-every later call in the script - captured once, never rotated, matching
-`stUpdateAllRoutes.py`'s own pattern.
+- A bare call carrying a fresh `Authorization: Basic` header (no cookie, no token)
+  succeeds on its own, writes included. That is why almost every bash example works
+  with no CSRF handling at all: they pass `-u user:pass` on every call and keep no
+  session. It makes sense: CSRF protects against a browser attaching a cookie the user
+  did not intend, which cannot happen when the credential is put on each request.
+- A GET inside a kept session needs no token. CSRF gates writes, not reads.
+- A write inside a kept session was also accepted without one, on the Admin API and on
+  the EndUser API. The lab is therefore more lenient than the documented contract, and
+  a script that omits the token works there and fails on a server that enforces it. The
+  bundled mock and `tests/lib/fake_requests` are strict, which is what finds the omission.
+- The examples that keep a session send the token anyway, captured once from the login
+  (`curl -D headerfile`, then read back out), never rotated, the python ones as in
+  `stUpdateAllRoutes.py`: the two bash examples that keep a cookie jar
+  (`01.Authentication/01.myself_cookie_POST.sh`, `02.Introduction/06.myself_DELETE.sh`,
+  and their `.bat` twins) and the EndUser examples. It is harmless, and they stay
+  correct if a release starts enforcing it.
 
-## PATCH cannot insert into the middle of an array
+## PATCH can insert into an array; PUT is still the safest for many changes
 
-You can `replace` an element by index, and `add` at a position or at the end with
-`-`, but rebuilding an array in place is unreliable. **To insert a step into an
-existing route's steps array, read the whole route, change your copy, and PUT it
-back.** `python3/stUpdateRouteWithPut.py` is the worked example.
+`replace` by index replaces an element, `add` at `/array/N` inserts at position N
+(valid up to the current length: `add` at `/addressBookSettings/contacts/1` of an
+empty list is 400 `"Array index 1 out of bounds"`), and `/array/-` appends.
+Confirmed on a route: `add` at `/steps/1` inserted in the middle and the
+`precedingStep` links followed. For several changes at once, or anything that relies
+on the order staying put, the safest way is still: read the whole object, change
+your copy, PUT it back. `python3/stUpdateRouteWithPut.py` is the worked example.
 
 PUT replaces the entire object. Always send back the object you read with your
-change applied — never a hand-built fragment, or you will silently drop fields.
+change applied, never a hand-built fragment: a field left out is reset (confirmed for
+sites, subscriptions, zones, transfer profiles, user classes) and the object silently
+loses it.
 
 ## replace needs the field to exist; add creates it
 
-This is the usual cause of a **422** from a PATCH:
-
-- `replace` on a field that is not set yet fails.
-- `add` on a field that is already set may fail or duplicate.
+- `replace` of a path the object does not have is refused: **400 `Missing field`** on
+  every resource probed on 5.5-20260924 (the mock, and older notes here, say 422). A key
+  that is present with a null value can be replaced.
+- `add` on a field that is already set may replace it, fail or duplicate, depending on
+  the resource.
 
 When you do not know whether a field is set, GET the object first.
 `python3/stUpdateAllSubscriptions.py` shows a body that mixes both operations.
 
-## A route step has no id — it is addressed by index
+## A route step has an id, but a patch addresses it by position
 
-There is no step identifier. A step is referenced by its position:
+A step carries an `id` and a `precedingStep` link when you read it, but a patch path
+takes its position, not the id:
 
 ```
 /steps/1/customProperties/mHostName
 ```
 
-So you must GET the route, find the index of the step you want, and build the
-path from it. Never assume an index. `python3/stUpdateAllRoutes.py` does this
-properly.
+So GET the route, find the index of the step you want, and build the path from it.
+Never assume an index. `python3/stUpdateAllRoutes.py` does this properly.
 
-## Appending to an array uses a dash
+## Appending to an array uses a dash, but where the item lands is not promised
 
 To add to the end of a list without knowing its length:
 
@@ -165,14 +152,12 @@ To add to the end of a list without knowing its length:
 [{ "op": "add", "path": "/businessUnits/-", "value": "HumanResources" }]
 ```
 
-A numeric index is only valid up to the array's current length - confirmed
-directly: `add` at `/addressBookSettings/contacts/1` on an account whose
-`contacts` array is still empty 400s with `"Array index 1 out of bounds"`,
-even though the same call succeeds once index 0 is already occupied. This was
-a real bug in the shipped `05.Accounts/06.accounts_name_PATCH.sh`: it hardcoded
-index `1`, which only ever worked because the real account it was tested
-against already had one contact. Fixed to use `-` instead, which works
-whether the array is empty or not.
+A numeric index only works up to the array's current length: the shipped
+`05.Accounts/06.accounts_name_PATCH.sh` once hard coded index `1` and only worked on
+an account that already had a contact; it uses `-`, which works on an empty array too.
+`-` adds, but the position is not the end on every resource: `/rules/-` of a login
+restriction policy puts the new rule first, `/menus/-` is not necessarily last, and an
+added LDAP server (`/ldapServers/-`) takes order 1. Read back when order matters.
 
 ## remove nulls a field; it does not drop it from the response
 
@@ -195,17 +180,25 @@ longer ignores the call's status: it reads the sources first, skips the change t
 custom, and says so, when there are fewer than two, and stops at the first patch the
 server refuses (exit 1).
 
-## Paging: ask for a page size and compare the return count
+## Paging: ask for a page size and walk the offset
 
-List calls return at most `Webservices.EntriesPerPage` objects, 100 by default.
-The pattern used throughout:
+A list answers at most `Webservices.EntriesPerPage` objects, 100 by default, in no
+fixed order unless you ask for one. Confirmed on `/logs/transfers` (5.5-20260924): the
+default is 100 of 12604, `limit=1000` returns 1000 (the page size is not capped at 100),
+`offset` works, and **`limit=0` is still 100, not "all"**. On other resources `limit=0`
+does list everything (zones, user classes, sites), and on some it is a 400 (sessions), so
+never rely on it.
 
 ```
-GET /collection?offset=0&limit=200
+GET /collection?offset=0&limit=100&sortBy...=ascending
 ```
 
-then keep going while `resultSet.returnCount` equals your limit, and stop when it
-is smaller. Every python example that walks a collection does this.
+Keep going, `offset` += `limit`, until a page has fewer entries than `limit`; sort
+explicitly (`sortByStartTime=ascending` for the transfer log) so the pages do not move
+while you read. `totalCount` counts the whole collection and on some resources ignores
+your filter, so use the length of the pages you read for a count. A script that reads
+one call sees the first page only: `IteratePesitInbounds.sh` acknowledged nothing past
+the 100th transfer of its window until it paged.
 
 ## A new object's id comes back in the Location header
 
@@ -219,12 +212,19 @@ capture the headers. `bash/09.CompositeRoutes/02.routes_POST.sh` does this.
 | ---- | ------- |
 | POST that creates | 201, with a `Location` header |
 | PATCH | 204, no body |
-| PUT | 204, no body |
+| PUT | 204, no body (on mail templates a PUT creates, also 204) |
 | DELETE | 204 |
 | GET, HEAD | 200 |
+| an operation (`POST .../operations?operation=X`) | 200 or 202: read the body, a 200 can carry a failure (`isSuccessful: false`) |
+| certificate import | 200 |
 
 Checking for 200 on a PATCH will report failure on success. Use
 `-o /dev/null -w "%{http_code}"` to read just the code.
+
+Failures are less regular than the table: an unknown id is a 404 on a GET or HEAD but
+a 400 on a PUT, PATCH or DELETE of user classes, and a DELETE of a missing denied user
+is 400 where the reference says 404. HEAD is the
+cheap existence check, but 405 on denied users. Read the code, do not assume the family.
 
 ## POST /myself is a login call, not "get info about myself"
 
@@ -436,11 +436,21 @@ hardcode this; it searches the whole response and reports where the value was
 found, which is the safer pattern until a field has actually been confirmed
 against the version you are targeting.
 
-## Duplicate names are rejected
+## Duplicate names: the answer differs by resource
 
-Route template names, server names and account names must be unique. A bulk
-create loop over a list with repeats will fail on the repeats — worth
-de-duplicating the list first.
+Do not assume one rule. Confirmed on 5.5-20260924:
+
+| Resource | A second object with the same name | Case |
+| -------- | ----------------------------------- | ---- |
+| accounts, user classes | 409 | user class names are case sensitive |
+| zones | **400** "The zone name is not unique." (not 409) | case sensitive |
+| sites, mail templates | case variants coexist | |
+| simple routes | **two may share a name** (a list read by name returns both) | |
+| route templates, servers | rejected (earlier notes, not re-probed) | |
+
+A bulk create loop over a list with repeats fails on the repeats where names are
+unique: de-duplicate first, or check existence (HEAD, or a list with `name=`: it takes
+wildcards and ignores case on several resources, so pick the exact match yourself).
 
 ## Some object types allow only one instance per server, regardless of name
 
