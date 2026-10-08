@@ -425,6 +425,12 @@ try:
         except OSError:
             _time.sleep(0.1)
     check("the mock starts", up)
+    # It listens as soon as the port is bound, a moment before it has loaded its certificate and
+    # removed the folder: give it a few seconds to get there
+    for _ in range(100):
+        if not _glob.glob(os.path.join(tmp_root, "mock_st_*")):
+            break
+        _time.sleep(0.1)
     check("and no mock_st_* folder (its key) is left in its temp folder while it runs",
           _glob.glob(os.path.join(tmp_root, "mock_st_*")) == [], _glob.glob(os.path.join(tmp_root, "mock_st_*")))
 finally:
