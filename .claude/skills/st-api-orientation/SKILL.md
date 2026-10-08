@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     220 curl examples, numbered by topic
-    bat/      212 of them, for Windows
+    bash/     227 curl examples, numbered by topic
+    bat/      219 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -61,7 +61,8 @@ create, read, update, delete cycle for that object.
 | Create flow or maintenance applications | `bash/04.Applications/` |
 | Create, read, update, delete accounts | `bash/05.Accounts/` |
 | Send a PATCH body from a file | `bash/05.Accounts/06.accounts_name_PATCH_with_file.sh` |
-| Create, list or delete a transfer site, including SSH pull and push sites that rename | `bash/06.TransferSites/` |
+| Create, list or delete a transfer site, including SSH pull and push sites that rename | `bash/06.TransferSites/` (01 to 04) |
+| Check, read, replace (PUT) or patch one transfer site by its id; test a site's connection (saved, or before saving it); list a folder on the partner | `bash/06.TransferSites/05.sites_id_HEAD.sh` to `11.sites_operations_POST_list.sh` |
 | Subscribe a folder to Advanced Routing, with or without a trigger file | `bash/07.Subscriptions/` |
 | Create route templates in bulk | `bash/08.RouteTemplates/` |
 | Create a composite route, with or without an extension | `bash/09.CompositeRoutes/` |
@@ -185,10 +186,9 @@ Every script resolves its own directory, so it runs from anywhere:
 ## What is not covered
 
 The Admin examples are being added resource by resource, in the order of the
-API reference; through the routes it is done (cluster services, and the
+API reference; through the sites it is done (cluster services, and the
 cluster-only configuration operations, are left out: they need a cluster). Not
-yet in bash or bat: route step metadata and charsets, sessions, statistics summary, zones;
-transfer profiles; site templates, user classes; the transaction manager. `.claude/skills/st-api-cover-resource` keeps
+yet in bash or bat: site templates, statistics summary, subscriptions, transfer profiles, user classes, zones; the transaction manager. `.claude/skills/st-api-cover-resource` keeps
 the exact list.
 
 Changing routes and subscriptions that already exist, and the transaction

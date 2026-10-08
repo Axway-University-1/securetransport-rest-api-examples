@@ -76,6 +76,26 @@ with dummy_servers.TcpSink() as sink:
     check("it records the connection", len(sink.connections) == 1 and sink.connections[0]["client"] == "127.0.0.1")
     check("wait_for gives up on what never comes", not sink.wait_for(b"NEVER", 1))
 
+print("=== JunkServer ===")
+with dummy_servers.JunkServer() as junk:
+    for _ in range(2):
+        with socket.create_connection(("127.0.0.1", junk.port), timeout=10) as conn:
+            conn.settimeout(10)
+            first = conn.recv(100)
+            rest = conn.recv(100)
+        check("it sends its line, then closes the connection", first == b"this is not a partner\r\n" and rest == b"", (first, rest))
+    check("it counts the connections", junk.connections == 2, junk.connections)
+stopped = False
+try:
+    socket.create_connection(("127.0.0.1", junk.port), timeout=2).close()
+except OSError:
+    stopped = True
+check("it stops listening when the with block ends", stopped)
+with dummy_servers.JunkServer(line=b"220 hello\r\n") as junk2:
+    with socket.create_connection(("127.0.0.1", junk2.port), timeout=10) as conn:
+        conn.settimeout(10)
+        check("the line can be chosen", conn.recv(100) == b"220 hello\r\n")
+
 print("=== SlowProxy ===")
 with dummy_servers.TcpSink() as target:
     with dummy_servers.SlowProxy("127.0.0.1", target.port, rate=100 * 1024) as proxy:

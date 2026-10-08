@@ -44,8 +44,8 @@ chk("every bat twin carries the same Risk line as its bash example", not mismatc
 
 reads_that_write = [e["path"] for e in items if e["method"] in ("GET", "HEAD") and e["risk"] != "read"]
 chk("a GET or HEAD example is a read", not reads_that_write, reads_that_write[:5])
-# POSTs that change nothing: logins, logouts, connection tests, a checksum
-READ_POSTS = ("myself_POST", "myself_cookie_POST", "myself_DELETE", "_POST_test", "POST_md5calc")
+# POSTs that change nothing: logins, logouts, connection tests, a checksum, a remote folder listing
+READ_POSTS = ("myself_POST", "myself_cookie_POST", "myself_DELETE", "_POST_test", "POST_md5calc", "sites_operations_POST_list")
 writes_called_read = [e["path"] for e in items if e["method"] in ("POST", "PUT", "PATCH", "DELETE") and e["risk"] == "read"
                       and not any(k in e["path"] for k in READ_POSTS)]
 chk("a POST, PUT, PATCH or DELETE is a read only when it is a login, logout or test", not writes_called_read, writes_called_read[:5])

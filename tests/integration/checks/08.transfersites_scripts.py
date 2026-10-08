@@ -4,9 +4,9 @@ WRITES TO THE SERVER. Runs the actual, unmodified
 Admin/API 2.0/bash/06.TransferSites/01.sites_POST.sh against a configured
 server, and independently verifies it through the API.
 
-This folder has only a POST example - no GET, HEAD, PATCH or DELETE example
-exists for transfer sites, so this check verifies the real POST script and
-then cleans up directly through the API, the same as the business units check.
+This check verifies the real POST script (01) and then cleans up directly
+through the API, the same as the business units check. The other examples of
+the folder are run by 31 (02 to 04) and 54 (05 to 11).
 
 A site is addressed by a server generated id, not by its name - confirmed
 against a real server: GET /sites?name=HTTP&account=john returns the id to

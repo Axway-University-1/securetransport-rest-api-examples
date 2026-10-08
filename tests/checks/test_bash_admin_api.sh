@@ -1778,6 +1778,219 @@ expect "05 GET: a refusal exits 1" "${RC}" "1"
 GET_BODY=
 
 echo
+echo "=== 06.TransferSites (05 to 11: the sites operations not called before) ==="
+F=06.TransferSites
+S="${BASE}/sites"
+LOOK="${S}?account=example_acct&name=example_site&fields=id,name"
+ONE_SITE='{"resultSet":{"returnCount":1,"totalCount":1},"result":[{"id":"s1id","name":"example_site"}]}'
+# the name filter ignores case and takes a *, so other sites come back too: only the exact name counts
+LONGER_SITE='{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"id":"s2id","name":"EXAMPLE_SITE"},{"id":"s1id","name":"example_site"},{"id":"s3id","name":"example_site2"}]}'
+TWO_SAME_SITE='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"id":"s1id","name":"example_site"},{"id":"s4id","name":"example_site"}]}'
+NO_SITE='{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}'
+SITE_FULL='{"type":"ssh","id":"s1id","name":"example_site","account":"example_acct","protocol":"ssh","transferType":"partner","maxConcurrentConnection":4,"default":false,"accessLevel":"PRIVATE","host":"partner.example.com","port":"8022","downloadFolder":"/in","downloadPattern":"*","uploadFolder":"/out","userName":"example_partner","usePassword":true,"password":"{AES128}abcDEF==","postTransmissionActions":{"doAsIn":"${stenv.target}_IN","doAsOut":null},"additionalAttributes":{},"metadata":{"links":{"account":"https://st.example.com:8444/api/v2.0/accounts/example_acct"}}}'
+NO_FOLDER_SITE='{"type":"pesit","id":"s1id","name":"example_site","account":"example_acct","protocol":"pesit","host":"partner.example.com","port":"17617","maxConcurrentConnection":0,"metadata":{"links":{}}}'
+TEST_OK='{"connectionStatus":"success","authenticationStatus":"success","fingerprintVerificationStatus":"not verified","errorDetails":null}'
+TEST_BAD_PW='{"connectionStatus":"success","authenticationStatus":"failed","errorDetails":"Password authentication failed."}'
+TEST_REFUSED='{"connectionStatus":"failed","authenticationStatus":"failed","errorDetails":"Connection refused"}'
+
+GET_BODY=$(body site_one "${ONE_SITE}")
+run "${F}/05.sites_id_HEAD.sh" example_acct example_site
+expect "05 HEAD: looks the id up by account and name, then HEADs the id" "${RC}:$(calls)" "0:GET ${LOOK}
+HEAD ${S}/s1id"
+has "05 HEAD: says the site exists, with its id" "The site example_site of example_acct exists, id s1id."
+run "${F}/05.sites_id_HEAD.sh"
+expect "05 HEAD: SSH_PULL of john by default" "$(calls | head -1)" "GET ${S}?account=john&name=SSH_PULL&fields=id,name"
+STATUS=404 run "${F}/05.sites_id_HEAD.sh" example_acct example_site
+expect "05 HEAD: 404 is 'does not exist', exit 1" "${RC}" "1"
+GET_BODY=$(body site_longer "${LONGER_SITE}")
+run "${F}/05.sites_id_HEAD.sh" example_acct example_site
+expect "05 HEAD: other names the filter matched are not counted, the exact one is used" "${RC}:$(calls | tail -1)" "0:HEAD ${S}/s1id"
+GET_BODY=$(body site_same "${TWO_SAME_SITE}")
+run "${F}/05.sites_id_HEAD.sh" example_acct example_site
+expect "05 HEAD: two sites of one name, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+GET_BODY=$(body site_none "${NO_SITE}")
+run "${F}/05.sites_id_HEAD.sh" example_acct example_site
+expect "05 HEAD: no such site, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+run "${F}/05.sites_id_HEAD.sh" example_acct "example site"
+expect "05 HEAD: a name with a space goes into the query for curl to encode" "$(calls)" "GET ${S}?account=example_acct&name=example site&fields=id,name"
+
+SEQUENCE=$(sequence site_get "${ONE_SITE}" "${SITE_FULL}" "${SITE_FULL}")
+run "${F}/06.sites_id_GET.sh" example_acct example_site
+expect "06 GET: looks the id up, reads the site, then reads only some fields" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/s1id
+GET ${S}/s1id?fields=name,host,port"
+has "06 GET: the type" "  type:             ssh"
+has "06 GET: the partner" "  partner:          partner.example.com:8022"
+has "06 GET: the folders" "  download folder:  /in"
+has "06 GET: the upload folder" "  upload folder:    /out"
+has "06 GET: the connection limit" "  max connections:  4"
+has "06 GET: the password as stored, never in clear" "  password:         {AES128}abcDEF=="
+SEQUENCE=$(sequence site_get_none "${ONE_SITE}" "${NO_FOLDER_SITE}")
+run "${F}/06.sites_id_GET.sh" example_acct example_site
+has "06 GET: a field the type has not is shown as -" "  download folder:  -"
+SEQUENCE=$(sequence site_get_unknown "${ONE_SITE}" '{"message":"Error validating request","validationErrors":["Site with id s1id not found or not accessible."]}')
+run "${F}/06.sites_id_GET.sh" example_acct example_site
+expect "06 GET: an answer with no id, exit 1" "${RC}" "1"
+SEQUENCE=
+
+SEQUENCE=$(sequence site_put "${ONE_SITE}" "${SITE_FULL}")
+STATUS=204 run "${F}/07.sites_id_PUT.sh" example_acct example_site 9
+expect "07 PUT: looks the id up, reads the site, PUTs it" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/s1id
+PUT ${S}/s1id"
+expect "07 PUT: sends the whole site back, the password as read, only the limit changed, metadata dropped" \
+  "$(payload 1 | jq -c .)" \
+  '{"type":"ssh","id":"s1id","name":"example_site","account":"example_acct","protocol":"ssh","transferType":"partner","maxConcurrentConnection":9,"default":false,"accessLevel":"PRIVATE","host":"partner.example.com","port":"8022","downloadFolder":"/in","downloadPattern":"*","uploadFolder":"/out","userName":"example_partner","usePassword":true,"password":"{AES128}abcDEF==","postTransmissionActions":{"doAsIn":"${stenv.target}_IN","doAsOut":null},"additionalAttributes":{}}'
+has "07 PUT: prints the value before" "maxConcurrentConnection of example_site is now 4."
+has "07 PUT: prints the code" "HTTP 204"
+SEQUENCE=$(sequence site_put_default "${ONE_SITE}" "${SITE_FULL}")
+STATUS=204 run "${F}/07.sites_id_PUT.sh" example_acct example_site
+expect "07 PUT: 2 by default" "$(payload 1 | jq -r .maxConcurrentConnection)" "2"
+SEQUENCE=$(sequence site_put_zero "${ONE_SITE}" "${SITE_FULL}")
+STATUS=204 run "${F}/07.sites_id_PUT.sh" example_acct example_site 0
+expect "07 PUT: 0, no limit, is a value (a number, not a string)" "$(payload 1 | jq -c .maxConcurrentConnection)" "0"
+SEQUENCE=$(sequence site_put_refused "${ONE_SITE}" "${SITE_FULL}")
+STATUS=400 run "${F}/07.sites_id_PUT.sh" example_acct example_site 3
+expect "07 PUT: a refusal exits 1" "${RC}" "1"
+SEQUENCE=
+GET_BODY=$(body site_none "${NO_SITE}")
+run "${F}/07.sites_id_PUT.sh" example_acct example_site 3
+expect "07 PUT: no such site, exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+GET_BODY=
+for args in "" "example_acct" "example_acct example_site abc" "example_acct example_site -1" "example_acct example_site 65536"; do
+    # shellcheck disable=SC2086
+    run "${F}/07.sites_id_PUT.sh" ${args}
+    expect "07 PUT: bad arguments (${args:-none}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+
+SEQUENCE=$(sequence site_patch "${ONE_SITE}" "${SITE_FULL}")
+STATUS=204 run "${F}/08.sites_id_PATCH.sh" example_acct example_site /archive
+expect "08 PATCH: looks the id up, reads the site, PATCHes it" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/s1id
+PATCH ${S}/s1id"
+expect "08 PATCH: replaces the download folder, nothing else" "$(payload 1 | jq -c .)" \
+  '[{"op":"replace","path":"/downloadFolder","value":"/archive"}]'
+has "08 PATCH: prints the folder before" "The download folder of example_site is now /in."
+has "08 PATCH: prints the code" "HTTP 204"
+SEQUENCE=$(sequence site_patch_default "${ONE_SITE}" "${SITE_FULL}")
+STATUS=204 run "${F}/08.sites_id_PATCH.sh" example_acct example_site
+expect "08 PATCH: /inbox by default" "$(payload 1 | jq -r '.[0].value')" "/inbox"
+SEQUENCE=$(sequence site_patch_quote "${ONE_SITE}" "${SITE_FULL}")
+STATUS=204 run "${F}/08.sites_id_PATCH.sh" example_acct example_site 'a "b" \ c'
+expect "08 PATCH: quotes and a backslash stay valid JSON" "$(payload 1 | jq -r '.[0].value')" 'a "b" \ c'
+SEQUENCE=$(sequence site_patch_nofolder "${ONE_SITE}" "${NO_FOLDER_SITE}")
+STATUS=204 run "${F}/08.sites_id_PATCH.sh" example_acct example_site
+expect "08 PATCH: a site with no download folder, exit 1, no PATCH" "${RC}:$(calls | grep -c PATCH)" "1:0"
+SEQUENCE=$(sequence site_patch_refused "${ONE_SITE}" "${SITE_FULL}")
+STATUS=400 run "${F}/08.sites_id_PATCH.sh" example_acct example_site
+expect "08 PATCH: a refusal exits 1" "${RC}" "1"
+SEQUENCE=
+for args in "" "example_acct"; do
+    # shellcheck disable=SC2086
+    run "${F}/08.sites_id_PATCH.sh" ${args}
+    expect "08 PATCH: bad arguments (${args:-none}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+
+SEQUENCE=$(sequence site_test "${ONE_SITE}" "${SITE_FULL}")
+POST_BODY=$(body test_ok "${TEST_OK}")
+run "${F}/09.sites_operations_POST_test.sh" example_acct example_site
+expect "09 test: looks the site up, reads it, POSTs testConnection" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/s1id
+POST ${S}/operations?operation=testConnection"
+expect "09 test: names the site by id, and carries no login" "$(payload 1 | jq -c .)" \
+  '{"id":"s1id","name":"example_site","host":"partner.example.com","port":"8022","protocol":"ssh","account":"example_acct"}'
+has "09 test: prints the connection" "  connection:      success"
+has "09 test: prints the authentication" "  authentication:  success"
+SEQUENCE=$(sequence site_test_pw "${ONE_SITE}" "${SITE_FULL}")
+SITE_PASSWORD='p@ss "w0rd"' run "${F}/09.sites_operations_POST_test.sh" example_acct example_site
+expect "09 test: SITE_PASSWORD is sent as the password to try, intact" \
+  "$(payload 1 | jq -c '[.password, .usePassword]')" '["p@ss \"w0rd\"","true"]'
+SEQUENCE=$(sequence site_test_badpw "${ONE_SITE}" "${SITE_FULL}")
+POST_BODY=$(body test_badpw "${TEST_BAD_PW}")
+run "${F}/09.sites_operations_POST_test.sh" example_acct example_site
+expect "09 test: a 200 whose login failed is exit 1" "${RC}" "1"
+has "09 test: and says why" "  error:           Password authentication failed."
+SEQUENCE=$(sequence site_test_refused "${ONE_SITE}" "${SITE_FULL}")
+POST_BODY=$(body test_refused "${TEST_REFUSED}")
+run "${F}/09.sites_operations_POST_test.sh" example_acct example_site
+expect "09 test: a connection that failed is exit 1" "${RC}" "1"
+has "09 test: and says why" "  error:           Connection refused"
+SEQUENCE=$(sequence site_test_404 "${ONE_SITE}" "${SITE_FULL}")
+POST_BODY=$(body test_404 '{"message":"Error validating request","validationErrors":["Site with id s1id not found or not accessible."]}')
+STATUS=404 run "${F}/09.sites_operations_POST_test.sh" example_acct example_site
+expect "09 test: a refusal exits 1 and prints the answer" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'not found or not accessible')" "1:1"
+SEQUENCE=
+GET_BODY=$(body site_none "${NO_SITE}")
+run "${F}/09.sites_operations_POST_test.sh" example_acct example_site
+expect "09 test: no such site, exit 1, no POST" "${RC}:$(calls | grep -c POST)" "1:0"
+GET_BODY=
+POST_BODY=
+
+POST_BODY=$(body test_new_ok "${TEST_OK}")
+SITE_PASSWORD='p@ss "w0rd"' run "${F}/10.sites_operations_POST_test_new.sh"
+expect "10 test new: one call, POST testConnection" "${RC}:$(calls)" "0:POST ${S}/operations?operation=testConnection"
+expect "10 test new: john on this server's SSH port by default, the login in username" "$(payload 1 | jq -c .)" \
+  '{"name":"example_untested","account":"john","protocol":"ssh","host":"st.example.com","port":"8022","username":"john","password":"p@ss \"w0rd\"","usePassword":"true"}'
+has "10 test new: says what it tests" "Testing ssh://st.example.com:8022 as john..."
+has "10 test new: prints the connection" "  connection:      success"
+SITE_PASSWORD=x run "${F}/10.sites_operations_POST_test_new.sh" example_acct ftp ftp.example.com 21 example_partner
+expect "10 test new: the arguments are used" "$(payload 1 | jq -c '[.account, .protocol, .host, .port, .username, .isSecure]')" \
+  '["example_acct","ftp","ftp.example.com","21","example_partner",null]'
+SITE_PASSWORD=x run "${F}/10.sites_operations_POST_test_new.sh" example_acct http ftp.example.com 443 example_partner true
+expect "10 test new: SECURE true sets isSecure" "$(payload 1 | jq -c '.isSecure')" '"true"'
+POST_BODY=$(body test_new_bad "${TEST_BAD_PW}")
+SITE_PASSWORD=x run "${F}/10.sites_operations_POST_test_new.sh"
+expect "10 test new: a login that failed is exit 1" "${RC}" "1"
+POST_BODY=$(body test_new_400 '{"message":"Error validating request","validationErrors":["Cannot perform a test operation for a non saved site. Account null does not exist."]}')
+SITE_PASSWORD=x STATUS=400 run "${F}/10.sites_operations_POST_test_new.sh"
+expect "10 test new: a refusal exits 1 and prints the answer" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'Account null does not exist')" "1:1"
+POST_BODY=
+run "${F}/10.sites_operations_POST_test_new.sh"
+expect "10 test new: no SITE_PASSWORD, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+for args in "john smb" "john ssh h abc" "john ssh h 22 u maybe"; do
+    # shellcheck disable=SC2086
+    SITE_PASSWORD=x run "${F}/10.sites_operations_POST_test_new.sh" ${args}
+    expect "10 test new: bad arguments (${args}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+
+LISTING='{"connectionStatus":"success","remoteFolder":"/in","errorDetails":"","resultSet":{"returnCount":2,"totalCount":2},"result":[{"fileName":"a.txt","fileSize":"12.00 bytes","filePermissions":"-rw-r-----","lastModifiedTime":"Thu Oct 08 06:41:18 EEST 2026"},{"fileName":"sub","fileSize":"0.00 bytes","filePermissions":"drwxr-x---","lastModifiedTime":"Thu Oct 08 06:41:19 EEST 2026"}]}'
+SEQUENCE=$(sequence site_list "${ONE_SITE}" "${SITE_FULL}")
+POST_BODY=$(body list_ok "${LISTING}")
+run "${F}/11.sites_operations_POST_list.sh" example_acct example_site
+expect "11 list: looks the site up, reads it, POSTs listRemoteFolder, always saying which folder, the limit and the folders" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/s1id
+POST ${S}/operations?operation=listRemoteFolder&folderToList=downloadFolder&limit=20&includesFolderNamesInResult=true"
+expect "11 list: names the site by id, and carries no login" "$(payload 1 | jq -c .)" \
+  '{"id":"s1id","name":"example_site","host":"partner.example.com","port":"8022","protocol":"ssh","account":"example_acct"}'
+has "11 list: the folder listed" "  folder:      /in"
+has "11 list: the count" "  entries:     2 of 2"
+has "11 list: a file, with size, permissions and time" "    a.txt  12.00 bytes  -rw-r-----  Thu Oct 08 06:41:18 EEST 2026"
+SEQUENCE=$(sequence site_list_up "${ONE_SITE}" "${SITE_FULL}")
+run "${F}/11.sites_operations_POST_list.sh" example_acct example_site uploadFolder -1 false
+expect "11 list: the folder, the limit and the folders can be given" "$(calls | tail -1)" \
+  "POST ${S}/operations?operation=listRemoteFolder&folderToList=uploadFolder&limit=-1&includesFolderNamesInResult=false"
+SEQUENCE=$(sequence site_list_missing "${ONE_SITE}" "${SITE_FULL}")
+POST_BODY=$(body list_missing '{"connectionStatus":"success","remoteFolder":"/nodir","errorDetails":"No such file: Specified file path is invalid.","resultSet":{"returnCount":0,"totalCount":0},"result":[]}')
+run "${F}/11.sites_operations_POST_list.sh" example_acct example_site
+expect "11 list: a folder that does not exist (200 with errorDetails) is exit 1" "${RC}" "1"
+has "11 list: and says why" "  error:       No such file: Specified file path is invalid."
+SEQUENCE=$(sequence site_list_bad "${ONE_SITE}" "${SITE_FULL}")
+POST_BODY=$(body list_bad '{"message":"Error validating request","validationErrors":["Remote folder value cannot be empty for a non saved site."]}')
+STATUS=400 run "${F}/11.sites_operations_POST_list.sh" example_acct example_site
+expect "11 list: a refusal exits 1 and prints the answer" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'cannot be empty')" "1:1"
+SEQUENCE=
+POST_BODY=
+GET_BODY=$(body site_none "${NO_SITE}")
+run "${F}/11.sites_operations_POST_list.sh" example_acct example_site
+expect "11 list: no such site, exit 1, no POST" "${RC}:$(calls | grep -c POST)" "1:0"
+GET_BODY=
+for args in "john x sideFolder" "john x downloadFolder abc" "john x downloadFolder 5 maybe"; do
+    # shellcheck disable=SC2086
+    run "${F}/11.sites_operations_POST_list.sh" ${args}
+    expect "11 list: bad arguments (${args}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

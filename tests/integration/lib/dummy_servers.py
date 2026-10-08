@@ -9,6 +9,9 @@ real HashiCorp Vault, S3 bucket or Axway Sentinel:
 - FakeS3     answers path-style S3 requests with any credentials, keeping
              objects in memory - enough for an S3 storage profile's test.
 - TcpSink    accepts connections and keeps what it receives, for Sentinel.
+- JunkServer accepts a connection, sends one line that no SSH, FTP or HTTP server would send, and
+             closes it: a "partner" that is not what its site says, so a connection test fails at once
+             (a TcpSink would keep the test waiting for more than 30 seconds).
 - SlowProxy  a TCP proxy that passes the bytes through at a limited rate, in both
              directions, so a transfer through it lasts as long as you need; close()
              cuts every connection, which aborts the transfer.
@@ -26,7 +29,7 @@ machine's address as the server sees it.
         ...
         assert any(r["path"].endswith("/approle/login") for r in vault.requests)
 
-Run on its own to keep one up by hand:  python3 dummy_servers.py vault|s3|sink|icap [PORT]
+Run on its own to keep one up by hand:  python3 dummy_servers.py vault|s3|sink|junk|icap [PORT]
 """
 import hashlib
 import json
@@ -254,6 +257,47 @@ class TcpSink:
         self.thread.join(5)
 
 
+class JunkServer:
+    """Answers every connection with `line` (default: a text no protocol uses) and closes it.
+    connections counts them."""
+
+    def __init__(self, port=0, line=b"this is not a partner\r\n"):
+        self.line = line
+        self.connections = 0
+        self.sock = socket.socket()
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("0.0.0.0", port))
+        self.sock.listen()
+        self.port = self.sock.getsockname()[1]
+        self.thread = threading.Thread(target=self._accept, daemon=True)
+
+    def _accept(self):
+        while True:
+            try:
+                conn, _ = self.sock.accept()
+            except OSError:
+                return
+            self.connections += 1
+            try:
+                conn.sendall(self.line)
+            except OSError:
+                pass
+            conn.close()
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        # On Linux close() alone leaves accept() blocked and the port listening
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self.sock.close()
+        self.thread.join(5)
+
+
 class SlowProxy:
     """
     Forwards each connection to target_host:target_port, passing at most `rate` bytes
@@ -460,9 +504,9 @@ class FakeIcap:
 
 
 if __name__ == "__main__":
-    kinds = {"vault": FakeVault, "s3": FakeS3, "sink": TcpSink, "icap": FakeIcap}  # SlowProxy needs a target: use it from code
+    kinds = {"vault": FakeVault, "s3": FakeS3, "sink": TcpSink, "junk": JunkServer, "icap": FakeIcap}  # SlowProxy needs a target: use it from code
     if len(sys.argv) < 2 or sys.argv[1] not in kinds:
-        sys.exit("usage: dummy_servers.py vault|s3|sink|icap [PORT]")
+        sys.exit("usage: dummy_servers.py vault|s3|sink|junk|icap [PORT]")
     with kinds[sys.argv[1]](int(sys.argv[2]) if len(sys.argv) > 2 else 0) as dummy:
         print("%s listening on port %d; Ctrl-C to stop" % (sys.argv[1], dummy.port), flush=True)
         try:

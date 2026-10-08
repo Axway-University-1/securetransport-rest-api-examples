@@ -750,6 +750,47 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   and follows the sessions as they open and close; `/sessions/statistics/bandwidth` stayed `[]` while an FTP client
   uploaded 6 MB (no bandwidth limit on the lab), so its shape is the reference's, unseen.
 
+- **Sites** (`/sites`; examples `06.TransferSites` 05 to 11): a site is addressed by a generated **id**, so every
+  example looks it up by account and name. **The `name=` filter ignores case and takes a `*`**: `example_x` and
+  `EXAMPLE_X` are two sites (creation is case sensitive, a second `example_x` on the same account is 409 "Entry
+  already exist."), both come back for either, and `example_x*` also finds `example_x2`; the same name on two accounts
+  is fine. So pick the exact name out of the answer yourself, and refuse more than one. `account=` is exact, case
+  sensitive, no `*`. Unlike the reference, the type-specific filters (`port=`, `downloadFolder=`) work **without**
+  `type=`; `limit=0` lists everything, `-1` is 400. HEAD is 200 or a bodiless 404; GET of an unknown id is a JSON 404
+  ("Site with id X not found or not accessible."); `fields=` keeps the named keys, an unknown one is 400; `type=` on a
+  GET of one is ignored (`type=http` on an SSH site answers it). The password reads back as `{AES128}...`.
+  **PUT replaces the whole site**: a fragment answers 204 and resets what it leaves out (folders, pattern, renaming,
+  connection limit); the read object with the encrypted password sent back keeps the password, no password at all is
+  400 "Specify password", plain text is encrypted anew; `account` in the body is accepted and ignored, `type` cannot
+  change (400), no `type` is 400, `name` renames. **PATCH**: `type` is read only (400), a path that does not exist
+  is 400 `Missing field`, `remove` sets null (the key stays), `replace` of `/id` and `/account` answer 204 and do
+  nothing, `replace` of `/name` renames, an empty patch is 204, `add` to `/additionalAttributes/userVars.<name>` works,
+  `add` to `/alternativeAddresses/-` is 404 "usage of Site Alternative Addresses is disabled". `customProperties` is
+  refused on an SSH or HTTP site (400 "Unsupported parameter") and is the whole of a custom site (S3, SMB...).
+  **`POST /sites/operations`** (`operation=testConnection` or `listRemoteFolder`; anything else, or none, is 400): the
+  test answers **200 whether or not it worked**, read `connectionStatus`, `authenticationStatus`, `errorDetails`
+  ("Connection refused", "Unknown site host: x", "Password authentication failed...", "530-Login failed...", "Failed
+  to negotiate transport component" for a partner that is not SSH). With the site's `id` in the body (and name,
+  host, port, protocol, as the reference requires) the server fills in the rest, the saved login included; what the
+  body does carry wins (a wrong password, host or port fails the test), except the protocol, which is the saved
+  site's. A site that is not saved needs `account` (400 "Account null does not exist" without it), `host`, `port`,
+  `protocol` and `username` (lower case) with `password` and `usePassword` "true". A partner that accepts the
+  connection and says nothing keeps the call waiting over 30 seconds; a stand-in that sends one junk line and closes
+  (`JunkServer`) fails at once. **A wrong password is a real failed login: one wrong SSH password counts as two
+  failures (password, then keyboard-interactive), and with `failedAuthMaximum` 3 a second wrong test locks the
+  account, which then refuses every login until unlocked**; a login that works resets the count. **`listRemoteFolder`
+  lists the UPLOAD folder when `folderToList` is left out** (the reference says download), so is
+  `includesFolderNamesInResult` false when left out (the reference says true), and any `folderToList` other than
+  `downloadFolder` means upload. SSH, FTP and HTTP sites list; a folder that is not there is 200 with an empty
+  result and `errorDetails` "No such file: Specified file path is invalid."; a site with no folder of that kind is
+  400 "Remote folder value cannot be empty for a non saved site." (the text says non saved though it is saved); a
+  `limit` that is not a number is a bare 404; `limit=-1` lists all; `orderByLastModified=ascending` reverses the
+  order. A custom S3 site's test needs HTTPS and a download key or upload destination: against the plain HTTP
+  `FakeS3` it fails with "https protocol is not supported", so it is not covered here.
+  A home folder on disk keeps the first account's owner: a new account with another uid on a used home cannot create
+  folders there (403 "Error occurred while creating file: null"), and a fresh home can refuse the first folder for a
+  moment.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root
@@ -804,7 +845,12 @@ worked, server-verified examples of everything below.
   site's own `POST`/`PUT` body is rejected as `"Unsupported parameter"`. The
   site just stores the literal template string verbatim; `customProperties`
   is supplied per request on the actual transfer operation, which is a
-  different call this project does not yet have an example for.
+  different call this project does not yet have an example for. (Confirmed
+  again on 5.5-20260924 for SSH and HTTP sites. The exception is a **custom**
+  site, `type: ExternalPersistedCustomSite` with `protocol` s3, smb, SharePoint
+  and so on: it is made of nothing but `customProperties`, and reads them back
+  with every default filled in. See "Sites" under "The Admin API, against its
+  own reference".)
 
 ## The Transaction Manager has no start operation - only stop
 

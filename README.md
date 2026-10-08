@@ -273,7 +273,7 @@ already exists.
 | 03. Connect | `/daemons`, `/servers`, and their operations | 13 | 13 |
 | 04. Applications | `/applications`, flow and maintenance types | 7 | 7 |
 | 05. Accounts | `/accounts`, including PATCH from a file | 8 | 8 |
-| 06. Transfer Sites | `/sites`, HTTP and SSH pull and push sites, list, delete by id | 4 | 4 |
+| 06. Transfer Sites | `/sites`, HTTP and SSH pull and push sites: list, check, read, replace, change and delete one by id, test a connection (saved or not) and list a remote folder | 11 | 11 |
 | 07. Subscriptions | `/subscriptions`, Advanced Routing, with and without a trigger file, delete by id | 4 | 4 |
 | 08. Route Templates | `/routes`, template type | 1 | 1 |
 | 09. Composite Routes | `/routes`, composite and simple types, Compress and Decompress steps, linked to a subscription, list, check, replace, patch a step, delete by id | 9 | 9 |
