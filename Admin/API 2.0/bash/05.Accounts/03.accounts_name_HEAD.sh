@@ -6,56 +6,47 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# This script checks whether an account exists using the HEAD method on the
-# `/accounts/{name}` endpoint.
+# This script checks whether an account exists, using the `/accounts/{name}` endpoint with the HEAD method.
 # It demonstrates:
-# - Sending a HEAD request
-# - Capturing the HTTP response code
-# - Acting on the result
+# - HEAD, which returns the headers only and so is a cheap existence check
+# - Reading the HTTP code with curl itself (`-w`), and acting on it
 #
 # Usage:
-# ./03.accounts_name_HEAD.sh
+# ./03.accounts_name_HEAD.sh [NAME]
+#
+#   NAME  the account (default example_user, the one 02.accounts_POST.sh creates)
 #
 # Risk: read
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - HEAD returns the headers only, which makes it a cheap existence check.
+# - Confirmed directly: 200 when the account exists and 404 when it does not, with no body either way.
+# - Exit codes: 0 when the account exists, 1 when it does not (404) or the server answers otherwise.
 # ==============================================================================
 
 #
-# Get the directory of the script
+# Get the directory of this script, so that it can be run from any location
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-# 
-# First we will load the variables into our context.
-# Put your own values in set_variables.local.sh, which set_variables.sh
-# loads and which git ignores.
-#
-printf "Loading variables into our context...\n\n"
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
+MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts"
+NAME="${1:-example_user}"
+NAME_URI=$(jq -rn --arg name "${NAME}" '$name | @uri')
 
-ACCOUNT_TO_CHECK="UserAccount"
-curl -k -u "${ST_USER}:${ST_PASSWORD}" --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
+# The HTTP code comes from curl itself. A bare --head would print the headers instead, and
+# curl -I does the same as --head.
+HTTP_CODE=$(curl -s -o /dev/null -k -u "${ST_USER}:${ST_PASSWORD}" --head "${MAIN_URL}/${NAME_URI}" -H "accept: */*" -H "${REFERER_HEADER}" -w "%{http_code}")
+printf "HTTP %s\n" "${HTTP_CODE}"
 
-# Or you can achieve the same thing with the '-I' option
-# curl -k -u "${ST_USER}:${ST_PASSWORD}" -I "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}"
-
-# If you want to parse the response code, here is an example how to do it
-# The ${HTTP_RESPONSE_CODE} variable will contain our HTTP Response code
-HTTP_RESPONSE_CODE=$(curl -k -u "${ST_USER}:${ST_PASSWORD}" --head "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${ACCOUNT_TO_CHECK}" -H "accept: */*" -H "${REFERER_HEADER}" 2>&1 | grep HTTP | awk '{print $2}')
-
-# And this is the if statement that we will use to print "Account Exists" if the HTTP Reponse Code is equal to 200
-if [[ ${HTTP_RESPONSE_CODE} == "200" ]]; then
-	echo "Account Exists"
-fi
-
-# An alternative version with if-else contruction
-if [[ ${HTTP_RESPONSE_CODE} == "200" ]]; then
-	echo "Account Exists"
+if [ "${HTTP_CODE}" = "200" ]; then
+    echo "Account Exists"
+elif [ "${HTTP_CODE}" = "404" ]; then
+    echo "Account does not exist"
+    exit 1
 else
-	echo "Account does not exist"
+    printf "Could not tell whether the account exists.\n"
+    exit 1
 fi

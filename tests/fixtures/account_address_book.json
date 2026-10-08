@@ -1,0 +1,4 @@
+{"type": "user", "name": "example_user", "uid": "41733", "gid": "41733", "homeFolder": "/home/example_user",
+ "addressBookSettings": {"policy": "default", "nonAddressBookCollaborationAllowed": null,
+   "sources": [{"name": "LDAP", "type": "LDAP"}, {"name": "Local", "type": "LOCAL"}],
+   "contacts": [{"fullName": "Existing Contact"}]}}

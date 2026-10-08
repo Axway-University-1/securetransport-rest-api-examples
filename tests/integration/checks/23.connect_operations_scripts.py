@@ -10,7 +10,12 @@ and verifies the restore.
 This needed, and got, an explicit, informed decision before it was added:
 05 really does stop the live http daemon (forcefully) and gracefully stop
 the live ssh daemon (up to a 600 second timeout) on whatever server this
-runs against.
+runs against. 05 no longer does anything when run bare: it needs the daemon,
+the operation and, for a stop, the confirmation word `stop-the-<daemon>-daemon`
+(and exits 2 without sending anything otherwise), so this check now gives it
+those: two runs, `http stop stop-the-http-daemon false` and `ssh stop
+stop-the-ssh-daemon true 600`, which are the two stops the bare script made.
+What it checks is unchanged. Run it only on a lab you can restart.
 
 Confirmed directly while building this, and worth knowing before assuming
 the two scripts are equally disruptive: 13.servers_operations_POST.sh is NOT
@@ -112,10 +117,13 @@ c.info("original server states: %s" % original_servers)
 
 try:
     with runner.real_credentials(BASH_TREE, config):
-        result = runner.run(os.path.join(CONNECT_DIR, "05.daemons_operations_POST.sh"), timeout=90)
-        c.check("05.daemons_operations_POST.sh runs without a shell level error",
-                result.returncode == 0,
-                result.stderr.strip()[-300:] if result.returncode else "")
+        # The two stops the script made when it was run bare: http at once, ssh gracefully with a timeout
+        for args in (["http", "stop", "stop-the-http-daemon", "false"],
+                     ["ssh", "stop", "stop-the-ssh-daemon", "true", "600"]):
+            result = runner.run(os.path.join(CONNECT_DIR, "05.daemons_operations_POST.sh"), args, timeout=90)
+            c.check("05.daemons_operations_POST.sh %s runs without a shell level error" % " ".join(args),
+                    result.returncode == 0,
+                    (result.stdout + result.stderr).strip()[-300:] if result.returncode else "")
 
     stopped = wait_until(lambda: daemon_statuses(client)["http"] == "Not running"
                         and daemon_statuses(client)["ssh"] == "Not running")

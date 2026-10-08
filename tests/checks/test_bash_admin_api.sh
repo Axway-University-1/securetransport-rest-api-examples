@@ -147,6 +147,174 @@ STATUS=204 run "${F}/04.accounts_name_DELETE.sh"
 expect "04 DELETE: the account, which takes its sites and profiles with it" "${RC}:$(calls)" "0:DELETE ${BASE}/accounts/example_setup"
 
 echo
+echo "=== 05.Accounts (02 to 07: made safe to run bare) ==="
+F=05.Accounts
+U="${BASE}/accounts"
+bad_args() { expect "$1" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"; }
+mkdir -p "${WORK}/admin/${F}" && cp -r "${ADMIN_TREE}/${F}/06.patch_body" "${WORK}/admin/${F}/"
+CLASSES='{"resultSet":{"returnCount":3},"result":[{"className":"ExampleRealClass","userType":"real","order":1},{"className":"ExampleVirtualClass","userType":"virtual","order":3},{"className":"ExampleAnyClass","userType":"*","order":2}]}'
+
+GET_BODY=$(body classes "${CLASSES}")
+STATUS=201 STATUS_GET=200 ACCOUNT_PASSWORD='p "q" $x' run "${F}/02.accounts_POST.sh"
+expect "02 POST: looks a user class up, then creates the three accounts" "${RC}:$(calls)" "0:GET ${BASE}/userClasses?fields=className,userType,order
+POST ${U}
+POST ${U}
+POST ${U}"
+expect "02 POST: example_user, the password from the environment, a fixed uid" \
+  "$(payload 1 | jq -c '[.name, .type, .homeFolder, .uid, .gid, .user.name, .user.passwordCredentials.password]')" \
+  '["example_user","user","/home/example_user","41733","41733","example_user","p \"q\" $x"]'
+expect "02 POST: example_service has no user object" "$(payload 2 | jq -c '[.name, .type, .homeFolder, .uid, (has("user"))]')" '["example_service","service","/home/example_service","41733",false]'
+expect "02 POST: example_template takes the first class that is not real, by order, not VirtClass" \
+  "$(payload 3 | jq -c '[.name, .type, .homeFolder, .templateClass]')" '["example_template","template","/home/example_template","ExampleAnyClass"]'
+expect "02 POST: a password given is not printed" "$(printf '%s\n' "${OUT}" | grep -cF 'p "q" $x')" "0"
+has "02 POST: prints HTTP 201" "HTTP 201"
+STATUS=201 STATUS_GET=200 run "${F}/02.accounts_POST.sh"
+GENERATED=$(printf '%s\n' "${OUT}" | sed -n 's/^The password of example_user is \(.*\) (generated.*/\1/p')
+expect "02 POST: a generated password is printed, and is the one sent" "$(payload 1 | jq -r .user.passwordCredentials.password)" "${GENERATED}"
+expect "02 POST: a generated password is 16 characters" "${#GENERATED}" "16"
+STATUS=201 run "${F}/02.accounts_POST.sh" MyClass
+expect "02 POST: a class given is used as it is, nothing looked up" "${RC}:$(calls | grep -c userClasses):$(payload 3 | jq -r .templateClass)" "0:0:MyClass"
+STATUS=409 STATUS_GET=200 run "${F}/02.accounts_POST.sh" MyClass
+expect "02 POST: a refusal exits 1, and the others are still tried" "${RC}:$(calls | grep -c POST)" "1:3"
+has "02 POST: and shows the HTTP code" "HTTP 409"
+GET_BODY=$(body no_classes '{"result":[]}')
+STATUS_GET=200 run "${F}/02.accounts_POST.sh"
+expect "02 POST: no user class to use, exit 1, nothing created" "${RC}:$(calls | grep -c POST)" "1:0"
+run "${F}/02.accounts_POST.sh" a b
+bad_args "02 POST: too many arguments, nothing sent"
+GET_BODY=
+
+STATUS=200 run "${F}/03.accounts_name_HEAD.sh"
+expect "03 HEAD: example_user, one HEAD, exit 0" "${RC}:$(calls)" "0:HEAD ${U}/example_user"
+has "03 HEAD: prints the code and says it exists" "HTTP 200"
+has "03 HEAD: says Account Exists" "Account Exists"
+STATUS=404 run "${F}/03.accounts_name_HEAD.sh" "a b"
+expect "03 HEAD: a missing account is exit 1, name URL-encoded" "${RC}:$(calls)" "1:HEAD ${U}/a%20b"
+has "03 HEAD: says it does not exist" "Account does not exist"
+STATUS=500 run "${F}/03.accounts_name_HEAD.sh"
+expect "03 HEAD: another answer is exit 1" "${RC}" "1"
+
+STATUS_GET=200 run "${F}/04.accounts_name_GET.sh"
+expect "04 GET: example_user, four reads" "${RC}:$(calls)" "0:GET ${U}/example_user
+GET ${U}/example_user?fields=name,uid,gid
+GET ${U}/example_user?fields=addressBookSettings
+GET ${U}/example_user?type=user&fields=addressBookSettings"
+STATUS_GET=404 run "${F}/04.accounts_name_GET.sh" other
+expect "04 GET: a missing account stops after the first read, exit 1" "${RC}:$(calls)" "1:GET ${U}/other"
+# The server refuses fields=addressBookSettings without a type (400): that third read is the demonstration, so it does not stop the script
+cp "${WORK}/bin/curl" "${WORK}/bin/curl.stub"
+cat > "${WORK}/bin/curl" <<'EOS'
+#!/bin/bash
+out=$("$(dirname "$0")/curl.stub" "$@")
+case "$*" in
+    *"fields=addressBookSettings"*) case "$*" in *"type=user"*) ;; *) out="${out%200}400" ;; esac ;;
+esac
+printf '%s' "${out}"
+EOS
+chmod +x "${WORK}/bin/curl"
+STATUS_GET=200 run "${F}/04.accounts_name_GET.sh"
+expect "04 GET: the refusal of the type specific field without the type is shown, and the fourth read still follows, exit 0" "${RC}:$(calls | wc -l | tr -d ' ')" "0:4"
+has "04 GET: with the code of the refusal" "HTTP 400"
+mv "${WORK}/bin/curl.stub" "${WORK}/bin/curl"
+
+ACCOUNT='{"type":"user","name":"example_user","uid":"41733","gid":"41733","homeFolder":"/home/example_user","metadata":{"links":{"self":"https://st.example.com:8444/api/v2.0/accounts/example_user"}},"user":{"name":"example_user"}}'
+GET_BODY=$(body acct "${ACCOUNT}")
+STATUS=204 STATUS_GET=200 run "${F}/05.accounts_name_PUT.sh"
+expect "05 PUT: reads, then PUTs, on example_user" "${RC}:$(calls)" "0:GET ${U}/example_user
+PUT ${U}/example_user"
+expect "05 PUT: sends the whole object back, with only the uid changed" "$(payload 1 | jq -c --argjson a "${ACCOUNT}" '. == ($a | .uid = "1111")')" "true"
+has "05 PUT: prints the old uid" "The uid of example_user is now 41733."
+has "05 PUT: and the command that puts it back" "To put it back: ./05.accounts_name_PUT.sh example_user 41733"
+has "05 PUT: prints HTTP 204" "HTTP 204"
+expect "05 PUT: leaves no file behind" "$(ls "${WORK}/admin/${F}" | grep -cE '^(result|new_result)\.json$')" "0"
+STATUS=204 STATUS_GET=200 run "${F}/05.accounts_name_PUT.sh" "a b" 2222
+expect "05 PUT: another account and uid, name URL-encoded" "$(calls | head -1):$(payload 1 | jq -r .uid)" "GET ${U}/a%20b:2222"
+STATUS=400 STATUS_GET=200 run "${F}/05.accounts_name_PUT.sh"
+expect "05 PUT: a refusal exits 1" "${RC}" "1"
+STATUS=204 STATUS_GET=404 run "${F}/05.accounts_name_PUT.sh"
+expect "05 PUT: an account that cannot be read, exit 1, nothing sent" "${RC}:$(calls | grep -c PUT)" "1:0"
+run "${F}/05.accounts_name_PUT.sh" example_user abc
+bad_args "05 PUT: a uid that is not a number, nothing sent"
+GET_BODY=
+
+AB='{"type":"user","homeFolder":"/home/example_user","addressBookSettings":{"policy":"default","nonAddressBookCollaborationAllowed":null,"sources":[{"name":"LDAP"},{"name":"Local"}],"contacts":[{"fullName":"Existing"}]}}'
+GET_BODY=$(body acct_ab "${AB}")
+STATUS=204 STATUS_GET=200 run "${F}/06.accounts_name_PATCH.sh"
+expect "06 PATCH: reads, three patches, a read, then the last patch, on example_user" "${RC}:$(calls)" "0:GET ${U}/example_user?type=user&fields=addressBookSettings
+PATCH ${U}/example_user
+PATCH ${U}/example_user
+PATCH ${U}/example_user
+GET ${U}/example_user?type=user&fields=addressBookSettings.nonAddressBookCollaborationAllowed
+PATCH ${U}/example_user"
+expect "06 PATCH: the policy to custom" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/addressBookSettings/policy","value":"custom"}]'
+expect "06 PATCH: two fields at once" "$(payload 2 | jq -c .)" '[{"op":"replace","path":"/addressBookSettings/policy","value":"default"},{"op":"replace","path":"/addressBookSettings/nonAddressBookCollaborationAllowed","value":"true"}]'
+expect "06 PATCH: removes the flag" "$(payload 3 | jq -c .)" '[{"op":"remove","path":"/addressBookSettings/nonAddressBookCollaborationAllowed"}]'
+expect "06 PATCH: appends a contact with -, never an index" "$(payload 4 | jq -c .)" '[{"op":"add","path":"/addressBookSettings/contacts/-","value":{"fullName":"Jane Doe","primaryEmail":"jane.doe@abc.com"}}]'
+has "06 PATCH: prints the old settings" "The address book settings of example_user are now: policy default, nonAddressBookCollaborationAllowed null, 2 sources, 1 contacts."
+has "06 PATCH: and the body that puts the policy and the flag back" 'To put the policy and the flag back, PATCH this body: [{"op":"replace","path":"/addressBookSettings/policy","value":"default"},{"op":"remove","path":"/addressBookSettings/nonAddressBookCollaborationAllowed"}]'
+has "06 PATCH: and the one that takes the contact out" 'To take the contact out again, PATCH this body: [{"op":"remove","path":"/addressBookSettings/contacts/1"}]'
+expect "06 PATCH: prints HTTP 204 for each patch" "$(printf '%s\n' "${OUT}" | grep -c '^HTTP 204')" "4"
+GET_BODY=$(body acct_ab_flag '{"type":"user","addressBookSettings":{"policy":"disabled","nonAddressBookCollaborationAllowed":true,"sources":[{"name":"Local"}],"contacts":[]}}')
+STATUS=204 STATUS_GET=200 run "${F}/06.accounts_name_PATCH.sh" "a b"
+expect "06 PATCH: one source only, the change to custom is skipped (it would be a 400), name URL-encoded" "${RC}:$(calls | grep -c PATCH):$(calls | head -1)" "0:3:GET ${U}/a%20b?type=user&fields=addressBookSettings"
+has "06 PATCH: and says so" "Skipping the change to custom: it needs at least two address book sources and this account has 1."
+has "06 PATCH: puts back a flag that was set, with replace" '[{"op":"replace","path":"/addressBookSettings/policy","value":"disabled"},{"op":"replace","path":"/addressBookSettings/nonAddressBookCollaborationAllowed","value":true}]'
+GET_BODY=$(body acct_ab2 "${AB}")
+STATUS=400 STATUS_GET=200 run "${F}/06.accounts_name_PATCH.sh"
+expect "06 PATCH: a refusal exits 1 and the later patches are not sent" "${RC}:$(calls | grep -c PATCH)" "1:1"
+has "06 PATCH: and shows the HTTP code" "HTTP 400"
+STATUS=204 STATUS_GET=404 run "${F}/06.accounts_name_PATCH.sh"
+expect "06 PATCH: an account that cannot be read, exit 1, nothing patched" "${RC}:$(calls | grep -c PATCH)" "1:0"
+
+TYPE_BODY=$(body acct_type '{"type":"user"}')
+export STUB_CURL_GET_RULES="${WORK}/rules_acct.txt"
+printf 'fields=type\t%s\n' "${TYPE_BODY}" > "${STUB_CURL_GET_RULES}"
+STATUS=204 STATUS_GET=200 run "${F}/06.accounts_name_PATCH_with_file.sh"
+expect "06 PATCH with file: reads the type, reads the account with it, then PATCHes example_user" "${RC}:$(calls)" "0:GET ${U}/example_user?fields=type
+GET ${U}/example_user?type=user
+PATCH ${U}/example_user"
+expect "06 PATCH with file: sends the file as it is" "$(payload 1 | jq -c .)" "$(jq -c . "${ADMIN_TREE}/${F}/06.patch_body/stPatchAccount.json")"
+has "06 PATCH with file: says what the path holds now" "  /addressBookSettings/contacts/-: null"
+has "06 PATCH with file: prints HTTP 204" "HTTP 204"
+STATUS=204 STATUS_GET=200 run "${F}/06.accounts_name_PATCH_with_file.sh" other "${WORK}/admin/${F}/06.patch_body/stPatchAccountNotes.json"
+expect "06 PATCH with file: another account, the file given as the second argument" "$(calls | tail -1):$(payload 1 | jq -c '.[0].path')" "PATCH ${U}/other:\"/notes\""
+STATUS=204 STATUS_GET=200 run "${F}/06.accounts_name_PATCH_with_file.sh" example_user "${WORK}/admin/${F}/06.patch_body/stPatchAccountBU.json"
+has "06 PATCH with file: prints what the paths of a longer file hold now" '  /homeFolder: "/home/example_user"'
+STATUS=404 STATUS_GET=200 run "${F}/06.accounts_name_PATCH_with_file.sh" example_user "${WORK}/admin/${F}/06.patch_body/stPatchAccountBU.json"
+expect "06 PATCH with file: a refusal exits 1, with the code" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^HTTP 404')" "1:1"
+run "${F}/06.accounts_name_PATCH_with_file.sh" example_user "${WORK}/no_such_file.json"
+bad_args "06 PATCH with file: a missing file, nothing sent"
+printf '{"op":"add"}\n' > "${WORK}/not_a_patch.json"
+run "${F}/06.accounts_name_PATCH_with_file.sh" example_user "${WORK}/not_a_patch.json"
+bad_args "06 PATCH with file: a file that is not a JSON Patch, nothing sent"
+STATUS=204 STATUS_GET=404 run "${F}/06.accounts_name_PATCH_with_file.sh"
+expect "06 PATCH with file: an account that cannot be read, exit 1, nothing patched" "${RC}:$(calls | grep -c PATCH)" "1:0"
+unset STUB_CURL_GET_RULES
+GET_BODY=
+
+GET_BODY=$(body acct_small '{"type":"user","homeFolder":"/home/example_user","uid":"41733"}')
+STATUS=204 STATUS_GET=200 run "${F}/07.accounts_name_DELETE.sh"
+expect "07 DELETE: the three example accounts, each read first" "${RC}:$(calls)" "0:GET ${U}/example_user?fields=type,homeFolder,uid
+DELETE ${U}/example_user
+GET ${U}/example_service?fields=type,homeFolder,uid
+DELETE ${U}/example_service
+GET ${U}/example_template?fields=type,homeFolder,uid
+DELETE ${U}/example_template"
+has "07 DELETE: says what it deletes" "Deleting Account: example_user (type user, home folder /home/example_user, uid 41733)"
+has "07 DELETE: prints HTTP 204" "HTTP 204"
+expect "07 DELETE: never touches john, UserAccount, ServiceAccount or TemplateAccount" "$(calls | grep -cE 'john|UserAccount|ServiceAccount|TemplateAccount')" "0"
+STATUS=204 STATUS_GET=200 run "${F}/07.accounts_name_DELETE.sh" "a b" other
+expect "07 DELETE: only the names given, URL-encoded" "$(calls | grep -c DELETE):$(calls | grep DELETE | head -1)" "2:DELETE ${U}/a%20b"
+STATUS_GET=404 run "${F}/07.accounts_name_DELETE.sh" other
+expect "07 DELETE: an account that is not there is not deleted, exit 0" "${RC}:$(calls | grep -c DELETE)" "0:0"
+has "07 DELETE: and says so" "Account other does not exist."
+STATUS=400 STATUS_GET=200 run "${F}/07.accounts_name_DELETE.sh"
+expect "07 DELETE: a refusal exits 1, and the others are still tried" "${RC}:$(calls | grep -c DELETE)" "1:3"
+has "07 DELETE: and shows the HTTP code" "HTTP 400"
+run "${F}/07.accounts_name_DELETE.sh" example_user ""
+bad_args "07 DELETE: an empty name, nothing sent"
+GET_BODY=
+echo
 echo "=== 19.AddressBook ==="
 F=19.AddressBook
 U="${BASE}/addressBook/sources"
@@ -342,6 +510,129 @@ STATUS=404 run "${F}/10.administrators_name_apiKeys_keyId_DELETE.sh" k9
 expect "10 DELETE: anything but 204 exits 1" "${RC}" "1"
 GET_BODY=
 
+echo
+echo "=== 04.Applications (02 to 07: made safe to run bare) ==="
+F=04.Applications
+U="${BASE}/applications"
+bad_args() { expect "$1" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"; }
+
+GET_BODY=$(body apps_none '{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}')
+STATUS=201 STATUS_GET=200 run "${F}/02.applications_POST.sh"
+expect "02 POST: creates the flow application, looks for a purge one by type, creates it" "${RC}:$(calls)" "0:POST ${U}
+GET ${U}?type=AccountFilePurge&fields=name
+POST ${U}"
+expect "02 POST: a flow application with only a type, a name and notes" "$(payload 1 | jq -c .)" '{"type":"HumanSystem","name":"example_humansystem","notes":"This is a HumanSystem application"}'
+expect "02 POST: the maintenance application is example_filepurge, with no schedule" \
+  "$(payload 2 | jq -c '[.type, .name, .deleteFilesDays, .pattern, .removeFolders, .schedules]')" '["AccountFilePurge","example_filepurge",90,"*.txt",true,[]]'
+expect "02 POST: the rest of the schema is there, JSON built by jq" "$(payload 2 | jq -c '[.expirationPeriod, .notifyDays, .sendSentinelAlert, .warnNotifyAccount, .deletionNotifications, .deletionNotifyAccount]')" '[true,"90",false,false,false,false]'
+has "02 POST: prints HTTP 201" "HTTP 201"
+STATUS=201 STATUS_GET=200 run "${F}/02.applications_POST.sh" once
+expect "02 POST: with once, a ONCE schedule that starts in the future" \
+  "$(payload 2 | jq -c '.schedules[0] | [.tag, .type, .executionTimes, .skipHolidays, (.startDate | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T00:00:00Z$"))]')" '["AccountFilePurge","ONCE",["00:00"],false,true]'
+expect "02 POST: and the start date is after today" "$(payload 2 | jq -r '.schedules[0].startDate[:10]' | awk -v today="$(date -u +%Y-%m-%d)" '{ print ($0 > today) ? "later" : "not later" }')" "later"
+GET_BODY=$(body apps_one '{"result":[{"name":"SomeoneElsesPurge","type":"AccountFilePurge"}]}')
+STATUS=201 STATUS_GET=200 run "${F}/02.applications_POST.sh"
+expect "02 POST: a purge application exists already (only one is allowed): none created, exit 0" "${RC}:$(calls | grep -c POST)" "0:1"
+has "02 POST: and says which one" "exists already (SomeoneElsesPurge): the server allows only one, so none was created."
+GET_BODY=$(body apps_none2 '{"result":[]}')
+STATUS=400 STATUS_GET=200 run "${F}/02.applications_POST.sh"
+expect "02 POST: a refusal exits 1" "${RC}" "1"
+has "02 POST: and shows the HTTP code" "HTTP 400"
+STATUS=201 STATUS_GET=500 run "${F}/02.applications_POST.sh"
+expect "02 POST: the lookup by type cannot be done, exit 1, no maintenance application created" "${RC}:$(calls | grep -c POST)" "1:1"
+run "${F}/02.applications_POST.sh" sometimes
+bad_args "02 POST: a schedule that is neither none nor once, nothing sent"
+run "${F}/02.applications_POST.sh" once extra
+bad_args "02 POST: too many arguments, nothing sent"
+GET_BODY=
+
+STATUS=200 run "${F}/03.applications_name_HEAD.sh"
+expect "03 HEAD: example_filepurge, one HEAD, exit 0" "${RC}:$(calls)" "0:HEAD ${U}/example_filepurge"
+has "03 HEAD: prints the code and says it exists" "Application exists."
+STATUS=404 run "${F}/03.applications_name_HEAD.sh" "my app"
+expect "03 HEAD: a missing application is exit 1, name URL-encoded" "${RC}:$(calls)" "1:HEAD ${U}/my%20app"
+has "03 HEAD: prints HTTP 404" "HTTP 404"
+STATUS=500 run "${F}/03.applications_name_HEAD.sh"
+expect "03 HEAD: another answer is exit 1" "${RC}" "1"
+
+GET_BODY=$(body app_flow '{"type":"HumanSystem","name":"example_humansystem","notes":"n","businessUnits":["BU1"]}')
+STATUS_GET=200 run "${F}/04.applications_name_GET.sh" example_humansystem
+expect "04 GET: one read of the application named" "${RC}:$(calls)" "0:GET ${U}/example_humansystem"
+has "04 GET: lists the business units" 'Business units assigned to the application: ["BU1"]'
+STATUS_GET=200 run "${F}/04.applications_name_GET.sh"
+expect "04 GET: example_filepurge by default" "$(calls)" "GET ${U}/example_filepurge"
+STATUS_GET=404 run "${F}/04.applications_name_GET.sh" "my app"
+expect "04 GET: a missing application is exit 1, name URL-encoded" "${RC}:$(calls)" "1:GET ${U}/my%20app"
+GET_BODY=$(body app_nobu '{"type":"Basic","name":"x","businessUnits":[]}')
+STATUS_GET=200 run "${F}/04.applications_name_GET.sh" x
+has "04 GET: says when there are none" "No business units assigned to the application."
+
+APP='{"type":"AccountFilePurge","name":"example_filepurge","notes":"old notes","businessUnits":[],"deleteFilesDays":90,"schedules":[{"type":"ONCE","tag":"AccountFilePurge","startDate":"1791493200000","executionTimes":["00:00"]}]}'
+GET_BODY=$(body app_purge "${APP}")
+STATUS=204 STATUS_GET=200 run "${F}/05.applications_name_PUT.sh"
+expect "05 PUT: reads, then PUTs, on example_filepurge" "${RC}:$(calls)" "0:GET ${U}/example_filepurge
+PUT ${U}/example_filepurge"
+expect "05 PUT: sends the whole object back, with only the notes changed" "$(payload 1 | jq -c --argjson a "${APP}" '(.notes | startswith("New note ")) and (del(.notes) == ($a | del(.notes)))')" "true"
+has "05 PUT: prints the old notes" "The notes of example_filepurge are now 'old notes'."
+has "05 PUT: and the command that puts them back" "To put them back: ./05.applications_name_PUT.sh example_filepurge old\\ notes"
+has "05 PUT: prints HTTP 204" "HTTP 204"
+expect "05 PUT: leaves no tmp.json behind" "$(ls "${WORK}/admin/${F}" | grep -c '^tmp.json')" "0"
+STATUS=204 STATUS_GET=200 run "${F}/05.applications_name_PUT.sh" "my app" 'text with "quotes"'
+expect "05 PUT: another application and notes, name URL-encoded" "$(calls | head -1):$(payload 1 | jq -r .notes)" "GET ${U}/my%20app"':text with "quotes"'
+STATUS=204 STATUS_GET=200 run "${F}/05.applications_name_PUT.sh" example_filepurge ""
+expect "05 PUT: empty notes are sent as empty notes, not replaced by the default (the command it printed must work)" "$(payload 1 | jq -c '.notes')" '""'
+STATUS=400 STATUS_GET=200 run "${F}/05.applications_name_PUT.sh"
+expect "05 PUT: a refusal exits 1" "${RC}" "1"
+STATUS=204 STATUS_GET=404 run "${F}/05.applications_name_PUT.sh"
+expect "05 PUT: an application that cannot be read, exit 1, nothing sent" "${RC}:$(calls | grep -c PUT)" "1:0"
+run "${F}/05.applications_name_PUT.sh" a b c
+bad_args "05 PUT: too many arguments, nothing sent"
+
+STATUS=204 STATUS_GET=200 run "${F}/06.applications_name_PATCH.sh"
+expect "06 PATCH: reads, then patches the notes and the start date, on example_filepurge" "${RC}:$(calls)" "0:GET ${U}/example_filepurge
+PATCH ${U}/example_filepurge
+PATCH ${U}/example_filepurge"
+expect "06 PATCH: the notes" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/notes","value":"Patched note"}]'
+expect "06 PATCH: a start date in the future, never the 2025 date that the server refuses" \
+  "$(payload 2 | jq -r '.[0] | .path + " " + .value[:10]' | awk -v today="$(date -u +%Y-%m-%d)" '{ print $1 " " (($2 > today) ? "later" : "not later") }')" "/schedules/0/startDate later"
+has "06 PATCH: prints the old notes, and how to put them back" 'To put them back, PATCH this body: [{"op":"replace","path":"/notes","value":"old notes"}]'
+has "06 PATCH: prints the old start date as an ISO date" "The start date of the first schedule is now 2026-10-08T21:00:00Z."
+has "06 PATCH: and how to put it back" 'To put it back, PATCH this body: [{"op":"replace","path":"/schedules/0/startDate","value":"2026-10-08T21:00:00Z"}]'
+expect "06 PATCH: prints HTTP 204 for each patch" "$(printf '%s\n' "${OUT}" | grep -c '^HTTP 204')" "2"
+GET_BODY=$(body app_flow2 '{"type":"HumanSystem","name":"example_humansystem","notes":"n","businessUnits":[]}')
+STATUS=204 STATUS_GET=200 run "${F}/06.applications_name_PATCH.sh" "my app"
+expect "06 PATCH: no schedule, only the notes are patched (the path would be a 400), name URL-encoded" "${RC}:$(calls | grep -c PATCH):$(calls | head -1)" "0:1:GET ${U}/my%20app"
+has "06 PATCH: and says so" "The application has no schedule, so there is no startDate to change."
+GET_BODY=$(body app_purge2 "${APP}")
+STATUS=400 STATUS_GET=200 run "${F}/06.applications_name_PATCH.sh"
+expect "06 PATCH: a refusal exits 1 and the later patch is not sent" "${RC}:$(calls | grep -c PATCH)" "1:1"
+has "06 PATCH: and shows the HTTP code" "HTTP 400"
+STATUS=204 STATUS_GET=404 run "${F}/06.applications_name_PATCH.sh"
+expect "06 PATCH: an application that cannot be read, exit 1, nothing patched" "${RC}:$(calls | grep -c PATCH)" "1:0"
+GET_BODY=
+
+GET_BODY=$(body app_type '{"type":"HumanSystem"}')
+STATUS=204 STATUS_GET=200 run "${F}/07.applications_name_DELETE.sh"
+expect "07 DELETE: the two example applications, each read first" "${RC}:$(calls)" "0:GET ${U}/example_filepurge?fields=type
+DELETE ${U}/example_filepurge
+GET ${U}/example_humansystem?fields=type
+DELETE ${U}/example_humansystem"
+has "07 DELETE: says what it deletes" "Application exists. Deleting application 'example_filepurge' (type HumanSystem)..."
+has "07 DELETE: prints HTTP 204" "HTTP 204"
+expect "07 DELETE: never names the old AccountFilePurge Application or the built in jobs" "$(calls | grep -cE 'AccountFilePurge%20Application|Maintenance')" "0"
+STATUS=204 STATUS_GET=200 run "${F}/07.applications_name_DELETE.sh" "my app" other
+expect "07 DELETE: only the names given, URL-encoded" "$(calls | grep -c DELETE):$(calls | grep DELETE | head -1)" "2:DELETE ${U}/my%20app"
+STATUS_GET=404 run "${F}/07.applications_name_DELETE.sh" other
+expect "07 DELETE: an application that is not there is not deleted, exit 0" "${RC}:$(calls | grep -c DELETE)" "0:0"
+has "07 DELETE: and says so" "Application other does not exist."
+STATUS=400 STATUS_GET=200 run "${F}/07.applications_name_DELETE.sh"
+expect "07 DELETE: a refusal exits 1, and the other is still tried" "${RC}:$(calls | grep -c DELETE)" "1:2"
+has "07 DELETE: and shows the HTTP code" "HTTP 400"
+run "${F}/07.applications_name_DELETE.sh" example_filepurge ""
+bad_args "07 DELETE: an empty name, nothing sent"
+GET_BODY=
+STATUS=
+STATUS_GET=
 echo
 echo "=== 12.BusinessUnits ==="
 F=12.BusinessUnits
@@ -795,6 +1086,211 @@ STATUS=204 run "${F}/47.configurations_storageProfiles_options_PUT_unregister.sh
 expect "47 PUT: the last one leaves [\"\"], not []" "$(payload 1 | jq -c '.[0].values')" '[""]'
 GET_BODY=
 
+F=13.Configurations
+U="${BASE}/configurations"
+
+# 01 and 02: written bare before. The old values are read first, and a missing value stops the script before anything is sent.
+GET_BODY=$(body opt_value '{"values":["true"]}')
+run "${F}/01.configurations_PATCH.sh"
+nothing_sent "01 PATCH: bare, needs a VALUE, nothing sent"
+run "${F}/01.configurations_PATCH.sh" maybe
+nothing_sent "01 PATCH: AddressBook.Enabled is true or false, nothing sent"
+run "${F}/01.configurations_PATCH.sh" true "Bad Option"
+nothing_sent "01 PATCH: an option name with a space, nothing sent"
+run "${F}/01.configurations_PATCH.sh" a b c
+nothing_sent "01 PATCH: too many arguments, nothing sent"
+STATUS=204 STATUS_GET=200 run "${F}/01.configurations_PATCH.sh" false
+expect "01 PATCH: reads AddressBook.Enabled, then patches it" "${RC}:$(calls)" "0:GET ${U}/options/AddressBook.Enabled?fields=values
+PATCH ${U}/options/AddressBook.Enabled"
+expect "01 PATCH: replaces /values/0" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/values/0","value":"false"}]'
+has "01 PATCH: prints the old values" 'The values of AddressBook.Enabled are now: ["true"]'
+has "01 PATCH: and the command that puts the first back" "To put the first one back: ./01.configurations_PATCH.sh true AddressBook.Enabled"
+has "01 PATCH: prints HTTP 204" "HTTP 204"
+STATUS=204 STATUS_GET=200 run "${F}/01.configurations_PATCH.sh" 'a "b"' Some.Other-Option_1
+expect "01 PATCH: another option, any value, kept valid JSON" "$(calls | tail -1):$(payload 1 | jq -c '.[0].value')" "PATCH ${U}/options/Some.Other-Option_1:\"a \\\"b\\\"\""
+STATUS=400 STATUS_GET=200 run "${F}/01.configurations_PATCH.sh" true
+expect "01 PATCH: a refusal exits 1" "${RC}" "1"
+has "01 PATCH: and shows the HTTP code" "HTTP 400"
+STATUS=204 STATUS_GET=404 run "${F}/01.configurations_PATCH.sh" true
+expect "01 PATCH: an option that cannot be read, exit 1, nothing patched" "${RC}:$(calls | grep -c PATCH)" "1:0"
+GET_BODY=$(body opt_empty '{"values":[]}')
+STATUS=204 STATUS_GET=200 run "${F}/01.configurations_PATCH.sh" true
+expect "01 PATCH: an option with no value (replace would be a 400), exit 1, nothing patched" "${RC}:$(calls | grep -c PATCH)" "1:0"
+
+USAGE_VARS="ST_USAGE_CLIENT_ID ST_USAGE_CLIENT_SECRET ST_USAGE_ENVIRONMENT_ID ST_USAGE_ENVIRONMENT_NAME ST_USAGE_FILE_PATH ST_USAGE_NETWORK_ZONE ST_USAGE_PLATFORM_API ST_USAGE_PLATFORM_AUTHENTICATION ST_USAGE_SCHEMA_ID ST_USAGE_DAYS_TO_INCLUDE"
+set_usage_env() {
+    export ST_USAGE_CLIENT_ID='example client' ST_USAGE_CLIENT_SECRET='sec "ret" $x \ y' ST_USAGE_ENVIRONMENT_ID=example-env-id
+    export ST_USAGE_ENVIRONMENT_NAME='Example Env' ST_USAGE_FILE_PATH=/example/reports ST_USAGE_NETWORK_ZONE=example-zone
+    export ST_USAGE_PLATFORM_API=https://platform.example.com/api ST_USAGE_PLATFORM_AUTHENTICATION=https://login.example.com/token
+    export ST_USAGE_SCHEMA_ID=https://platform.example.com/schema.json ST_USAGE_DAYS_TO_INCLUDE=3
+}
+clear_usage_env() { unset ${USAGE_VARS}; }
+clear_usage_env
+GET_BODY=$(body opt_values '{"values":["old value"]}')
+STATUS=204 STATUS_GET=200 run "${F}/02.configurations_PATCH_UsageReporting.sh"
+nothing_sent "02 PATCH usage: bare, nothing is sent, however many options"
+expect "02 PATCH usage: and every variable is named" "$(printf '%s\n' "${OUT}" | grep -c 'is not set')" "9"
+set_usage_env
+ST_USAGE_CLIENT_ID='<PUT YOUR CLIENT ID HERE>' run "${F}/02.configurations_PATCH_UsageReporting.sh"
+nothing_sent "02 PATCH usage: a placeholder is refused, nothing sent"
+has "02 PATCH usage: and says which variable" "ST_USAGE_CLIENT_ID still holds a placeholder"
+ST_USAGE_CLIENT_SECRET='<PUT YOUR CLIENT_SECRET HERE>' run "${F}/02.configurations_PATCH_UsageReporting.sh"
+nothing_sent "02 PATCH usage: the secret still a placeholder, nothing sent"
+ST_USAGE_ENVIRONMENT_NAME='PUT YOUR ENVIRONMENT_NAME HERE' run "${F}/02.configurations_PATCH_UsageReporting.sh"
+nothing_sent "02 PATCH usage: a placeholder without the brackets, nothing sent"
+ST_USAGE_ENVIRONMENT_ID= run "${F}/02.configurations_PATCH_UsageReporting.sh"
+nothing_sent "02 PATCH usage: an empty value, nothing sent"
+has "02 PATCH usage: and says which variable" "ST_USAGE_ENVIRONMENT_ID is not set"
+ST_USAGE_DAYS_TO_INCLUDE=abc run "${F}/02.configurations_PATCH_UsageReporting.sh"
+nothing_sent "02 PATCH usage: days that are not a number, nothing sent"
+ST_USAGE_PLATFORM_API=http://platform.example.com run "${F}/02.configurations_PATCH_UsageReporting.sh"
+nothing_sent "02 PATCH usage: an address that is not https, nothing sent"
+STATUS=204 STATUS_GET=200 run "${F}/02.configurations_PATCH_UsageReporting.sh"
+SCO=StatisticsSummaryReport
+expect "02 PATCH usage: reads the ten options, then patches the ten" "${RC}:$(calls | grep -c '^GET'):$(calls | grep -c '^PATCH')" "0:10:10"
+expect "02 PATCH usage: the options, in order" "$(calls | grep '^PATCH' | sed "s#.*/options/${SCO}.##" | paste -sd' ' -)" \
+  "ClientId ClientSecret EnvironmentId EnvironmentName FilePath NetworkZone Platform.API Platform.Authentication SchemaId AutomaticReport.DaysToInclude"
+expect "02 PATCH usage: each body replaces /values with the value of its own variable, the secret kept valid JSON" \
+  "$(for n in 1 2 3 4 5 6 7 8 9 10; do payload "${n}" | jq -c '.[0].value[0]'; done | paste -sd'|' -)" \
+  '"example client"|"sec \"ret\" $x \\ y"|"example-env-id"|"Example Env"|"/example/reports"|"example-zone"|"https://platform.example.com/api"|"https://login.example.com/token"|"https://platform.example.com/schema.json"|"3"'
+expect "02 PATCH usage: every body is a replace of /values" "$(for n in 1 2 3 4 5 6 7 8 9 10; do payload "${n}" | jq -c '.[0] | [.op, .path]'; done | sort -u)" '["replace","/values"]'
+has "02 PATCH usage: prints the old values first" "  StatisticsSummaryReport.ClientId: [\"old value\"]"
+expect "02 PATCH usage: the secret is never printed" "$(printf '%s\n' "${OUT}" | grep -cF 'sec "ret"')" "0"
+has "02 PATCH usage: says it is hidden" "Updating StatisticsSummaryReport.ClientSecret to '(hidden)'..."
+expect "02 PATCH usage: prints HTTP 204 ten times" "$(printf '%s\n' "${OUT}" | grep -c '^HTTP 204')" "10"
+unset ST_USAGE_NETWORK_ZONE
+STATUS=204 STATUS_GET=200 run "${F}/02.configurations_PATCH_UsageReporting.sh"
+expect "02 PATCH usage: no network zone is allowed, the option is then set to empty" "${RC}:$(payload 6 | jq -c '.[0].value')" '0:[""]'
+set_usage_env
+STATUS=400 STATUS_GET=200 run "${F}/02.configurations_PATCH_UsageReporting.sh"
+expect "02 PATCH usage: the first refusal stops it, exit 1" "${RC}:$(calls | grep -c '^PATCH')" "1:1"
+has "02 PATCH usage: and says where" "Stopped at StatisticsSummaryReport.ClientId."
+STATUS=204 STATUS_GET=404 run "${F}/02.configurations_PATCH_UsageReporting.sh"
+expect "02 PATCH usage: an option that cannot be read stops it before any change, exit 1" "${RC}:$(calls | grep -c '^PATCH')" "1:0"
+clear_usage_env
+GET_BODY=
+STATUS=
+STATUS_GET=
+echo
+echo "=== 03.Connect (03 to 05: the daemons, made safe to run bare) ==="
+F=03.Connect
+U="${BASE}/daemons"
+bad_args() { expect "$1" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"; }
+
+GET_BODY=$(body daemon_ssh '{"maxConnections":50,"preferBouncyCastleProvider":true,"banner":"old banner"}')
+run "${F}/03.daemons_name_PUT.sh"
+bad_args "03 PUT: bare, nothing sent"
+run "${F}/03.daemons_name_PUT.sh" ssh 10 false
+bad_args "03 PUT: three arguments, a PUT needs all four (the banner too), nothing sent"
+run "${F}/03.daemons_name_PUT.sh" ssh abc false x
+bad_args "03 PUT: maxConnections that is not a number, nothing sent"
+run "${F}/03.daemons_name_PUT.sh" ssh 10 maybe x
+bad_args "03 PUT: preferBouncyCastleProvider that is not true or false, nothing sent"
+run "${F}/03.daemons_name_PUT.sh" "s sh" 10 false x
+bad_args "03 PUT: a daemon name with a space, nothing sent"
+run "${F}/03.daemons_name_PUT.sh" ssh 10 false x y
+bad_args "03 PUT: five arguments, nothing sent"
+STATUS=204 STATUS_GET=200 run "${F}/03.daemons_name_PUT.sh" ssh 10 false 'A "banner" here'
+expect "03 PUT: reads the daemon, then PUTs it" "${RC}:$(calls)" "0:GET ${U}/ssh
+PUT ${U}/ssh"
+expect "03 PUT: the three settings, typed by jq, the banner kept valid JSON" "$(payload 1 | jq -c .)" '{"maxConnections":10,"preferBouncyCastleProvider":false,"banner":"A \"banner\" here"}'
+has "03 PUT: prints the old settings" 'The daemon ssh is now: {"maxConnections":50,"preferBouncyCastleProvider":true,"banner":"old banner"}'
+has "03 PUT: and the command that puts them back" "To put it back: ./03.daemons_name_PUT.sh ssh 50 true old\\ banner"
+has "03 PUT: prints HTTP 204" "HTTP 204"
+STATUS=204 STATUS_GET=200 run "${F}/03.daemons_name_PUT.sh" ssh 7 true ""
+expect "03 PUT: an empty banner is sent as an empty text, not left out" "$(payload 1 | jq -c .)" '{"maxConnections":7,"preferBouncyCastleProvider":true,"banner":""}'
+STATUS=400 STATUS_GET=200 run "${F}/03.daemons_name_PUT.sh" ssh -10 false x
+expect "03 PUT: a value the server refuses exits 1, with the code" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^HTTP 400')" "1:1"
+expect "03 PUT: a negative number was sent as it is, for the server to refuse" "$(payload 1 | jq -c .maxConnections)" "-10"
+STATUS=204 STATUS_GET=400 run "${F}/03.daemons_name_PUT.sh" http 10 false x
+expect "03 PUT: another daemon is read first (the server answers 400), exit 1, nothing replaced" "${RC}:$(calls | grep -c PUT):$(calls | head -1)" "1:0:GET ${U}/http"
+STATUS=200 STATUS_GET=200 run "${F}/03.daemons_name_PUT.sh" ssh 10 false x
+expect "03 PUT: only 204 is a success, exit 1 otherwise" "${RC}" "1"
+
+run "${F}/04.daemons_name_PATCH.sh"
+bad_args "04 PATCH: bare, nothing sent"
+run "${F}/04.daemons_name_PATCH.sh" ssh maxConnections
+bad_args "04 PATCH: no value, nothing sent"
+run "${F}/04.daemons_name_PATCH.sh" ssh nope 1
+bad_args "04 PATCH: a field the daemon does not have, nothing sent"
+run "${F}/04.daemons_name_PATCH.sh" ssh maxConnections abc
+bad_args "04 PATCH: maxConnections that is not a number, nothing sent"
+run "${F}/04.daemons_name_PATCH.sh" ssh preferBouncyCastleProvider 1
+bad_args "04 PATCH: a boolean that is not true or false, nothing sent"
+STATUS=204 STATUS_GET=200 run "${F}/04.daemons_name_PATCH.sh" ssh maxConnections 4
+expect "04 PATCH: reads the daemon, then patches it" "${RC}:$(calls)" "0:GET ${U}/ssh
+PATCH ${U}/ssh"
+expect "04 PATCH: maxConnections as a number" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/maxConnections","value":4}]'
+has "04 PATCH: prints the old value" "The maxConnections of ssh is now '50'."
+has "04 PATCH: and how to put it back" "To put it back: ./04.daemons_name_PATCH.sh ssh maxConnections 50"
+has "04 PATCH: prints HTTP 204" "HTTP 204"
+STATUS=204 STATUS_GET=200 run "${F}/04.daemons_name_PATCH.sh" ssh preferBouncyCastleProvider false
+expect "04 PATCH: preferBouncyCastleProvider as a boolean" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/preferBouncyCastleProvider","value":false}]'
+STATUS=204 STATUS_GET=200 run "${F}/04.daemons_name_PATCH.sh" ssh banner 'New "banner"'
+expect "04 PATCH: the banner as text, kept valid JSON" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/banner","value":"New \"banner\""}]'
+has "04 PATCH: and the old banner to put back" "To put it back: ./04.daemons_name_PATCH.sh ssh banner old\\ banner"
+STATUS=204 STATUS_GET=200 run "${F}/04.daemons_name_PATCH.sh" ssh banner ""
+expect "04 PATCH: an empty banner is allowed" "$(payload 1 | jq -c '.[0].value')" '""'
+STATUS=400 STATUS_GET=200 run "${F}/04.daemons_name_PATCH.sh" ssh maxConnections -1
+expect "04 PATCH: a value the server refuses exits 1, with the code" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^HTTP 400')" "1:1"
+STATUS=204 STATUS_GET=400 run "${F}/04.daemons_name_PATCH.sh" http maxConnections 4
+expect "04 PATCH: another daemon is read first (the server answers 400), exit 1, nothing patched" "${RC}:$(calls | grep -c PATCH)" "1:0"
+
+DAEMONS='{"ftpStatus":"Running","httpStatus":"Not running","sshStatus":"Running","as2Status":"Not running","pesitStatus":"Running"}'
+OPERATION_OK='{"daemonOperationResults":[{"daemon":"SSH","message":"The SSH daemon was stopped.","isSuccessful":true}]}'
+GET_BODY=$(body daemons "${DAEMONS}")
+POST_BODY=$(body daemon_op_ok "${OPERATION_OK}")
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh"
+bad_args "05 operations: bare, nothing sent (it used to stop http and ssh)"
+run "${F}/05.daemons_operations_POST.sh" ssh
+bad_args "05 operations: no operation, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" nope stop stop-the-nope-daemon
+bad_args "05 operations: a daemon that is not one of the five, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh restart
+bad_args "05 operations: an operation that is neither start nor stop, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh stop
+bad_args "05 operations: a stop without the confirmation word, nothing sent"
+has "05 operations: and says which word" "give the word stop-the-ssh-daemon as the third argument"
+run "${F}/05.daemons_operations_POST.sh" ssh stop yes
+bad_args "05 operations: a stop with another word, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-http-daemon
+bad_args "05 operations: the confirmation of another daemon, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon maybe
+bad_args "05 operations: graceful that is not true or false, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon false 600
+bad_args "05 operations: a timeout with an immediate stop, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon true abc
+bad_args "05 operations: a timeout that is not a number, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon true 60 extra
+bad_args "05 operations: a sixth argument, nothing sent"
+run "${F}/05.daemons_operations_POST.sh" ssh start extra
+bad_args "05 operations: a start with more than the daemon, nothing sent"
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon
+expect "05 operations: reads the status, then stops that one daemon, gracefully by default" "${RC}:$(calls)" "0:GET ${U}
+POST ${U}/operations?operation=stop&daemon=ssh&graceful=true"
+has "05 operations: prints the status before" "The ssh daemon is now: Running"
+has "05 operations: and the command that brings it back" "To bring it back: ./05.daemons_operations_POST.sh ssh start"
+has "05 operations: prints HTTP 200" "HTTP 200"
+has "05 operations: and the result for the daemon" "SSH The SSH daemon was stopped. (successful: true)"
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" http stop stop-the-http-daemon false
+expect "05 operations: an immediate stop" "$(calls | tail -1)" "POST ${U}/operations?operation=stop&daemon=http&graceful=false"
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon true 600
+expect "05 operations: a graceful stop with a timeout" "$(calls | tail -1)" "POST ${U}/operations?operation=stop&daemon=ssh&graceful=true&timeout=600"
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" http start
+expect "05 operations: a start needs no confirmation, and has no graceful or timeout" "${RC}:$(calls | tail -1)" "0:POST ${U}/operations?operation=start&daemon=http"
+has "05 operations: says how to stop it again" "To stop it again: ./05.daemons_operations_POST.sh http stop stop-the-http-daemon"
+POST_BODY=$(body daemon_op_fail '{"daemonOperationResults":[{"daemon":"AS2","message":"Can not start AS2 daemon - the default server As2 Default is not enabled.","isSuccessful":false}]}')
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" as2 start
+expect "05 operations: a 200 whose result says it did not work is exit 1" "${RC}" "1"
+has "05 operations: and shows the message" "Can not start AS2 daemon"
+STATUS=400 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon
+expect "05 operations: a refusal exits 1, with the code" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^HTTP 400')" "1:1"
+STATUS=200 STATUS_GET=500 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon
+expect "05 operations: the status cannot be read, exit 1, nothing stopped" "${RC}:$(calls | grep -c POST)" "1:0"
+GET_BODY=
+POST_BODY=
+STATUS=
+STATUS_GET=
 echo
 echo "=== 22.DeniedUsers ==="
 F=22.DeniedUsers
@@ -1493,6 +1989,28 @@ nothing_sent "06 DELETE: no name, nothing sent"
 run "${F}/06.mailTemplates_name_DELETE.sh" "a\\b.xhtml"
 nothing_sent "06 DELETE: a name with a backslash is refused, nothing sent"
 
+echo
+echo "=== 02.Introduction (04: the password of the administrator, made safe to run bare) ==="
+F=02.Introduction
+U="${BASE}/myself"
+run "${F}/04.myself_PATCH.sh"
+expect "04 PATCH: bare, nothing sent, exit 2 (it used to set a placeholder password)" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+has "04 PATCH: and says what to set" "set ST_NEW_PASSWORD to the new password"
+ST_NEW_PASSWORD= run "${F}/04.myself_PATCH.sh"
+expect "04 PATCH: an empty password, nothing sent, exit 2" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STATUS=204 ST_NEW_PASSWORD='p "q" $x \ y' run "${F}/04.myself_PATCH.sh"
+expect "04 PATCH: one PATCH of /myself" "${RC}:$(calls)" "0:PATCH ${U}"
+expect "04 PATCH: replaces /passwordCredentials/password with the password from the environment, kept valid JSON" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/passwordCredentials/password","value":"p \"q\" $x \\ y"}]'
+has "04 PATCH: prints HTTP 204" "HTTP 204"
+expect "04 PATCH: the password is never printed" "$(printf '%s\n' "${OUT}" | grep -cF 'p "q"')" "0"
+expect "04 PATCH: the placeholder password it used to send is nowhere" "$(printf '%s\n%s\n' "${OUT}" "$(payload 1)" | grep -c TYPE_WHATEVER)" "0"
+STATUS=400 ST_NEW_PASSWORD=x run "${F}/04.myself_PATCH.sh"
+expect "04 PATCH: a refusal exits 1, with the code" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^HTTP 400')" "1:1"
+STATUS=401 ST_NEW_PASSWORD=x run "${F}/04.myself_PATCH.sh"
+expect "04 PATCH: a 401 exits 1" "${RC}" "1"
+STATUS=200 ST_NEW_PASSWORD=x run "${F}/04.myself_PATCH.sh"
+expect "04 PATCH: only 204 is a success" "${RC}" "1"
+STATUS=
 echo
 echo "=== 09.CompositeRoutes (08 to 10: the routes operations not called before) ==="
 F=09.CompositeRoutes

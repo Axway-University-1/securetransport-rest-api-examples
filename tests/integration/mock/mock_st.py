@@ -71,14 +71,61 @@ def filter_account_fields(account, params):
     """
     Apply the same two rules the real /accounts/{name} endpoint applies:
     fields= narrows the response (type always included), and a type specific
-    field is only present when type= was also supplied.
+    field asked for with fields= is only present when type= was also supplied.
+    The whole object, read with no fields=, carries it either way: confirmed on
+    a real 5.5-20260924 server, where the one without type= and with fields= is a 400.
     """
-    if not params.get("type"):
+    if params.get("fields") and not params.get("type"):
         account = {k: v for k, v in account.items() if k not in TYPE_SPECIFIC_FIELDS}
     if params.get("fields"):
         wanted = set(params["fields"].split(",")) | {"type"}
         account = {k: v for k, v in account.items() if k in wanted}
     return account
+
+
+def _pointer_parts(pointer):
+    return [part.replace("~1", "/").replace("~0", "~") for part in pointer.lstrip("/").split("/")]
+
+
+def apply_patch_operation(document, action, pointer, value):
+    """
+    One JSON Patch operation (add, replace or remove) on a nested document, by
+    its JSON pointer: "/addressBookSettings/contacts/-" appends to that list.
+    Returns None, or the message of the refusal.
+    """
+    parts = _pointer_parts(pointer)
+    parent = document
+    for part in parts[:-1]:
+        if isinstance(parent, list) and part.isdigit() and int(part) < len(parent):
+            parent = parent[int(part)]
+        elif isinstance(parent, dict) and part in parent:
+            parent = parent[part]
+        else:
+            return 'Missing field "%s"' % part
+    last = parts[-1]
+    if isinstance(parent, list):
+        if action == "add" and last == "-":
+            parent.append(value)
+        elif action == "add" and last.isdigit() and int(last) <= len(parent):
+            parent.insert(int(last), value)
+        elif action != "add" and last.isdigit() and int(last) < len(parent):
+            if action == "replace":
+                parent[int(last)] = value
+            else:
+                parent.pop(int(last))
+        else:
+            return "Array index %s out of bounds" % last
+        return None
+    if not isinstance(parent, dict):
+        return 'Missing field "%s"' % last
+    # replace requires the field to exist; add creates it
+    if action == "replace" and last not in parent:
+        return "cannot replace missing field " + last
+    if action == "remove":
+        parent.pop(last, None)
+    else:
+        parent[last] = value
+    return None
 
 
 def seed():
@@ -192,7 +239,8 @@ class Handler(BaseHTTPRequestHandler):
         for pair in query.split("&"):
             if "=" in pair:
                 k, v = pair.split("=", 1)
-                params[k] = v
+                # curl -G --data-urlencode and the harness's own client both encode a comma as %2C
+                params[urlunquote_plus(k)] = urlunquote_plus(v)
         return path, params
 
     # -- verbs ------------------------------------------------------------
@@ -318,15 +366,9 @@ class Handler(BaseHTTPRequestHandler):
                 action, pointer = op.get("op"), str(op.get("path", ""))
                 if action not in ("add", "replace", "remove") or not pointer.startswith("/"):
                     return self._send(422, {"message": "bad operation"})
-                field = pointer.lstrip("/")
-                # replace requires the field to exist; add creates it
-                if action == "replace" and field not in account:
-                    return self._send(422, {"message":
-                                            "cannot replace missing field " + field})
-                if action == "remove":
-                    account.pop(field, None)
-                else:
-                    account[field] = op.get("value")
+                refusal = apply_patch_operation(account, action, pointer, op.get("value"))
+                if refusal:
+                    return self._send(422, {"message": refusal})
         return self._send(204)
 
     def do_PUT(self):
@@ -375,6 +417,11 @@ class Handler(BaseHTTPRequestHandler):
 def urlunquote(text):
     from urllib.parse import unquote
     return unquote(text)
+
+
+def urlunquote_plus(text):
+    from urllib.parse import unquote_plus
+    return unquote_plus(text)
 
 
 def make_certificate(directory):

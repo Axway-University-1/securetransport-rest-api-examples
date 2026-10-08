@@ -1,0 +1,2 @@
+{"type": "AccountFilePurge", "name": "example_filepurge", "notes": "old notes", "businessUnits": [],
+ "deleteFilesDays": 90, "schedules": [{"type": "ONCE", "tag": "AccountFilePurge", "startDate": "1791493200000", "executionTimes": ["00:00"]}]}

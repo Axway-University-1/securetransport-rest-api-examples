@@ -68,18 +68,38 @@ for rel in "06.TransferSites/01.sites_POST.sh" \
     base=$(basename "${rel}")
     cp "${src}" "${WORK}/run/sub/${base}"
 
-    # An example that reads a response before sending one needs a body to read
+    # An example that reads a response before sending one needs a body to read. The older
+    # examples that were made safe to run bare need their arguments, or their environment, and
+    # a stub that answers with the status they check (STUB_CURL_PRINT_CODE makes it print -w).
     GET_BODY=""
+    ARGS=()
+    EXTRA_ENV=("STUB_CURL_PRINT_CODE=1" "STUB_CURL_STATUS_GET=200" "STUB_CURL_STATUS=204")
     case "${base}" in
         07.servers_POST.sh|10.servers_name_PUT.sh)
             GET_BODY="${TESTS_DIR}/fixtures/server_ssh.json" ;;
         05.routes_POST_composite_subscription.sh)
             GET_BODY="${TESTS_DIR}/fixtures/lookup_result.json" ;;
+        01.configurations_PATCH.sh)
+            GET_BODY="${TESTS_DIR}/fixtures/option_values.json"; ARGS=(true) ;;
+        02.configurations_PATCH_UsageReporting.sh)
+            GET_BODY="${TESTS_DIR}/fixtures/option_values.json"
+            EXTRA_ENV+=("ST_USAGE_CLIENT_ID=example-client" "ST_USAGE_CLIENT_SECRET=example-secret" "ST_USAGE_ENVIRONMENT_ID=example-env-id"
+                        "ST_USAGE_ENVIRONMENT_NAME=Example Env" "ST_USAGE_FILE_PATH=/example/reports" "ST_USAGE_NETWORK_ZONE=example-zone"
+                        "ST_USAGE_PLATFORM_API=https://platform.example.com/api" "ST_USAGE_PLATFORM_AUTHENTICATION=https://login.example.com/token"
+                        "ST_USAGE_SCHEMA_ID=https://platform.example.com/schema.json" "ST_USAGE_DAYS_TO_INCLUDE=3") ;;
+        02.accounts_POST.sh)
+            GET_BODY="${TESTS_DIR}/fixtures/user_classes.json"; EXTRA_ENV+=("STUB_CURL_STATUS=201") ;;
+        06.accounts_name_PATCH.sh)
+            GET_BODY="${TESTS_DIR}/fixtures/account_address_book.json" ;;
+        02.applications_POST.sh)
+            GET_BODY="${TESTS_DIR}/fixtures/applications_none.json"; ARGS=(once); EXTRA_ENV+=("STUB_CURL_STATUS=201") ;;
+        06.applications_name_PATCH.sh)
+            GET_BODY="${TESTS_DIR}/fixtures/application_schedule.json" ;;
     esac
 
     out="${WORK}/${base}.out"
-    ( cd "${WORK}/run/sub" && PATH="${WORK}/bin:${PATH}" \
-        STUB_CURL_GET_BODY="${GET_BODY}" bash "./${base}" ) > "${out}" 2>&1
+    ( cd "${WORK}/run/sub" && env "${EXTRA_ENV[@]}" PATH="${WORK}/bin:${PATH}" \
+        STUB_CURL_GET_BODY="${GET_BODY}" bash "./${base}" "${ARGS[@]}" ) > "${out}" 2>&1
 
     dir="${WORK}/${base}.payloads"
     n=$(decode_payloads "${out}" "${dir}")
@@ -130,7 +150,7 @@ fi
 
 # The usage reporting example must patch a different option each iteration
 DISTINCT=$(grep '^URL: ' "${WORK}/02.configurations_PATCH_UsageReporting.sh.out" \
-           | sed 's#.*/options/##' | sort -u | wc -l | tr -d ' ')
+           | sed 's#.*/options/##; s#?.*##' | sort -u | wc -l | tr -d ' ')
 if [ "${DISTINCT}" -eq 10 ]; then
     pass "usage reporting patches 10 distinct options"
 else

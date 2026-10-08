@@ -1,0 +1,4 @@
+{"resultSet": {"returnCount": 3, "totalCount": 3},
+ "result": [{"className": "ExampleRealClass", "userType": "real", "order": 1},
+            {"className": "ExampleVirtualClass", "userType": "virtual", "order": 3},
+            {"className": "ExampleAnyClass", "userType": "*", "order": 2}]}
