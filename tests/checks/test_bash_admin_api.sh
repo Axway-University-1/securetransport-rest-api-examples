@@ -2852,6 +2852,134 @@ run "${F}/07.userClasses_id_DELETE.sh"
 expect "07 DELETE: no name, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 
 echo
+echo "=== 37.Zones ==="
+F=37.Zones
+U="${BASE}/zones"
+ZONE_LIST='{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"name":"example_zone","description":null,"isDefault":false,"edges":[]},{"name":"EXAMPLE_ZONE","description":"upper","isDefault":true,"edges":[{"title":"e1"}]},{"name":"Private","description":"This network zone holds the information for back ends.","isDefault":false,"edges":[{"title":"Host"}]}]}'
+ZONE_JSON='{"name":"example zone","description":"old","publicURLPrefix":"https://example.invalid/x","ssoSpEntityId":"eid","isDnsResolutionEnabled":true,"isDefault":false,"edges":[{"edgeId":"e1id","title":"e1","notes":null,"enabledProxy":true,"protocols":[{"streamingProtocol":"SSH","port":8022,"isEnabled":false,"sslAlias":null,"metadata":null}],"proxies":[{"proxyProtocol":"SOCKS_PROXY","port":1081,"isEnabled":true,"username":"u","password":null,"isUsePassword":true}],"ipAddresses":[{"ipAddress":"edge.example.invalid"}]}]}'
+
+GET_BODY=$(body zones_list "${ZONE_LIST}")
+run "${F}/01.zones_GET.sh"
+expect "01 GET: the count, every zone (limit=0), then the default zone" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=name
+GET ${U}?limit=0
+GET ${U}?isDefault=true&limit=0"
+has "01 GET: a line per zone: default, edges, description" "  example_zone  default false  edges 0  -"
+has "01 GET: the description is shown" "  Private  default false  edges 1  This network zone holds the information for back ends."
+run "${F}/01.zones_GET.sh" example_zone
+expect "01 GET: a name goes into the query, urlencoded by curl" "$(calls | sed -n 2p)" "GET ${U}?name=example_zone&limit=0"
+expect "01 GET: the filter is not wildcard, case sensitive: only the exact name is listed (EXAMPLE_ZONE is not)" \
+  "$(printf '%s\n' "${OUT}" | sed -n '/^The zones named/,/^The default/p' | grep -c '^  ')" "1"
+expect "01 GET: the default section lists only a zone that is really the default" \
+  "$(printf '%s\n' "${OUT}" | sed -n '/^The default zone/,$p' | grep -c 'default true')" "1"
+expect "01 GET: sends the Referer" "$(has_header 'Referer: THIS_IS_A_RANDOM_TEXT' | head -1)" "3"
+GET_BODY=
+
+STATUS=201 LOCATION=example_zone run "${F}/02.zones_POST.sh"
+expect "02 POST: POST /zones" "${RC}:$(calls)" "0:POST ${U}"
+expect "02 POST: by default a zone example_zone with a description, no edge, not default" "$(payload 1 | jq -c .)" \
+  '{"name":"example_zone","description":"Created by the examples"}'
+has "02 POST: prints the code" "HTTP 201"
+has "02 POST: prints the address from Location" "It is at ${U}/example_zone"
+STATUS=201 run "${F}/02.zones_POST.sh" 'example "z" é' 'a "b" \ c'
+expect "02 POST: quotes and a backslash stay valid JSON" "$(payload 1 | jq -c '[.name, .description]')" '["example \"z\" é","a \"b\" \\ c"]'
+STATUS=201 run "${F}/02.zones_POST.sh" example_zone d e1
+expect "02 POST: an edge title adds an edge with that title only" "$(payload 1 | jq -c .edges)" '[{"title":"e1"}]'
+STATUS=201 run "${F}/02.zones_POST.sh" example_zone d e1 edge.example.invalid 8022
+expect "02 POST: an address and a port add an address and one disabled SSH protocol, the port a number" "$(payload 1 | jq -c .edges)" \
+  '[{"title":"e1","ipAddresses":[{"ipAddress":"edge.example.invalid"}],"protocols":[{"streamingProtocol":"SSH","port":8022,"isEnabled":false}]}]'
+STATUS=400 POST_BODY=$(body zone_dup '{"message":"Error validating request","validationErrors":["Error creating zone with name example_zone: The zone name is not unique."]}') run "${F}/02.zones_POST.sh"
+expect "02 POST: a refusal exits 1" "${RC}" "1"
+has "02 POST: and prints the server's reason" "The zone name is not unique."
+LONG=$(printf 'a%.0s' $(seq 1 256))
+for args in "a/b" 'a\b' "a;b" "a'b" "${LONG}"; do
+    run "${F}/02.zones_POST.sh" "${args}"
+    expect "02 POST: the name ${args:0:12} is refused, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+run "${F}/02.zones_POST.sh" example_zone "${LONG}"
+expect "02 POST: a description of 256 characters, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run "${F}/02.zones_POST.sh" example_zone d "a/b"
+expect "02 POST: an edge title with a /, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run "${F}/02.zones_POST.sh" example_zone d "" edge.example.invalid
+expect "02 POST: an address with no edge title, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+for port in 80 1023 65536 abc; do
+    run "${F}/02.zones_POST.sh" example_zone d e1 "" "${port}"
+    expect "02 POST: the port ${port} is refused, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS=
+
+run "${F}/03.zones_name_HEAD.sh"
+expect "03 HEAD: example_zone, which 02 creates, by default" "${RC}:$(calls)" "0:HEAD ${U}/example_zone"
+STATUS=404 run "${F}/03.zones_name_HEAD.sh" "example zone"
+expect "03 HEAD: the name URL-encoded; 404 exits 1" "${RC}:$(calls)" "1:HEAD ${U}/example%20zone"
+STATUS=
+
+SEQUENCE=$(sequence zone_get "${ZONE_JSON}" '{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"name":"Finance","dmz":null},{"name":"example_bu_1","dmz":"example zone"},{"name":"example_bu_2","dmz":"example zone"},{"name":"example_bu_3","dmz":"EXAMPLE ZONE"}]}')
+run "${F}/04.zones_name_GET.sh" "example zone"
+expect "04 GET: the zone, then every business unit's dmz (the unit's own dmz= filter answers 403)" "${RC}:$(calls)" "0:GET ${U}/example%20zone
+GET ${BASE}/businessUnits?fields=name,dmz&limit=1000"
+has "04 GET: the zone, its default and edges" "  example zone, default false, 1 edge(s)"
+has "04 GET: each edge's protocols, proxies, addresses" "  edge e1: 1 protocol(s), 1 prox(ies), 1 address(es)"
+has "04 GET: the units that name it, by exact name, in the answer's order" "  business units that name it: example_bu_1, example_bu_2"
+SEQUENCE=$(sequence zone_get_none "${ZONE_JSON}" '{"result":[{"name":"Finance","dmz":null}]}')
+run "${F}/04.zones_name_GET.sh" "example zone"
+has "04 GET: no unit names it" "  business units that name it: none"
+SEQUENCE=
+STATUS_GET=404 GET_BODY=$(body zone_missing '{"message":"Error validating request","validationErrors":["Zone with name nope not found."]}') run "${F}/04.zones_name_GET.sh" nope
+expect "04 GET: a 404 exits 1, no business units call" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+STATUS_GET=
+run "${F}/04.zones_name_GET.sh"
+expect "04 GET: example_zone by default" "$(calls | head -1)" "GET ${U}/example_zone"
+GET_BODY=
+
+GET_BODY=$(body zone "${ZONE_JSON}")
+STATUS=204 run "${F}/05.zones_name_PUT.sh" "example zone" "new text"
+expect "05 PUT: read, then PUT" "${RC}:$(calls)" "0:GET ${U}/example%20zone
+PUT ${U}/example%20zone"
+expect "05 PUT: the whole zone sent back, only the description changed" "$(payload 1 | jq -c --argjson z "${ZONE_JSON}" '. == ($z | .description = "new text")')" "true"
+expect "05 PUT: the edges, protocols, proxy and its flag are in the body" "$(payload 1 | jq -c '[.edges[0].edgeId, .edges[0].protocols[0].port, .edges[0].proxies[0].isUsePassword, .publicURLPrefix, .isDnsResolutionEnabled]')" '["e1id",8022,true,"https://example.invalid/x",true]'
+has "05 PUT: prints the description before" "The description of example zone is now: old"
+STATUS=204 run "${F}/05.zones_name_PUT.sh" "example zone"
+expect "05 PUT: a default description" "$(payload 1 | jq -r .description)" "Replaced by the examples"
+STATUS=400 run "${F}/05.zones_name_PUT.sh" "example zone" x
+expect "05 PUT: a refusal exits 1" "${RC}" "1"
+run "${F}/05.zones_name_PUT.sh"
+expect "05 PUT: needs a NAME, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run "${F}/05.zones_name_PUT.sh" "example zone" "${LONG}"
+expect "05 PUT: a description over 255, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=$(body zone_none '{"message":"Error validating request","validationErrors":["Zone with name nope not found."]}')
+run "${F}/05.zones_name_PUT.sh" nope
+expect "05 PUT: no such zone, exit 1, nothing sent" "${RC}:$(calls | grep -c PUT)" "1:0"
+GET_BODY=
+
+GET_BODY=$(body zone_desc '{"description":"old"}')
+STATUS=204 run "${F}/06.zones_name_PATCH.sh" "example zone" "new text"
+expect "06 PATCH: reads the description, then PATCH" "${RC}:$(calls)" "0:GET ${U}/example%20zone?fields=description
+PATCH ${U}/example%20zone"
+expect "06 PATCH: replaces /description" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/description","value":"new text"}]'
+has "06 PATCH: prints the description before" "The description of example zone is now: old"
+STATUS=204 run "${F}/06.zones_name_PATCH.sh" example_zone 'a "q" \ b'
+expect "06 PATCH: quotes and a backslash stay valid JSON" "$(payload 1 | jq -r '.[0].value')" 'a "q" \ b'
+run "${F}/06.zones_name_PATCH.sh"
+expect "06 PATCH: needs a NAME, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run "${F}/06.zones_name_PATCH.sh" example_zone "${LONG}"
+expect "06 PATCH: a description over 255, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STATUS=400 run "${F}/06.zones_name_PATCH.sh" example_zone x
+expect "06 PATCH: a refusal exits 1" "${RC}" "1"
+GET_BODY=
+STATUS=
+
+STATUS=204 run "${F}/07.zones_name_DELETE.sh" "example zone"
+expect "07 DELETE: the zone named, URL-encoded" "${RC}:$(calls)" "0:DELETE ${U}/example%20zone"
+STATUS=500 POST_BODY= GET_BODY=$(body zone_in_use '{"message":"Error validating request","validationErrors":["Database error deleting DMZ zone: example_zone"]}') run "${F}/07.zones_name_DELETE.sh" example_zone
+expect "07 DELETE: a refusal exits 1" "${RC}" "1"
+STATUS=500 run "${F}/07.zones_name_DELETE.sh" example_zone
+has "07 DELETE: and shows the HTTP code" "HTTP 500"
+run "${F}/07.zones_name_DELETE.sh"
+expect "07 DELETE: no default, needs a NAME, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=
+STATUS=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

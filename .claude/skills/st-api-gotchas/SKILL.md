@@ -892,6 +892,32 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   (`GET /accounts/X?type=template&fields=templateClass`; without the type, 400 "Field templateClass does not exist."). A template
   with no `templateClass` is 400. The session list keeps a just closed session for a moment, so to read the class of a login, take
   the session whose id was not there before it (check 60 does).
+- **Zones** (`/zones`; examples `37.Zones`, check 61): a zone is a NETWORK (DMZ) zone: a name, a description, `publicURLPrefix`, `ssoSpEntityId`,
+  `isDnsResolutionEnabled`, `isDefault` and `edges` (an edge has a `title`, notes, addresses, protocols with a port, proxies). It is addressed by its
+  **name**, which is case sensitive (`example_a` and `EXAMPLE_A` coexist, `private` is a 404). The lab has one, **`Private`**, "the information for back
+  ends", with one edge `Host` carrying the lab's own FTP, SSH, HTTP, ADMIN, AS2 and PESIT ports: never change or delete it. A standalone lab can create
+  and delete zones freely, and a zone with edges changes nothing by itself (no listener, no routing): check 61 saved the whole list, ran, and compared it
+  at the end. The lists are plain `{resultSet, result}` and stable. Only `name` is required; a duplicate is **400** "The zone name is not unique." (not the
+  reference's 409); `/ \ ; '` in a name or an edge title and 256 characters are 400; an unknown field is 400 "Unsupported parameter"; an edge needs a
+  `title`; a protocol needs `streamingProtocol` (HTTP, FTP, AS2, SSH, PESIT, ADMIN: another is a bare 403 "unable to comply") and a `port` from 1024
+  (400); a protocol's `sslAlias` that is no certificate of the server is 400 "Error creating zone"; an edge's `deploymentSite` defaults to `Prod`; protocols
+  come back in the server's order; a proxy's `password` is never read back, `isUsePassword` is. **Filters are exact and case sensitive, `name=` too (no
+  `*`)**: `isDefault=` takes true or false, the `edges.*` ones work, an unknown filter is ignored, `edges.proxies.isUsePassword=` is a 403; `limit=0` lists
+  all, a negative or text limit and a negative offset are 400. **PUT replaces**: it needs `name`, equal to the one in the path (another is 400, so no
+  rename by PUT or by PATCH of `/name`), and leaving a field out RESETS it (`publicURLPrefix`, `ssoSpEntityId`, `isDnsResolutionEnabled`, and **`isDefault`
+  goes off**), but **a body with no `edges` key keeps the edges**, `"edges": []` removes them and an edge sent with a title only loses everything else;
+  sent back as it was read the whole zone is kept, edge ids and a proxy's `isUsePassword` included. PATCH leaves the rest alone: `replace`, `add` and
+  `remove` of the scalars (also of a null one), `/edges/-` adds an edge, `remove /edges/1` removes it, a path that does not exist is 400 `Missing field`,
+  `/edges/0/edgeId` is 204 and ignored, an empty patch is 204; **a patch of an edge's `title` makes the edge a new one and its saved proxy password is
+  lost**, two edges with one title are a 500, a second protocol of the same kind on an edge is accepted. **There is only one default zone**: making one
+  the default (create, PUT or PATCH) turns the other off; `Private` is not the default on the lab. **Using a zone**: a business unit names one in `dmz`
+  (a name that does not exist is 400 "No such DMZ zone with name X"; the unit's `dmz=` filter answers 403, so read every unit's `dmz` and pick). On the
+  lab an account of a unit that names a zone with an edge logged in over SFTP, the EndUser API and FTP exactly as before: nothing is routed without a real
+  edge. What it does do: **the zone cannot be deleted while a unit names it, a 500** "Database error deleting DMZ zone: X" (not a 400 or 409; fine once
+  the unit is gone), and the default flag is **not** copied into a unit created while a zone was the default (`dmz` stays null). A delete of a zone
+  that is not there is 404, GET one a JSON 404, HEAD a bodiless 404. The effect behind a real edge (routing, `isAutoDiscoverable`, a proxy in use)
+  was **not seen**. The `networkZone` fields met elsewhere (`testConnection` of `/statisticsSummary`, and `s3NetworkZone` and the other storage
+  profile ones, "network zone name to use for proxying connections") name a zone the connection is to go through; that was not run through a real edge either.
 - **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
   the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
   An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST

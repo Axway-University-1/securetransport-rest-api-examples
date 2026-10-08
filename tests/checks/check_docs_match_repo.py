@@ -82,6 +82,7 @@ rows = [("01. Authentication", "01.Authentication"),
         ("34. Transaction Manager", "34.TransactionManager"),
         ("35. Transfer Profiles", "35.TransferProfiles"),
         ("36. User Classes", "36.UserClasses"),
+        ("37. Zones", "37.Zones"),
         ("90. End To End Acknowledgment", "90.EndToEndAcknowledgment")]
 
 for label, folder in rows:
