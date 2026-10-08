@@ -2411,6 +2411,233 @@ POST_BODY=
 STATUS=
 
 echo
+echo "=== 35.TransferProfiles ==="
+F=35.TransferProfiles
+P="${BASE}/transferProfiles"
+LOOK="${P}?account=example_acct&name=example_profile&fields=id,name"
+ONE_PROFILE='{"resultSet":{"returnCount":1,"totalCount":1},"result":[{"id":"p1id","name":"example_profile"}]}'
+# the name filter ignores case and takes a *, so other profiles come back too: only the exact name counts
+LONGER_PROFILE='{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"id":"p2id","name":"EXAMPLE_PROFILE"},{"id":"p1id","name":"example_profile"},{"id":"p3id","name":"example_profile2"}]}'
+TWO_SAME_PROFILE='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"id":"p1id","name":"example_profile"},{"id":"p4id","name":"example_profile"}]}'
+NO_PROFILE='{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}'
+PROFILE_FULL='{"id":"p1id","name":"example_profile","default":false,"account":"example_acct","sendMapping":"/a.txt","receiveMapping":"/in_${pesit.fileName}","sendingAcknowledgmentEnabled":true,"fileLabelOption":"SEND_FILENAME","multiSelect":true,"transferMode":"ASCII","recordFormat":"Fixed","recordLength":80,"paddingStripEnabled":true,"additionalAttributes":{"userVars.example_k":"v"},"metadata":{"links":{"account":"https://st.example.com:8444/api/v2.0/accounts/example_acct"}},"advancedSettings":{"enabled":false,"callerTranscoding":{"type":"binary","localDataCode":"BINARY","networkDataCode":"BINARY","outputRecordFormat":"VARIABLE","outputRecordLength":2048},"receiverTranscoding":{"type":"binary","localDataCode":"BINARY"},"receiverMessage":{"receiverMessageDirectory":null}}}'
+PROFILE_ADV=$(printf '%s' "${PROFILE_FULL}" | jq -c '.advancedSettings = {"enabled":true,"callerTranscoding":{"type":"ascii","localDataCode":"ASCII","networkDataCode":"ASCII","outputRecordFormat":"FIXED","outputRecordLength":80,"paddingCharacter":"\\u0020"},"receiverTranscoding":{"type":"ascii","localDataCode":"ASCII","outputRecordFormat":"VARIABLE","outputRecordLength":2048,"paddingCharacter":"\\u0020","lineEndingFormat":"DEFAULT"},"receiverMessage":{"receiverMessageDirectory":null}}')
+PROFILES_LIST='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"id":"p1id","name":"example_profile","default":true,"account":"example_acct","sendMapping":"/a.txt","receiveMapping":"/in.txt","fileLabelOption":"SEND_FILENAME","transferMode":"BINARY"},{"id":"p5id","name":"other","default":false,"account":"example_acct","sendMapping":"","receiveMapping":"/b.txt","fileLabelOption":"DONT_SEND","transferMode":"ASCII"}]}'
+
+GET_BODY=$(body tp_list "${PROFILES_LIST}")
+run "${F}/01.transferProfiles_GET.sh"
+expect "01 GET: the count, every profile, then only the default ones" "${RC}:$(calls)" "0:GET ${P}?limit=1&fields=id
+GET ${P}?name=*
+GET ${P}?name=*&default=true"
+has "01 GET: one line per profile, with account/name and the mappings" "  p1id  example_acct/example_profile  default  send /a.txt  receive /in.txt  SEND_FILENAME  BINARY"
+has "01 GET: a profile that is not the default shows -" "  p5id  example_acct/other  -  send   receive /b.txt  DONT_SEND  ASCII"
+run "${F}/01.transferProfiles_GET.sh" example_acct "example*"
+expect "01 GET: an account and a pattern go into the query" "$(calls | tail -2)" "GET ${P}?account=example_acct&name=example*
+GET ${P}?account=example_acct&name=example*&default=true"
+expect "01 GET: sends the Referer" "$(has_header 'Referer: THIS_IS_A_RANDOM_TEXT' | head -1)" "3"
+GET_BODY=
+
+STATUS=201 LOCATION=newid run "${F}/02.transferProfiles_POST.sh" example_acct example_profile /a.txt "in_\${pesit.fileName}"
+expect "02 POST: POST /transferProfiles" "${RC}:$(calls)" "0:POST ${P}"
+expect "02 POST: the body leads with advancedSettings: binary on both sides, with both mappings" "$(payload 1 | jq -c .)" \
+  '{"name":"example_profile","account":"example_acct","sendMapping":"/a.txt","fileLabelOption":"DONT_SEND","receiveMapping":"in_${pesit.fileName}","advancedSettings":{"enabled":true,"callerTranscoding":{"type":"binary"},"receiverTranscoding":{"type":"binary"}}}'
+has "02 POST: says which kind of profile" "Creating the transfer profile example_profile for example_acct (binary)..."
+has "02 POST: prints the code" "HTTP 201"
+has "02 POST: prints the address from Location" "It is at ${P}/newid"
+STATUS=201 run "${F}/02.transferProfiles_POST.sh"
+expect "02 POST: john, example_profile and /example_file.txt by default, no receiveMapping, binary" "$(payload 1 | jq -c .)" \
+  '{"name":"example_profile","account":"john","sendMapping":"/example_file.txt","fileLabelOption":"DONT_SEND","advancedSettings":{"enabled":true,"callerTranscoding":{"type":"binary"},"receiverTranscoding":{"type":"binary"}}}'
+for kind in ascii ebcdic; do
+    STATUS=201 run "${F}/02.transferProfiles_POST.sh" example_acct example_profile /a.txt "" "${kind}"
+    expect "02 POST: ${kind} sets the type of both sides, nothing else" "$(payload 1 | jq -c '.advancedSettings')" \
+      "{\"enabled\":true,\"callerTranscoding\":{\"type\":\"${kind}\"},\"receiverTranscoding\":{\"type\":\"${kind}\"}}"
+done
+STATUS=201 run "${F}/02.transferProfiles_POST.sh" example_acct example_profile /a.txt "" basic
+expect "02 POST: basic is the plain fields only, no advancedSettings" "$(payload 1 | jq -c .)" \
+  '{"name":"example_profile","account":"example_acct","sendMapping":"/a.txt","fileLabelOption":"DONT_SEND"}'
+run "${F}/02.transferProfiles_POST.sh" example_acct example_profile /a.txt "" Binary
+expect "02 POST: a TRANSCODING that is not one of the four, exit 2, nothing sent (case matters)" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STATUS=201 run "${F}/02.transferProfiles_POST.sh" example_acct 'a "b" \ c' '/x y'
+expect "02 POST: quotes and a backslash in a name stay valid JSON" "$(payload 1 | jq -r .name)" 'a "b" \ c'
+POST_BODY=$(body tp_nosite '{"message":"Error validating request","validationErrors":["Account does not contain any PeSIT transfer sites."]}')
+STATUS=400 run "${F}/02.transferProfiles_POST.sh" example_acct example_profile
+expect "02 POST: a refusal exits 1" "${RC}" "1"
+has "02 POST: and prints the server's reason" "Account does not contain any PeSIT transfer sites."
+POST_BODY=
+run "${F}/02.transferProfiles_POST.sh" example_acct " "
+expect "02 POST: a blank name, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+for mapping in 'a*' 'a?b' 'in_*.txt'; do
+    run "${F}/02.transferProfiles_POST.sh" example_acct example_profile /a.txt "${mapping}"
+    expect "02 POST: a receiveMapping with * or ? (${mapping}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+run "${F}/02.transferProfiles_POST.sh" example_acct "" /a.txt
+expect "02 POST: an empty name is not sent (the default name is used)" "$(payload 1 | jq -r .name)" "example_profile"
+LONG_SEND=$(printf 'a%.0s' $(seq 1 251))
+run "${F}/02.transferProfiles_POST.sh" example_acct example_profile "${LONG_SEND}"
+expect "02 POST: a sendMapping over 250 characters, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STATUS=
+
+GET_BODY=$(body tp_one "${ONE_PROFILE}")
+run "${F}/03.transferProfiles_id_HEAD.sh" example_acct example_profile
+expect "03 HEAD: looks the id up by account and name, then HEADs the id" "${RC}:$(calls)" "0:GET ${LOOK}
+HEAD ${P}/p1id"
+has "03 HEAD: says the profile exists, with its id" "The transfer profile example_profile of example_acct exists, id p1id."
+run "${F}/03.transferProfiles_id_HEAD.sh"
+expect "03 HEAD: TP of john by default" "$(calls | head -1)" "GET ${P}?account=john&name=TP&fields=id,name"
+STATUS=404 run "${F}/03.transferProfiles_id_HEAD.sh" example_acct example_profile
+expect "03 HEAD: 404 is 'does not exist', exit 1" "${RC}" "1"
+GET_BODY=$(body tp_longer "${LONGER_PROFILE}")
+run "${F}/03.transferProfiles_id_HEAD.sh" example_acct example_profile
+expect "03 HEAD: other names the filter matched are not counted, the exact one is used" "${RC}:$(calls | tail -1)" "0:HEAD ${P}/p1id"
+GET_BODY=$(body tp_same "${TWO_SAME_PROFILE}")
+run "${F}/03.transferProfiles_id_HEAD.sh" example_acct example_profile
+expect "03 HEAD: two profiles of one name, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+GET_BODY=$(body tp_none "${NO_PROFILE}")
+run "${F}/03.transferProfiles_id_HEAD.sh" example_acct example_profile
+expect "03 HEAD: no such profile, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+has "03 HEAD: and says how many were found" "Found 0 transfer profiles named example_profile on the account example_acct"
+run "${F}/03.transferProfiles_id_HEAD.sh" example_acct "example profile"
+expect "03 HEAD: a name with a space goes into the query for curl to encode" "$(calls)" "GET ${P}?account=example_acct&name=example profile&fields=id,name"
+
+SEQUENCE=$(sequence tp_get "${ONE_PROFILE}" "${PROFILE_FULL}" '{"name":"example_profile","sendMapping":"/a.txt","receiveMapping":"/in_${pesit.fileName}"}')
+run "${F}/04.transferProfiles_id_GET.sh" example_acct example_profile
+expect "04 GET: looks the id up, reads the profile, then reads only some fields" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${P}/p1id
+GET ${P}/p1id?fields=name,sendMapping,receiveMapping"
+has "04 GET: the default flag" "  default:     false"
+has "04 GET: what it sends" "  send:        /a.txt"
+has "04 GET: what it receives as" '  receive:     /in_${pesit.fileName}'
+has "04 GET: the file label" "  file label:  SEND_FILENAME"
+has "04 GET: the mode, record format and length" "  mode:        ASCII, Fixed records of 80"
+has "04 GET: the acknowledgment" "  acknowledge: true"
+has "04 GET: advanced settings off" "  advanced:    false"
+expect "04 GET: and then no sending or receiving line" "$(printf '%s\n' "${OUT}" | grep -c 'sending:')" "0"
+SEQUENCE=$(sequence tp_get_adv "${ONE_PROFILE}" "${PROFILE_ADV}" '{"name":"example_profile"}')
+run "${F}/04.transferProfiles_id_GET.sh" example_acct example_profile
+has "04 GET: advanced settings on" "  advanced:    true"
+has "04 GET: the sending side: type, record format and length" "  sending:     ascii, FIXED records of 80"
+has "04 GET: the receiving side: type and line ending" "  receiving:   ascii, line ending DEFAULT"
+SEQUENCE=$(sequence tp_get_unknown "${ONE_PROFILE}" '{"message":"Error validating request","validationErrors":["Transfer Profile with id p1id not found or not accessible."]}')
+run "${F}/04.transferProfiles_id_GET.sh" example_acct example_profile
+expect "04 GET: an answer with no id, exit 1" "${RC}" "1"
+SEQUENCE=
+
+FULL_OUT='{"id":"p1id","name":"example_profile","default":false,"account":"example_acct","sendMapping":"/new.txt","receiveMapping":"/in_${pesit.fileName}","sendingAcknowledgmentEnabled":true,"fileLabelOption":"SEND_FILENAME","multiSelect":true,"transferMode":"ASCII","recordFormat":"Fixed","recordLength":80,"paddingStripEnabled":true,"additionalAttributes":{"userVars.example_k":"v"},"advancedSettings":{"enabled":false,"callerTranscoding":{"type":"binary","localDataCode":"BINARY","networkDataCode":"BINARY","outputRecordFormat":"VARIABLE","outputRecordLength":2048},"receiverTranscoding":{"type":"binary","localDataCode":"BINARY"},"receiverMessage":{"receiverMessageDirectory":null}}}'
+# advanced first: the line ending of the receiving side
+SEQUENCE=$(sequence tp_put_adv "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=204 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile
+expect "05 PUT: looks the id up, reads the profile, PUTs it" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${P}/p1id
+PUT ${P}/p1id"
+expect "05 PUT: WINDOWS by default: the whole profile back, only receiverTranscoding.lineEndingFormat changed, the id kept, metadata dropped" \
+  "$(payload 1 | jq -c .)" "$(printf '%s' "${PROFILE_ADV}" | jq -c 'del(.metadata) | .advancedSettings.receiverTranscoding.lineEndingFormat = "WINDOWS"')"
+has "05 PUT: prints the line ending before" "The lineEndingFormat of example_profile is now DEFAULT."
+has "05 PUT: prints the code" "HTTP 204"
+SEQUENCE=$(sequence tp_put_unix "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=204 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile UNIX /new.txt
+expect "05 PUT: a line ending and a send mapping change both, and nothing else" "$(payload 1 | jq -c '[.advancedSettings.receiverTranscoding.lineEndingFormat, .sendMapping]')" '["UNIX","/new.txt"]'
+expect "05 PUT: the sending side of the advanced settings is sent back as read" "$(payload 1 | jq -c '.advancedSettings.callerTranscoding.outputRecordLength')" "80"
+has "05 PUT: prints the send mapping before too" "The sendMapping of example_profile is now /a.txt."
+# the basic form: the send mapping only
+SEQUENCE=$(sequence tp_put "${ONE_PROFILE}" "${PROFILE_FULL}")
+STATUS=204 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile - /new.txt
+expect "05 PUT: a - leaves the line ending alone: the whole profile back, only sendMapping changed, metadata dropped" "$(payload 1 | jq -c .)" "${FULL_OUT}"
+has "05 PUT: prints the value before" "The sendMapping of example_profile is now /a.txt."
+SEQUENCE=$(sequence tp_put_off "${ONE_PROFILE}" "${PROFILE_FULL}")
+STATUS=204 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile WINDOWS
+expect "05 PUT: a profile with the advanced settings off has no line ending: exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+has "05 PUT: and says so" "has no receiving line ending"
+SEQUENCE=$(sequence tp_put_bin "${ONE_PROFILE}" "$(printf '%s' "${PROFILE_ADV}" | jq -c '.advancedSettings.receiverTranscoding = {"type":"binary","localDataCode":"BINARY"}')")
+STATUS=204 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile UNIX
+expect "05 PUT: a binary receiving side has no line ending either: exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+SEQUENCE=$(sequence tp_put_quote "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=204 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile - 'a "b" \ c'
+expect "05 PUT: quotes and a backslash stay valid JSON" "$(payload 1 | jq -r .sendMapping)" 'a "b" \ c'
+SEQUENCE=$(sequence tp_put_refused "${ONE_PROFILE}" "${PROFILE_ADV}")
+POST_BODY=
+STATUS=403 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile UNIX
+expect "05 PUT: a refusal exits 1" "${RC}" "1"
+has "05 PUT: and prints the code" "HTTP 403"
+SEQUENCE=
+GET_BODY=$(body tp_none "${NO_PROFILE}")
+run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile UNIX
+expect "05 PUT: no such profile, exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+GET_BODY=
+for args in "" "example_acct" "example_acct example_profile SOMETIMES" "example_acct example_profile -" "example_acct example_profile windows"; do
+    # shellcheck disable=SC2086
+    run "${F}/05.transferProfiles_id_PUT.sh" ${args}
+    expect "05 PUT: bad arguments (${args:-none}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile - "${LONG_SEND}"
+expect "05 PUT: a sendMapping over 250 characters, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+
+# 06: advanced first, the receiving side's record length
+SEQUENCE=$(sequence tp_patch "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=204 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile 512
+expect "06 PATCH: looks the id up, reads the profile, PATCHes it" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${P}/p1id
+PATCH ${P}/p1id"
+expect "06 PATCH: replaces the receiving side's outputRecordLength, as a number, nothing else" "$(payload 1 | jq -c .)" \
+  '[{"op":"replace","path":"/advancedSettings/receiverTranscoding/outputRecordLength","value":512}]'
+has "06 PATCH: prints the length before, and the side" "The record length of example_profile (receiver) is now 2048."
+has "06 PATCH: prints the code" "HTTP 204"
+SEQUENCE=$(sequence tp_patch_caller "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=204 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile 64 caller
+expect "06 PATCH: the sending side's own length" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/advancedSettings/callerTranscoding/outputRecordLength","value":64}]'
+has "06 PATCH: and the length before" "The record length of example_profile (caller) is now 80."
+SEQUENCE=$(sequence tp_patch_basic "${ONE_PROFILE}" "${PROFILE_FULL}")
+STATUS=204 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile 512 basic
+expect "06 PATCH: the basic form replaces the plain recordLength" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/recordLength","value":512}]'
+has "06 PATCH: prints the length before" "The record length of example_profile (basic) is now 80."
+SEQUENCE=$(sequence tp_patch_off "${ONE_PROFILE}" "${PROFILE_FULL}")
+STATUS=204 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile 512
+expect "06 PATCH: the receiving side of a profile with advanced settings off: exit 1, no PATCH" "${RC}:$(calls | grep -c PATCH)" "1:0"
+has "06 PATCH: and says so" "has no record length for receiver"
+SEQUENCE=$(sequence tp_patch_binary "${ONE_PROFILE}" "$(printf '%s' "${PROFILE_ADV}" | jq -c '.advancedSettings.receiverTranscoding = {"type":"binary","localDataCode":"BINARY"}')")
+STATUS=204 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile 512
+expect "06 PATCH: a binary receiving side has no record length: exit 1, no PATCH" "${RC}:$(calls | grep -c PATCH)" "1:0"
+SEQUENCE=$(sequence tp_patch_default "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=204 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile
+expect "06 PATCH: 1024 by default" "$(payload 1 | jq -c '.[0].value')" "1024"
+SEQUENCE=$(sequence tp_patch_refused "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=400 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile 5
+expect "06 PATCH: a refusal exits 1" "${RC}" "1"
+SEQUENCE=
+for args in "" "example_acct" "example_acct example_profile abc" "example_acct example_profile 0" "example_acct example_profile -1" "example_acct example_profile 32768" "example_acct example_profile 10 sender"; do
+    # shellcheck disable=SC2086
+    run "${F}/06.transferProfiles_id_PATCH.sh" ${args}
+    expect "06 PATCH: bad arguments (${args:-none}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+SEQUENCE=$(sequence tp_patch_max "${ONE_PROFILE}" "${PROFILE_ADV}")
+STATUS=204 run "${F}/06.transferProfiles_id_PATCH.sh" example_acct example_profile 32767
+expect "06 PATCH: 32767 is the largest record length accepted" "$(payload 1 | jq -c '.[0].value')" "32767"
+SEQUENCE=
+
+GET_BODY=$(body tp_one "${ONE_PROFILE}")
+STATUS=204 run "${F}/07.transferProfiles_id_DELETE.sh" example_acct example_profile
+expect "07 DELETE: looks the id up by account and name, then DELETEs the id" "${RC}:$(calls)" "0:GET ${LOOK}
+DELETE ${P}/p1id"
+has "07 DELETE: prints the code" "HTTP 204"
+STATUS=404 run "${F}/07.transferProfiles_id_DELETE.sh" example_acct example_profile
+expect "07 DELETE: a refusal exits 1" "${RC}" "1"
+GET_BODY=$(body tp_longer "${LONGER_PROFILE}")
+STATUS=204 run "${F}/07.transferProfiles_id_DELETE.sh" example_acct example_profile
+expect "07 DELETE: of the profiles the filter matched, only the exact name goes" "$(calls | grep -c DELETE):$(calls | tail -1)" "1:DELETE ${P}/p1id"
+GET_BODY=$(body tp_same "${TWO_SAME_PROFILE}")
+run "${F}/07.transferProfiles_id_DELETE.sh" example_acct example_profile
+expect "07 DELETE: two profiles of one name, exit 1, no DELETE" "${RC}:$(calls | grep -c DELETE)" "1:0"
+GET_BODY=$(body tp_none "${NO_PROFILE}")
+run "${F}/07.transferProfiles_id_DELETE.sh" example_acct example_profile
+expect "07 DELETE: no such profile, exit 1, no DELETE" "${RC}:$(calls | grep -c DELETE)" "1:0"
+GET_BODY=
+STATUS=
+for args in "" "example_acct"; do
+    # shellcheck disable=SC2086
+    run "${F}/07.transferProfiles_id_DELETE.sh" ${args}
+    expect "07 DELETE: bad arguments (${args:-none}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

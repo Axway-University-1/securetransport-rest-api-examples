@@ -18,6 +18,8 @@ real HashiCorp Vault, S3 bucket or Axway Sentinel:
 - SlowProxy  a TCP proxy that passes the bytes through at a limited rate, in both
              directions, so a transfer through it lasts as long as you need; close()
              cuts every connection, which aborts the transfer.
+- CapturingProxy  a TCP proxy that passes the bytes through unchanged and keeps a copy of each
+             direction of each connection, to see what a transfer puts on the wire.
 - FakeIcap   an ICAP server: answers OPTIONS, reads a REQMOD or RESPMOD request
              with its preview, and either lets the file through (204) or blocks
              it with a 403 when it holds the marker text. Records each request.
@@ -379,6 +381,133 @@ class SlowProxy:
                 end.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
+
+    def close(self):
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except OSError:
+            pass
+        self.sock.close()
+        for end in self._open:
+            try:
+                end.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            end.close()
+        self._open = []
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self.close()
+        self.thread.join(5)
+
+
+class CapturingProxy:
+    """
+    A TCP proxy that passes the bytes through unchanged and keeps a copy of them. connections holds
+    one dict per connection through it: {"to_target": bytes the client sent, "to_client": bytes the
+    target answered}, in the order the connections were made. to_target_all() and to_client_all()
+    join them. A client that keeps its connection open for the next transfer (SecureTransport does)
+    makes no new record, so reset() starts every open connection a new record and forgets the old
+    ones: what is read after it is what passed since. wait_idle(seconds) waits until nothing has
+    moved for that long. close() cuts what is open.
+    """
+
+    def __init__(self, target_host, target_port, port=0):
+        self.target = (target_host, target_port)
+        self.connections = []
+        self._live = []
+        self._open = []
+        self._last = time.time()
+        self._lock = threading.Lock()
+        self.sock = socket.socket()
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("0.0.0.0", port))
+        self.sock.listen()
+        self.port = self.sock.getsockname()[1]
+        self.thread = threading.Thread(target=self._accept, daemon=True)
+
+    @staticmethod
+    def _new_record():
+        return {"to_target": bytearray(), "to_client": bytearray()}
+
+    def _accept(self):
+        while True:
+            try:
+                client, _ = self.sock.accept()
+            except OSError:
+                return
+            try:
+                upstream = socket.create_connection(self.target, timeout=15)
+                upstream.settimeout(None)
+            except OSError:
+                client.close()
+                continue
+            conn = {"record": self._new_record()}
+            with self._lock:
+                self.connections.append(conn["record"])
+                self._live.append(conn)
+                self._open += [client, upstream]
+            for source, sink, key in ((client, upstream, "to_target"), (upstream, client, "to_client")):
+                threading.Thread(target=self._pump, args=(source, sink, conn, key), daemon=True).start()
+
+    def _pump(self, source, sink, conn, key):
+        try:
+            while True:
+                data = source.recv(65536)
+                if not data:
+                    break
+                with self._lock:
+                    conn["record"][key].extend(data)
+                    self._last = time.time()
+                sink.sendall(data)
+        except OSError:
+            pass
+        for end in (source, sink):
+            try:
+                end.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+
+    def to_target_all(self):
+        with self._lock:
+            return b"".join(bytes(c["to_target"]) for c in self.connections)
+
+    def to_client_all(self):
+        with self._lock:
+            return b"".join(bytes(c["to_client"]) for c in self.connections)
+
+    def reset(self):
+        """Forget what was captured. Connections still open go on into a new record each."""
+        with self._lock:
+            self.connections = []
+            for conn in self._live:
+                conn["record"] = self._new_record()
+                self.connections.append(conn["record"])
+
+    def wait_idle(self, seconds=2, limit=30):
+        """Wait until no byte has passed for `seconds`, at most `limit` seconds; True if it went quiet."""
+        deadline = time.time() + limit
+        while time.time() < deadline:
+            if time.time() - self._last >= seconds:
+                return True
+            time.sleep(0.2)
+        return False
+
+    def drop_connections(self):
+        """Cut every connection that is open, and keep listening: the client's next transfer has to make a new one."""
+        with self._lock:
+            ends, self._open = self._open, []
+            self._live = []
+        for end in ends:
+            try:
+                end.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            end.close()
 
     def close(self):
         try:

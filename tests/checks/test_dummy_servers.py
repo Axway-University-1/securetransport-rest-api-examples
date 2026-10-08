@@ -210,6 +210,107 @@ except OSError:
     stopped = True
 check("the sink stops listening when the with block ends", stopped)
 
+print("=== CapturingProxy ===")
+
+
+def echo_target():
+    """A TcpSink answers nothing; this one answers every chunk with the same bytes upper cased, in a thread."""
+    import threading
+    server = socket.socket()
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+
+    def serve():
+        while True:
+            try:
+                conn, _ = server.accept()
+            except OSError:
+                return
+            threading.Thread(target=answer, args=(conn,), daemon=True).start()
+
+    def answer(conn):
+        try:
+            while True:
+                data = conn.recv(65536)
+                if not data:
+                    break
+                conn.sendall(data.upper())
+        except OSError:
+            pass
+        conn.close()
+    threading.Thread(target=serve, daemon=True).start()
+    return server
+
+
+target_server = echo_target()
+with dummy_servers.CapturingProxy("127.0.0.1", target_server.getsockname()[1]) as capture:
+    with socket.create_connection(("127.0.0.1", capture.port), timeout=10) as conn:
+        conn.settimeout(10)
+        conn.sendall(b"hello \x00\xff bytes")
+        got = b""
+        while len(got) < 14:
+            got += conn.recv(100)
+        check("what the client sent reaches the target and the answer comes back unchanged", got == b"HELLO \x00\xff BYTES", got)
+        check("it kept both directions of the connection",
+              capture.to_target_all() == b"hello \x00\xff bytes" and capture.to_client_all() == b"HELLO \x00\xff BYTES",
+              (capture.to_target_all(), capture.to_client_all()))
+        check("one connection, one record", len(capture.connections) == 1, len(capture.connections))
+        check("it goes quiet once nothing moves", capture.wait_idle(0.5, 10))
+        capture.reset()
+        check("reset() forgets what was captured", capture.to_target_all() == b"" and capture.to_client_all() == b"")
+        conn.sendall(b"again")
+        got = b""
+        while len(got) < 5:
+            got += conn.recv(100)
+        check("a connection that stays open goes on being captured after a reset",
+              capture.to_target_all() == b"again" and capture.to_client_all() == b"AGAIN", (capture.to_target_all(), capture.to_client_all()))
+    with socket.create_connection(("127.0.0.1", capture.port), timeout=10) as conn2:
+        conn2.sendall(b"two")
+        conn2.settimeout(10)
+        conn2.recv(10)
+    deadline = time.time() + 5
+    while len(capture.connections) < 2 and time.time() < deadline:
+        time.sleep(0.1)
+    check("a second connection makes a second record", len(capture.connections) == 2 and capture.connections[1]["to_target"] == b"two", len(capture.connections))
+capture_port = capture.port
+try:
+    socket.create_connection(("127.0.0.1", capture_port), timeout=2).close()
+    capture_stopped = False
+except OSError:
+    capture_stopped = True
+check("it stops listening when the with block ends", capture_stopped)
+target_server.close()
+
+print("=== pesit_wire: reading a captured PeSIT transfer ===")
+import pesit_wire  # noqa: E402
+
+
+def fpdu(phase, kind, params=b"", dst=1, src=2):
+    body = bytes([phase, kind, dst, src]) + params
+    size = len(body) + 2
+    return size.to_bytes(2, "big") + size.to_bytes(2, "big") + body
+
+
+select_ack = fpdu(0xC0, 0x31, b"\x02\x03\x00\x00\x00" + b"\x10\x01\x01" + b"\x1e\x08\x1f\x01\x80\x20\x02\x08\x00")
+capture_bytes = (b"\x00\x04\xc1\xc3\xd2\xf0" + fpdu(0x40, 0x21, b"\x06\x01\x02") + select_ack
+                 + fpdu(0x00, 0x00, b"\x00\x05alpha\x00\x04beta") + fpdu(0x00, 0x00, b"\x00\x05gamma") + fpdu(0xC0, 0x04))
+frames = pesit_wire.fpdus(capture_bytes)
+check("it skips the pre-connection message and reads each FPDU: phase, type, parameters",
+      [(f[0], f[1]) for f in frames] == [(0x40, 0x21), (0xC0, 0x31), (0, 0), (0, 0), (0xC0, 0x04)] and frames[0][4] == b"\x06\x01\x02", frames)
+check("data() joins the bodies of the data FPDUs only", pesit_wire.data(capture_bytes) == b"\x00\x05alpha\x00\x04beta\x00\x05gamma", pesit_wire.data(capture_bytes))
+check("records() cuts articles: 2 byte length, then the bytes", pesit_wire.records(pesit_wire.data(capture_bytes)) == [b"alpha", b"beta", b"gamma"])
+check("records() says None for a stream that is not made of records", pesit_wire.records(b"alpha\nbeta\n") is None and pesit_wire.records(b"\x00\x09abc") is None)
+check("records() of nothing is no records", pesit_wire.records(b"") == [])
+check("frame_records() builds what records() reads", pesit_wire.records(pesit_wire.frame_records([b"a", b"", b"xyz"])) == [b"a", b"", b"xyz"])
+check("the DTFDA, DTFMA and DTFFA types are data too",
+      pesit_wire.data(fpdu(0, 0x40, b"ab") + fpdu(0, 0x41, b"cd") + fpdu(0, 0x42, b"ef") + fpdu(0, 0x43, b"zz")) == b"abcdef")
+check("PI 16, the data coding, is read from the answer to the select, even inside a group",
+      pesit_wire.network_data_code(capture_bytes) == b"\x01" and pesit_wire.parameter(b"\x1e\x08\x1f\x01\x80\x20\x02\x08\x00", 32) == b"\x08\x00")
+check("a parameter that is not there is None", pesit_wire.parameter(b"\x10\x01\x01", 99) is None and pesit_wire.network_data_code(b"") is None)
+check("a capture cut in the middle of a frame gives the whole frames before it",
+      len(pesit_wire.fpdus(capture_bytes[:-3])) == 4, len(pesit_wire.fpdus(capture_bytes[:-3])))
+
 print()
 print("test_dummy_servers: %s" % ("PASS" if not failed else "FAIL"))
 sys.exit(1 if failed else 0)

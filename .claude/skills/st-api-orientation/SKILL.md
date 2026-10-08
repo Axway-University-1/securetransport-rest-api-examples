@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     241 curl examples, numbered by topic
-    bat/      233 of them, for Windows
+    bash/     248 curl examples, numbered by topic
+    bat/      240 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -89,6 +89,7 @@ create, read, update, delete cycle for that object.
 | See who is connected now, end one session (disconnect a client), or count sessions by user class | `bash/32.Sessions/` |
 | Report how many files came in and went out each day (the usage report), list the users who have logged in, or test the connection to the Amplify Platform | `bash/33.StatisticsSummary/` |
 | Read the status of the Transaction Manager, or stop it (server wide, cannot be undone through the API; needs a confirmation word) | `bash/34.TransactionManager/` |
+| List, create, read, replace, patch or delete the transfer profile of an account (PeSIT: which file it sends, what a file it receives is called, and with `advancedSettings` what happens to its bytes: character set, records, padding, line ending; the account needs a PeSIT site). What each setting does is in st-api-gotchas, "What a transfer profile does to the bytes of a file" | `bash/35.TransferProfiles/` |
 | Manage the embedded database's access rules (pg_hba.conf) | `bash/17.AccessPolicies/` |
 | Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
 | Change an address book source | `bash/19.AddressBook/` |

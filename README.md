@@ -300,6 +300,7 @@ already exists.
 | 32. Sessions | `/sessions`, the sessions open now: list, read one, end one (a client is disconnected), and the bandwidth and user class statistics | 5 | 5 |
 | 33. Statistics Summary | `/statisticsSummary`, the usage report: the transfers in and out for each day of a period, the users who have logged in, and a test of the connection to the Amplify Platform it is sent to (read only) | 3 | 3 |
 | 34. Transaction Manager | `/transactionManager`, the status of the Transaction Manager (read only), and `/transactionManager/operations`, the stop: server wide, no start to undo it, needs a confirmation word on the command line (disruptive, written from the reference and not run on a server) | 2 | 2 |
+| 35. Transfer Profiles | `/transferProfiles`, the PeSIT profiles of an account that say which file to send, what to call the file received and how it is labelled: list, create, HEAD, read, replace, patch and delete | 7 | 7 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same
@@ -390,7 +391,6 @@ These areas of the API do not have examples yet. Contributions are welcome, and
 the list doubles as a rough roadmap.
 
 - Mail Templates, Sessions, Statistics Summary and Zones
-- Transfer Profiles, Route Steps Charsets and Route Steps Metadata
 - Site Templates and User Classes
 - Cluster Services (not planned: the examples are written against a standalone server)
 

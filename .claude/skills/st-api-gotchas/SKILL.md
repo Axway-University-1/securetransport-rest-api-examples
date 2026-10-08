@@ -782,6 +782,84 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   `stop-the-transaction-manager` (exit 2 otherwise), and check 57 runs only its refusals, behind a fake `curl`. The reference's `graceful` is false when
   left out, an immediate stop; the script sends it always and defaults to true.
 
+- **Transfer profiles** (`/transferProfiles`; examples `35.TransferProfiles`, check 58): a profile is **PeSIT only** and belongs to an
+  account that **already has a PeSIT transfer site** (400 "Account does not contain any PeSIT transfer sites."; an account that does
+  not exist is 404; a template account was not tried, its creation needs a `templateClass`). It is addressed by a generated **id**,
+  so every example looks it up by account and name. Name is unique per account but case sensitive (`p1` and `P1` coexist, the same
+  name on another account is fine, a duplicate is 400 "The transfer profile cannot have the same account and name."), while the
+  **`name=` filter ignores case and takes a `*`**: pick the exact name out of the answer yourself. `account=` is exact (no `*`, case
+  sensitive). `default=` takes true or false and **any other text means false**; `transferMode`, `recordFormat`, `recordLength`,
+  `multiSelect`, `fileLabelOption`, `sendMapping` and `additionalAttributes.key`/`.value` filter too, a value that is no
+  transfer mode finds nothing (no 400); `limit=-1` is 400, `fields=` keeps the keys named (unknown 400). Required, though the
+  reference marks less: `name`, `account`, `fileLabelOption`, and one of `sendMapping`/`receiveMapping` (the 400 also names the
+  receiving message directory); `receiveMapping` may not contain `*` or `?` and `sendMapping` is 250 characters at most;
+  `recordLength` 1 to 32767; a name of 300 characters is a 403 "unable to comply". **The server stores a `/` in front of both
+  mappings** and an unset `receiveMapping` reads back `""`. An account has **at most one default**: making a profile the default
+  (create, PUT or PATCH) turns the old one off. **PUT replaces the whole profile and needs the `id` in the body** (400 "id to
+  load is required for loading" without it); a fragment *with* the id answers 204 and resets everything left out (transfer mode,
+  record format and length, multiSelect, the acknowledgment and padding flags, the attributes, the receive mapping). `account`
+  in a PUT or PATCH is accepted and ignored, `name` renames, a name the account already has is **403, not 400**, an unknown id
+  404. PATCH: `replace`/`add` work on the scalars, an `add` to `/additionalAttributes/userVars.<name>` (the prefix is required,
+  the value may not be blank), an empty patch is 204, a path that does not exist is 400 `Missing field`, a patch that would
+  leave both mappings empty is 400, `replace` of `/id` is 400. GET of an unknown id (well formed or not) is a JSON 404, HEAD a
+  bodiless 404, DELETE a JSON 404 the second time. Deleting the account deletes its profiles. **What a profile does** (check
+  58, two real pulls over the lab's own PeSIT server): the PeSIT file name of a pull is the **name of the receiver's profile**
+  (the one the pull names in `transferProfile`, else the account's default); it shows as the `filename` of the transfer log entry
+  and `${pesit.fileName}` in a `receiveMapping` evaluates to it. The profile named decides what the received file is called
+  (`receiveMapping: "landed.txt"` gave `landed.txt`, `${pesit.fileName}` gave the profile's name), in the pull's
+  `destinationDirectory`; what is sent comes from the **sender's default profile** (`sendMapping`). A pull that names no profile uses
+  the receiver's default one. `advancedSettings`: see the next entry, which has what they do to a file.
+  **PATCH of a side's `type` is 400** ("Patch operation on read only or discriminator fields is not permitted."; PUT the whole
+  profile to change it, and the fields of the old type go); a PATCH or PUT of a field the type does not have (an
+  `outputRecordLength` of a binary sender, a `lineEndingFormat` of a binary receiver) is **204 and ignored**. `type` is case
+  sensitive (an unknown one, `Binary` too, is 400); `lineEndingFormat` is DEFAULT, WINDOWS or UNIX; the server fills in
+  `localDataCode`, `networkDataCode`, VARIABLE records of 2048, a `paddingCharacter` of the text `\u0020` (ascii) or `\u0040`
+  (ebcdic) and `lineEndingFormat` DEFAULT. `custom_table` (sender or receiver) names a server configuration option that holds the
+  table, and is 400 "does not exist or is empty" when there is none; `ascii_custom_table` and `ebcdic_custom_table` with an inline
+  `translationTable` (base64 of 256 bytes) and a `translationCustomTableFileName` are accepted and read back (201), creating no
+  option, but **a transfer through them fails**: "Failure in opening file" (check 59).
+
+- **What a transfer profile does to the bytes of a file** (check 59, 116 real PeSIT pulls, the wire read through a
+  `CapturingProxy` and `tests/integration/lib/pesit_wire.py`). In a pull the SENDER's default profile `callerTranscoding` ("sending")
+  decides what goes on the wire and the RECEIVER's `receiverTranscoding` what is stored; the sender announces the data coding in PI 16
+  (0 ASCII, 1 EBCDIC, 2 binary) and the receiver decides by it. The connection is `LEN2 + FPDU` (FPDU: length, phase, type, two
+  ids, parameters); the data is in DTF FPDUs (phase 0, type 0), as the file's bytes or as records, each a 2 byte length (not counting
+  itself) and its bytes. Sent and received are one link: only the stored file shows the receiver's conversion.
+  - **binary**: bytes untouched (stream, PI 16 = 2); a stream longer than the record length (2048) is cut into records of that
+    length and joined again by a binary receiver, still byte for byte. `outputRecordFormat`/`Length` of a binary sender are read only.
+    A binary receiver joins records with nothing between them (CRLF/LF of an ascii sender are gone), converts nothing.
+  - **ascii sender**: a record per LF (a CR right before it goes too; other CRs stay), the LF removed, none added for a final line
+    without one; one record only is sent as bare bytes with no length. No conversion of the characters (UTF-8, Latin-1 and EBCDIC bytes
+    pass), a record longer than `outputRecordLength` (2048, or what is set) **fails the transfer**: receiver "Record length too long"
+    (the receiver compares each record with the length the sender announced). FIXED pads a short record (paddingCharacter, a space by
+    default; the text `\u002E` is a dot) and, like VARIABLE, fails on a longer one; the cut-to-length seen earlier was an artifact (below).
+    An empty file sends nothing. `paddingCharacter` and `outputRecordLength` change nothing for VARIABLE records that fit.
+  - **ascii_predefined / ebcdic_predefined sender**: the same record cutting, then characters converted from `sourceEncodingScheme`
+    to `outputEncodingScheme` (UTF-8 to ISO-8859-1 turns a euro sign into `?`; IBM037 lacks it too, it becomes 0x3F), announced as
+    `networkDataCode`. IBM1047 differs from IBM037 in `[ ] ^` and in the line feed (0x15 against 0x25); 0x25 converted from IBM037 to
+    IBM1047 becomes 0x15 and is not a record end.
+  - **ebcdic sender**: no conversion, announced as EBCDIC, records end at 0x15 (not at LF 0x0A or 0x25), FIXED pads with byte 0x7C: the
+    default paddingCharacter `\u0040` is the character @, converted to EBCDIC (not the EBCDIC space 0x40).
+  - **ascii receiver**: puts LF (WINDOWS: CRLF, UNIX/DEFAULT: LF) after each record, adds a final one to a line that had none; a **stream**
+    (binary data, a single bare record) gets the line end added after it, so a file that already ends in LF ends in two; an empty file
+    stays empty. Converts only EBCDIC network data (PI 16 = 1) to ASCII, with a table that is IBM1047 except that 0x4F reads as the
+    letter E with a diaeresis and 0x6A as `|`. FIXED pads or cuts each record to the length, then the line end.
+  - **ebcdic receiver**: converts only network ASCII data (PI 16 = 0) to EBCDIC (IBM1047 except that `|` becomes 0x6A), ends records
+    with 0x15 (WINDOWS: 0x0D 0x15); network binary or EBCDIC data is not converted, only the end added. FIXED pads with 0x7C.
+  - **predefined receiver**: converts from `sourceEncodingScheme` to `outputEncodingScheme` whatever the network code says, and adds the
+    line end of the OUTPUT encoding (0x15 for IBM1047).
+  - **advancedSettings.enabled**: true and the advanced sides win over the plain `transferMode`; false and the plain fields are in force,
+    whatever the advanced settings hold.
+  - **plain fields**: `transferMode` ASCII = ascii sender and receiver; EBCDIC and EBCDIC_NATIVE sender = no conversion, announced as
+    EBCDIC, records end at 0x25 and 0x15 (and 0x0A), padded with 0x40; an EBCDIC receiver converts nothing; EBCDIC_NATIVE ends records
+    with 0x25. `recordFormat` Fixed with `recordLength` pads the sender's records, **also the last block of a BINARY file with NUL bytes**
+    (a 17 byte file with 10 becomes 20 bytes), and makes a receiver FAIL ("Incorrect record length") on records of another length;
+    `paddingStripEnabled` strips the padding from an ASCII receiver's fixed records (not a binary receiver's).
+  - **A PeSIT connection that is kept open between pulls carries the record format of the transfer before it**: with it reused, a
+    changed profile gave other answers (a FIXED sender that did not pad, a record longer than the length cut instead of refused, the
+    record length announced twice different). Check 59 cuts the connection after every pull; do the same (or wait for it to close)
+    before believing a test of a changed profile.
+
 - **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
   the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
   An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST
@@ -1108,8 +1186,12 @@ server's own PeSIT listener (17617), and each has a default transfer profile.
   `operationIndex`; a failed entry's own record (`GET` its `self` link) has
   the PeSIT exchange and the error.
 - **A relative `receiveMapping`** (`${pesit.fileName}`) lands the file in the
-  pull's `destinationDirectory`. An absolute one (`/${pesit.fileName}`) lands
-  it in the home folder, whatever the pull asked for.
+  pull's `destinationDirectory`. An absolute one (`/${pesit.fileName}`) was
+  once recorded here as landing in the home folder; check 58 (5.5-20260924) did
+  not see that: the server stores every mapping with a `/` in front
+  (`in.txt` reads back `/in.txt`) and a receive mapping of `/abs_rd.txt` landed
+  in the pull's `destinationDirectory`. See "Transfer profiles" under "The Admin
+  API, against its own reference".
 - **The sender's outbound and the receiver's inbound have different
   `coreId`s.** So a plain pull has no outbound under the receiver's `coreId`,
   and `Acknowledgment.sh` sends a NACK. For an ACK, something must push the

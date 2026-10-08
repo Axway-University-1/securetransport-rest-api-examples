@@ -19,8 +19,9 @@ Three things found while building it, each confirmed directly:
   - sendMapping "/*" is not a wildcard: the sender looks for a file named "*"
     and answers "File not found". The mapping names the file instead.
   - A relative receiveMapping lands the file in the pull's
-    destinationDirectory; "/${pesit.fileName}" would land it in the home
-    folder whatever the pull asked for.
+    destinationDirectory. (An absolute one was once recorded here as landing in
+    the home folder; check 58 did not see that: the server stores a leading /
+    on every receiveMapping and "/abs.txt" landed in the destinationDirectory.)
   - Deleting a received file through the End User API is logged as an
     outgoing transfer under the file's coreId. Acknowledgment.sh counts it as
     the outbound, and ACKs. So nothing here deletes a received file before it
