@@ -1,0 +1,27 @@
+* text=auto
+
+# Bash and Python: LF only (Unix line endings)
+*.sh text eol=lf
+*.py text eol=lf
+
+# Batch files: CRLF (Windows line endings)
+*.bat text eol=crlf
+
+# JSON and YAML: LF
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# Markdown and documentation: LF
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary files
+*.jpg binary
+*.png binary
+*.gif binary
+*.pem binary
+*.key binary
+*.p12 binary
+*.pfx binary
+*.jks binary
