@@ -21,6 +21,9 @@
 # - This example uses the account "john". 02.subscriptions_POST.sh and
 #   03.subscriptions_POST_triggerfile.sh create subscriptions for it.
 # - Requires `jq`, which prints the short listing.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when both answers are 200, 1 otherwise.
 # ==============================================================================
 
 #
@@ -31,14 +34,27 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
+MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/subscriptions"
 
 ACCOUNT="john"
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "Get all the subscriptions of the account '%s'...\n" "${ACCOUNT}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/subscriptions?account=${ACCOUNT}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "${MAIN_URL}?account=${ACCOUNT}"
+printf '%s' "${RESPONSE}"
 
 printf "\n\nGet only its Advanced Routing subscriptions, one line each: id, folder, application...\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/subscriptions?account=${ACCOUNT}&type=AdvancedRouting" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '(.result // [])[] | "\(.id)  \(.folder)  \(.application)"'
+st_get "${MAIN_URL}?account=${ACCOUNT}&type=AdvancedRouting"
+printf '%s\n' "${RESPONSE}" | jq -r '(.result // [])[] | "\(.id)  \(.folder)  \(.application)"'

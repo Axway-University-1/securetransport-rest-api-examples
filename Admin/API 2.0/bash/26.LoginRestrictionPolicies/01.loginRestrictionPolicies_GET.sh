@@ -30,6 +30,9 @@
 #   ask for it as businessUnit (singular); fields=businessUnits answers 400. The rules are
 #   rules.
 # - Requires `jq`, which prints one policy per line.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when TYPE is not ALLOW_THEN_DENY or DENY_THEN_ALLOW, or there are more than two arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -43,6 +46,10 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/loginRestrictionPolicies"
 PATTERN="${1:-*}"
 TYPE="$2"
+if [ "$#" -gt 2 ]; then
+    printf "Usage: ./01.loginRestrictionPolicies_GET.sh [PATTERN [TYPE]]\n"
+    exit 2
+fi
 if [ -n "${TYPE}" ] && ! [[ "${TYPE}" =~ ^(ALLOW_THEN_DENY|DENY_THEN_ALLOW)$ ]]; then
     printf "TYPE is ALLOW_THEN_DENY or DENY_THEN_ALLOW, not %s.\n" "${TYPE}"
     exit 2
@@ -50,20 +57,33 @@ fi
 LINE='"  \(.name)  \(.type)  \(.rules | length) rule(s)  \(if .isDefault then "default  " else "" end)business units: \((.businessUnits // []) | if length == 0 then "-" else join(", ") end)"'
 FIELDS="name,type,isDefault,rules,businessUnit"
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "Login restriction policies: "
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?limit=1&fields=name" -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '.resultSet.totalCount'
+st_get "${MAIN_URL}?limit=1&fields=name"
+printf '%s\n' "${RESPONSE}" | jq -r '.resultSet.totalCount'
 
 printf "\nThe policies named %s: name, type, rules, business units:\n" "${PATTERN}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "name=${PATTERN}" --data-urlencode "fields=${FIELDS}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+st_get -G "${MAIN_URL}" --data-urlencode "name=${PATTERN}" --data-urlencode "fields=${FIELDS}"
+printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 
 if [ -n "${TYPE}" ]; then
     printf "\nOnly the ones of type %s:\n" "${TYPE}"
-    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "type=${TYPE}" --data-urlencode "fields=${FIELDS}" \
-      -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+    st_get -G "${MAIN_URL}" --data-urlencode "type=${TYPE}" --data-urlencode "fields=${FIELDS}"
+    printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 fi
 
 printf "\nThe default policy, which applies to every account that has none of its own:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "isDefault=true" --data-urlencode "fields=${FIELDS}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+st_get -G "${MAIN_URL}" --data-urlencode "isDefault=true" --data-urlencode "fields=${FIELDS}"
+printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"

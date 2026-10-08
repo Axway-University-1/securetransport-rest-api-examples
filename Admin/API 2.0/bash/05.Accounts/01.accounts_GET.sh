@@ -21,6 +21,9 @@
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The type is always returned, even when it is not listed in the fields.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when the answer is 200, 1 otherwise.
 # ==============================================================================
 
 #
@@ -41,7 +44,15 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 
 # Simple GET to retrieve all available Accounts
-curl -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}"
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}"  -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts" -H "accept: */*" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    printf "\nHTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
+printf '%s' "${RESPONSE}"
 
 
 # GET only the Accounts of type user

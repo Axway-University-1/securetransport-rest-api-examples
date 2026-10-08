@@ -18,6 +18,13 @@
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - This script demonstrates how to parse and filter JSON responses using grep.
+# - 01.version_GET.sh makes the same call and prints the whole answer; this one keeps it in a variable and picks lines out.
+# - The greps only show what is in the answer. grep exits 1 when it finds nothing (a server that is not 5.5 has no line for
+#   "version.*5.5"), so the script no longer ends with the status of the last grep: its exit code is that of the call.
+# - Confirmed directly: on a 5.5-20260924 server `grep "version"` finds the release and the versions of the components
+#   the answer lists, `grep "os"` finds both "os" and "osDistribution", and 401 ("Authentication required.",
+#   plain text) is the answer to refused credentials: the script prints the status and that text and exits 1.
+# - Exit codes: 0 when the answer is 200 (whatever the greps find), 1 otherwise.
 # ==============================================================================
 
 echo "Loading variables into our context..."
@@ -31,7 +38,14 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 # Store full response in a variable
-RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X "GET" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/version" -H "accept: application/json" -H "${REFERER_HEADER}")
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X "GET" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/version" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    printf "HTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
 
 # Uncomment to see full response
 # echo "${RESPONSE}"
@@ -51,3 +65,6 @@ echo "${RESPONSE}" | grep "serverType"
 # Extract operating system
 printf "grep for os...\n"
 echo "${RESPONSE}" | grep "os"
+
+# The greps above only show lines: the exit code is that of the call, which answered 200
+exit 0

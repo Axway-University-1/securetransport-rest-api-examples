@@ -30,6 +30,9 @@
 #   unable to comply with your request") for true and for false. List them all and
 #   read isDefault, as this script does.
 # - Requires `jq`, which prints one domain per line.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when PROTOCOL_VERSION is not 2 or 3, or there are more than two arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -43,6 +46,10 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/ldapDomains"
 NAME="$1"
 VERSION="$2"
+if [ "$#" -gt 2 ]; then
+    printf "Usage: ./01.ldapDomains_GET.sh [NAME [PROTOCOL_VERSION]]\n"
+    exit 2
+fi
 if [ -n "${VERSION}" ] && ! [[ "${VERSION}" =~ ^[23]$ ]]; then
     printf "PROTOCOL_VERSION is 2 or 3, not %s.\n" "${VERSION}"
     exit 2
@@ -50,22 +57,35 @@ fi
 LINE='"  \(.name)  \([.ldapServers[]? | "\(.host):\(.port)"] | join(", "))  \(.ldapSearches.baseDn // "-")  \(if .isDefault then "default" else "-" end)"'
 FIELDS="name,ldapServers,ldapSearches.baseDn,isDefault"
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "LDAP domains: "
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?limit=1&fields=name" -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '.resultSet.totalCount'
+st_get "${MAIN_URL}?limit=1&fields=name"
+printf '%s\n' "${RESPONSE}" | jq -r '.resultSet.totalCount'
 
 printf "\nAll of them: name, servers, base DN, default:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "fields=${FIELDS}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+st_get -G "${MAIN_URL}" --data-urlencode "fields=${FIELDS}"
+printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 
 if [ -n "${NAME}" ]; then
     printf "\nThe one named %s:\n" "${NAME}"
-    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "name=${NAME}" --data-urlencode "fields=${FIELDS}" \
-      -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+    st_get -G "${MAIN_URL}" --data-urlencode "name=${NAME}" --data-urlencode "fields=${FIELDS}"
+    printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 fi
 
 if [ -n "${VERSION}" ]; then
     printf "\nOnly the ones using LDAP version %s:\n" "${VERSION}"
-    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "protocolVersion=${VERSION}" --data-urlencode "fields=${FIELDS}" \
-      -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+    st_get -G "${MAIN_URL}" --data-urlencode "protocolVersion=${VERSION}" --data-urlencode "fields=${FIELDS}"
+    printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 fi

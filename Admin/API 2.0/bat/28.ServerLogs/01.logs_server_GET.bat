@@ -42,6 +42,9 @@ REM   HTTP login also WARNs "virtual user NAME does not have email associated", 
 REM   FTPD, INFO "virtual user NAME logged in from" and WARN "Failed login for user NAME from". Component TM also
 REM   writes INFO "User with login name 'NAME' ... successfully authenticated over SSH, HTTP or FTP".
 REM - PowerShell is used to print one entry per line, in place of jq.
+REM - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+REM   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+REM - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when MINUTES, a component or a level is wrong, or there are more than four arguments (nothing sent).
 REM ==============================================================================
 
 SETLOCAL
@@ -55,6 +58,7 @@ IF "%MINUTES%"=="" SET "MINUTES=60"
 SET "MESSAGE=%~2"
 SET "COMPONENTS=%~3"
 SET "LEVELS=%~4"
+IF NOT "%~5"=="" GOTO usage
 ECHO %MINUTES%| FINDSTR /R /X "[1-9][0-9]*" >NUL || (
     echo MINUTES must be a whole number of 1 or more: %MINUTES%
     EXIT /B 2
@@ -70,11 +74,40 @@ FOR /F "delims=" %%S IN ('powershell -NoProfile -Command "[DateTime]::UtcNow.Add
 FOR /F "delims=" %%Q IN ('powershell -NoProfile -Command "$q = @(\"fromDate=\" + [uri]::EscapeDataString($env:SINCE)); if ($env:MESSAGE) { $q += \"message=\" + [uri]::EscapeDataString($env:MESSAGE) }; foreach ($i in ($env:COMPONENTS -split \",\")) { if ($i) { $q += \"component=\" + $i } }; foreach ($i in ($env:LEVELS -split \",\")) { if ($i) { $q += \"level=\" + $i } }; $q -join [char]38"') DO SET "QUERY=%%Q"
 FOR /F "delims=" %%Q IN ('powershell -NoProfile -Command "\"fromDate=\" + [uri]::EscapeDataString($env:SINCE)"') DO SET "SINCE_QUERY=%%Q"
 
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MAIN_URL%?%SINCE_QUERY%&limit=1&fields=id" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+CALL :main
+SET RC=%ERRORLEVEL%
+IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+EXIT /B %RC%
+
+:main
+SET "URL=%MAIN_URL%?%SINCE_QUERY%&limit=1&fields=id"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 FOR /F %%N IN ('powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).resultSet.totalCount"') DO echo Server log entries since %SINCE%: %%N
 
 echo.
 echo The first 20 that match the filters: time, level, component, message:
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MAIN_URL%?%QUERY%&limit=20&fields=time,level,component,message" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+SET "URL=%MAIN_URL%?%QUERY%&limit=20&fields=time,level,component,message"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($e in $r.result) { $m = ($e.message -replace '[\r\n\t]', ' '); if ($m.Length -gt 140) { $m = $m.Substring(0, 140) }; '  {0}  {1}  {2}  {3}' -f $e.time, $e.level, $e.component, $m }"
+EXIT /B 0
+
+REM ------------------------------------------------------------------------------
+REM A GET of the URL in URL, with the curl options in CURL_OPTS (for example -G --data-urlencode ...). The answer goes to
+REM RESPONSE_FILE. A status other than 200 prints the status and the answer and returns 1.
+REM ------------------------------------------------------------------------------
+:st_get
+SET HTTP_CODE=
+SET OPTS=%CURL_OPTS%
+SET CURL_OPTS=
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" %OPTS% -X GET "%URL%" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
+IF "%HTTP_CODE%"=="200" EXIT /B 0
+echo HTTP %HTTP_CODE%
+IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
+EXIT /B 1
+
+:usage
+echo Usage: 01.logs_server_GET.bat [MINUTES [MESSAGE [COMPONENTS [LEVELS]]]]
+EXIT /B 2

@@ -25,6 +25,9 @@
 # - An id is a position, and the ones after a deleted rule move up. Look a rule
 #   up just before using its id.
 # - Requires `jq`, which finds the rule.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200 and exactly one object is found, 1 otherwise, 2 when there are too many arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -41,9 +44,27 @@ DATABASE="example_db"
 USER_NAME="example_user"
 
 POLICY_ID="$1"
+if [ "$#" -gt 1 ]; then
+    printf "Usage: ./04.accessPolicies_id_GET.sh [ID]\n"
+    exit 2
+fi
+
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 if [ -z "${POLICY_ID}" ]; then
-    POLICY_ID=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}" \
-      -H "accept: application/json" -H "${REFERER_HEADER}" \
+    st_get "${MAIN_URL}"
+    POLICY_ID=$(printf '%s\n' "${RESPONSE}" \
       | jq -r --arg db "${DATABASE}" --arg user "${USER_NAME}" \
         '[.[] | select(.database == $db and .user == $user)] | last | .id // empty')
     if [ -z "${POLICY_ID}" ]; then
@@ -53,10 +74,10 @@ if [ -z "${POLICY_ID}" ]; then
 fi
 
 printf "Rule %s:\n" "${POLICY_ID}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${POLICY_ID}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "${MAIN_URL}/${POLICY_ID}"
+printf '%s' "${RESPONSE}"
 
 printf "\n\nOnly its database, user and method:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${POLICY_ID}?fields=database,user,authMethod" \
-  -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "${MAIN_URL}/${POLICY_ID}?fields=database,user,authMethod"
+printf '%s' "${RESPONSE}"
 printf "\n"

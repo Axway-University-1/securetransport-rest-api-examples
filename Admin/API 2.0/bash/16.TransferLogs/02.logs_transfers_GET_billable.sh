@@ -31,6 +31,10 @@
 # - Features/audit-billable-transfers explains which transfers are billable, and
 #   tests it.
 # - Requires `jq`, which reads the count.
+# - Every day is one call, and a call that is not 200 (401, "Authentication required." as plain text, for refused credentials;
+#   500) prints the status and the answer and ends the script with exit 1, before a total that would be too small is printed. A
+#   200 that carries no count is still said ("could not read a count") and skipped, as before, and makes the exit code 1 at the end.
+# - Exit codes: 0 when every day was counted, 1 otherwise, 2 when an argument is wrong (nothing sent).
 # ==============================================================================
 
 #
@@ -44,6 +48,10 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 DAYS="${1:-7}"
 ACCOUNT="$2"
+if [ "$#" -gt 2 ]; then
+    printf "Usage: ./02.logs_transfers_GET_billable.sh [DAYS [ACCOUNT]]\n"
+    exit 2
+fi
 [[ "${DAYS}" =~ ^[1-9][0-9]*$ ]] || { printf "DAYS must be a whole number, 1 or more: %s\n" "${DAYS}"; exit 2; }
 
 # Midnight today, in seconds. BSD date (macOS) and GNU date (Linux) differ here.
@@ -64,19 +72,29 @@ ACCOUNT_FILTER=()
 printf "Billable transfers per day, for %s\n" "${ACCOUNT:-every account}"
 
 TOTAL=0
+UNREAD=0
 for OFFSET in $(seq $((DAYS - 1)) -1 0); do
     START=$((TODAY_MIDNIGHT - OFFSET * 86400))
     END=$((START + 86400))
 
-    COUNT=$(curl -s -k -G -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/logs/transfers" \
+    RESPONSE=$(curl -s -k -G -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/logs/transfers" \
       --data-urlencode "isBillable=true" "${ACCOUNT_FILTER[@]}" \
       --data-urlencode "startTimeAfter=$(to_rfc2822 "${START}")" \
       --data-urlencode "endTimeBefore=$(to_rfc2822 "${END}")" \
       --data-urlencode "limit=1" --data-urlencode "fields=id" \
-      -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '.resultSet.totalCount // empty' 2>/dev/null)
+      -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "  %s  HTTP %s\n" "$(to_day "${START}")" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+    COUNT=$(printf '%s' "${RESPONSE}" | jq -r '.resultSet.totalCount // empty' 2>/dev/null)
 
     if [ -z "${COUNT}" ]; then
         printf "  %s  could not read a count\n" "$(to_day "${START}")"
+        UNREAD=$((UNREAD + 1))
         continue
     fi
     printf "  %s  %s\n" "$(to_day "${START}")" "${COUNT}"
@@ -84,3 +102,4 @@ for OFFSET in $(seq $((DAYS - 1)) -1 0); do
 done
 
 printf "Total: %s billable transfer(s) in %s day(s)\n" "${TOTAL}" "${DAYS}"
+[ "${UNREAD}" -eq 0 ]

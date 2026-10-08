@@ -26,6 +26,9 @@
 #   menu to it instead.
 # - Confirmed directly: a success answers 204, with no body.
 # - Requires `jq`, which edits the role.
+# - The role is read first, and the status of that read is checked: a role that does not exist (404, "No such administrative
+#   role."), a refused read (401) or any status but 200 stops the script with exit 1 before anything is changed.
+# - Exit codes: 0 when the PUT answers 204, 1 when the read or the PUT is refused.
 # ==============================================================================
 
 #
@@ -42,9 +45,16 @@ if [ "$#" -eq 0 ]; then
     set -- "Change Password" "Audit Log"
 fi
 
-ROLE_JSON=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${ROLE}" -H "accept: application/json" -H "${REFERER_HEADER}")
-if ! printf '%s' "${ROLE_JSON}" | jq -e '.roleName' >/dev/null 2>&1; then
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${ROLE}" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+ROLE_JSON="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" = "404" ]; then
     printf "There is no role %s. Run 02.administrativeRoles_POST.sh first.\n" "${ROLE}"
+    exit 1
+fi
+if [ "${HTTP_CODE}" != "200" ] || ! printf '%s' "${ROLE_JSON}" | jq -e '.roleName' >/dev/null 2>&1; then
+    printf "Could not read the role %s: HTTP %s\n" "${ROLE}" "${HTTP_CODE}"
+    [ -n "${ROLE_JSON}" ] && printf '%s\n' "${ROLE_JSON}"
     exit 1
 fi
 

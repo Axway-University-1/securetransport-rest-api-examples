@@ -61,7 +61,7 @@ payload() { printf '%s\n' "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | sed -n "${1}
 
 echo "=== 06.TransferSites ==="
 
-GET_BODY="${LOOKUP}" run admin "06.TransferSites/03.sites_GET.sh"
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "06.TransferSites/03.sites_GET.sh"
 expect "sites GET: two calls" "$(calls)" "GET ${BASE}/sites?account=john
 GET ${BASE}/sites?account=john&protocol=ssh"
 has "sites GET: one line per SSH site" "obj-1  SSH_PULL  st.example.com:8022  /outbound-drop"
@@ -70,7 +70,7 @@ has "sites GET: one line per SSH site" "obj-1  SSH_PULL  st.example.com:8022  /o
 echo
 echo "=== 07.Subscriptions ==="
 
-GET_BODY="${LOOKUP}" run admin "07.Subscriptions/01.subscriptions_GET.sh"
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "07.Subscriptions/01.subscriptions_GET.sh"
 expect "subscriptions GET: filters by account, then by type" "$(calls)" "GET ${BASE}/subscriptions?account=john
 GET ${BASE}/subscriptions?account=john&type=AdvancedRouting"
 has "subscriptions GET: one line per subscription" "obj-1  /inbox  AdvancedRoutingApplication"
@@ -80,7 +80,7 @@ has "subscriptions GET: one line per subscription" "obj-1  /inbox  AdvancedRouti
 echo
 echo "=== 09.CompositeRoutes ==="
 
-GET_BODY="${LOOKUP}" run admin "09.CompositeRoutes/06.routes_GET.sh"
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "09.CompositeRoutes/06.routes_GET.sh"
 has "routes GET: one line per composite route of the account" "obj-1  SSH_PULL  template=tpl-1  subscriptions=sub-1"
 has "routes GET: the steps of the simple route" "  Compress  ENABLED"
 expect "routes GET: reads the simple route by the id it found" "$(count_calls "GET ${BASE}/routes/obj-1")" "1"
@@ -90,16 +90,16 @@ expect "routes GET: reads the simple route by the id it found" "$(count_calls "G
 echo
 echo "=== 16.TransferLogs ==="
 
-GET_BODY="${LOOKUP}" run admin "16.TransferLogs/01.logs_transfers_GET.sh"
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/01.logs_transfers_GET.sh"
 expect "logs GET: the latest 10 of the account, then its failures" "$(calls)" "GET ${BASE}/logs/transfers?account=john&sortByStartTime=descending&limit=10
 GET ${BASE}/logs/transfers?account=john&status=Failed&limit=1&fields=id"
 has "logs GET: the count is totalCount, not returnCount" "42 transfer(s) of 'john' in the log, in all."
 has "logs GET: the failed count too" "42 failed transfer(s)."
 
-GET_BODY="${LOOKUP}" run admin "16.TransferLogs/01.logs_transfers_GET.sh" alice
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/01.logs_transfers_GET.sh" alice
 expect "logs GET: takes the account from the command line" "$(count_calls "account=alice&")" "2"
 
-GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh" 3 john
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh" 3 john
 expect "billable: one call per day" "$(count_calls "GET ${BASE}/logs/transfers?isBillable=true&account=john&startTimeAfter=")" "3"
 RFC='[A-Z][a-z]{2}, [0-9]{2} [A-Z][a-z]{2} [0-9]{4} 00:00:00 [+-][0-9]{4}'
 expect "billable: each day runs midnight to midnight, in RFC 2822" \
@@ -109,12 +109,12 @@ ENDS=$(calls | sed -n 's/.*endTimeBefore=\([^&]*\)&.*/\1/p' | head -n 2)
 expect "billable: each day ends where the next starts" "${ENDS}" "${STARTS}"
 has "billable: adds up totalCount, not returnCount" "Total: 126 billable transfer(s) in 3 day(s)"
 
-GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh"
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh"
 expect "billable: 7 days by default" "$(count_calls "isBillable=true")" "7"
 expect "billable: no account filter unless one is given" "$(count_calls "account=")" "0"
 has "billable: says it counts every account" "Billable transfers per day, for every account"
 
-GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh" x
+STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh" x
 expect "billable: refuses a DAYS that is not a number" "${RC}:$(count_calls "GET")" "2:0"
 
 echo

@@ -38,6 +38,9 @@
 # - Confirmed directly: a subscription's folder is not made when the subscription is created. It
 #   is in the account's home folder after the account's next login, or after the first pull.
 # - Requires `jq`, which reads the id and prints the summary.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200 and exactly one object is found, 1 otherwise, 2 when there are too many arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -52,13 +55,29 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/subscriptions"
 ACCOUNT="${1:-john}"
 APPLICATION="${2:-AdvancedRoutingApplication}"
 FOLDER="${3:-/inbox}"
+if [ "$#" -gt 3 ]; then
+    printf "Usage: ./06.subscriptions_id_GET.sh [ACCOUNT [APPLICATION [FOLDER]]]\n"
+    exit 2
+fi
+
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
 
 # The one subscription of that account on that application and folder: "1 <id>",
 # or how many there are. The account and application filters are exact; the
 # application and the folder are compared again here, on what comes back.
-read -r FOUND SUBSCRIPTION_ID < <(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" \
-  --data-urlencode "account=${ACCOUNT}" --data-urlencode "application=${APPLICATION}" --data-urlencode "fields=id,application,folder" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
+st_get -G "${MAIN_URL}" --data-urlencode "account=${ACCOUNT}" --data-urlencode "application=${APPLICATION}" --data-urlencode "fields=id,application,folder"
+read -r FOUND SUBSCRIPTION_ID < <(printf '%s\n' "${RESPONSE}" \
   | jq -r --arg application "${APPLICATION}" --arg folder "${FOLDER}" \
     '[(.result // [])[] | select(.application == $application and .folder == $folder)] | if length == 1 then "1 \(.[0].id)" else "\(length)" end')
 if [ "${FOUND}" != "1" ]; then
@@ -66,7 +85,8 @@ if [ "${FOUND}" != "1" ]; then
     exit 1
 fi
 
-SUBSCRIPTION_JSON=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${SUBSCRIPTION_ID}" -H "accept: application/json" -H "${REFERER_HEADER}")
+st_get "${MAIN_URL}/${SUBSCRIPTION_ID}"
+SUBSCRIPTION_JSON="${RESPONSE}"
 if ! printf '%s' "${SUBSCRIPTION_JSON}" | jq -e '.id' >/dev/null 2>&1; then
     printf "Could not read the subscription %s.\n" "${SUBSCRIPTION_ID}"
     exit 1
@@ -79,5 +99,5 @@ printf '%s' "${SUBSCRIPTION_JSON}" | jq -r '"  type:              \(.type)",
   "  flow attributes:   \(.flowAttributes | length)"'
 
 printf "\nOnly some of its fields, with fields=id,folder,fileRetentionPeriod:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}/${SUBSCRIPTION_ID}" --data-urlencode "fields=id,folder,fileRetentionPeriod" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -c .
+st_get -G "${MAIN_URL}/${SUBSCRIPTION_ID}" --data-urlencode "fields=id,folder,fileRetentionPeriod"
+printf '%s\n' "${RESPONSE}" | jq -c .

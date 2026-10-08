@@ -32,6 +32,9 @@
 # - The fields differ by type: an SSH, FTP or HTTP site has host, port and folders; a custom
 #   site (S3, SMB...) has `customProperties` instead; run it on one of each to see.
 # - Requires `jq`, which reads the id and prints the summary.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200 and exactly one object is found, 1 otherwise, 2 when there are too many arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -45,20 +48,37 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
 ACCOUNT="${1:-john}"
 NAME="${2:-SSH_PULL}"
+if [ "$#" -gt 2 ]; then
+    printf "Usage: ./06.sites_id_GET.sh [ACCOUNT [NAME]]\n"
+    exit 2
+fi
+
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
 
 # The one site of that account with that name: "1 <id>", or how many there are.
 # The name filter ignores case and takes a * wildcard, so the exact name is
 # picked out of what comes back.
-read -r FOUND SITE_ID < <(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" \
-  --data-urlencode "account=${ACCOUNT}" --data-urlencode "name=${NAME}" --data-urlencode "fields=id,name" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
+st_get -G "${MAIN_URL}" --data-urlencode "account=${ACCOUNT}" --data-urlencode "name=${NAME}" --data-urlencode "fields=id,name"
+read -r FOUND SITE_ID < <(printf '%s\n' "${RESPONSE}" \
   | jq -r --arg name "${NAME}" '[(.result // [])[] | select(.name == $name)] | if length == 1 then "1 \(.[0].id)" else "\(length)" end')
 if [ "${FOUND}" != "1" ]; then
     printf "Found %s sites named %s on the account %s; this script acts on exactly one.\n" "${FOUND:-0}" "${NAME}" "${ACCOUNT}"
     exit 1
 fi
 
-SITE_JSON=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${SITE_ID}" -H "accept: application/json" -H "${REFERER_HEADER}")
+st_get "${MAIN_URL}/${SITE_ID}"
+SITE_JSON="${RESPONSE}"
 if ! printf '%s' "${SITE_JSON}" | jq -e '.id' >/dev/null 2>&1; then
     printf "Could not read the site %s (id %s).\n" "${NAME}" "${SITE_ID}"
     exit 1
@@ -75,5 +95,5 @@ printf '%s' "${SITE_JSON}" | jq -r '"  type:             \(.type)",
   "  password:         \(.password // "-")"'
 
 printf "\nOnly some of its fields, with fields=name,host,port:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}/${SITE_ID}" --data-urlencode "fields=name,host,port" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -c .
+st_get -G "${MAIN_URL}/${SITE_ID}" --data-urlencode "fields=name,host,port"
+printf '%s\n' "${RESPONSE}" | jq -c .

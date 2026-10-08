@@ -33,6 +33,9 @@
 #   00:00:00 +0300; 2026-10-07 answers 400. duration= takes hours and needs no date.
 # - An operation that does not exist answers 400 "Unknown name value ... for enum class".
 # - Requires `jq`, which prints one entry per line.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when HOURS or OPERATION is wrong, or there are more than four arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -48,6 +51,10 @@ HOURS="${1:-24}"
 OBJECT_TYPE="$2"
 OBJECT_NAME="$3"
 OPERATION="$4"
+if [ "$#" -gt 4 ]; then
+    printf "Usage: ./01.logs_audit_GET.sh [HOURS [OBJECT_TYPE [OBJECT_NAME [OPERATION]]]]\n"
+    exit 2
+fi
 [[ "${HOURS}" =~ ^[1-9][0-9]*$ ]] || { printf "HOURS must be a whole number of 1 or more: %s\n" "${HOURS}"; exit 2; }
 if [ -n "${OPERATION}" ] && ! [[ "${OPERATION}" =~ ^(CREATE|UPDATE|DELETE|CREATE_OR_UPDATE)$ ]]; then
     printf "OPERATION is CREATE, UPDATE, DELETE or CREATE_OR_UPDATE, not %s.\n" "${OPERATION}"
@@ -56,15 +63,29 @@ fi
 LINE='"  \(.dateModified)  \(.operationType)  \(.objectType) \(.objectName // "-")  by \(.userName // "-") from \(.remoteAddress // "-")"'
 FIELDS="id,dateModified,operationType,objectType,objectName,userName,remoteAddress"
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "Audit log entries: "
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?limit=1&fields=id" -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '.resultSet.totalCount'
+st_get "${MAIN_URL}?limit=1&fields=id"
+printf '%s\n' "${RESPONSE}" | jq -r '.resultSet.totalCount'
 
 printf "\nThe last %s hour(s): " "${HOURS}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "duration=${HOURS}" --data-urlencode "limit=1" --data-urlencode "fields=id" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '"\(.resultSet.totalCount) entries"'
+st_get -G "${MAIN_URL}" --data-urlencode "duration=${HOURS}" --data-urlencode "limit=1" --data-urlencode "fields=id"
+printf '%s\n' "${RESPONSE}" | jq -r '"\(.resultSet.totalCount) entries"'
 printf "The latest 5, newest first:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "duration=${HOURS}" --data-urlencode "limit=5" --data-urlencode "fields=${FIELDS}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+st_get -G "${MAIN_URL}" --data-urlencode "duration=${HOURS}" --data-urlencode "limit=5" --data-urlencode "fields=${FIELDS}"
+printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 
 FILTER=()
 [ -n "${OBJECT_TYPE}" ] && FILTER+=(--data-urlencode "objectType=${OBJECT_TYPE}")
@@ -72,6 +93,6 @@ FILTER=()
 [ -n "${OPERATION}" ] && FILTER+=(--data-urlencode "operationType=${OPERATION}")
 if [ "${#FILTER[@]}" -gt 0 ]; then
     printf "\nThe latest 10 entries for those filters:\n"
-    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" "${FILTER[@]}" --data-urlencode "limit=10" --data-urlencode "fields=${FIELDS}" \
-      -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+    st_get -G "${MAIN_URL}" "${FILTER[@]}" --data-urlencode "limit=10" --data-urlencode "fields=${FIELDS}"
+    printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 fi

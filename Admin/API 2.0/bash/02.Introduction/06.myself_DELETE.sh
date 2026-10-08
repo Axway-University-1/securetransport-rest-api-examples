@@ -18,6 +18,11 @@
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The cookie jar is used to persist session state across requests.
+# - Confirmed directly: the login answers 200 {"message": "Logged in"}, the read 200, the logout 200 {"message": "Logged out"},
+#   and the read after it 401 with the plain text "Authentication required.": that is how this script knows the session ended.
+# - Every call is checked: a login, a read or a logout that is not 200 prints the status and the answer and ends the script
+#   with exit 1; so does a last read that is still 200 (the session did not end). The jar is left in the folder, as before.
+# - Exit codes: 0 when the session was opened, read, closed and then refused (401 or 403), 1 otherwise.
 # ==============================================================================
 
 echo "Loading variables into our context..."
@@ -32,7 +37,16 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 # Authenticate and store session
 LOGIN_HEADERS=$(mktemp)
-curl -k --cookie-jar cookie.jar -D "${LOGIN_HEADERS}" -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}"
+RESPONSE=$(curl -s -k --cookie-jar cookie.jar -D "${LOGIN_HEADERS}" -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    rm -f "${LOGIN_HEADERS}" cookie.jar
+    printf "HTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
+printf '%s' "${RESPONSE}"
 
 #
 # CSRF is enforced on session-cookie calls from the 20230525 release onward.
@@ -45,10 +59,34 @@ CSRF_TOKEN=$(grep -i "^csrfToken:" "${LOGIN_HEADERS}" | tr -d '\r' | cut -d' ' -
 rm -f "${LOGIN_HEADERS}"
 
 # Verify session is active
-curl -k --cookie cookie.jar -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
+RESPONSE=$(curl -s -k --cookie cookie.jar -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    printf "HTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
+printf '%s' "${RESPONSE}"
 
 # Log out
-curl -k -L --cookie cookie.jar -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
+RESPONSE=$(curl -s -k -L --cookie cookie.jar -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    printf "HTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
+printf '%s' "${RESPONSE}"
 
-# Verify session is terminated
-curl -k --cookie cookie.jar -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
+# Verify session is terminated: the server must now refuse the jar
+RESPONSE=$(curl -s -k --cookie cookie.jar -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "401" ] && [ "${HTTP_CODE}" != "403" ]; then
+    printf "\nThe session is still open: HTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
+printf '%s' "${RESPONSE}"

@@ -3,8 +3,9 @@
 Read only. Runs the actual, unmodified scripts in
 Admin/API 2.0/bash/01.Authentication and Admin/API 2.0/bash/02.Introduction
 against a configured server, and independently verifies what each one claims
-to do - never by trusting the script's own exit code alone, since none of
-these scripts check their own HTTP response code; they print the raw body.
+to do - not by trusting the script's own exit code alone: each of them now
+reads the HTTP status of its calls and exits 1 on one that is not 200, but the
+check still reads the server's own answer for what the script printed.
 
 No persistent object is created by any script this check runs, so this needs
 no --write, the same way 01.connect.py's own login/logout cycle does not.
@@ -81,8 +82,10 @@ with runner.real_credentials(BASH_TREE, config):
 
     # -- 01.Authentication ----------------------------------------------------
     result = run_and_report(AUTH_DIR, "01.myself_POST.sh")
-    c.check("01.myself_POST.sh's own output identifies the logged in user",
-            USER in result.stdout, result.stdout[-200:])
+    # It sends a real login, POST /myself, which answers a confirmation and not the
+    # account (GET /myself does that, see 02.Introduction/03.myself_GET.sh)
+    c.check('01.myself_POST.sh logs in: the answer is a login confirmation, not account data',
+            "Logged in" in result.stdout, result.stdout[-200:])
 
     cookie_jar = os.path.join(AUTH_DIR, "cookie.jar")
     result = run_and_report(AUTH_DIR, "01.myself_cookie_POST.sh")

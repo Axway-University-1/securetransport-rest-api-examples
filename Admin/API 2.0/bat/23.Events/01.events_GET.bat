@@ -42,6 +42,9 @@ REM   apart.
 REM - An event can stay active after its transfer has failed. 03.events_operations_POST_delete.bat
 REM   removes it.
 REM - PowerShell is used to print one event per line, in place of jq.
+REM - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+REM   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+REM - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when there are more than two arguments (nothing sent).
 REM ==============================================================================
 
 SETLOCAL
@@ -49,36 +52,67 @@ SETLOCAL
 CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
+SET RESPONSE_FILE=%TEMP%\events_%RANDOM%.json
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/events
 SET ACCOUNT_PATTERN=%~1
 IF "%ACCOUNT_PATTERN%"=="" SET ACCOUNT_PATTERN=*
 SET STATUS=%~2
-SET RESPONSE_FILE=%TEMP%\events_%RANDOM%.json
+IF NOT "%~3"=="" GOTO usage
 
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MAIN_URL%?limit=1&fields=id" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+CALL :main
+SET RC=%ERRORLEVEL%
+IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+EXIT /B %RC%
+
+:main
+SET "URL=%MAIN_URL%?limit=1&fields=id"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 FOR /F %%N IN ('powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).resultSet.totalCount"') DO echo Events: %%N
 
 echo.
 echo The events of the accounts matching %ACCOUNT_PATTERN%: id, status, account, file, retries:
-IF "%STATUS%"=="" (
-    curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" --data-urlencode "accountName=%ACCOUNT_PATTERN%" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
-) ELSE (
-    curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" --data-urlencode "accountName=%ACCOUNT_PATTERN%" --data-urlencode "status=%STATUS%" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
-)
+SET "URL=%MAIN_URL%"
+SET CURL_OPTS=-G --data-urlencode "accountName=%ACCOUNT_PATTERN%"
+IF NOT "%STATUS%"=="" SET CURL_OPTS=-G --data-urlencode "accountName=%ACCOUNT_PATTERN%" --data-urlencode "status=%STATUS%"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($e in $r.result) { $a = if ($e.accountName) { $e.accountName } else { '-' }; $t = if ($e.fullTarget) { $e.fullTarget } else { '-' }; '  {0}  {1}  {2}  {3}  retries {4}' -f $e.id, $e.status, $a, $t, $e.retryCount }"
 
 echo.
 echo Only the Advanced Routing ones:
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" --data-urlencode "accountName=%ACCOUNT_PATTERN%" ^
-  --data-urlencode "processorType=ADVANCED_ROUTING" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+SET "URL=%MAIN_URL%"
+SET CURL_OPTS=-G --data-urlencode "accountName=%ACCOUNT_PATTERN%" --data-urlencode "processorType=ADVANCED_ROUTING"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($e in $r.result) { $a = if ($e.accountName) { $e.accountName } else { '-' }; $t = if ($e.fullTarget) { $e.fullTarget } else { '-' }; '  {0}  {1}  {2}  {3}  retries {4}' -f $e.id, $e.status, $a, $t, $e.retryCount }"
 
 REM The last hour, as a timestamp in milliseconds
 FOR /F %%S IN ('powershell -NoProfile -Command "[DateTimeOffset]::UtcNow.AddHours(-1).ToUnixTimeMilliseconds()"') DO SET SINCE=%%S
 echo.
 echo With a heartbeat in the last hour:
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" --data-urlencode "accountName=%ACCOUNT_PATTERN%" ^
-  --data-urlencode "lastHeartbeatAfter=%SINCE%" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+SET "URL=%MAIN_URL%"
+SET CURL_OPTS=-G --data-urlencode "accountName=%ACCOUNT_PATTERN%" --data-urlencode "lastHeartbeatAfter=%SINCE%"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($e in $r.result) { $a = if ($e.accountName) { $e.accountName } else { '-' }; $t = if ($e.fullTarget) { $e.fullTarget } else { '-' }; '  {0}  {1}  {2}  {3}  retries {4}' -f $e.id, $e.status, $a, $t, $e.retryCount }"
+EXIT /B 0
 
+REM ------------------------------------------------------------------------------
+REM A GET of the URL in URL, with the curl options in CURL_OPTS (for example -G --data-urlencode ...). The answer goes to
+REM RESPONSE_FILE. A status other than 200 prints the status and the answer and returns 1.
+REM ------------------------------------------------------------------------------
+:st_get
+SET HTTP_CODE=
+SET OPTS=%CURL_OPTS%
+SET CURL_OPTS=
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" %OPTS% -X GET "%URL%" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
+IF "%HTTP_CODE%"=="200" EXIT /B 0
+echo HTTP %HTTP_CODE%
+IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
+EXIT /B 1
+
+:usage
+echo Usage: 01.events_GET.bat [ACCOUNT_PATTERN [STATUS]]
+EXIT /B 2

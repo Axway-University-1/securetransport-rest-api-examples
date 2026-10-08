@@ -35,6 +35,9 @@ REM   and any other text means false. `limit=0` lists all, a negative `limit` is
 REM   `limit=abc` and a negative `offset` are 400. `fields=` keeps the keys named, an unknown one is 400 "Field nope does not exist.".
 REM - A class has an `id`; the other examples in this folder look it up by name.
 REM - PowerShell is used to print one line per class, in place of jq.
+REM - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+REM   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+REM - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when USER_TYPE is wrong or there are more than two arguments (nothing sent).
 REM ==============================================================================
 
 SETLOCAL
@@ -42,32 +45,63 @@ SETLOCAL
 CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
+SET RESPONSE_FILE=%TEMP%\uclass_%RANDOM%.json
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/userClasses
 SET PATTERN=%~1
 IF "%PATTERN%"=="" SET PATTERN=*
 SET USER_TYPE=%~2
 IF "%USER_TYPE%"=="" SET USER_TYPE=any
+IF NOT "%~3"=="" GOTO usage
 IF NOT "%USER_TYPE%"=="any" IF NOT "%USER_TYPE%"=="real" IF NOT "%USER_TYPE%"=="virtual" IF NOT "%USER_TYPE%"=="*" (
     echo USER_TYPE is any, real, virtual or *, not %USER_TYPE%.
     EXIT /B 2
 )
 SET TYPE_ARGS=
 IF NOT "%USER_TYPE%"=="any" SET TYPE_ARGS=--data-urlencode "userType=%USER_TYPE%"
-SET RESPONSE_FILE=%TEMP%\uclass_%RANDOM%.json
 
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MAIN_URL%?limit=1&fields=id" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+CALL :main
+SET RC=%ERRORLEVEL%
+IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+EXIT /B %RC%
+
+:main
+SET "URL=%MAIN_URL%?limit=1&fields=id"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 FOR /F %%N IN ('powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).resultSet.totalCount"') DO echo User classes on the server: %%N
 
 echo.
 echo The classes matching %PATTERN%, in the order they are tried: order, name, type, user, group, address, state, expression:
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=0" ^
-  -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
-powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($c in ($r.result | Sort-Object order)) { $s = if ($c.enabled) { 'enabled' } else { 'disabled' }; $e = if ($c.expression) { $c.expression } else { '-' }; '  {0}  {1}  {2}  user {3}  group {4}  address {5}  {6}  expression {7}' -f $c.order, $c.className, $c.userType, $c.userName, $c.group, $c.address, $s, $e }"
+SET "URL=%MAIN_URL%"
+SET CURL_OPTS=-G %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=0"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
+powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($c in @($r.result | Sort-Object { [int]$_.order })) { if ($c) { $s = if ($c.enabled) { 'enabled' } else { 'disabled' }; $e = if ($c.expression) { $c.expression } else { '-' }; '  {0}  {1}  {2}  user {3}  group {4}  address {5}  {6}  expression {7}' -f $c.order, $c.className, $c.userType, $c.userName, $c.group, $c.address, $s, $e } }"
 
 echo.
 echo Only the enabled ones:
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=0" ^
-  --data-urlencode "enabled=true" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
-powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($c in ($r.result | Sort-Object order)) { $s = if ($c.enabled) { 'enabled' } else { 'disabled' }; $e = if ($c.expression) { $c.expression } else { '-' }; '  {0}  {1}  {2}  user {3}  group {4}  address {5}  {6}  expression {7}' -f $c.order, $c.className, $c.userType, $c.userName, $c.group, $c.address, $s, $e }"
+SET "URL=%MAIN_URL%"
+SET CURL_OPTS=-G %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=0" --data-urlencode "enabled=true"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
+powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($c in @($r.result | Sort-Object { [int]$_.order })) { if ($c) { $s = if ($c.enabled) { 'enabled' } else { 'disabled' }; $e = if ($c.expression) { $c.expression } else { '-' }; '  {0}  {1}  {2}  user {3}  group {4}  address {5}  {6}  expression {7}' -f $c.order, $c.className, $c.userType, $c.userName, $c.group, $c.address, $s, $e } }"
+EXIT /B 0
 
+REM ------------------------------------------------------------------------------
+REM A GET of the URL in URL, with the curl options in CURL_OPTS (for example -G --data-urlencode ...). The answer goes to
+REM RESPONSE_FILE. A status other than 200 prints the status and the answer and returns 1.
+REM ------------------------------------------------------------------------------
+:st_get
+SET HTTP_CODE=
+SET OPTS=%CURL_OPTS%
+SET CURL_OPTS=
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" %OPTS% -X GET "%URL%" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
+IF "%HTTP_CODE%"=="200" EXIT /B 0
+echo HTTP %HTTP_CODE%
+IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
+EXIT /B 1
+
+:usage
+echo Usage: 01.userClasses_GET.bat [NAME [USER_TYPE]]
+EXIT /B 2

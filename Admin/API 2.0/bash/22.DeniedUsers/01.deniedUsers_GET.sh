@@ -36,6 +36,9 @@
 # - Confirmed directly: blockedAt and blockedUntil take .from and .to, as
 #   yyyy-MM-dd, an RFC 2822 date or a timestamp in milliseconds.
 # - Requires `jq`, which prints one entry per line.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when SINCE is not a date as yyyy-MM-dd, or there are more than two arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -49,6 +52,10 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/deniedUsers"
 PATTERN="${1:-*}"
 SINCE="$2"
+if [ "$#" -gt 2 ]; then
+    printf "Usage: ./01.deniedUsers_GET.sh [PATTERN [SINCE]]\n"
+    exit 2
+fi
 if [ -n "${SINCE}" ] && ! [[ "${SINCE}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
     printf "SINCE is a date as yyyy-MM-dd: %s\n" "${SINCE}"
     exit 2
@@ -56,24 +63,37 @@ fi
 
 LINE='"  \(.loginName)  \(if .blockedUntil == null then "permanent" else "until " + .blockedUntil end)  by \(.blockedBy // "-")  \(.note // "")"'
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "Denied users: "
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?limit=1&fields=loginName" -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '.resultSet.totalCount'
+st_get "${MAIN_URL}?limit=1&fields=loginName"
+printf '%s\n' "${RESPONSE}" | jq -r '.resultSet.totalCount'
 
 printf "\nThe login names matching %s: name, until, by, note:\n" "${PATTERN}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+st_get -G "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}"
+printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 
 printf "\nOnly the permanent ones:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}" \
-  --data-urlencode "isPermanent=true" -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+st_get -G "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}" --data-urlencode "isPermanent=true"
+printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 
 printf "\nOnly the temporary ones:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}" \
-  --data-urlencode "isPermanent=false" -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+st_get -G "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}" --data-urlencode "isPermanent=false"
+printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 
 if [ -n "${SINCE}" ]; then
     printf "\nBlocked on or after %s:\n" "${SINCE}"
-    curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}" \
-      --data-urlencode "blockedAt.from=${SINCE}" -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r "(.result // [])[] | ${LINE}"
+    st_get -G "${MAIN_URL}" --data-urlencode "loginName=${PATTERN}" --data-urlencode "blockedAt.from=${SINCE}"
+    printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | ${LINE}"
 fi

@@ -18,6 +18,10 @@
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The cookie jar file will store session data for reuse.
+# - Confirmed directly: the login answers 200 {"message": "Logged in"} and a csrfToken header; the read that follows
+#   with the jar answers 200 with the administrator's data. A refused login (401, "Authentication required." as plain
+#   text) or a refused read prints the status and the answer and exits 1; the jar is removed when the login fails.
+# - Exit codes: 0 when both calls answer 200, 1 otherwise.
 # ==============================================================================
 
 printf "Loading variables into our context..."
@@ -33,8 +37,17 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 # Authenticate and store session in cookie jar
 LOGIN_HEADERS=$(mktemp)
-curl -k --cookie-jar cookie.jar -D "${LOGIN_HEADERS}" -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" \
-  -H "accept: application/json" -H "${REFERER_HEADER}"
+RESPONSE=$(curl -s -k --cookie-jar cookie.jar -D "${LOGIN_HEADERS}" -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" \
+  -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    rm -f "${LOGIN_HEADERS}" cookie.jar
+    printf "HTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
+printf '%s' "${RESPONSE}"
 
 #
 # CSRF is enforced on session-cookie calls from the 20230525 release onward.
@@ -47,5 +60,13 @@ CSRF_TOKEN=$(grep -i "^csrfToken:" "${LOGIN_HEADERS}" | tr -d '\r' | cut -d' ' -
 rm -f "${LOGIN_HEADERS}"
 
 # Reuse session to make a GET request
-curl -k --cookie cookie.jar -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
+RESPONSE=$(curl -s -k --cookie cookie.jar -X GET "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" \
+  -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+if [ "${HTTP_CODE}" != "200" ]; then
+    printf "HTTP %s\n" "${HTTP_CODE}"
+    [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+    exit 1
+fi
+printf '%s' "${RESPONSE}"

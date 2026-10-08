@@ -26,6 +26,9 @@ REM - PUT replaces the whole list; 06.administrativeRoles_name_PATCH.bat adds on
 REM   menu to it instead.
 REM - Confirmed directly: a success answers 204, with no body.
 REM - PowerShell is used to edit the role, in place of jq.
+REM - The role is read first, and the status of that read is checked: a role that does not exist (404, "No such administrative
+REM   role."), a refused read (401) or any status but 200 stops the script with exit 1 before anything is changed.
+REM - Exit codes: 0 when the PUT answers 204, 1 when the read or the PUT is refused.
 REM ==============================================================================
 
 SETLOCAL
@@ -48,11 +51,18 @@ GOTO next_menu
 :menus_done
 IF NOT DEFINED MENUS SET "MENUS=Change Password|Audit Log"
 
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MAIN_URL%/%ROLE%" -H "accept: application/json" -H "%REFERER_HEADER%" > "%ROLE_FILE%"
-SET FOUND=
-FOR /F "delims=" %%N IN ('powershell -NoProfile -Command "try { (Get-Content -Raw $env:ROLE_FILE | ConvertFrom-Json).roleName } catch { }"') DO SET FOUND=%%N
-IF NOT DEFINED FOUND (
+SET HTTP_CODE=
+FOR /F %%C IN ('curl -s -o "%ROLE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MAIN_URL%/%ROLE%" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
+IF "%HTTP_CODE%"=="404" (
     echo There is no role %ROLE%. Run 02.administrativeRoles_POST.bat first.
+    IF EXIST "%ROLE_FILE%" DEL "%ROLE_FILE%"
+    EXIT /B 1
+)
+SET FOUND=
+IF "%HTTP_CODE%"=="200" FOR /F "delims=" %%N IN ('powershell -NoProfile -Command "try { (Get-Content -Raw $env:ROLE_FILE | ConvertFrom-Json).roleName } catch { }"') DO SET FOUND=%%N
+IF NOT DEFINED FOUND (
+    echo Could not read the role %ROLE%: HTTP %HTTP_CODE%
+    IF EXIST "%ROLE_FILE%" TYPE "%ROLE_FILE%"
     IF EXIST "%ROLE_FILE%" DEL "%ROLE_FILE%"
     EXIT /B 1
 )
@@ -67,3 +77,4 @@ echo HTTP %HTTP_CODE%
 IF EXIST "%ROLE_FILE%" DEL "%ROLE_FILE%"
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 IF NOT "%HTTP_CODE%"=="204" EXIT /B 1
+EXIT /B 0

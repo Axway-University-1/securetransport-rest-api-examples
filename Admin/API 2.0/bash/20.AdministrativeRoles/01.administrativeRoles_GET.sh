@@ -25,6 +25,9 @@
 #   exist."), although a role read whole carries roleType.
 # - Each role has a link to its members: the administrators that hold it.
 # - Requires `jq`, which prints one role per line.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when both answers are 200, 1 otherwise.
 # ==============================================================================
 
 #
@@ -36,10 +39,24 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/administrativeRoles"
+
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "The first 5 roles:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?limit=5&offset=0" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "${MAIN_URL}?limit=5&offset=0"
+printf '%s' "${RESPONSE}"
 
 printf "\n\nThe limited roles, one line each: name, the menus they open:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?isLimited=true&fields=roleName,menus" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '(.result // [])[] | "  \(.roleName): \(.menus | join(", "))"'
+st_get "${MAIN_URL}?isLimited=true&fields=roleName,menus"
+printf '%s\n' "${RESPONSE}" | jq -r '(.result // [])[] | "  \(.roleName): \(.menus | join(", "))"'

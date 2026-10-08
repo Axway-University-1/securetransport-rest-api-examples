@@ -27,6 +27,9 @@
 # - The same GET with "accept: multipart/mixed" exports the file as well;
 #   08.certificates_id_operations_POST_export.sh is the simpler way.
 # - Requires `jq`, which reads the id and prints the summary.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200 and exactly one object is found, 1 otherwise, 2 when there are too many arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -39,22 +42,39 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/certificates"
 NAME="${1:-example_cert}"
+if [ "$#" -gt 1 ]; then
+    printf "Usage: ./05.certificates_id_GET.sh [NAME]\n"
+    exit 2
+fi
+
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 # The one certificate with that name: "1 <id>", or how many there are
-read -r FOUND CERT_ID < <(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "name=${NAME}" \
-  --data-urlencode "fields=id" -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '.result // [] | if length == 1 then "1 \(.[0].id)" else "\(length)" end')
+st_get -G "${MAIN_URL}" --data-urlencode "name=${NAME}" --data-urlencode "fields=id"
+read -r FOUND CERT_ID < <(printf '%s\n' "${RESPONSE}" | jq -r '.result // [] | if length == 1 then "1 \(.[0].id)" else "\(length)" end')
 if [ "${FOUND}" != "1" ]; then
     printf "Found %s certificates named %s; this script acts on exactly one.\n" "${FOUND:-0}" "${NAME}"
     exit 1
 fi
 
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${CERT_ID}" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "${MAIN_URL}/${CERT_ID}"
+printf '%s' "${RESPONSE}"
 
 printf "\n\nIts SHA256 fingerprint: "
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET \
-  "${MAIN_URL}/${CERT_ID}?fingerprintAlgorithm=SHA256&base64EncodedFingerprint=true&fields=fingerprint" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '.fingerprint'
+st_get "${MAIN_URL}/${CERT_ID}?fingerprintAlgorithm=SHA256&base64EncodedFingerprint=true&fields=fingerprint"
+printf '%s\n' "${RESPONSE}" | jq -r '.fingerprint'
 
 printf "\nIts path, from the certificate up:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/${CERT_ID}?includePath=true&fields=name,subject" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '.[] | "  \(.name)  \(.subject)"'
+st_get "${MAIN_URL}/${CERT_ID}?includePath=true&fields=name,subject"
+printf '%s\n' "${RESPONSE}" | jq -r '.[] | "  \(.name)  \(.subject)"'

@@ -28,9 +28,13 @@ REM - Each day runs from midnight to midnight in this machine's time zone, sent 
 REM   RFC 2822, for example "Mon, 05 Oct 2026 00:00:00 +0300".
 REM - The count is resultSet.totalCount. resultSet.returnCount is capped by limit,
 REM   which is 1 here to keep the response small.
-REM - Features\audit-billable-transfers explains which transfers are billable, and
+REM - Features/audit-billable-transfers explains which transfers are billable, and
 REM   tests it.
-REM - PowerShell is used for the dates and to read the response, in place of jq.
+REM - PowerShell is used to read the count, in place of jq.
+REM - Every day is one call, and a call that is not 200 (401, "Authentication required." as plain text, for refused credentials;
+REM   500) prints the status and the answer and ends the script with exit 1, before a total that would be too small is printed. A
+REM   200 that carries no count is still said ("could not read a count") and skipped, as before, and makes the exit code 1 at the end.
+REM - Exit codes: 0 when every day was counted, 1 otherwise, 2 when an argument is wrong (nothing sent).
 REM ==============================================================================
 
 SETLOCAL
@@ -38,15 +42,20 @@ SETLOCAL
 CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
+SET RESPONSE_FILE=%TEMP%\billable_%RANDOM%.json
 
 SET DAYS=%~1
 IF "%DAYS%"=="" SET DAYS=7
+IF NOT "%~3"=="" GOTO usage
 ECHO %DAYS%| FINDSTR /R /X "[1-9][0-9]*" >NUL || (
     echo DAYS must be a whole number, 1 or more: %DAYS%
     EXIT /B 2
 )
 SET ACCOUNT=%~2
-SET RESPONSE_FILE=%TEMP%\billable_%RANDOM%.json
+SET ACCOUNT_ARGS=
+IF NOT "%ACCOUNT%"=="" SET ACCOUNT_ARGS=--data-urlencode "account=%ACCOUNT%"
+SET FAILED=
+SET UNREAD=
 
 IF "%ACCOUNT%"=="" (
     echo Billable transfers per day, for every account
@@ -58,11 +67,18 @@ SET TOTAL=0
 SET /A LAST_OFFSET=%DAYS%-1
 FOR /L %%D IN (%LAST_OFFSET%,-1,0) DO CALL :count_day %%D
 
+IF DEFINED FAILED (
+    IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+    EXIT /B 1
+)
 echo Total: %TOTAL% billable transfer(s) in %DAYS% day(s)
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+IF DEFINED UNREAD EXIT /B 1
 EXIT /B 0
 
 :count_day
+REM After a day that was refused, the rest are not asked
+IF DEFINED FAILED EXIT /B 0
 SET DAY_OFFSET=%1
 REM English day and month names whatever the Windows language, and the offset
 REM as +0300, not the +03:00 .NET writes by default
@@ -72,19 +88,15 @@ FOR /F "tokens=1,2,3 delims=|" %%A IN ('powershell -NoProfile -Command "$c=[Glob
     SET END_RFC=%%C
 )
 
-REM Only add the account to the query when one was given
-IF "%ACCOUNT%"=="" (
-    curl -s -k -G -u "%ST_USER%:%ST_PASSWORD%" "https://%ST_SERVER%:%ST_PORT%/api/v2.0/logs/transfers" ^
-      --data-urlencode "isBillable=true" ^
-      --data-urlencode "startTimeAfter=%START_RFC%" --data-urlencode "endTimeBefore=%END_RFC%" ^
-      --data-urlencode "limit=1" --data-urlencode "fields=id" ^
-      -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
-) ELSE (
-    curl -s -k -G -u "%ST_USER%:%ST_PASSWORD%" "https://%ST_SERVER%:%ST_PORT%/api/v2.0/logs/transfers" ^
-      --data-urlencode "isBillable=true" --data-urlencode "account=%ACCOUNT%" ^
-      --data-urlencode "startTimeAfter=%START_RFC%" --data-urlencode "endTimeBefore=%END_RFC%" ^
-      --data-urlencode "limit=1" --data-urlencode "fields=id" ^
-      -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+REM Only add the account to the query when one was given (ACCOUNT_ARGS)
+SET HTTP_CODE=
+IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -G -u "%ST_USER%:%ST_PASSWORD%" "https://%ST_SERVER%:%ST_PORT%/api/v2.0/logs/transfers" --data-urlencode "isBillable=true" %ACCOUNT_ARGS% --data-urlencode "startTimeAfter=%START_RFC%" --data-urlencode "endTimeBefore=%END_RFC%" --data-urlencode "limit=1" --data-urlencode "fields=id" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
+IF NOT "%HTTP_CODE%"=="200" (
+    echo   %DAY_LABEL%  HTTP %HTTP_CODE%
+    IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
+    SET FAILED=yes
+    EXIT /B 0
 )
 
 SET DAY_COUNT=
@@ -92,8 +104,13 @@ FOR /F "delims=" %%N IN ('powershell -NoProfile -Command "try { (Get-Content -Ra
 
 IF "%DAY_COUNT%"=="" (
     echo   %DAY_LABEL%  could not read a count
+    SET UNREAD=yes
     EXIT /B 0
 )
 echo   %DAY_LABEL%  %DAY_COUNT%
 SET /A TOTAL=%TOTAL%+%DAY_COUNT%
 EXIT /B 0
+
+:usage
+echo Usage: 02.logs_transfers_GET_billable.bat [DAYS [ACCOUNT]]
+EXIT /B 2

@@ -393,12 +393,12 @@ STATUS_GET=404 GET_BODY=$(body role_missing '{"message":"not found"}') run "${F}
 expect "04 GET: a 404 exits 1, no members call" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
 
 GET_BODY=$(body role "${ROLE_JSON}")
-STATUS=204 run "${F}/05.administrativeRoles_name_PUT.sh"
+STATUS=204 STATUS_GET=200 run "${F}/05.administrativeRoles_name_PUT.sh"
 expect "05 PUT: read, then PUT the role" "${RC}:$(calls)" "0:GET ${U}/example_role
 PUT ${U}/example_role"
 expect "05 PUT: the whole role, default menus, no metadata" \
   "$(payload 1 | jq -c '[.roleName, .isLimited, .menus, has("metadata")]')" '["example_role",true,["Change Password","Audit Log"],false]'
-STATUS=204 run "${F}/05.administrativeRoles_name_PUT.sh" "File Tracking" "Change Password"
+STATUS=204 STATUS_GET=200 run "${F}/05.administrativeRoles_name_PUT.sh" "File Tracking" "Change Password"
 expect "05 PUT: the menus given, one argument each" "$(payload 1 | jq -c .menus)" '["File Tracking","Change Password"]'
 GET_BODY=$(body role_none '{"message":"not found"}')
 run "${F}/05.administrativeRoles_name_PUT.sh"

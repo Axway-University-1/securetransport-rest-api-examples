@@ -22,6 +22,9 @@
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The script uses basic authentication and GET requests with query parameters.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials)
+#   prints the status and the answer and ends the script with exit 1.
+# - Exit codes: 0 when every answer is 200, 1 otherwise.
 # ==============================================================================
 
 echo "Loading variables into our context..."
@@ -34,18 +37,36 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 # Get all servers
-curl -k -u "${ST_USER}:${ST_PASSWORD}" -X "GET" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers"
+printf '%s' "${RESPONSE}"
 
 # Get only serverName and isActive fields
-curl -k -u "${ST_USER}:${ST_PASSWORD}" -X "GET" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?fields=id,serverName,isActive" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?fields=id,serverName,isActive"
+printf '%s' "${RESPONSE}"
 
 # Filter by protocol: AS2
 PROTOCOL="as2"
-curl -k -u "${ST_USER}:${ST_PASSWORD}" -X "GET" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?protocol=${PROTOCOL}&fields=id,serverName,isActive" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?protocol=${PROTOCOL}&fields=id,serverName,isActive"
+printf '%s' "${RESPONSE}"
 
 # Filter by common fields
-curl -k -u "${ST_USER}:${ST_PASSWORD}" -X "GET" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?limit=1&offset=0&serverName=Ssh%20Default&isActive=true&isFipsEnabled=false" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?limit=1&offset=0&serverName=Ssh%20Default&isActive=true&isFipsEnabled=false"
+printf '%s' "${RESPONSE}"
 
 # Filter by protocol-specific field
-curl -k -u "${ST_USER}:${ST_PASSWORD}" -X "GET" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?fields=isScpEnabled&protocol=ssh" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers?fields=isScpEnabled&protocol=ssh"
+printf '%s' "${RESPONSE}"

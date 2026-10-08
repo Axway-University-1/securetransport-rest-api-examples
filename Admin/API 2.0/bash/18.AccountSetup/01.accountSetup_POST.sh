@@ -11,15 +11,19 @@
 # sites, transfer profiles, routes and subscriptions.
 #
 # Usage:
+# [export ACCOUNT_PASSWORD='the password of example_setup']
 # ./01.accountSetup_POST.sh
+#
+#   ACCOUNT_PASSWORD  the password of example_setup and of its site's login (optional): when it is not set, one is generated
+#                     (12 random letters and digits after a fixed beginning) and printed once
 #
 # Risk: write
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The account is example_setup, with an SSH site named example_setup_site.
-#   ACCOUNT_PASSWORD is read from the environment, so export it first:
-#     export ACCOUNT_PASSWORD='the password'
+#   ACCOUNT_PASSWORD is read from the environment (export ACCOUNT_PASSWORD='the password' first); when it is not set, a
+#   password is generated and printed, so the account is never created with a password anyone could guess.
 # - Every site, transfer profile and subscription in the body names its
 #   account too, even here: without it the call answers 400 "...account must
 #   not be null" (confirmed directly).
@@ -32,6 +36,9 @@
 #   reference.
 # - 04.accounts_name_DELETE.sh removes the account, its sites and its profiles.
 # - Requires `jq`, which builds the body.
+# - The password is never in the file. A generated one is printed once, after the call, also when the call fails (part of the body
+#   may have been created: see above).
+# - Exit codes: 0 when the call answers 200, 1 otherwise.
 # ==============================================================================
 
 #
@@ -44,9 +51,15 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 ACCOUNT="example_setup"
-ACCOUNT_PASSWORD="${ACCOUNT_PASSWORD:-change_me}"
+PASSWORD="${ACCOUNT_PASSWORD}"
+GENERATED=""
+if [ -z "${PASSWORD}" ]; then
+    PASSWORD="Ex1!$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 12)"
+    GENERATED="yes"
+fi
 
-BODY=$(jq -n --arg name "${ACCOUNT}" --arg password "${ACCOUNT_PASSWORD}" --arg host "${ST_SERVER}" \
+# The account and its site, with the password
+BODY=$(jq -n --arg name "${ACCOUNT}" --arg password "${PASSWORD}" --arg host "${ST_SERVER}" \
   '{accountSetup: {
       account: {name: $name, type: "user", uid: "41733", gid: "41733", homeFolder: ("/home/" + $name),
                 user: {name: $name, passwordCredentials: {password: $password}}},
@@ -61,6 +74,9 @@ RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVE
 HTTP_CODE="${RESPONSE##*$'\n'}"
 RESPONSE="${RESPONSE%$'\n'*}"
 
+if [ -n "${GENERATED}" ]; then
+    printf "The password of %s is %s (generated: it is not shown again).\n" "${ACCOUNT}" "${PASSWORD}"
+fi
 if [ "${HTTP_CODE}" != "200" ]; then
     printf "HTTP %s. Part of it may have been created all the same:\n%s\n" "${HTTP_CODE}" "${RESPONSE}"
     exit 1

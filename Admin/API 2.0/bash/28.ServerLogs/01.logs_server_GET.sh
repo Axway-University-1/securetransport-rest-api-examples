@@ -42,6 +42,9 @@
 #   FTPD, INFO "virtual user NAME logged in from" and WARN "Failed login for user NAME from". Component TM also
 #   writes INFO "User with login name 'NAME' ... successfully authenticated over SSH, HTTP or FTP".
 # - Requires `jq`, which prints one entry per line.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when MINUTES, a component or a level is wrong, or there are more than four arguments (nothing sent).
 # ==============================================================================
 
 #
@@ -57,6 +60,10 @@ MINUTES="${1:-60}"
 MESSAGE="$2"
 COMPONENTS="$3"
 LEVELS="$4"
+if [ "$#" -gt 4 ]; then
+    printf "Usage: ./01.logs_server_GET.sh [MINUTES [MESSAGE [COMPONENTS [LEVELS]]]]\n"
+    exit 2
+fi
 [[ "${MINUTES}" =~ ^[1-9][0-9]*$ ]] || { printf "MINUTES must be a whole number of 1 or more: %s\n" "${MINUTES}"; exit 2; }
 IFS=',' read -r -a COMPONENT_LIST <<< "${COMPONENTS}"
 IFS=',' read -r -a LEVEL_LIST <<< "${LEVELS}"
@@ -76,11 +83,23 @@ FILTER=(--data-urlencode "fromDate=${SINCE}")
 for ITEM in "${COMPONENT_LIST[@]}"; do [ -n "${ITEM}" ] && FILTER+=(--data-urlencode "component=${ITEM}"); done
 for ITEM in "${LEVEL_LIST[@]}"; do [ -n "${ITEM}" ] && FILTER+=(--data-urlencode "level=${ITEM}"); done
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "Server log entries since %s: " "${SINCE}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" --data-urlencode "fromDate=${SINCE}" --data-urlencode "limit=1" --data-urlencode "fields=id" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '.resultSet.totalCount'
+st_get -G "${MAIN_URL}" --data-urlencode "fromDate=${SINCE}" --data-urlencode "limit=1" --data-urlencode "fields=id"
+printf '%s\n' "${RESPONSE}" | jq -r '.resultSet.totalCount'
 
 printf "\nThe first 20 that match the filters: time, level, component, message:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G -X GET "${MAIN_URL}" "${FILTER[@]}" --data-urlencode "limit=20" --data-urlencode "fields=time,level,component,message" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '(.result // [])[] | "  \(.time)  \(.level)  \(.component)  \((.message // "") | gsub("[\n\t]"; " ") | .[0:140])"'
+st_get -G "${MAIN_URL}" "${FILTER[@]}" --data-urlencode "limit=20" --data-urlencode "fields=time,level,component,message"
+printf '%s\n' "${RESPONSE}" | jq -r '(.result // [])[] | "  \(.time)  \(.level)  \(.component)  \((.message // "") | gsub("[\n\t]"; " ") | .[0:140])"'

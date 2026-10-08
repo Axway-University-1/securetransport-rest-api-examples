@@ -25,6 +25,9 @@
 # - A server comes with its sources; the API has no POST or DELETE for them,
 #   only reading and changing (see 04 and 05 in this folder).
 # - Requires `jq`, which prints one source per line.
+# - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+#   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+# - Exit codes: 0 when every answer is 200, 1 otherwise.
 # ==============================================================================
 
 #
@@ -37,13 +40,27 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/addressBook/sources"
 
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
 printf "Every address book source:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "${MAIN_URL}"
+printf '%s' "${RESPONSE}"
 
 printf "\n\nThe LDAP sources only:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?type=LDAP" -H "accept: application/json" -H "${REFERER_HEADER}"
+st_get "${MAIN_URL}?type=LDAP"
+printf '%s' "${RESPONSE}"
 
 printf "\n\nThe enabled ones, one line each: id, type, name, group:\n"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}?enabled=true&fields=id,type,name,parentGroup" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
-  | jq -r '(.result // [])[] | "  \(.id)  \(.type)  \(.name)  \(.parentGroup)"'
+st_get "${MAIN_URL}?enabled=true&fields=id,type,name,parentGroup"
+printf '%s\n' "${RESPONSE}" | jq -r '(.result // [])[] | "  \(.id)  \(.type)  \(.name)  \(.parentGroup)"'

@@ -28,6 +28,9 @@
 # - It uses a different template than 02.routes_POST.sh, so the two do not
 #   touch each other's routes.
 # - Requires `jq`, which reads the ids out of the responses and builds the body.
+# - Every call is checked: the three lookups must answer 200, and the creation 201 (the status is printed); anything else prints
+#   the status and the server's answer and ends the script with exit 1.
+# - Exit codes: 0 when the route was created, 1 otherwise.
 # ==============================================================================
 
 #
@@ -46,23 +49,36 @@ ROUTE_TEMPLATE_NAME="RouteFromPartner"
 SUBSCRIPTION_FOLDER="/inbox"
 SIMPLE_ROUTE_NAME="SimpleRoute_Compress"
 
-ROUTE_TEMPLATE_ID=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/routes?fields=id&name=${ROUTE_TEMPLATE_NAME}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '.result[0].id // empty')
+# st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
+# is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.
+st_get() {
+    RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "$@" -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
+    HTTP_CODE="${RESPONSE##*$'\n'}"
+    RESPONSE="${RESPONSE%$'\n'*}"
+    if [ "${HTTP_CODE}" != "200" ]; then
+        printf "HTTP %s\n" "${HTTP_CODE}"
+        [ -n "${RESPONSE}" ] && printf '%s\n' "${RESPONSE}"
+        exit 1
+    fi
+}
+
+st_get "${MAIN_URL}/routes?fields=id&name=${ROUTE_TEMPLATE_NAME}"
+ROUTE_TEMPLATE_ID=$(printf '%s\n' "${RESPONSE}" | jq -r '.result[0].id // empty')
 if [ -z "${ROUTE_TEMPLATE_ID}" ]; then
     printf "Could not find the route template '%s'. Run 08.RouteTemplates first.\n" "${ROUTE_TEMPLATE_NAME}"
     exit 1
 fi
 
-SUBSCRIPTION_ID=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/subscriptions?account=${ACCOUNT}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" \
+st_get "${MAIN_URL}/subscriptions?account=${ACCOUNT}"
+SUBSCRIPTION_ID=$(printf '%s\n' "${RESPONSE}" \
   | jq -r --arg folder "${SUBSCRIPTION_FOLDER}" '[(.result // [])[] | select(.folder == $folder)][0].id // empty')
 if [ -z "${SUBSCRIPTION_ID}" ]; then
     printf "Could not find a subscription of '%s' on '%s'. Run 07.Subscriptions first.\n" "${ACCOUNT}" "${SUBSCRIPTION_FOLDER}"
     exit 1
 fi
 
-SIMPLE_ROUTE_ID=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/routes?fields=id&name=${SIMPLE_ROUTE_NAME}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" | jq -r '.result[0].id // empty')
+st_get "${MAIN_URL}/routes?fields=id&name=${SIMPLE_ROUTE_NAME}"
+SIMPLE_ROUTE_ID=$(printf '%s\n' "${RESPONSE}" | jq -r '.result[0].id // empty')
 if [ -z "${SIMPLE_ROUTE_ID}" ]; then
     printf "Could not find the simple route '%s'. Run 03.routes_POST_simple_compress.sh first.\n" "${SIMPLE_ROUTE_NAME}"
     exit 1
@@ -77,6 +93,13 @@ BODY=$(jq -n --arg account "${ACCOUNT}" --arg name "${ROUTE_NAME}" \
     steps: [{type: "ExecuteRoute", status: "ENABLED", autostart: false, executeRoute: $simple}]}')
 
 printf "Creating the composite route '%s'...\n" "${ROUTE_NAME}"
-curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}/routes" \
+RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}/routes" \
   -H "accept: */*" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-  -w "\nHTTP %{http_code}\n" -d "${BODY}"
+  -d "${BODY}" -w "\n%{http_code}")
+HTTP_CODE="${RESPONSE##*$'\n'}"
+RESPONSE="${RESPONSE%$'\n'*}"
+printf "HTTP %s\n" "${HTTP_CODE}"
+if [ "${HTTP_CODE}" != "201" ]; then
+    printf '%s' "${RESPONSE}" | jq -r '(.validationErrors // [.message // empty])[]' 2>/dev/null || printf '%s\n' "${RESPONSE}"
+    exit 1
+fi

@@ -78,12 +78,11 @@ def run(script_path, args=None, timeout=60):
     Run a shipped script from its own directory, the way its own header says
     to ("./02.accounts_POST.sh"), and return the CompletedProcess.
 
-    Never raises on a non-zero exit, and a non-zero exit here does not by
-    itself mean the API call failed: these scripts use plain curl with no
-    --fail, so curl exits 0 even when the server returned 4xx or 5xx. Treat
-    this as a coarse check that the script itself ran without a shell level
-    error (a missing file, jq failing to parse) - confirm the real outcome
-    against the API afterward, independently.
+    Never raises on a non-zero exit. Most examples now read the status with
+    curl -w and exit 1 when the server refuses and 2 on a bad argument, but a
+    few older ones still ignore it (curl itself has no --fail here and exits 0
+    on a 4xx or 5xx), so a zero exit is not proof the call worked: confirm the
+    real outcome against the API afterward, independently.
     """
     script_dir = os.path.dirname(script_path)
     script_name = os.path.basename(script_path)

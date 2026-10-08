@@ -34,6 +34,9 @@ REM   filter is ignored (200), but `edges.proxies.isUsePassword=` answers 403 "u
 REM   should be a positive number or 0.", `limit=abc` and a negative `offset` are 400; `limit=1&offset=N` walked three zones once each. `fields=` keeps
 REM   the keys named; an unknown one is 400 "Field bogus does not exist.".
 REM - PowerShell is used to print one line per zone, in place of jq.
+REM - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
+REM   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
+REM - Exit codes: 0 when every answer is 200, 1 otherwise, 2 when there is more than one argument (nothing sent).
 REM ==============================================================================
 
 SETLOCAL
@@ -41,26 +44,58 @@ SETLOCAL
 CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
+SET RESPONSE_FILE=%TEMP%\zones_%RANDOM%.json
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/zones
 SET NAME=%~1
-SET RESPONSE_FILE=%TEMP%\zones_%RANDOM%.json
+IF NOT "%~2"=="" GOTO usage
 SET SHOWN=%NAME%
 IF "%SHOWN%"=="" SET "SHOWN=(any)"
 SET NAME_FILTER=
 IF NOT "%NAME%"=="" SET NAME_FILTER=--data-urlencode "name=%NAME%"
 
-<nul set /p "=Zones on the server: "
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X GET "%MAIN_URL%?limit=1&fields=name" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
-powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).resultSet.totalCount"
+CALL :main
+SET RC=%ERRORLEVEL%
+IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+EXIT /B %RC%
+
+:main
+SET "URL=%MAIN_URL%?limit=1&fields=name"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
+FOR /F %%N IN ('powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).resultSet.totalCount"') DO echo Zones on the server: %%N
 
 echo.
 echo The zones named %SHOWN%: name, default, edges, description:
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" %NAME_FILTER% --data-urlencode "limit=0" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+SET "URL=%MAIN_URL%"
+SET CURL_OPTS=-G %NAME_FILTER% --data-urlencode "limit=0"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "foreach ($z in @((Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).result)) { if ($z -and ($env:NAME -eq '' -or $z.name -ceq $env:NAME)) { '  {0}  default {1}  edges {2}  {3}' -f $z.name, ([string]$z.isDefault).ToLower(), ($z.edges | Measure-Object).Count, $(if ($z.description) { $z.description } else { '-' }) } }"
 
 echo.
 echo The default zone:
-curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -G -X GET "%MAIN_URL%" --data-urlencode "isDefault=true" --data-urlencode "limit=0" -H "accept: application/json" -H "%REFERER_HEADER%" > "%RESPONSE_FILE%"
+SET "URL=%MAIN_URL%"
+SET CURL_OPTS=-G --data-urlencode "isDefault=true" --data-urlencode "limit=0"
+CALL :st_get
+IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "foreach ($z in @((Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).result)) { if ($z -and $z.isDefault) { '  {0}  default {1}  edges {2}  {3}' -f $z.name, ([string]$z.isDefault).ToLower(), ($z.edges | Measure-Object).Count, $(if ($z.description) { $z.description } else { '-' }) } }"
+EXIT /B 0
 
+REM ------------------------------------------------------------------------------
+REM A GET of the URL in URL, with the curl options in CURL_OPTS (for example -G --data-urlencode ...). The answer goes to
+REM RESPONSE_FILE. A status other than 200 prints the status and the answer and returns 1.
+REM ------------------------------------------------------------------------------
+:st_get
+SET HTTP_CODE=
+SET OPTS=%CURL_OPTS%
+SET CURL_OPTS=
 IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
+FOR /F %%C IN ('curl -s -o "%RESPONSE_FILE%" -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" %OPTS% -X GET "%URL%" -H "accept: application/json" -H "%REFERER_HEADER%"') DO SET HTTP_CODE=%%C
+IF "%HTTP_CODE%"=="200" EXIT /B 0
+echo HTTP %HTTP_CODE%
+IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
+EXIT /B 1
+
+:usage
+echo Usage: 01.zones_GET.bat [NAME]
+EXIT /B 2
