@@ -18,7 +18,6 @@ import datetime
 import json
 import os
 import sys
-import types
 import urllib.parse
 from multiprocessing import Value
 
@@ -31,19 +30,29 @@ UTILS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # --------------------------------------------------------------------------
 # A stand-in for the requests module
 # --------------------------------------------------------------------------
-class _StubError(Exception):
-    pass
+# The examples import requests at the top of the file, so `import requests` has to
+# find a stand-in while one is being loaded. fake_requests/ is the package that also
+# stands in when an example is run as a whole (run_example.py), with the same
+# exception classes as the real library: ConnectionError, Timeout and HTTPError are
+# three different things there, and a test that raises one must not be caught as
+# another.
+FAKE_REQUESTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fake_requests")
 
 
-requests = types.ModuleType("requests")
-requests.ConnectionError = _StubError
-requests.exceptions = types.SimpleNamespace(HTTPError=_StubError,
-                                            Timeout=_StubError,
-                                            RequestException=_StubError)
-requests.packages = types.SimpleNamespace(
-    urllib3=types.SimpleNamespace(
-        exceptions=types.SimpleNamespace(InsecureRequestWarning=Warning),
-        disable_warnings=lambda *a, **k: None))
+def _install_fake_requests():
+    for name in [n for n in sys.modules if n == "requests" or n.startswith("requests.")]:
+        del sys.modules[name]
+    sys.path.insert(0, FAKE_REQUESTS_DIR)
+    try:
+        import requests as fake
+        import requests.packages.urllib3.exceptions  # noqa: F401
+    finally:
+        sys.path.remove(FAKE_REQUESTS_DIR)
+    return fake
+
+
+requests = _install_fake_requests()
+_loaded_fake_modules = {n: m for n, m in sys.modules.items() if n == "requests" or n.startswith("requests.")}
 
 
 class Response:
@@ -56,6 +65,10 @@ class Response:
 
     def json(self):
         return self._body
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise requests.exceptions.HTTPError("%s Error" % self.status_code)
 
 
 class FakeSession:
@@ -84,6 +97,7 @@ class FakeSession:
         self.reads = []
         self.login_ok = login_ok
         self.totals = totals or {}
+        self.cert = None
 
     # -- helpers ----------------------------------------------------------
     def _split(self, url):
@@ -167,14 +181,30 @@ def load(script_name, directory=None, **overrides):
         "json": json,
         "os": os,
         "numAPIs": Value("i", 0),
+        "numFailed": Value("i", 0),
         "apiCounter": Value("i", 0),
+        "apiCount": Value("i", 0),
         "stUrl": "https://st.example.com:8444/api/v2.0/",
         "referer": "THIS_IS_A_RANDOM_TEXT",
         "stTimeout": 10,
+        "stVerify": False,
+        "logFile": os.devnull,
+        "pollSeconds": 0,
         "dryRun": False,
     }
     namespace.update(overrides)
-    exec(compile(source, script_name, "exec"), namespace)
+    # `import requests` at the top of an example finds the stand-in, and goes back
+    # to normal afterwards
+    saved = {n: m for n, m in sys.modules.items() if n == "requests" or n.startswith("requests.")}
+    for name in saved:
+        del sys.modules[name]
+    sys.modules.update({n: m for n, m in _loaded_fake_modules.items()})
+    try:
+        exec(compile(source, script_name, "exec"), namespace)
+    finally:
+        for name in [n for n in sys.modules if n == "requests" or n.startswith("requests.")]:
+            del sys.modules[name]
+        sys.modules.update(saved)
     return namespace
 
 

@@ -49,6 +49,13 @@
 #        DAYS - warn about certificates expiring within this many days.
 #               Defaults to the warnWithinDays setting below.
 #
+# Risk: read
+#
+# Notes:
+# - Exit codes: 0 done (no certificates at all included), 1 anything failed, and also
+#   when no expiry date field could be found on the certificates (there is then no
+#   report), 2 DAYS is not a whole number.
+#
 # Outputs:
 #    A count by usage, then the expired and expiring certificates, on standard
 #    output. This script only reads. It changes nothing.
@@ -72,7 +79,7 @@ def stLogout(session, token):
                'csrfToken': token,
                'Accept': 'application/json'}
     try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.delete(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -86,8 +93,11 @@ def stLogout(session, token):
         print('Unknown Error: ' + str(e))
         sys.exit(1)
     else:
-        print('Session Mgt Logged Out')
         numAPIs.value += 1
+        if response.status_code != 200:
+            print('Logout answered ' + str(response.status_code))
+            sys.exit(1)
+        print('Session Mgt Logged Out')
         return True
 
 
@@ -106,7 +116,7 @@ def stLogin(basicAuth, session):
                'Authorization': authString}
 
     try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.post(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -152,7 +162,9 @@ def findExpiryField(certificate):
 # Turn whatever the API gave us into a date.
 #
 # Different releases have used an ISO 8601 string and an epoch value in
-# milliseconds, so both are handled. Returns None if the value cannot be read.
+# milliseconds, and 5.5-20260924 writes expirationTime as an RFC 2822 date
+# ("Tue, 31 Dec 2030 22:59:59 +0200", confirmed directly), so all three are
+# handled. Returns None if the value cannot be read.
 #
 def parseExpiry(value):
 
@@ -163,7 +175,7 @@ def parseExpiry(value):
     if isinstance(value, (int, float)):
         seconds = value / 1000.0 if value > 100000000000 else float(value)
         try:
-            return datetime.datetime.utcfromtimestamp(seconds)
+            return datetime.datetime.fromtimestamp(seconds, datetime.timezone.utc).replace(tzinfo=None)
         except (ValueError, OverflowError, OSError):
             return None
 
@@ -184,6 +196,16 @@ def parseExpiry(value):
             return parsed.replace(tzinfo=None)
         except ValueError:
             continue
+
+    # RFC 2822, as 5.5-20260924 writes expirationTime, with its own UTC offset
+    try:
+        import email.utils
+        parsed = email.utils.parsedate_to_datetime(text)
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+        return parsed
+    except (TypeError, ValueError, IndexError):
+        pass
 
     return None
 
@@ -208,7 +230,7 @@ def stReadCertificates(session, csrftoken):
                '&limit=' + str(numberObjectsToFetchPerCall))
 
         try:
-            response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
+            response = session.get(url, headers=headers, verify=stVerify, timeout=stTimeout)
         except requests.ConnectionError as ec:
             print('I cannot connect to ' + url + ' ' + str(ec))
             sys.exit(1)
@@ -275,7 +297,7 @@ if __name__ == "__main__":
 
     # Tried in order, when expiryFieldName is empty
     expiryFieldCandidates = ['endDate', 'validTo', 'notAfter', 'expiryDate',
-                             'expirationDate', 'certificateEndDate']
+                             'expirationDate', 'certificateEndDate', 'expirationTime']
 
     # -------------------------------------------------------------------------------
     # END Configuration Section
@@ -298,7 +320,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -307,7 +329,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -322,12 +347,14 @@ if __name__ == "__main__":
             warnWithinDays = int(sys.argv[1])
         except ValueError:
             print('DAYS must be a whole number of days')
-            sys.exit(0)
+            print('Usage: python3 stCertificateExpiry.py [DAYS]')
+            sys.exit(2)
 
     numAPIs = Value('i', 0)                  # counter to see how many APIs we sent
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session....
     sessionMgt = requests.Session()
@@ -369,12 +396,12 @@ if __name__ == "__main__":
         print('Set expiryFieldName in the configuration section to the right one.')
         stLogout(sessionMgt, csrftoken)
         print('Completed Run, number of APIs issued: ' + str(numAPIs.value))
-        sys.exit(0)
+        sys.exit(1)
 
     print('')
     print('Reading the expiry date from the ' + expiryField + ' field')
 
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)    # UTC, with no time zone, as parseExpiry gives
     horizon = now + datetime.timedelta(days=warnWithinDays)
 
     expired = []
@@ -401,7 +428,7 @@ if __name__ == "__main__":
     print('=' * 70)
     print('EXPIRED: ' + str(len(expired)))
     print('=' * 70)
-    for when, cert in sorted(expired):
+    for when, cert in sorted(expired, key=lambda pair: pair[0]):
         print(when.strftime('%Y-%m-%d') + '  (' + str((now - when).days) + ' days ago)')
         print('   ' + describe(cert))
 
@@ -409,7 +436,7 @@ if __name__ == "__main__":
     print('=' * 70)
     print('EXPIRING within ' + str(warnWithinDays) + ' days: ' + str(len(expiring)))
     print('=' * 70)
-    for when, cert in sorted(expiring):
+    for when, cert in sorted(expiring, key=lambda pair: pair[0]):
         print(when.strftime('%Y-%m-%d') + '  (in ' + str((when - now).days) + ' days)')
         print('   ' + describe(cert))
 

@@ -97,15 +97,14 @@ PY_INTERPRETER = path("tests", "local", "pyvenv", "bin", "python3")
 
 def python_available():
     """
-    True when tests/local/pyvenv has been set up - a venv holding requests
-    and requests_toolbelt, the two third-party libraries the Admin API 2.0
-    python3 examples need. st_client.py stays stdlib only on purpose so the
+    True when tests/local/pyvenv has been set up - a venv holding requests,
+    the third-party library the Admin API 2.0 python3 examples need. st_client.py stays stdlib only on purpose so the
     harness itself runs on any machine; the examples it runs were written
     against requests, same as bash examples assume curl and jq are on PATH.
     Create it with:
 
         python3 -m venv tests/local/pyvenv
-        tests/local/pyvenv/bin/pip install requests requests_toolbelt
+        tests/local/pyvenv/bin/pip install requests
     """
     return os.path.exists(PY_INTERPRETER)
 

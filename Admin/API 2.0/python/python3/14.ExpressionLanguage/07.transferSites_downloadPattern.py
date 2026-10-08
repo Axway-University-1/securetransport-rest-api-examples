@@ -27,6 +27,8 @@
 #
 # Usage: python3 07.transferSites_downloadPattern.py
 #
+# Risk: write - creates three throwaway transfer sites on the account john and deletes them again, by the id each was created with; a site that was there already is never deleted
+#
 # Notes:
 # - Confirmed directly against a real server: downloadPatternType is only
 #   recognised on some site types (ssh here) - the same field name on an
@@ -48,6 +50,7 @@ import el_client  # noqa: E402
 
 config = el_client.load_config()
 client = el_client.ELClient(config)
+created = []
 
 SITES = [
     ("anyXml", "*.xml", "glob"),
@@ -55,39 +58,39 @@ SITES = [
     ("xmlOrTxt", r".*\.(xml|txt)", "regex"),
 ]
 
-for suffix, pattern, pattern_type in SITES:
-    name = "ZZTEST_EL_dlpattern_" + suffix
-    print("\nCreating %s with downloadPattern: %s (%s)" % (name, pattern, pattern_type))
-    response = client.post("sites", {
-        "name": name,
-        "type": "ssh",
-        "protocol": "ssh",
-        "account": "john",
-        "host": config["st_server"],
-        "port": "22",
-        "downloadFolder": "/tmp",
-        "downloadPattern": pattern,
-        "downloadPatternType": pattern_type,
-        "uploadFolder": "/",
-        "userName": "john",
-        "usePassword": True,
-        "password": "placeholder",
-    })
-    print(response.status_code, response.text[:200])
+try:
+    for suffix, pattern, pattern_type in SITES:
+        name = "ZZTEST_EL_dlpattern_" + suffix
+        print("\nCreating %s with downloadPattern: %s (%s)" % (name, pattern, pattern_type))
+        response = client.post("sites", {
+            "name": name,
+            "type": "ssh",
+            "protocol": "ssh",
+            "account": "john",
+            "host": config["st_server"],
+            "port": "22",
+            "downloadFolder": "/tmp",
+            "downloadPattern": pattern,
+            "downloadPatternType": pattern_type,
+            "uploadFolder": "/",
+            "userName": "john",
+            "usePassword": True,
+            "password": "placeholder",
+        })
+        print(response.status_code, response.text[:200])
+        # A site of that name that is there already is refused: it is not ours, so stop
+        client.expect(response, [201], "Creating " + name)
+        client.track(created, "sites", response, name)
 
-print("\nReading all three back, and cleaning each up...")
-for suffix, _, _ in SITES:
-    name = "ZZTEST_EL_dlpattern_" + suffix
-    response = client.get("sites", params={
-        "name": name, "fields": "name,downloadPattern,downloadPatternType"})
-    print("\n%s:" % name)
-    print(response.text)
+    print("\nReading all three back...")
+    for suffix, _, _ in SITES:
+        name = "ZZTEST_EL_dlpattern_" + suffix
+        response = client.get("sites", params={
+            "name": name, "fields": "name,downloadPattern,downloadPatternType"})
+        client.expect(response, [200], "Reading " + name)
+        print("\n%s:" % name)
+        print(response.text)
 
-    response = client.get("sites", params={"name": name, "fields": "id"})
-    result = response.json().get("result", [])
-    if result:
-        site_id = result[0]["id"]
-        client.delete("sites/" + site_id)
-        print("deleted %s (%s)" % (name, site_id))
-
-client.logout()
+    print("\nCleaning up the three throwaway sites...")
+finally:
+    client.finish(created)

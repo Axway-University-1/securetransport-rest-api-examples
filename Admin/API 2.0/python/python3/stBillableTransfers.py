@@ -32,6 +32,11 @@
 # APIs used - /myself         POST DELETE ( ST login and logout )
 #             /logs/transfers GET, with isBillable=true
 #
+# Risk: read
+#
+# Notes:
+# - Exit codes: 0 done, 1 anything failed, 2 the arguments are wrong.
+#
 # Outputs:
 #    One line per day, today last, and the total.
 #
@@ -61,7 +66,7 @@ def stLogout(session, token):
                'csrfToken': token,
                'Accept': 'application/json'}
     try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.delete(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -75,8 +80,11 @@ def stLogout(session, token):
         print('Unknown Error: ' + str(e))
         sys.exit(1)
     else:
+        numAPIs.value += 1
+        if response.status_code != 200:
+            print('Logout answered ' + str(response.status_code))
+            sys.exit(1)
         print('Session Mgt Logged Out')
-        numAPIs.value+=1
         return True
 
         # Successful logout response
@@ -101,7 +109,7 @@ def stLogin(basicAuth, session):
                'Authorization': authString}
 
     try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.post(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -174,7 +182,7 @@ def stCountBillable(session, csrftoken, start, end, account):
                'Accept': 'application/json'}
 
     try:
-        response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.get(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + url + ' ' + str(ec))
         sys.exit(1)
@@ -190,8 +198,9 @@ def stCountBillable(session, csrftoken, start, end, account):
     else:
         numAPIs.value += 1
         if response.status_code != 200:
-            print('HTTP response is ' + str(response.status_code))
-            return None
+            # a day with no count would make the report wrong, so this is not carried on from
+            print('GET logs/transfers answered ' + str(response.status_code) + ': ' + str(response.text)[:300])
+            sys.exit(1)
         # totalCount, not returnCount, which limit caps at 1
         return response.json().get('resultSet', {}).get('totalCount')
 
@@ -201,15 +210,20 @@ def stReportBillable(session, csrftoken, days, account):
     print('Billable transfers per day, for ' + (account or 'every account'))
 
     total = 0
+    unread = 0
     for label, start, end in dayWindows(days):
         count = stCountBillable(session, csrftoken, start, end, account)
         if count is None:
             print('  ' + label + '  could not read a count')
+            unread += 1
             continue
         print('  ' + label + '  ' + str(count))
         total += int(count)
 
     print('Total: ' + str(total) + ' billable transfer(s) in ' + str(days) + ' day(s)')
+    if unread:
+        print('INCOMPLETE: the answer of ' + str(unread) + ' day(s) held no count, so that total is too low.')
+        sys.exit(1)
     return total
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -259,7 +273,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -268,7 +282,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -295,7 +312,8 @@ if __name__ == "__main__":
     numAPIs = Value('i', 0)                  # counter to see how many APIS we sent
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session....
     sessionMgt = requests.Session()

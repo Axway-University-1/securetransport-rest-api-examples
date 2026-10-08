@@ -41,12 +41,21 @@
 # APIs used - /myself ( ST login and logout ) POST, DELETE
 #             /routes  GET, PUT
 #
-# Usage: python3 stUpdateRouteWithPut.py <routeId> [secondId]
+# Usage: python3 stUpdateRouteWithPut.py [--apply] <routeId> [secondId]
 #
 #        routeId  - the route to change.
 #        secondId - for mode 'link', the id of the simple route to execute.
 #                   For mode 'subscription', the id of the subscription.
 #                   Not needed for mode 'insert'.
+#        --apply  send the PUT. Without it (or with dryRun left True in the
+#                 configuration section) the script prints the object it would
+#                 send and sends nothing.
+#
+# Risk: write - replaces one route (PUT) with the object read and changed (with --apply)
+#
+# Notes:
+# - Exit codes: 0 done (or nothing to change), 1 anything failed (a PUT the server refused,
+#   or an insert offset outside the route, included), 2 an argument is missing or wrong.
 #
 #        Set dryRun to True in the configuration section to see the object that
 #        would be sent without sending it. Start there.
@@ -73,7 +82,7 @@ def stLogout(session, token):
                'csrfToken': token,
                'Accept': 'application/json'}
     try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.delete(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -87,8 +96,11 @@ def stLogout(session, token):
         print('Unknown Error: ' + str(e))
         sys.exit(1)
     else:
-        print('Session Mgt Logged Out')
         numAPIs.value += 1
+        if response.status_code != 200:
+            print('Logout answered ' + str(response.status_code))
+            sys.exit(1)
+        print('Session Mgt Logged Out')
         return True
 
 
@@ -107,7 +119,7 @@ def stLogin(basicAuth, session):
                'Authorization': authString}
 
     try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.post(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -147,7 +159,7 @@ def stGetRoute(session, csrftoken, routeId):
                'Accept': 'application/json'}
 
     try:
-        response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.get(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + url + ' ' + str(ec))
         sys.exit(1)
@@ -188,7 +200,7 @@ def stPutRoute(session, csrftoken, routeId, route):
         return True
 
     try:
-        response = session.put(url, headers=headers, json=route, verify=False, timeout=stTimeout)
+        response = session.put(url, headers=headers, json=route, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + url + ' ' + str(ec))
         sys.exit(1)
@@ -303,8 +315,14 @@ if __name__ == "__main__":
     referer = 'THIS_IS_A_RANDOM_TEXT'
 
     # Show the object that would be sent, without sending it. Run with this set
-    # to True first, and read the output, before you let it write.
+    # to True first, and read the output, before you let it write. --apply on the
+    # command line sets it to False.
     dryRun = True
+
+    arguments = sys.argv[1:]
+    if '--apply' in arguments:
+        dryRun = False
+        arguments.remove('--apply')
 
     # Which of the three jobs to do: 'insert', 'link' or 'subscription'
     mode = 'insert'
@@ -340,7 +358,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -349,7 +367,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -364,25 +385,25 @@ if __name__ == "__main__":
 
     if mode not in ('insert', 'link', 'subscription'):
         print("mode must be one of 'insert', 'link' or 'subscription'")
-        sys.exit(0)
+        sys.exit(2)
 
     try:
-        routeId = sys.argv[1]
+        routeId = arguments[0]
     except IndexError:
         print('Please provide argument 1, the id of the route to change.')
-        print('Usage: python3 stUpdateRouteWithPut.py <routeId> [secondId]')
-        sys.exit(0)
+        print('Usage: python3 stUpdateRouteWithPut.py [--apply] <routeId> [secondId]')
+        sys.exit(2)
 
     secondId = None
     if mode in ('link', 'subscription'):
         try:
-            secondId = sys.argv[2]
+            secondId = arguments[1]
         except IndexError:
             if mode == 'link':
                 print('Please provide argument 2, the id of the simple route to execute.')
             else:
                 print('Please provide argument 2, the id of the subscription.')
-            sys.exit(0)
+            sys.exit(2)
 
     numAPIs = Value('i', 0)                  # counter to see how many APIs we sent
 
@@ -391,7 +412,8 @@ if __name__ == "__main__":
         print('')
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session....
     sessionMgt = requests.Session()
@@ -411,10 +433,16 @@ if __name__ == "__main__":
         changed = stAttachToSubscription(theRoute, secondId)
 
     # 3. Write the whole thing back
+    failed = False
     if changed:
-        stPutRoute(sessionMgt, csrftoken, routeId, theRoute)
+        if not stPutRoute(sessionMgt, csrftoken, routeId, theRoute):
+            failed = True
     else:
         print('Nothing to change.')
+        # an insert that is not done is an offset outside the route; the others find nothing to do
+        failed = (mode == 'insert')
 
     stLogout(sessionMgt, csrftoken)
     print('Completed Run, number of APIs issued: ' + str(numAPIs.value))
+    if failed:
+        sys.exit(1)

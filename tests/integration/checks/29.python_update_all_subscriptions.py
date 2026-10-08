@@ -101,10 +101,17 @@ try:
         subs = {"    dryRun = True": "    dryRun = False"}
         with runner.substituted_copy(SCRIPT, subs) as copy:
             result = runner.run_python(copy, timeout=90)
-            c.check("stUpdateAllSubscriptions.py runs without a shell level error "
-                    "(dryRun False)", result.returncode == 0,
-                    result.stderr.strip()[-300:] if result.returncode else "")
             expected_patched = sum(1 for v in has_ppa.values() if v)
+            expected_refused = sum(1 for v in has_ppa.values() if not v)
+            # a PATCH the server refuses (422 for the replace of a field a subscription does not
+            # have) is a failure the script reports in its exit code: 1 exactly when there are some
+            c.check("stUpdateAllSubscriptions.py (dryRun False) exits %d: the server refuses the %d "
+                    "subscriptions with no postProcessingActions, and the script says so"
+                    % (1 if expected_refused else 0, expected_refused),
+                    result.returncode == (1 if expected_refused else 0)
+                    and (("the server refused %d patch" % expected_refused) in result.stdout
+                         if expected_refused else True),
+                    (result.returncode, (result.stdout + result.stderr).strip()[-300:]))
             c.check("it reports patching exactly the %d AdvancedRouting subscriptions "
                     "(the 2 Basic ones have no postProcessingActions to replace)"
                     % expected_patched,

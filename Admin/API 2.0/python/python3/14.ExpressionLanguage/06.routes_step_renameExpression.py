@@ -35,6 +35,8 @@
 #
 # Usage: python3 06.routes_step_renameExpression.py
 #
+# Risk: write - creates three throwaway routes and deletes them again, by the id each was created with; a route that was there already is never deleted
+#
 # Notes:
 # - Confirmed directly against a real server: this field round trips exactly
 #   as sent for all three examples - none of them use a regex, so no
@@ -51,6 +53,7 @@ import el_client  # noqa: E402
 
 config = el_client.load_config()
 client = el_client.ELClient(config)
+created = []
 
 RENAMES = [
     ("timestamped", "${basename(transfer.target)}-${date('yyyyMMdd_HHmmss')}${extension(transfer.target)}"),
@@ -58,41 +61,40 @@ RENAMES = [
     ("accountName", "${account.name}_${basename(transfer.target)}"),
 ]
 
-for suffix, rename_expr in RENAMES:
-    name = "ZZTEST_EL_rename_" + suffix
-    print("\nCreating %s with postTransformationActionRenameAsExpression: %s" % (name, rename_expr))
-    response = client.post("routes", {
-        "name": name,
-        "type": "SIMPLE",
-        "conditionType": "ALWAYS",
-        "steps": [{
-            "type": "EncodingConversion",
-            "status": "ENABLED",
+try:
+    for suffix, rename_expr in RENAMES:
+        name = "ZZTEST_EL_rename_" + suffix
+        print("\nCreating %s with postTransformationActionRenameAsExpression: %s" % (name, rename_expr))
+        response = client.post("routes", {
+            "name": name,
+            "type": "SIMPLE",
             "conditionType": "ALWAYS",
-            "usePrecedingStepFiles": False,
-            "fileFilterExpression": "*",
-            "fileFilterExpressionType": "GLOB",
-            "inputCharset": "UTF-8",
-            "outputCharset": "UTF-8",
-            "postTransformationActionRenameAsExpression": rename_expr,
-            "actionOnStepFailure": "PROCEED",
-        }],
-    })
-    print(response.status_code)
+            "steps": [{
+                "type": "EncodingConversion",
+                "status": "ENABLED",
+                "conditionType": "ALWAYS",
+                "usePrecedingStepFiles": False,
+                "fileFilterExpression": "*",
+                "fileFilterExpressionType": "GLOB",
+                "inputCharset": "UTF-8",
+                "outputCharset": "UTF-8",
+                "postTransformationActionRenameAsExpression": rename_expr,
+                "actionOnStepFailure": "PROCEED",
+            }],
+        })
+        print(response.status_code)
+        client.expect(response, [201], "Creating " + name)
+        client.track(created, "routes", response, name)
 
-print("\nReading all three back, and cleaning each up...")
-for suffix, _ in RENAMES:
-    name = "ZZTEST_EL_rename_" + suffix
-    response = client.get("routes", params={
-        "name": name, "fields": "name,steps.postTransformationActionRenameAsExpression"})
-    print("\n%s:" % name)
-    print(response.text)
+    print("\nReading all three back...")
+    for suffix, _ in RENAMES:
+        name = "ZZTEST_EL_rename_" + suffix
+        response = client.get("routes", params={
+            "name": name, "fields": "name,steps.postTransformationActionRenameAsExpression"})
+        client.expect(response, [200], "Reading " + name)
+        print("\n%s:" % name)
+        print(response.text)
 
-    response = client.get("routes", params={"name": name, "fields": "id"})
-    result = response.json().get("result", [])
-    if result:
-        route_id = result[0]["id"]
-        client.delete("routes/" + route_id)
-        print("deleted %s (%s)" % (name, route_id))
-
-client.logout()
+    print("\nCleaning up the three throwaway routes...")
+finally:
+    client.finish(created)

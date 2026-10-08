@@ -77,7 +77,7 @@ ACC_NAME = "ZZTEST_stBuildFullTestAccount"
 TEMPLATE_NAME = "ZZTEST_emptytemplate"
 APP_NAME = "ZZTEST_advrouting"
 KEY_FILE = os.path.join(PY_DIR, "testsshkey")
-KEY_PASSPHRASE = "12345678"  # matches the script's own hardcoded "password" field
+KEY_PASSPHRASE = "change_me"  # matches the script's own "password" field for the key
 
 client = st_client.connect(config, c)
 
@@ -121,7 +121,7 @@ try:
             "accName = 'TestAccount1'": "accName = '%s'" % ACC_NAME,
             "homeFolder = '/usrdata/NoBU/' + accName": "homeFolder = '/home/' + accName",
             "templateRouteName = 'Empty'": "templateRouteName = '%s'" % TEMPLATE_NAME,
-            '"caPassword": "Axway123"': '"caPassword": "%s"' % ca_password,
+            '"caPassword": "change_me"': '"caPassword": "%s"' % ca_password,
             '"application": "AdvRouting"': '"application": "%s"' % APP_NAME,
             '"host": "<SERVER>"': '"host": "%s"' % config["st_server"],
         }

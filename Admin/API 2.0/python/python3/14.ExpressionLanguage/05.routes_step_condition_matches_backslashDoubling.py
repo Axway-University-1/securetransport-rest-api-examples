@@ -44,6 +44,8 @@
 #
 # Usage: python3 05.routes_step_condition_matches_backslashDoubling.py
 #
+# Risk: write - creates two throwaway routes and deletes them again, by the id each was created with; a route that was there already is never deleted
+#
 # Notes:
 # - Confirmed directly against a real server: both values round trip exactly
 #   as sent, with the number of backslash characters preserved. What each
@@ -59,29 +61,29 @@ import el_client  # noqa: E402
 
 config = el_client.load_config()
 client = el_client.ELClient(config)
+created = []
 
 ROUTES = [
     ("ZZTEST_EL_doubled", "${transfer.target.matches('.*\\\\.txt')}"),
     ("ZZTEST_EL_single", "${transfer.target.matches('.*\\.txt')}"),
 ]
 
-for name, condition in ROUTES:
-    print("\nCreating %s with condition: %s" % (name, condition))
-    response = client.post("routes", {
-        "name": name, "type": "SIMPLE", "conditionType": "EL", "condition": condition,
-    })
-    print(response.status_code)
+try:
+    for name, condition in ROUTES:
+        print("\nCreating %s with condition: %s" % (name, condition))
+        response = client.post("routes", {
+            "name": name, "type": "SIMPLE", "conditionType": "EL", "condition": condition,
+        })
+        print(response.status_code)
+        client.expect(response, [201], "Creating " + name)
+        client.track(created, "routes", response, name)
 
-print("\nReading both back - compare the number of backslashes in each condition value:")
-for name, _ in ROUTES:
-    response = client.get("routes", params={"name": name, "fields": "name,condition"})
-    print(response.text)
+    print("\nReading both back - compare the number of backslashes in each condition value:")
+    for name, _ in ROUTES:
+        response = client.get("routes", params={"name": name, "fields": "name,condition"})
+        client.expect(response, [200], "Reading " + name)
+        print(response.text)
 
-print("\nCleaning up both throwaway routes...")
-for name, _ in ROUTES:
-    response = client.get("routes", params={"name": name, "fields": "id"})
-    for result in response.json().get("result", []):
-        client.delete("routes/" + result["id"])
-        print("deleted %s (%s)" % (name, result["id"]))
-
-client.logout()
+    print("\nCleaning up both throwaway routes...")
+finally:
+    client.finish(created)

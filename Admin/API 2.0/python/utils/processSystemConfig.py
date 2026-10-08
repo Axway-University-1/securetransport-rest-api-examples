@@ -46,6 +46,11 @@
 #
 # Usage: python3 processSystemConfig.py systemConfiguration.xml
 #
+# Risk: write - converts a file on this machine, and with createOnTarget set True it creates the user classes on the server
+#
+# Exit codes: 0 done (nothing sent, or every user class created), 1 anything failed (a user
+# class the server refused included), 2 the file name is missing.
+#
 #        createOnTarget is False by default, so the first run only writes the
 #        converted XML and tells you what it would create. Read that output
 #        before turning it on.
@@ -98,7 +103,7 @@ def stLogout(session, token):
                'csrfToken': token,
                'Accept': 'application/json'}
     try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.delete(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -112,6 +117,9 @@ def stLogout(session, token):
         print('Unknown Error: ' + str(e))
         sys.exit(1)
     else:
+        if response.status_code != 200:
+            print('Logout answered ' + str(response.status_code))
+            sys.exit(1)
         writeLog('Session Mgt Logged Out', 'INFORMATION')
         return True
 
@@ -131,7 +139,7 @@ def stLogin(basicAuth, session):
                'Authorization': authString}
 
     try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.post(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -173,7 +181,7 @@ def stCreateUserClass(session, csrftoken, uclassJson):
 
     try:
         response = session.post(url, headers=headers, json=uclassJson,
-                                verify=False, timeout=stTimeout)
+                                verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + url + ' ' + str(ec))
         sys.exit(1)
@@ -339,7 +347,7 @@ if __name__ == "__main__":
     except IndexError:
         print('Please provide an input XML filename for me to process')
         print('Usage: python3 processSystemConfig.py systemConfiguration.xml')
-        sys.exit(0)
+        sys.exit(2)
 
     apiCounter = Value('i', 0)
 
@@ -398,7 +406,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -407,7 +415,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -417,7 +428,8 @@ if __name__ == "__main__":
     basicAuth = base64.b64encode((stUser + ':' + stPassword).encode()).decode()
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     sessionMgt = requests.Session()
     csrftoken = stLogin(basicAuth, sessionMgt)
@@ -433,3 +445,5 @@ if __name__ == "__main__":
              'INFORMATION')
     writeLog('I issued: ' + str(apiCounter.value) + ' APIs on this run', 'INFORMATION')
     writeLog('Stopping at ' + str(datetime.datetime.now()), 'INFORMATION')
+    if created != len(userClasses):
+        sys.exit(1)

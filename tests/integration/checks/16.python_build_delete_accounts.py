@@ -4,17 +4,19 @@ WRITES TO THE SERVER. Runs stBuildTestAccounts.py and the real, unmodified
 stDeleteTestAccounts.py in Admin/API 2.0/python/python3 against a configured
 server, and independently verifies both.
 
-stBuildTestAccounts.py hardcodes 100 accounts across 3 processes and an
-unconditional business unit named "CatFoodCorporation" - not check-before-
-create the way this repository's own accounts examples are. This check runs
-a name-and-count-substituted copy instead: 3 accounts, 1 process, and the
-business unit renamed to "ZZTEST_CatFoodCorporation" so a real business unit
-of that name is never at risk and cleanup is unambiguous. That is not the
-same as running the real file - see script_runner.substituted_copy. The
-accounts themselves are named "ZZ0".."ZZ2" by the script's own logic
-(unchanged - "ZZ" + an index), which is what stDeleteTestAccounts.py's
-hardcoded namePattern="ZZ" (a substring match) is built to find, so that
-script runs completely unmodified.
+stBuildTestAccounts.py is a dry run unless given --apply, takes the prefix and the
+count as arguments (here ZZ and 3), and makes sure a business unit named
+"CatFoodCorporation" is there (it is not check-before-create in the sense of
+leaving a real one alone only for the accounts: an existing unit is kept, a
+missing one created). This check runs a copy with the business unit renamed to
+"ZZTEST_CatFoodCorporation", so a real business unit of that name is never at
+risk and cleanup is unambiguous. That is not the same as running the real file -
+see script_runner.substituted_copy. The accounts themselves are named
+"ZZ0".."ZZ2", which is what stDeleteTestAccounts.py (a dry run unless --apply, and
+a match on the START of the name, with the same default prefix ZZ) is built to
+find, so that script runs completely unmodified.
+
+The dry run of both is checked first: nothing is created, nothing is deleted.
 
 Needs tests/local/pyvenv - see 15.python_read_scripts.py's docstring for how
 to create it.
@@ -101,19 +103,41 @@ try:
         sys.exit(c.done())
     c.check("none of %s already exist on this server" % (NAMES + [BU_NAME]), True)
 
+    # stDeleteTestAccounts.py deletes every user account whose name starts with ZZ, and this
+    # check runs it for real: with any other such account on the server it would delete that too
+    def other_zz_accounts():
+        return [a["name"] for a in client.page("accounts", params={"type": "user"})
+                if a["name"].startswith("ZZ") and a["name"] not in NAMES]
+
+    other = other_zz_accounts()
+    if other:
+        c.info("refusing to run: stDeleteTestAccounts.py would also delete these user accounts "
+               "whose name starts with ZZ: %s. Remove them, or run this when nothing else is "
+               "using the lab." % other)
+        c.check("no other user account starts with ZZ on this server", False, other)
+        client.logout()
+        sys.exit(c.done())
+    c.check("no other user account starts with ZZ on this server", True)
+
     subs = {
         "numberParallelProcesses = 3": "numberParallelProcesses = 1",
-        "numberAccountsToCreate = 100": "numberAccountsToCreate = 3",
         "'name': 'CatFoodCorporation',": "'name': '%s'," % BU_NAME,
         "'baseFolder' : '/usrdata/CatFoodCo'": "'baseFolder' : '/usrdata/ZZTEST_CatFoodCo'",
     }
 
     with runner.real_credentials_python(PY_TREE, config):
         with runner.substituted_copy(script("stBuildTestAccounts.py"), subs) as copy:
-            result = runner.run_python(copy, timeout=60)
-            c.check("stBuildTestAccounts.py runs without a shell level error "
-                    "(name/count-substituted copy)", result.returncode == 0,
-                    result.stderr.strip()[-300:] if result.returncode else "")
+            result = runner.run_python(copy, ["ZZ", "3"], timeout=60)
+            c.check("stBuildTestAccounts.py without --apply is a dry run: exit 0, nothing created",
+                    result.returncode == 0 and "DRY RUN" in result.stdout
+                    and not any(client.exists("accounts/" + n) for n in NAMES)
+                    and not client.exists("businessUnits/" + BU_NAME),
+                    result.stdout[-300:])
+
+            result = runner.run_python(copy, ["--apply", "ZZ", "3"], timeout=60)
+            c.check("stBuildTestAccounts.py --apply runs without a shell level error "
+                    "(business unit renamed, 3 accounts, 1 process)", result.returncode == 0,
+                    (result.stdout + result.stderr).strip()[-300:] if result.returncode else "")
 
         created = client.exists("businessUnits/" + BU_NAME)
         for n in NAMES:
@@ -121,13 +145,29 @@ try:
         c.check("the throwaway business unit exists after the build script", created)
 
         result = runner.run_python(script("stDeleteTestAccounts.py"), timeout=60)
-        c.check("stDeleteTestAccounts.py runs without a shell level error",
-                result.returncode == 0,
-                result.stderr.strip()[-300:] if result.returncode else "")
+        c.check("stDeleteTestAccounts.py without --apply is a dry run: it lists ZZ0..ZZ2, exit 0, deletes nothing",
+                result.returncode == 0 and "DRY RUN" in result.stdout
+                and all(n in result.stdout for n in NAMES)
+                and all(client.exists("accounts/" + n) for n in NAMES),
+                (result.stdout + result.stderr)[-400:])
+        listed = result.stdout
+        c.check("it listed the three accounts and no other (3 of the user accounts start with ZZ)",
+                "3 of " in listed and "john" not in listed.replace("DRY", ""), listed[-400:])
 
-        for n in NAMES:
-            c.check("%s is gone after stDeleteTestAccounts.py" % n,
-                    not client.exists("accounts/" + n))
+        # something else may have made a ZZ account since the check above: do not delete it
+        other = other_zz_accounts()
+        if other:
+            c.info("not running --apply: another user account whose name starts with ZZ "
+                   "appeared: %s" % other)
+        else:
+            result = runner.run_python(script("stDeleteTestAccounts.py"), ["--apply"], timeout=60)
+            c.check("stDeleteTestAccounts.py --apply runs without a shell level error",
+                    result.returncode == 0,
+                    (result.stdout + result.stderr).strip()[-300:] if result.returncode else "")
+
+            for n in NAMES:
+                c.check("%s is gone after stDeleteTestAccounts.py" % n,
+                        not client.exists("accounts/" + n))
 
 finally:
     if created:

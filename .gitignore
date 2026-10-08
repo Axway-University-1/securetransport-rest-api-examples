@@ -82,6 +82,12 @@ test.txt_*
 # Output written by the python utils
 convertedUserClasses.xml
 
+# The baseline stConfigScan.py writes: every option of a server, which can hold secrets
+*.baseline
+
+# The private key stGetPrivateCert.py exports (exportedPrivateKey.p12 by default)
+exportedPrivateKey*
+
 # ------------------------------------------------------------------------------
 # Test workspace
 # ------------------------------------------------------------------------------

@@ -11,8 +11,13 @@
 #  be responsible for any loss or damage to data that is a result of this tool.  #
 ##################################################################################
 #
-# V2.00 Ian Percival   21-Jun-2023   Fix errors + csrf compliant 
-#                                    This code assumes that Webservices.Admin.CsrfToken.enabled is set to 'true' which is the default 
+# V3.00 Plamen Milenkov  08-Oct-2026 The status of every call is checked, and a call that fails ends the
+#                                    script with exit code 1 (it used to carry on, and a create that
+#                                    was refused was reported as done). The id of a new object is read
+#                                    from the Location header and a missing one is an error, not a
+#                                    KeyError. A missing config, key file or argument exits non-zero.
+# V2.00 Ian Percival   21-Jun-2023   Fix errors + csrf compliant
+#                                    This code assumes that Webservices.Admin.CsrfToken.enabled is set to 'true' which is the default
 #                                    for ST after and including the 20230525 release.
 # V1.00 Ian Percival   23-Nov-2021
 #
@@ -23,21 +28,84 @@
 #
 # APIs used - /myself ( ST login and logout ) POST, DELETE
 #             /accounts  POST
-#             /certificates POST
+#             /certificates GET, POST
 #             /sites POST
 #             /routes GET, POST
 #             /subscriptions POST
 #
 # Usage: python3 stBuildFullTestAccount.py
 #
-# Outputs:
+# Risk: write - creates an account with a key, two transfer sites, a subscription and two routes, under fixed names
 #
+# Notes:
+# - The names are fixed (the account TestAccount1, the sites FolderMonitor and SFTPsite, the routes
+#   SimpleRouteToSFTPsite and PackageRouteToSFTPsite). If one is there already the server refuses it and
+#   the script exits 1, leaving what it made before that: remove it by hand.
+# - It needs a private key file named testsshkey in the folder it is run from, and the route template
+#   named in templateRouteName (Empty) to be there.
+# - The caPassword of the key import is the one of the server's own certificate authority: "change_me" is
+#   a placeholder, and the server refuses it with "Specify a valid CA Password.".
+# - Exit codes: 0 done, 1 anything failed.
+#
+# Outputs:
+#    The ids of what it made, on standard output.
 #
 # Start of Program is 'main' below.
 #   Configuration section is there for you to tailor to your env...
 #
 
+import base64
+import datetime
+import json
+import multiprocessing
+import os
+import re              # Regular Expressions
+import sys
+
+import requests
+
+from multiprocessing import Value
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
 # All functions are defined below
+
+
+# Send one request. Anything that keeps the call from completing is fatal: the script
+# says what failed and exits 1. An HTTP status is not an exception, so the caller
+# looks at it (see stExpect).
+def stCall(method, url, **kwargs):
+    try:
+        response = getattr(sessionMgt, method.lower())(url, verify=stVerify, timeout=stTimeout, **kwargs)
+    except requests.exceptions.Timeout as et:
+        print('Timeout talking to ' + url + ': ' + str(et))
+        sys.exit(1)
+    except requests.exceptions.ConnectionError as ec:
+        print('I cannot connect to ' + url + ': ' + str(ec))
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print('The request to ' + url + ' failed: ' + str(e))
+        sys.exit(1)
+    apiCount.value += 1
+    return response
+
+
+# Exit 1 unless the status is the one expected
+def stExpect(response, expected, what):
+    if response.status_code != expected:
+        print(what + ' answered ' + str(response.status_code) + ', not ' + str(expected) + ': ' + str(response.text)[:300])
+        sys.exit(1)
+
+
+# The id of a new object: the last part of its Location header, which looks like
+#   https://<SERVER>:8444/api/v2.0/sites/8a0101967d2e236c017d766239902d02
+def stIdFromLocation(response, what):
+    location = response.headers.get('location')
+    if not location:
+        print(what + ' answered ' + str(response.status_code) + ' with no Location header')
+        sys.exit(1)
+    # all after the last occurrence of /
+    # match at least one of anything not a slash folowed by end of string
+    return re.search('[^/]+$', location).group(0)
 
 
 # This is the ST logout session management
@@ -51,33 +119,20 @@ def stLogout(session, csrftoken):
     headers =  {'Referer': referer,
                 'csrfToken': csrftoken,
                 'Accept': 'application/json'}
-    try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error')
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error: ' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        print('\nSession Mgt Logged Out')
-        return True
 
-        # Successful logout response
+    response = stCall('DELETE', url, headers=headers)
+    stExpect(response, 200, 'Logout')
 
-        # {
-        #     "message" : "Logged out"
-        # }
+    # Successful logout response
+
+    # {
+    #     "message" : "Logged out"
+    # }
+    print('\nSession Mgt Logged Out')
+    return True
 
 
-# Login to ST using session management
+# Login to ST using session management, and return the csrfToken the server answers with
 #
 # This is the ST /myself POST method
 #
@@ -91,40 +146,19 @@ def stLogin(basicAuth, session):
                'Accept': 'application/json',
                'Authorization': authString}
 
-    try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error ' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error ' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        if response.status_code != 200:
-            print("Cannot login ", response.status_code)
-            sys.exit(1)
-        jsonResponse = response.json()
-        csrftoken = response.headers.get('csrfToken')
-        message = jsonResponse.get("message")
-        if 'Logged in' == message:
-            print('Session Login', 'INFORMATION')
-            return csrftoken
-        else:
-            print("Login Failure ",response.status_code)
-            sys.exit(0)
+    response = stCall('POST', url, headers=headers)
+    stExpect(response, 200, 'Login')
 
-        # Successful login
+    # Successful login
 
-        # {
-        #     "message" : "Logged in"
-        # }
+    # {
+    #     "message" : "Logged in"
+    # }
+    if response.json().get('message') != 'Logged in':
+        print('The login did not answer "Logged in"')
+        sys.exit(1)
+    print('Session Login')
+    return response.headers.get('csrfToken')
 
 
 def stCreateAccount(token):
@@ -149,27 +183,12 @@ def stCreateAccount(token):
                         }
               }
 
-    try:
-        response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value+=1
-        return True
-    return False
+    response = stCall('POST', url, json=jsonIn, headers=headers)
+    stExpect(response, 201, 'Creating the account')
+    return True
 
 # This will import a private key stored as a file
-# It demonstrates using multipart/mixed format payloads which are used by ST 
+# It demonstrates using multipart/mixed format payloads which are used by ST
 #
 def stImportKey(token):
     url = stUrl + 'certificates'
@@ -208,77 +227,47 @@ def stImportKey(token):
     multipart = jsonsection + certBeginSection
     multipart = multipart.encode()
 
-
-    with open('testsshkey', mode='rb') as file:
-        binaryCert = file.read()
+    try:
+        with open('testsshkey', mode='rb') as file:
+            binaryCert = file.read()
+    except IOError:
+        print('I cannot read the private key file testsshkey in ' + os.getcwd())
+        sys.exit(1)
 
     multipartBytes = multipart + binaryCert + certEndSection
 
-    try:
-        response = sessionMgt.post(url, data=multipartBytes, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        if response.status_code != 200:
-            print("Certificate Import failure ", response.status_code)
-            sys.exit(1) 
-        return True
-        # Python / ST bug - location header not visible! We should be able to simply do 
+    response = stCall('POST', url, data=multipartBytes, headers=headers)
+    stExpect(response, 200, 'Certificate Import')
+    return True
+    # Python / ST bug - location header not visible! We should be able to simply do
 
-        #a = re.search('[^/]+$',response.headers['location'])
-        #certId = a.group(0)
-        #return certId
+    #a = re.search('[^/]+$',response.headers['location'])
+    #certId = a.group(0)
+    #return certId
 
-def stGetKeyId():
+def stGetKeyId(token):
 
     # As location header is missing - do another GET to find the id
     url = stUrl + 'certificates?usage=private&account=' + accName + '&name=PrivateSSHKey'
     headers = {'Referer': referer,
+               'csrfToken': token,
                'Accept': 'application/json'}
 
-    try:
-        response = sessionMgt.get(url, headers=headers, verify=False, timeout=stTimeout)   
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        if response.status_code != 200:
-            print("Certificate Find failure ", response.status_code)
-            sys.exit(1)
-        rJson = response.json()
+    response = stCall('GET', url, headers=headers)
+    stExpect(response, 200, 'Certificate Find')
+    rJson = response.json()
 
-        resultSet = rJson['resultSet']
-        returnCount = resultSet['returnCount']
-        if returnCount != 1:
-            print('I cannot find the Certificate')
-            sys.exit(1)
+    resultSet = rJson['resultSet']
+    returnCount = resultSet['returnCount']
+    if returnCount != 1:
+        print('I cannot find the Certificate')
+        sys.exit(1)
 
-        # should only be the 1 result as the name is unique
-        results = rJson['result']
-        certId = results[0]['id']
-        print(certId)
-        return certId
+    # should only be the 1 result as the name is unique
+    results = rJson['result']
+    certId = results[0]['id']
+    print(certId)
+    return certId
 
 
 def stCreateSiteFolder(token):
@@ -300,34 +289,17 @@ def stCreateSiteFolder(token):
               "uploadFolder": "/tmp"
               }
 
-    try:
-        response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        # No JSON is returned by the create.
-        #
-        # To find the id of the newly created object:
-        # Search the returned location header for all after the last occurrence of /
-        # match at least one of anything not a slash folowed by end of string
-        # location header looks like this:
-        # https://<SERVER>:8444/api/v2.0/sites/8a0101967d2e236c017d766239902d02
+    response = stCall('POST', url, json=jsonIn, headers=headers)
+    stExpect(response, 201, 'Creating the folder monitor site')
 
-        a = re.search('[^/]+$',response.headers['location'])
-        folderId = a.group(0)
-        return True
-    return False
+    # No JSON is returned by the create.
+    #
+    # To find the id of the newly created object:
+    # Search the returned location header for all after the last occurrence of /
+    # location header looks like this:
+    # https://<SERVER>:8444/api/v2.0/sites/8a0101967d2e236c017d766239902d02
+    folderId = stIdFromLocation(response, 'Creating the folder monitor site')
+    return True
 
 def stCreateSiteSFTP(keyId,token):
 
@@ -368,34 +340,12 @@ def stCreateSiteSFTP(keyId,token):
               }
 
 
-    try:
-        response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        # No JSON is returned by the create.
-        #
-        # To find the id of the newly created object:
-        # Search the returned location header for all after the last occurrence of /
-        # match at least one of anything not a slash folowed by end of string
-        # location header looks like this:
-        # https://<SERVER>:8444/api/v2.0/sites/8a0101967d2e236c017d766239902d02
+    response = stCall('POST', url, json=jsonIn, headers=headers)
+    stExpect(response, 201, 'Creating the SFTP site')
 
-        a = re.search('[^/]+$',response.headers['location'])
-        sftpSiteId = a.group(0) # ie return the match value
-        return True
-    return False
+    # No JSON is returned by the create. The id of the new site is in the Location header
+    sftpSiteId = stIdFromLocation(response, 'Creating the SFTP site')
+    return True
 
 def stCreateSubscription(token):
     url = stUrl + 'subscriptions'
@@ -419,35 +369,13 @@ def stCreateSubscription(token):
                                            "ppaOnSuccessInDoDelete": True
                                        }
               }
-    try:
-        response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        # No JSON is returned by the create.
-        #
-        # To find the id of the newly created object:
-        # Search the returned location header for all after the last occurrence of /
-        # match at least one of anything not a slash folowed by end of string
-        # location header looks like this:
-        # https://<SERVER>:8444/api/v2.0/sites/8a0101967d2e236c017d766239902d02
+    response = stCall('POST', url, json=jsonIn, headers=headers)
+    stExpect(response, 201, 'Creating the subscription')
 
-        a = re.search('[^/]+$', response.headers['location'])
-        subId = a.group(0)
-        print(subId)
-        return subId
-    return None
+    # No JSON is returned by the create. The id of the new subscription is in the Location header
+    subId = stIdFromLocation(response, 'Creating the subscription')
+    print(subId)
+    return subId
 
 
 def stCreateSimpleRoute(token):
@@ -475,35 +403,12 @@ def stCreateSimpleRoute(token):
               }]
               }
 
-    try:
-        response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        # No JSON is returned by the create.
-        #
-        # To find the id of the newly created object:
-        # Search the returned location header for all after the last occurrence of /
-        # match at least one of anything not a slash folowed by end of string
-        # location header looks like this:
-        # https://<SERVER>:8444/api/v2.0/sites/8a0101967d2e236c017d766239902d02
+    response = stCall('POST', url, json=jsonIn, headers=headers)
+    stExpect(response, 201, 'Creating the simple route')
 
-        a = re.search('[^/]+$', response.headers['location'])
-        sRouteId = a.group(0)
-        print('Simple Route Id: ' + sRouteId)
-        return sRouteId
-    return None
+    sRouteId = stIdFromLocation(response, 'Creating the simple route')
+    print('Simple Route Id: ' + sRouteId)
+    return sRouteId
 
 def stCreatePackageRoute(sRouteId,subId, tRouteId, token):
     url = stUrl + 'routes'
@@ -528,72 +433,36 @@ def stCreatePackageRoute(sRouteId,subId, tRouteId, token):
                             "executeRoute": sRouteId
     }]}
 
-    try:
-        response = sessionMgt.post(url, json=jsonIn, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        # No JSON is returned by the create.
-        #
-        # To find the id of the newly created object:
-        # Search the returned location header for all after the last occurrence of /
-        # match at least one of anything not a slash folowed by end of string
-        # location header looks like this:
-        # https://<SERVER>:8444/api/v2.0/sites/8a0101967d2e236c017d766239902d02
+    response = stCall('POST', url, json=jsonIn, headers=headers)
+    stExpect(response, 201, 'Creating the package route')
 
-        a = re.search('[^/]+$', response.headers['location'])
-        pRouteId = a.group(0)
-        print('Package Route Id: ' + pRouteId)
-        return pRouteId
-    return None
+    pRouteId = stIdFromLocation(response, 'Creating the package route')
+    print('Package Route Id: ' + pRouteId)
+    return pRouteId
 
-def stGetTemplateRouteId(name):
+def stGetTemplateRouteId(name, token):
 
     url = stUrl + 'routes?type=TEMPLATE&name=' + str(name)
 
     headers = {'Referer': referer,
+               'csrfToken': token,
                'Accept': 'application/json'}
 
-    try:
-        response = sessionMgt.get(url, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        rJson = response.json()
+    response = stCall('GET', url, headers=headers)
+    stExpect(response, 200, 'Looking for the route template ' + str(name))
+    rJson = response.json()
 
-        resultSet = rJson['resultSet']
-        returnCount = resultSet['returnCount']
-        if returnCount != 1:
-            print('I cannot find the Route Package Template')
-            sys.exit(1)
+    resultSet = rJson['resultSet']
+    returnCount = resultSet['returnCount']
+    if returnCount != 1:
+        print('I cannot find the Route Package Template')
+        sys.exit(1)
 
-        # should only be the 1 result as the name is unique
-        results = rJson['result']
-        templateId = results[0]['id']
-        print(templateId)
-        return templateId
+    # should only be the 1 result as the name is unique
+    results = rJson['result']
+    templateId = results[0]['id']
+    print(templateId)
+    return templateId
 
 
 
@@ -604,23 +473,6 @@ def stGetTemplateRouteId(name):
 # ====================================================================================
 
 if __name__ == "__main__":
-
-    import base64
-    import datetime
-    import json
-    import multiprocessing
-    import os
-    import re              # Regular Expressions
-    import requests
-    # import ssl
-    # import string
-    import sys
-
-    from multiprocessing import Process, Value, Queue
-    #from requests.auth import HTTPBasicAuth
-    from requests.packages.urllib3.exceptions import InsecureRequestWarning
-    from requests import Request
-
 
     # --------------------------------------------------------------------------------
     # BEGIN Configuration Section
@@ -649,7 +501,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -658,7 +510,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -689,7 +544,8 @@ if __name__ == "__main__":
     apiCount = Value('i', 0)
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session which will be shared amongst all APIs
     sessionMgt = requests.Session()
@@ -698,36 +554,28 @@ if __name__ == "__main__":
     csrftoken = stLogin(basicAuth, sessionMgt)
 
     # Create the base user account
-    if not stCreateAccount(csrftoken):
-        print('Failed to Create the User Account')
+    stCreateAccount(csrftoken)
 
     # Import an SSH private Key
-    if not stImportKey(csrftoken):
-        print('Failed to Import the SSH key')
+    stImportKey(csrftoken)
 
     # Find the ID of the created SSH private key
-    sshKeyId = stGetKeyId()
+    sshKeyId = stGetKeyId(csrftoken)
 
     # Create a Folder Monitor Transfer Site
-    if not stCreateSiteFolder(csrftoken):
-        print('failed to create a folder monitor')
+    stCreateSiteFolder(csrftoken)
 
     # Create an SFTP transfer Site
-    if not stCreateSiteSFTP(sshKeyId,csrftoken):
-        print('failed to create an SFTP site')
+    stCreateSiteSFTP(sshKeyId,csrftoken)
 
     # Create a Subscription
     subId = stCreateSubscription(csrftoken)
-    if subId == None:
-        print('Failed to create Subscription')
 
     # Create a Simple Route
     sRouteId = stCreateSimpleRoute(csrftoken)
-    if sRouteId == None:
-        print('Failed to create Simple Route')
 
     # Get Template Route ID
-    tRouteId = stGetTemplateRouteId(templateRouteName)
+    tRouteId = stGetTemplateRouteId(templateRouteName, csrftoken)
 
     # Create a Package Route
     pRouteId = stCreatePackageRoute(sRouteId,subId, tRouteId, csrftoken)
@@ -736,4 +584,3 @@ if __name__ == "__main__":
     print('I issued: ' + str(apiCount.value) + ' APIs')
     outputString = 'Ending at: ' + str(datetime.datetime.now())
     print(outputString)
-

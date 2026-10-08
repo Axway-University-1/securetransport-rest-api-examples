@@ -46,8 +46,8 @@ tests/integration/run_integration.sh --mock
 ```
 
 Read only, expect `3 passed, 58 skipped`. With `--write`, expect
-`4 passed, 56 skipped, 1 failed`: the failure is `04.accounts_scripts.py`, see
-[the integration README](integration/README.md). Most checks skip because the mock
+`5 passed, 56 skipped, 0 failed` (`04.accounts_scripts.py` passes: it used to fail
+here, see [the integration README](integration/README.md)). Most checks skip because the mock
 does not implement what they need, so the mock proves the harness, not the
 examples: a check that makes no assertion counts as skipped, not passed. The
 numbers move when a check is added; the point is that nothing else fails. To run
@@ -69,7 +69,11 @@ server](#against-a-real-server).
 | `checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: README coverage tables whose counts differ from the directories, and `.claude` skills that describe a layout, file or variable that no longer exists. |
 | `checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
 | `checks/test_bash_reads_and_deletes.sh` | The examples that look up, read and delete, and the EndUser examples that open their own session: a DELETE going to an id the lookup did not find, or to anything when the lookup found nothing; composite routes not deleted before the simple routes they run; a count read from `returnCount` instead of `totalCount`; an EndUser call without the `csrfToken` its login returned. |
-| `checks/test_python_logic.py` | The python examples doing the wrong thing, by running them against a fake ST that serves paged collections and records what they would write. |
+| `checks/test_python_logic.py` | The python examples doing the wrong thing, by running them against a fake ST that serves paged collections and records what they would write. Also a request that cannot complete (a connection error, any kind of timeout) ending the script with exit 1. |
+| `checks/test_python_scripts_run.py` | Every python example run as a whole, as its own process, against an in-memory fake ST that does what the documentation says and the lab does not insist on: it refuses a write with no `csrfToken` (the logout too), a call with no or another `Referer`, a call with no timeout. Then it makes the server fail every way it can (a connection error, a timeout, 401 and 500 on the login, after it, on one verb) and wants a non-zero exit code, no traceback and no loop that does not end. Also `st_verify` and `st_ca_bundle` reaching every call. |
+| `checks/test_python_safety.py` | What each python example does with what it can destroy, the secrets it handles and the files it writes: a delete by prefix, not by substring, that is a dry run unless `--apply`; workers that start fresh (`spawn`); a private key written 0600 with its password out of the URL and the output; a JSON baseline compared in both directions; a cleanup that deletes only what the run created; every missing config, argument or bad value, exit 1 or 2 with nothing sent. |
+| `checks/test_python_graceful.py` | `stGraceful.py`, which can never be run on the lab: it stops nothing without `--yes`, stops a daemon once by `daemon=`, waits for every daemon to be down (bounded, on a fake clock) before the Transaction Manager, and ends with exit 1, the Transaction Manager untouched, when one never goes down. |
+| `checks/check_python_risk.py` | The python examples each having exactly one `Risk:` line with one of the four levels, a reason when it is not `read`, and a level that matches what the script is known to do. |
 | `checks/test_integration_helpers.py` | The real-server check `31` acting on a real object: every Admin example it runs must have every real name (`john`, the application, the routes) substituted with a throwaway one. Also the release comparison that decides whether the 5.5-20260924 checks run, and that every example in the newer folders is run by a real-server check. |
 | `checks/test_utils_xml.sh` | The XML helper scripts in `python/utils` (configuration compare and conversion). |
 | `checks/test_feature_version_check.sh` | The version check at the start of every `Features/` example: it must run the example on a server at or after the introducing version, skip it on an older one, and stop with an error when the version cannot be read. Also fails if a feature example has no version check. |
@@ -88,7 +92,9 @@ scripts without a server, which is how the silent JSON corruption described in
 ```
 tests/
     run_all.sh          runs everything in checks/
-    lib/                the stubs: a fake curl, a fake ST API
+    lib/                the stubs: a fake curl, a fake ST API (fake_st.py, for single functions),
+                        a fake requests library with an in-memory server (fake_requests/, run by
+                        run_example.py, for whole scripts), the worlds they serve (example_worlds.py)
     fixtures/           small synthetic inputs. No real data, ever.
     checks/             the checks themselves
     integration/        opt-in checks against a real server. See its README.
@@ -104,7 +110,9 @@ Every new script and every change needs a test in the same change.
    `check_*` or `test_*`, in bash or python, and treats exit code 0 as a pass.
 2. Extend an existing check when one fits:
    - a bash example: `test_bash_payloads.sh`
-   - a python example: `test_python_logic.py`
+   - a python example: `test_python_logic.py` for its functions, `test_python_scripts_run.py` and
+     `test_python_safety.py` for the whole script (a new one goes in the `CASES` list of the first,
+     so it is held to the csrfToken, exit code and failure rules at once)
    - an XML helper: `test_utils_xml.sh`
 3. Use synthetic inputs from `fixtures/`.
 4. Keep it offline and fast. The point is that people actually run it.

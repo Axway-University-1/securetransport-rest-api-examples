@@ -12,70 +12,99 @@
 #  be responsible for any loss or damage to data that is a result of this tool.  #
 ##################################################################################
 #
+# V2.00 Plamen Milenkov  08-Oct-2026  CSRF compliant: the logout sends the csrfToken. Every
+#                                     failure exits 1, a missing or bad date exits 2.
 # V1.01 ian Percival   20-Jun-2023 Fix typo on first line!
 # V1.00 Ian Percival   21-Jul-2022
 #
 # This script will output all accounts created after an input date...
 #
-#
 # APIs used - /myself ( ST login and logout ) POST DELETE
 #             /accounts  GET
 #
-# Usage: python3
+# Usage: python3 stGetAccountsAfterDate.py YYYY-MM-DD
+#
+# Risk: read
+#
+# Notes:
+# - Only user accounts are listed (type=user). An account with no creation date is skipped.
+# - Exit codes: 0 done, 1 anything failed, 2 the date is missing or not YYYY-MM-DD.
 #
 # Outputs:
-#
+#    The accounts, with their creation date, on standard output.
 #
 # Start of Program is 'main' below.
 #   Configuration section is there for you to tailor to your env...
 #
 
+import base64
+import datetime
+import os
+import sys
+
+import requests
+
+from multiprocessing import Value
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
 # All functions are defined below
+
+
+def writeLog(logString, severity):
+    # No log file in this example: the message goes to the screen.
+    print(severity + ' ' + logString)
+
+
+# Send one request. Anything that keeps the call from completing is fatal: the script
+# says what failed and exits 1. An HTTP status is not an exception, so the caller
+# looks at it (see stExpect).
+def stCall(session, method, url, **kwargs):
+    try:
+        response = getattr(session, method.lower())(url, verify=stVerify, timeout=stTimeout, **kwargs)
+    except requests.exceptions.Timeout as et:
+        writeLog('Timeout talking to ' + url + ': ' + str(et), 'FATAL')
+        sys.exit(1)
+    except requests.exceptions.ConnectionError as ec:
+        writeLog('I cannot connect to ' + url + ': ' + str(ec), 'FATAL')
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        writeLog('The request to ' + url + ' failed: ' + str(e), 'FATAL')
+        sys.exit(1)
+    apiCount.value += 1
+    return response
+
+
+# Exit 1 unless the status is the one expected
+def stExpect(response, expected, what):
+    if response.status_code != expected:
+        writeLog(what + ' answered ' + str(response.status_code) + ', not ' + str(expected) +
+                 ': ' + str(response.text)[:300], 'FATAL')
+        sys.exit(1)
 
 
 # This is the ST logout session management
 #
 # This is the ST /myself DELETE method
-
-def writeLog(logString, severity):
-    # No log file in this example: the message goes to the screen. print only,
-    # because this can run in a worker process that has not imported sys
-    print(severity + ' ' + logString)
-
-
-def stLogout(session):
+def stLogout(session, token):
 
     url = stUrl + 'myself'
 
-    headers =  {'Referer': referer,
-                'Accept': 'application/json'}
-    try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error')
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error: ' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        print('\nSession Mgt Logged Out')
-        return True
+    headers = {'Referer': referer,
+               'csrfToken': token,
+               'Accept': 'application/json'}
 
-        # Successful logout response
+    response = stCall(session, 'DELETE', url, headers=headers)
+    stExpect(response, 200, 'Logout')
 
-        # {
-        #     "message" : "Logged out"
-        # }
+    # Successful logout response
+    # {
+    #     "message" : "Logged out"
+    # }
+    print('\nSession Mgt Logged Out')
+    return True
 
 
-# Login to ST using session management
+# Login to ST using session management, and return the csrfToken the server answers with
 #
 # This is the ST /myself POST method
 #
@@ -89,38 +118,22 @@ def stLogin(basicAuth, session):
                'Accept': 'application/json',
                'Authorization': authString}
 
-    try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        print('I cannot connect to ' + stUrl + ' ' + str(ec))
+    response = stCall(session, 'POST', url, headers=headers)
+    stExpect(response, 200, 'Login')
+
+    # Successful login response
+    # {
+    #     "message" : "Logged in"
+    # }
+    if response.json().get('message') != 'Logged in':
+        writeLog('The login did not answer "Logged in"', 'FATAL')
         sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        print('HTTP Error ' + str(eh))
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        print('Timeout Error:' + str(et))
-        sys.exit(1)
-    except requests.exceptions.RequestException as e:
-        print('Unknown Error ' + str(e))
-        sys.exit(1)
-    else:
-        apiCount.value += 1
-        print('Session Mgt Login using /myself: SUCCESS')
-        # print( response.status_code )
-        # print( response.json())
-
-        # Successful login response
-
-        # {
-        #     "message" : "Logged in"
-        # }
-        return True
+    print('Session Mgt Login using /myself: SUCCESS')
+    # Present from the 20230525 release, and to be sent back on every later call
+    return response.headers.get('csrfToken')
 
 
-def stGetAccounts(stUrl, session, count, fromDate):
-
-    global referer
-    global stTimeout
+def stGetAccounts(stUrl, session, token, count, fromDate):
 
     entry = 0
     numberToFetchEachTime = 200
@@ -129,50 +142,39 @@ def stGetAccounts(stUrl, session, count, fromDate):
     numberOfUserAccounts = 0
 
     headers = {'Referer': referer,
+               'csrfToken': token,
                'Accept': 'application/json'}
-
 
     while keepLooping:
 
         url = stUrl + 'accounts?type=user&offset=' + str(entry) + '&limit=' + str(numberToFetchEachTime)
 
-        try:
-            response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
-        except requests.ConnectionError as ec:   
-            writeLog('I cannot connect to ' + stUrl, 'FATAL')
-            writeLog(str(ec),'FATAL')
-            sys.exit(1)
-        except requests.exceptions.HTTPError as eh:
-            writeLog('HTTP Error','FATAL')
-            sys.exit(1)
-        except requests.exceptions.Timeout as et:
-            writeLog('Timeout Error:' + str(et),'FATAL')
-            sys.exit(1)
-        except requests.exceptions.RequestException as e:
-            sys.exit(1)
-        else:
-            count.value+=1
-            jsonResponse = response.json()
-            jsonAccounts = jsonResponse["result"]
+        response = stCall(session, 'GET', url, headers=headers)
+        stExpect(response, 200, 'Reading the accounts')
 
-            if len(jsonAccounts) == 0:
-                keepLooping = False
+        jsonAccounts = response.json().get('result', [])
+
+        if len(jsonAccounts) < numberToFetchEachTime:
+            keepLooping = False
+
+        for item in jsonAccounts:
+            stUserAccount = item.get('name')
+            createDate = item.get('accountCreationDate')
+            if createDate is None:
                 continue
+            createDate = datetime.datetime.fromtimestamp(float(createDate) / 1000.)
 
-            for item in jsonAccounts:
-                stUserAccount = item.get("name")
-                createDate = item.get("accountCreationDate")  
-                createDate = datetime.datetime.fromtimestamp(float(createDate)/1000.)
+            if createDate < fromDate:
+                continue
+            print(stUserAccount, ' has creation date: ', createDate)
+            numberOfUserAccounts += 1
 
-                if createDate < fromDate:
-                    continue
-                print(stUserAccount," has creation date: ", createDate)
-                numberOfUserAccounts+=1
+        entry += numberToFetchEachTime
 
-            entry+=numberToFetchEachTime
+    print('There were: ', numberOfUserAccounts, ' created in this time period')
+    return numberOfUserAccounts
 
-    print("There were: ", numberOfUserAccounts, " created in this time period")
-    return
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # MAIN = Start of Program....
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -180,30 +182,20 @@ def stGetAccounts(stUrl, session, count, fromDate):
 
 if __name__ == "__main__":
 
-    import base64
-    import datetime
-    import json
-    import multiprocessing
-    import os
-    import requests
-    # import ssl
-    # import string
-    import sys
-
-    from multiprocessing import Process, Value, Queue
-    #from requests.auth import HTTPBasicAuth
-    from requests.packages.urllib3.exceptions import InsecureRequestWarning
-
-    global referer
-    global stTimeout
-
+    try:
+        fromDate = datetime.datetime.strptime(sys.argv[1], "%Y-%m-%d")
+    except IndexError:
+        print('Please provide argument 1 to list all accounts created after date X in format YYYY-MM-DD')
+        sys.exit(2)
+    except ValueError:
+        print('The date must be in format YYYY-MM-DD, not ' + sys.argv[1])
+        sys.exit(2)
 
     # --------------------------------------------------------------------------------
     # BEGIN Configuration Section
     # --------------------------------------------------------------------------------
     # Please modify the below to match your environment
 
-    #logFile = 'updateConfig.log'  # We won't use a logFile for this example
     stTimeout = 60  # in seconds
     referer = 'THIS_IS_A_RANDOM_TEXT'
 
@@ -223,7 +215,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -232,7 +224,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -245,20 +240,6 @@ if __name__ == "__main__":
     # END Configuration Section
     # -------------------------------------------------------------------------------
 
-    try:
-        fromDate = sys.argv[1]
-    except IndexError:
-        errText = 'Please provide argument 1 to list all accounts created after date X in format YYYY-MM-DD'
-        print(errText)
-        sys.exit(0)
-    fromDate = datetime.datetime.strptime(fromDate, "%Y-%m-%d")
-    
-
-    print('Running on a system with: ' + str(multiprocessing.cpu_count()) + ' CPUs')
-    if os.name == 'posix' and hasattr(os, 'sched_getaffinity'):
-        # sched_getaffinity is Linux only - os.name == 'posix' is also true on
-        # macOS and BSD, where this raised AttributeError - confirmed directly.
-        print('We can use: ' + str(os.sched_getaffinity(0)) + ' of these')
     outputString = 'Starting at: ' + str(datetime.datetime.now())
     print(outputString)
 
@@ -266,23 +247,18 @@ if __name__ == "__main__":
     apiCount = Value('i', 0)
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session....
     sessionMgt = requests.Session()
 
     # We'll use session management and login to ST via /myself
-    if not stLogin(basicAuth, sessionMgt):
-        print("Something nasty! Couldn't login to ST")
-        sys.exit(1)
+    csrftoken = stLogin(basicAuth, sessionMgt)
 
-    stGetAccounts(stUrl, sessionMgt, apiCount, fromDate)
+    stGetAccounts(stUrl, sessionMgt, csrftoken, apiCount, fromDate)
 
-
-
-
-
-    stLogout(sessionMgt)
+    stLogout(sessionMgt, csrftoken)
     print('I issued: ' + str(apiCount.value) + ' APIs')
     outputString = 'Ending at: ' + str(datetime.datetime.now())
     print(outputString)

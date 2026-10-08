@@ -80,6 +80,12 @@ this check touches anything, and is left alone throughout, matching its
 original state without this check needing to do anything about it
 specifically.
 
+stGraceful.py stops nothing without --yes, which this check gives; it also stops a daemon
+by daemon=<protocol> (it used to send a serverName=, which the reference does not give that
+endpoint), so a daemon stop here is the first time that call is made against a real server.
+The offline tests (tests/checks/test_python_graceful.py) run the whole script against a fake
+server instead, and are what covers it day to day.
+
 Needs --write, st_allow_writes="yes" (same as 04.accounts_scripts.py), AND
 --i-understand-this-can-disrupt-live-service on the command line - three
 separate, deliberate opt-ins for one script, because two were not enough to
@@ -194,9 +200,9 @@ c.info("original TM status: %s" % original_tm)
 with open(SCRIPT) as f:
     source = f.read()
 old_tm_block = (
-    "    if getTransactionManagerStatus(sessionMgtCore, stUrlCore): \n"
+    "    if getTransactionManagerStatus(coreSession, coreUrl, coreToken):\n"
     "        print('The TM is still running')\n"
-    "        stopTransactionManager(sessionMgtCore, stUrlCore, gtime)   \n"
+    "        stopTransactionManager(coreSession, coreUrl, coreToken, gtime)\n"
 )
 if old_tm_block not in source:
     c.check("found the Transaction Manager stop block in stGraceful.py to remove it", False)
@@ -204,7 +210,7 @@ if old_tm_block not in source:
     sys.exit(c.done())
 c.check("found the Transaction Manager stop block in stGraceful.py to remove it", True)
 new_tm_block = (
-    "    if getTransactionManagerStatus(sessionMgtCore, stUrlCore):\n"
+    "    if getTransactionManagerStatus(coreSession, coreUrl, coreToken):\n"
     "        print('The TM is still running - NOT stopping it, no confirmed way to '\n"
     "              'start it again via the API (see the check that made this copy)')\n"
 )
@@ -216,7 +222,7 @@ try:
             # No short timeout here on purpose - see this file's own
             # docstring for why killing this script mid-run is exactly what
             # caused the incident this rewrite responds to.
-            result = runner.run_python(copy, args=[GTIME], timeout=600)
+            result = runner.run_python(copy, args=[GTIME, "--yes"], timeout=600)
             c.check("stGraceful.py runs without a shell level error "
                     "(Transaction Manager stop removed)", result.returncode == 0,
                     result.stderr.strip()[-500:] if result.returncode else "")

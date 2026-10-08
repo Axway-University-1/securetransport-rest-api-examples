@@ -24,6 +24,8 @@
 #
 # Usage: python3 08.transferSites_dynamicProperties.py
 #
+# Risk: write - creates a throwaway transfer site on the account john and deletes it again, by the id it was created with; a site that was there already is never deleted
+#
 # Notes:
 # - Confirmed directly against a real server: a site's host and
 #   downloadPattern fields accept and store the literal template text
@@ -46,33 +48,33 @@ import el_client  # noqa: E402
 
 config = el_client.load_config()
 client = el_client.ELClient(config)
+created = []
 
 NAME = "ZZTEST_EL_dynamicSite"
 
-print("Creating %s with templated host and downloadPattern fields..." % NAME)
-response = client.post("sites", {
-    "name": NAME,
-    "type": "http",
-    "protocol": "http",
-    "account": "john",
-    "host": "${DXAGENT_TRANSFERSAPI_SERVER}",
-    "port": "443",
-    "downloadPattern": "${DXAGENT_TRANSFERSAPI_FILE}",
-    "uploadFolder": "/",
-    "userName": "john",
-})
-print(response.status_code)
+try:
+    print("Creating %s with templated host and downloadPattern fields..." % NAME)
+    response = client.post("sites", {
+        "name": NAME,
+        "type": "http",
+        "protocol": "http",
+        "account": "john",
+        "host": "${DXAGENT_TRANSFERSAPI_SERVER}",
+        "port": "443",
+        "downloadPattern": "${DXAGENT_TRANSFERSAPI_FILE}",
+        "uploadFolder": "/",
+        "userName": "john",
+    })
+    print(response.status_code)
+    # A site of that name that is there already is refused: it is not ours, so stop
+    client.expect(response, [201], "Creating " + NAME)
+    client.track(created, "sites", response, NAME)
 
-print("\nReading it back - both fields should still hold the literal template text:")
-response = client.get("sites", params={"name": NAME, "fields": "name,host,downloadPattern"})
-print(response.text)
+    print("\nReading it back - both fields should still hold the literal template text:")
+    response = client.get("sites", params={"name": NAME, "fields": "name,host,downloadPattern"})
+    client.expect(response, [200], "Reading " + NAME)
+    print(response.text)
 
-print("\nCleaning up the throwaway site...")
-response = client.get("sites", params={"name": NAME, "fields": "id"})
-result = response.json().get("result", [])
-if result:
-    site_id = result[0]["id"]
-    client.delete("sites/" + site_id)
-    print("deleted %s (%s)" % (NAME, site_id))
-
-client.logout()
+    print("\nCleaning up the throwaway site...")
+finally:
+    client.finish(created)

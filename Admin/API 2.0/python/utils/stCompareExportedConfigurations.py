@@ -32,6 +32,11 @@
 # Usage:
 #    python3 stCompareExportedConfigurations.py filename1 filename2
 #
+# Risk: read - it reads two files on this machine and sends nothing to a server
+#
+# Exit codes: 0 done (differences are the output, not an error), 1 a file cannot be read or
+# is not XML, 2 a file name is missing.
+#
 # Outputs:
 #    The differences, on standard output, in three groups: options whose value
 #    differs, options only in the first file, and options only in the second.
@@ -139,14 +144,14 @@ if __name__ == "__main__":
     except IndexError:
         print('Please enter the Filename of the first exported Server Config XML')
         print('Usage: python3 stCompareExportedConfigurations.py filename1 filename2')
-        sys.exit(0)
+        sys.exit(2)
 
     try:
         sourceFile2 = sys.argv[2]
     except IndexError:
         print('Please enter the Filename of the second exported Server Config XML')
         print('Usage: python3 stCompareExportedConfigurations.py filename1 filename2')
-        sys.exit(0)
+        sys.exit(2)
 
     writeLog('Starting at ' + str(datetime.datetime.now()), 'INFORMATION')
 

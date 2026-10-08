@@ -29,6 +29,8 @@
 #
 # Usage: python3 01.loginRestrictionPolicy_sessionExpression.py
 #
+# Risk: write - creates a throwaway login restriction policy, adds a rule to it and deletes it again; a policy of that name that is there already is never touched
+#
 # Notes:
 # - Confirmed directly against a real server: POST /loginRestrictionPolicies
 #   requires "type" (ALLOW_THEN_DENY or DENY_THEN_ALLOW) and a policy starts
@@ -38,6 +40,8 @@
 #   parameter serializes this dict correctly no matter what characters the
 #   expression string contains, since it is just a Python string, not
 #   something assembled as literal JSON text by hand.
+# - Exit codes: 0 done, 1 anything failed, and nothing is deleted that this run did not create:
+#   when the policy is there already the POST is refused and the script stops.
 #
 import os
 import sys
@@ -49,32 +53,38 @@ POLICY = "ZZTEST_EL_sessionLimit"
 
 config = el_client.load_config()
 client = el_client.ELClient(config)
+created = []
 
-print("Creating a throwaway login restriction policy...")
-response = client.post("loginRestrictionPolicies", {"name": POLICY, "type": "ALLOW_THEN_DENY"})
-print(response.status_code, response.text)
+try:
+    print("Creating a throwaway login restriction policy...")
+    response = client.post("loginRestrictionPolicies", {"name": POLICY, "type": "ALLOW_THEN_DENY"})
+    print(response.status_code, response.text)
+    # Not a 201 means the policy was not made by this run (it may be there already): stop,
+    # and leave whatever is there alone.
+    client.expect(response, [201], "Creating " + POLICY)
+    client.track(created, "loginRestrictionPolicies", response, POLICY, key=POLICY)
 
-print("\nAdding a rule that only allows login while fewer than 4 sessions are active...")
-response = client.patch("loginRestrictionPolicies/" + POLICY, [{
-    "op": "add",
-    "path": "/rules/0",
-    "value": {
-        "name": "sessions fewer than 4",
-        "isEnabled": True,
-        "type": "ALLOW",
-        "clientAddress": "*",
-        "expression": "${currentSessions <= 3}",
-        "description": "Only allow if less than 4 sessions",
-    },
-}])
-print(response.status_code)
+    print("\nAdding a rule that only allows login while fewer than 4 sessions are active...")
+    response = client.patch("loginRestrictionPolicies/" + POLICY, [{
+        "op": "add",
+        "path": "/rules/0",
+        "value": {
+            "name": "sessions fewer than 4",
+            "isEnabled": True,
+            "type": "ALLOW",
+            "clientAddress": "*",
+            "expression": "${currentSessions <= 3}",
+            "description": "Only allow if less than 4 sessions",
+        },
+    }])
+    print(response.status_code)
+    client.expect(response, [204], "Adding the rule")
 
-print("\nReading the policy back...")
-response = client.get("loginRestrictionPolicies/" + POLICY)
-print(response.text)
+    print("\nReading the policy back...")
+    response = client.get("loginRestrictionPolicies/" + POLICY)
+    client.expect(response, [200], "Reading the policy")
+    print(response.text)
 
-print("\nCleaning up the throwaway policy...")
-response = client.delete("loginRestrictionPolicies/" + POLICY)
-print(response.status_code)
-
-client.logout()
+    print("\nCleaning up the throwaway policy...")
+finally:
+    client.finish(created)

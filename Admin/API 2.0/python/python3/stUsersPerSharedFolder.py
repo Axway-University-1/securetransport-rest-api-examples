@@ -38,6 +38,11 @@
 #
 # Usage: python3 stUsersPerSharedFolder.py
 #
+# Risk: read
+#
+# Notes:
+# - Exit codes: 0 done, 1 anything failed.
+#
 # Outputs:
 #    One block per shared folder, listing the accounts that subscribe to it,
 #    on standard output.
@@ -61,7 +66,7 @@ def stLogout(session, token):
                'csrfToken': token,
                'Accept': 'application/json'}
     try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.delete(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -75,8 +80,11 @@ def stLogout(session, token):
         print('Unknown Error: ' + str(e))
         sys.exit(1)
     else:
-        print('Session Mgt Logged Out')
         numAPIs.value += 1
+        if response.status_code != 200:
+            print('Logout answered ' + str(response.status_code))
+            sys.exit(1)
+        print('Session Mgt Logged Out')
         return True
 
 
@@ -95,7 +103,7 @@ def stLogin(basicAuth, session):
                'Authorization': authString}
 
     try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.post(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -135,7 +143,7 @@ def stGetPage(session, csrftoken, collection, offset, limit):
                'Accept': 'application/json'}
 
     try:
-        response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.get(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + url + ' ' + str(ec))
         sys.exit(1)
@@ -265,7 +273,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -274,7 +282,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -290,7 +301,8 @@ if __name__ == "__main__":
     numAPIs = Value('i', 0)                  # counter to see how many APIs we sent
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session....
     sessionMgt = requests.Session()

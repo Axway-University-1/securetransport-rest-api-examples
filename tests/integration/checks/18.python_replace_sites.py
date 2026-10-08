@@ -36,6 +36,10 @@ inert, cosmetic side effect of PUT on this object type - not something
 special to this script - and is not asserted on. keyExchangeAlgorithms and
 password are asserted on, since those are what matters.
 
+stReplaceSites.py is a dry run unless given --apply. This check runs it both ways:
+without --apply nothing may change on any site (compared with the saved copy), with it
+every site is replaced as described.
+
 Needs tests/local/pyvenv - see 15.python_read_scripts.py's docstring.
 
 Needs --write and st_allow_writes="yes", same as 04.accounts_scripts.py.
@@ -87,9 +91,17 @@ backups = {s["id"]: client.get("sites/" + s["id"]).json() for s in sites}
 try:
     with runner.real_credentials_python(PY_TREE, config):
         result = runner.run_python(SCRIPT, timeout=120)
-        c.check("stReplaceSites.py runs without a shell level error",
+        c.check("stReplaceSites.py without --apply is a dry run: exit 0, and says it changed nothing",
+                result.returncode == 0 and "DRY RUN" in result.stdout and "Successfully" not in result.stdout,
+                (result.stdout + result.stderr)[-300:])
+        unchanged = all((client.get("sites/" + i).json() or {}).get("keyExchangeAlgorithms") == o.get("keyExchangeAlgorithms")
+                        for i, o in backups.items())
+        c.check("and no site changed", unchanged)
+
+        result = runner.run_python(SCRIPT, ["--apply"], timeout=120)
+        c.check("stReplaceSites.py --apply runs without a shell level error",
                 result.returncode == 0,
-                result.stderr.strip()[-300:] if result.returncode else "")
+                (result.stdout + result.stderr).strip()[-300:] if result.returncode else "")
 
     for site_id, original in backups.items():
         name = original.get("name")

@@ -26,18 +26,23 @@ This document tracks the systematic improvements to the examples repository iden
 
 ## Remaining Work (Organized by Priority)
 
-### Priority 1c: Dangerous script defaults (HIGH RISK - 5 scripts)
-These scripts change the server when run with default arguments:
+### Priority 1c: Dangerous script defaults - DONE for the 14 scripts below (bash, bat twin, offline tests, lab checks)
+These scripts changed the server when run with default arguments. Each now defaults to an `example_*` object or requires
+its input (exit 2, nothing sent), prints `HTTP <code>`, exits 1 on a refusal and prints the old value and how to put it back:
 
-| Script | Issue | Fix |
-|--------|-------|-----|
-| `02.myself_PATCH.sh` | Changes admin password to placeholder | Require `$1` (new password) or exit 2 |
-| `03.daemons_name_PUT.sh` | Modifies real daemon settings | Require daemon name + values as args |
-| `04.daemons_name_PATCH.sh` | Patches daemon | Require daemon + values as args |
-| `05.daemons_operations_POST.sh` | Stops SSH daemon forever | Require daemon + operation + confirmation word |
-| `13.configurations_PATCH.sh` | Writes placeholder client secrets | Require env vars for all 10 settings |
+| Script | Now |
+|--------|-----|
+| `02.Introduction/04.myself_PATCH.sh` | needs `ST_NEW_PASSWORD` (exit 2 without it) |
+| `03.Connect/03.daemons_name_PUT.sh`, `04.daemons_name_PATCH.sh` | need the daemon and the values as arguments |
+| `03.Connect/05.daemons_operations_POST.sh` | needs the daemon, the operation and, for a stop, `stop-the-<daemon>-daemon` |
+| `13.Configurations/01.configurations_PATCH.sh` | needs the new value (and optionally the option) |
+| `13.Configurations/02.configurations_PATCH_UsageReporting.sh` | needs ten `ST_USAGE_*` variables, none a placeholder |
+| `05.Accounts/02` to `07` (7 scripts) | act on `example_user`, `example_service`, `example_template` |
+| `04.Applications/02` to `07` (6 scripts) | act on `example_humansystem` and `example_filepurge` (no schedule unless asked) |
 
-**Testing:** Verify each rejects with exit 2 when args missing.
+**Testing:** `tests/checks/test_bash_admin_api.sh` (bare run exits 2 and sends nothing, the exact bodies, the HTTP code, exit 1
+on a refusal, the old value printed); integration checks 04, 05, 13, 14, 21 on the lab (23, which stops daemons, was updated for the
+new arguments and not run). The `.bat` twins cannot be run on macOS: they were re-read against the bash ones.
 
 ### Priority 1d: Exit codes (88 bash + 79 bat scripts)
 Most scripts ignore HTTP errors and always exit 0. Fix pattern:
@@ -55,7 +60,7 @@ HTTP_CODE=$(curl ... -w "\n%{http_code}" ... | tail -1)
 | File | Issue | Fix |
 |------|-------|-----|
 | `03.Connect/11.servers_name_PATCH.bat` | PATCH sends object, not array | Use `ConvertTo-Json -InputObject @(...)` |
-| `04.Applications/02.applications_POST.bat` | PowerShell null bug (IF "%NAME%"=="null") | Use `if ($null -eq $var)` |
+| `04.Applications/02.applications_POST.bat` | PowerShell null bug (IF "%NAME%"=="null") | DONE: rewritten with subroutines, no null compare, no block variable read |
 | `90.Acknowledgment.bat` | Unquoted URL has &, Get-Date broken | Quote safely, fix format string |
 | `90.IteratePesitInbounds.bat` | Double CALL expansion corrupts URL | Use `%~2` not `%2` |
 

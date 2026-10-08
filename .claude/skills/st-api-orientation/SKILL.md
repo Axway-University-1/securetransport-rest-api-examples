@@ -132,17 +132,19 @@ whole programs for jobs you would actually run against an estate:
 | `stReplaceSites.py` | Update the cipher suites on SSH transfer sites |
 | `stCertificateExpiry.py` | Count certificates and report expired and expiring ones |
 | `stBillableTransfers.py` | Count billable transfers per day, for every account or one. Needs 5.5-20260924 or later |
-| `stGetPrivateCert.py` | Export a certificate by ID. Needs `requests_toolbelt` |
+| `stGetPrivateCert.py` | Export a certificate and its private key by ID, as a PKCS#12 file (mode 0600); the password is read from `ST_EXPORT_PASSWORD` or a prompt |
 | `stAddLoginRestrictionRule.py` | Add a rule to a login restriction policy |
 | `stConfigScan.py` | Baseline the server config, then report drift. Useful after a patch |
 | `stGraceful.py` | Drain and shut down a core plus edge pair |
 | `utils/stCompareExportedConfigurations.py` | Diff two exported `systemConfiguration.xml` files |
 | `utils/processSystemConfig.py` | Convert 5.2.1 user classes to the 5.5 expression format, optionally creating them |
 
-**The four scripts that change many objects at once — `stUpdateAllRoutes.py`,
-`stUpdateAllSubscriptions.py`, `stUpdateRouteWithPut.py` and
+**The eight scripts that change many objects at once — `stUpdateAllRoutes.py`,
+`stUpdateAllSubscriptions.py`, `stUpdateRouteWithPut.py`, `stUpdateAllAccounts.py`,
+`stReplaceSites.py`, `stBuildTestAccounts.py`, `stDeleteTestAccounts.py` and
 `utils/processSystemConfig.py` — default to a dry run.** Leave that on for the
-first run and read the output. They tell you exactly what they would send.
+first run and read the output. They tell you exactly what they would send; `--apply`
+makes them send it. `stGraceful.py` stops nothing without `--yes`.
 
 ## Configuration: four variables, one name everywhere
 
@@ -187,7 +189,6 @@ Every script resolves its own directory, so it runs from anywhere:
 | `jq` | the bash examples that read, build or edit JSON. Each one says so in its header |
 | PowerShell | the bat examples, in place of `jq` |
 | `python3` plus `requests` | the python examples |
-| `requests_toolbelt` | `stGetPrivateCert.py` only |
 
 ## What is not covered
 

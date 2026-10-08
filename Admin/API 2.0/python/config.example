@@ -30,3 +30,28 @@ st_password="change_me"
 # core plus edge deployment. It defaults to st_server when not set.
 #
 #st_edge_server="edge.example.com"
+
+#
+# Optional. Check the server's TLS certificate. By default the examples do not
+# check it (a lab server usually has a self signed one), which also means they
+# would talk to anything that answers on that address. For a server you do not
+# fully control, give the file that holds its certificate authority (a PEM
+# file), or say yes to check against the certificate authorities of this machine.
+#
+#st_ca_bundle="/path/to/ca-bundle.pem"
+#st_verify="yes"
+
+#
+# Optional. Only stUpdateAllAccounts.py uses this: the combined private key and
+# certificate (unencrypted, one PEM file) it logs in with. A relative path is
+# read from the folder of this file. When it is not set the script looks for
+# ST_API_client.pem next to itself.
+#
+#st_client_cert="ST_API_client.pem"
+
+#
+# Optional. Only stConfigScan.py uses this: where it writes and reads the
+# baseline of the server's options (JSON). The command line wins over it. When
+# it is not set the file is stConfig.baseline next to the script.
+#
+#st_config_baseline="/path/to/stConfig.baseline"

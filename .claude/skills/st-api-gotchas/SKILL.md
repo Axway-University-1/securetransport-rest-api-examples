@@ -85,9 +85,17 @@ it is on:
 1. `POST /myself` returns a `csrfToken` **response header**.
 2. Every later call in the session must send it back as a `csrfToken` header.
 
-The python examples do this. Any script written before that release will fail
-against a current server until it is updated. This is the single most common
-reason an old script stops working.
+Every python example that keeps a session does this: the token is read from the
+login's response header and sent on every later call, the logout included. This
+was **not** true of all of them until `tests/checks/test_python_scripts_run.py`
+was written: `stGraceful.py`, `stAddLoginRestrictionRule.py`, `stUpdateAllAccounts.py`
+and the logout of `stGetAccountsAfterDate.py` sent no token, and nothing showed
+it, because the lab accepts a cookie-based write without one (see below). That
+test runs each script against a fake server (`tests/lib/fake_requests`) that
+refuses a write with no valid `csrfToken`, a call with no `Referer` or another
+one than the login's, and a call with no timeout. Any script written before the
+20230525 release will fail against a current server until it is updated. This is
+the single most common reason an old script stops working.
 
 **Confirmed directly against a real, CSRF-enabled server: this only applies to
 session-cookie authentication.** A bare call carrying a fresh `Authorization:
@@ -180,9 +188,12 @@ Confirmed directly: `{"op":"replace","path":"/addressBookSettings/policy","value
 400s with `"addressBookSettings.sources must be at least two."` on an account
 whose `sources` array has fewer than two entries. An LDAP-integrated account
 normally has two by default (LDAP and Local, per the comment in
-`06.accounts_name_PATCH.sh`); a plain account created fresh through the API
-does not. The shipped script never checks this call's response code, so the
-failure is silent rather than a shell-level error.
+`06.accounts_name_PATCH.sh`); an account created fresh through the API had
+fewer when this was written. On 5.5-20260924 a user account created through
+`POST /accounts` already has both, and the change to "custom" is 204. The script no
+longer ignores the call's status: it reads the sources first, skips the change to
+custom, and says so, when there are fewer than two, and stops at the first patch the
+server refuses (exit 1).
 
 ## Paging: ask for a page size and compare the return count
 
@@ -298,10 +309,20 @@ confirmed directly:
   a real, disposable, freshly generated key.
 
 Separately confirmed while chasing an unrelated 403 down: the `password`
-query parameter `stGetPrivateCert.py` sends on the *export* call
-(hardcoded `12345678`) is not validated against anything at all - it is the
-passphrase the exported file gets encrypted with, freely chosen by the
-caller. Only the two `caPassword` uses above are gated by the real secret.
+query parameter `stGetPrivateCert.py` used to send on the *export* call
+(`GET /certificates/{id}?exportPrivateKey=true`, hardcoded `12345678`) is not
+validated against anything at all - it is the passphrase the exported file gets
+encrypted with, freely chosen by the caller. Only the two `caPassword` uses above
+are gated by the real secret.
+
+That password was in the URL, which servers and proxies log, and was printed. The
+script now uses `POST /certificates/{id}/operations?operation=export&format=pkcs12`
+with the password as a multipart form field (`exportPassword`), read from
+`ST_EXPORT_PASSWORD` or a prompt. Confirmed directly (5.5-20260924, a certificate
+generated for the test and deleted): it answers 200, `application/octet-stream`,
+a PKCS#12 file that `openssl pkcs12 -info` opens with that password and shows a
+"Shrouded Keybag" (the private key) and the certificate; without the field 400;
+with `Accept: application/json` 406.
 
 ## stBuildFullTestAccount.py hardcoded the wrong account name in two places
 
@@ -373,20 +394,26 @@ every value except `"ssh"` with a 400
 (`"Invalid value for parameter name, expected (ssh)"`), regardless of which
 of the others exist or are running. This is not one hardcoded example among
 several equally valid choices, the way an account or application name is -
-`03.daemons_name_PUT.sh` and `04.daemons_name_PATCH.sh` hardcode `NAME="ssh"`
-because that is the only name this endpoint will ever address. There is no
-"test daemon" to redirect either script at.
+`03.daemons_name_PUT.sh` and `04.daemons_name_PATCH.sh` used to hardcode `NAME="ssh"`
+because that is the only name this endpoint will ever address; they now take the
+daemon as an argument (with the values), and `http` and the others are refused by the
+server on the read, which the script shows (exit 1). There is no "test daemon" to
+redirect either script at. See "Older examples made safe to run bare" below for the
+status codes and ranges seen.
 
 ## Fields that are specific to one account type need the type
 
 Asking for a type-specific field without saying which type returns nothing:
 
 ```
-GET /accounts/UserAccount?fields=addressBookSettings           # empty
-GET /accounts/UserAccount?type=user&fields=addressBookSettings # works
+GET /accounts/example_user?fields=addressBookSettings           # empty, or a 400
+GET /accounts/example_user?type=user&fields=addressBookSettings # works
 ```
 
-The `type` is always returned whether you ask for it or not.
+The `type` is always returned whether you ask for it or not. Confirmed on
+5.5-20260924: the first call is a **400** "Field addressBookSettings does not exist.",
+not an empty answer, and the whole object read with no `fields=` carries
+`addressBookSettings` whatever the `type`.
 
 ## HEAD is the cheap existence check
 
@@ -422,10 +449,13 @@ Confirmed directly: a server rejected a second application of type
 under a different name than the one that already existed. This applies to
 every entry in `04.Applications`'s `MAINTENANCE_APPLICATIONS` list - only one
 `AccountFilePurge`, one `AuditLogMaint`, one `TransferLogMaint`, and so on, can
-exist at a time. Check by **type** before creating one, the same way
-`02.applications_POST.sh` already checks the flow type before creating that -
-checking only by name is not enough, since a differently named instance of the
-same type still gets rejected.
+exist at a time. Check by **type** before creating one, which is what
+`02.applications_POST.sh` does for its `example_filepurge` (it says so, and creates none,
+when one exists under any name) - checking only by name is not enough, since a
+differently named instance of the same type still gets rejected. The lab has one
+(`FileMaintenanceApp`, not ours), so the creation of `example_filepurge` was never seen there:
+the server refuses it with or without a schedule, 400 "Application of type AccountFilePurge
+already exists. Only one instance of this type is allowed."
 
 Different maintenance types also have genuinely different schemas - this is
 not just a naming collision to work around by picking another name of the
@@ -524,6 +554,25 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
 - **A role's menus come back in no fixed order.** `add` to `/menus/-` adds
   the menu, not necessarily at the end. `DELETE /administrativeRoles/{name}?targetRoleName=`
   moves the role's administrators to that role.
+- **Accounts: the type filter is `type=`, and `accountType=` is ignored.**
+  Confirmed directly (5.5-20260924): `GET /accounts?accountType=user`,
+  `accountType=template` and `accountType=nonsense` all answer every account, while
+  `type=template` answers the templates only and `type=nonsense` is 400 "Unknown name
+  value [nonsense] for enum class". `stDeleteTestAccounts.py` listed with `accountType=user`,
+  so a template or service account whose name matched was in its list too (the lab had no
+  such accounts, so it could not do harm there). It now sends `type=user`, and also looks at
+  each account's `type` itself.
+- **`GET /servers?fields=isActive` still names the protocol**: each entry is
+  `{"protocol": ..., "isActive": ...}` (add `serverName` to `fields=` for the name), as an
+  account list always carries `type`. Confirmed directly, a read. `stGraceful.py` reads the protocol out
+  of it; there are two `http` servers on the lab, so one protocol can list several.
+- **`POST /daemons/operations` takes `daemon=<protocol>`**, as the reference says
+  and `23.connect_operations_scripts.py` uses (`operation=stop&daemon=as2`). `stGraceful.py`
+  used to send `serverName=`, a parameter of `/servers/operations`, which that endpoint does not
+  list, and the reference says a stop with no `daemon` is every daemon. **Not run on the lab**
+  (a stop cannot be taken back, see "A graceful stop with a timeout keeps running server-side"):
+  this is from the reference and from check 23, and the fake server of the offline tests
+  behaves as the reference says.
 - **Business units:** `baseFolder=` as a filter is ignored (every value gives
   every unit). `parent` reads null even for a nested unit; the nesting shows in
   `businessUnitHierarchy` and `metadata.links.parentBusinessUnit`, and
@@ -944,6 +993,37 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   that is not there is 404, GET one a JSON 404, HEAD a bodiless 404. The effect behind a real edge (routing, `isAutoDiscoverable`, a proxy in use)
   was **not seen**. The `networkZone` fields met elsewhere (`testConnection` of `/statisticsSummary`, and `s3NetworkZone` and the other storage
   profile ones, "network zone name to use for proxying connections") name a zone the connection is to go through; that was not run through a real edge either.
+- **Older examples made safe to run bare** (`02.Introduction/04`, `03.Connect/03` to `05`,
+  `04.Applications`, `05.Accounts`, `13.Configurations/01` and `02`; checks 04, 05, 13, 14, 21, 23).
+  They used to change real or server wide things with no argument, ignore the HTTP status and exit 0;
+  they now default to `example_*` objects or require their input (exit 2, nothing sent), print `HTTP <code>`,
+  exit 1 on a refusal and print the old value and how to put it back. What was seen on the lab on the way:
+  **`PATCH /myself`** answers 204, and the old password stops working at once while the new one works at once;
+  the same password again is 204; a one letter password is accepted (no complexity rule on the admin) and an
+  empty one is 400 "password cannot be empty"; only `/passwordCredentials/password` and
+  `/preferredFileTrackingColumns` can be patched on it (400 "Patch operation is allowed only on fields ...");
+  a wrong current password is a plain 401. **`PUT /daemons/ssh`** is 204; `maxConnections` outside 1 to 100000 is 400
+  "should be in the range from 1 to 100000" (also for 0 and -10), text is 400 "Cannot parse 'abc' to int." and
+  the text "12" is accepted; `preferBouncyCastleProvider` text is 400; **a PUT with the `banner` left out or null is a
+  bare 403** "unable to comply" (not a 400), an empty one is fine; an unknown field is 400 "Unsupported parameter";
+  a changed configuration takes effect when the daemon restarts (the reference), which was not tried. PATCH
+  `replace` of each of the three fields is 204 and a path that does not exist is 400 `Missing field`.
+  **`PATCH /configurations/options/{name}`**: `replace` of `/values/0` and of `/values` are both 204, an unknown
+  option is 400 "Option with name ... does not exist." on the PATCH and 404 on the GET, the value is not checked
+  against what the option means (the text "abc" was accepted for the number of days), a value sent to an encrypted
+  option is stored encrypted and **differently each time**, while its own `{AES128}...` text sent back is kept as it is
+  (so a restore from the printed old value is exact). **Accounts**: a creation is 201 with `Location`, a duplicate is
+  409 "The account name is not unique."; a PUT of the object as read is 204 (also when read without a `type`);
+  a PATCH `replace` of `nonAddressBookCollaborationAllowed` takes the text "true" or the boolean; a business unit that does
+  not exist is 404 "Business unit with name X not found or not accessible."; a user account created through the API has the
+  LDAP and Local address book sources. **Applications**: a flow application is created with only `type`, `name` and `notes`
+  (201), a duplicate name is 400; a PUT of the object as read is 204; a `schedules` list is only there for maintenance types,
+  and `startDate` reads back as the **epoch in milliseconds, as text**; PATCH `replace` of `/schedules/0/startDate` with a date
+  in the past (the 2025 date the old example sent) is 400 "startDate occurs before the current moment."; the server derives the
+  schedule's `executionTimes` from the time of day of the start date in **its own time zone** (00:00:00Z on a +03:00 server read
+  back as `["03:00"]`), and sending the old date back, as the ISO date taken from the milliseconds, restores both exactly; on an
+  application with no schedules the path is 400 `Missing field "schedules"`.
+
 - **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
   the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
   An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST
@@ -1472,13 +1552,27 @@ than as arguments - fine on Linux, whose default start method is `fork`
 re-imports the module fresh, so anything set only inside the parent's
 `__main__` guard was never set in the child at all).
 
-If a function is going to run in its own process, either pass it everything
-it needs as arguments and have it use only those - not a same-named helper
-that reaches for a global - or seed the globals explicitly at the top of the
-function via `globals()['name'] = value` before calling anything that
-depends on them (works because `global name` cannot coexist with a parameter
-of the same name, which is exactly the shape this trap takes: the value
-you need is sitting right there in the argument list).
+If a function is going to run in its own process, pass it everything it needs
+as arguments and have it use only those - not a same-named helper that reaches
+for a global. `stBuildTestAccounts.py` and `stDeleteTestAccounts.py` now hand
+each worker one plain dictionary (the URL, the Referer, the timeout, the
+certificate check, the Authorization value) and import `requests` and `sys` at
+the top of the file, so a worker that starts fresh has them. An earlier fix seeded
+the globals in the worker with `globals()['name'] = value`, which works but hides
+the dependency; a name that is both a global and a parameter cannot be declared
+`global`, which is why that was the shape of the trap. Three more things went wrong
+in those scripts, all found by running them for real in `spawn` mode
+(`tests/checks/test_python_safety.py` does, on every platform, with
+`FAKE_ST_START_METHOD=spawn`):
+
+- `queue.get(block=False, timeout=...)` ignores the timeout and raises `queue.Empty`
+  the moment the queue looks empty, which a worker can see while another process is
+  still filling it. The queue now ends with one `None` per worker, and a worker
+  blocks on `get()` until it takes its own `None`.
+- `counter.value += 1` on a shared `multiprocessing.Value` is not atomic: 250 deletes
+  by three workers were counted as 246 until each add held `counter.get_lock()`.
+- After the workers are joined, `queue.cancel_join_thread()` keeps the parent from
+  waiting to flush items that a worker that died early never read.
 
 A third python3 example had a real, similarly-shaped CSRF bug, found while
 looking for one to write an integration test for:

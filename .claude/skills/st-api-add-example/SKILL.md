@@ -65,14 +65,15 @@ checked.
 # - template
 #
 # Usage:
-# ./02.accounts_POST.sh
+# ./02.accounts_POST.sh [TEMPLATE_CLASS]
 #
 # Risk: write
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - Requires `jq`, which is used to edit the retrieved JSON.
-# - This script deletes data. Check the names before running it.
+# - The accounts are example_user, example_service and example_template, so running
+#   it bare changes nothing that matters. 07.accounts_name_DELETE.sh removes them.
 # ==============================================================================
 ```
 
@@ -128,16 +129,24 @@ In the EndUser tree, `set_variables.sh` also derives `${ST_URL}` and
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts"
 
 printf "Creating an Account of type User...\n"
+BODY=$(jq -cn --arg name "example_user" '{name: $name, type: "user"}')
 curl -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "${MAIN_URL}" \
   -H "accept: */*" -H "Content-Type: application/json" \
-  -d "{\"name\":\"UserAccount\",\"type\":\"user\"}"
+  -d "${BODY}"
 ```
 
 - quote `"${ST_USER}:${ST_PASSWORD}"`
-- double-quote any payload that contains a variable, and escape the inner quotes
+- build a payload with `jq -cn --arg name "${NAME}" '...'`, never by pasting a variable into JSON text;
+  double-quote the variable that holds it
 - `printf "...%s...\n" "${VAR}"` — never put a variable in the format string
 - when only the outcome matters, print the code:
-  `-s -o /dev/null -w "%{http_code}\n"`
+  `-s -o /dev/null -w "%{http_code}\n"`; for a write, read the code and the answer together with
+  `-w "\n%{http_code}"` and split them (`${RESPONSE##*$'\n'}`), print `HTTP <code>`, and exit 1 when
+  it is not the expected one. Never read the status with `grep HTTP | awk` on `2>&1`: any header with
+  HTTP in it (a `Server: BaseHTTP/...`) breaks it
+- a script that changes something real defaults to an `example_*` object or REQUIRES its argument
+  (or an environment variable, for a secret) and exits 2 before sending anything; print the old value
+  and how to put it back before changing it
 - delete any temporary file the script created
 
 ## The shape of a bat example
@@ -157,11 +166,25 @@ Copy an existing script rather than starting from scratch —
 
 1. The AS-IS disclaimer banner.
 2. A version history line: `# V1.00 <name> <date> <what changed>`.
-3. A header stating the APIs used, the usage line, and the outputs.
-4. `stLogin()` and `stLogout()`, CSRF aware — copy them unchanged.
-5. A `BEGIN / END Configuration Section` block containing the config file read.
-6. `numAPIs = Value('i', 0)`, incremented per call, reported at the end.
-7. `requests.Session()`, `verify=False`, and the warning suppressed.
+3. A header stating the APIs used, the usage line, the outputs and the `# Risk:` line
+   (`read`, `write`, `config` or `disruptive`, with a reason when it is not `read`).
+4. `stCall()`, which sends every request and ends the script with exit code 1 when one
+   cannot complete (a timeout, no connection, any `requests` exception), and `stExpect()`,
+   which ends it unless the status is the expected one. A status is not an exception: every
+   call is followed by a look at it.
+5. `stLogin()` returning the `csrfToken` of the login, and `stLogout()` sending it: every
+   write sends it, the logout included. The lab accepts a write without it and the
+   documentation says it must be there, so `tests/checks/test_python_scripts_run.py` runs
+   your script against a fake server that refuses one.
+6. A `BEGIN / END Configuration Section` block containing the config file read.
+7. `numAPIs = Value('i', 0)`, incremented per call, reported at the end.
+8. `requests.Session()`, `verify=stVerify` (from `st_ca_bundle` or `st_verify` in the
+   config; off by default) and the warning suppressed only when it is off.
+9. Exit codes: 0 done, 1 anything failed, 2 a missing or wrong argument. Never `sys.exit(0)`
+   for an error.
+10. Imports at the top of the file (`import requests`, `import sys`), not inside the main
+    block: a worker process that starts fresh (macOS, Windows, Python 3.14 on Linux) does
+    not run the main block.
 
 The configuration read is identical in every script; copy it verbatim so that
 one fix applies everywhere:
@@ -180,20 +203,35 @@ try:
 except IOError:
     print('I cannot find the configuration file: ' + configFile)
     print('Copy config.example to config and set the values for your environment.')
-    sys.exit(0)
+    sys.exit(1)
+
+# Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
 stUrl = 'https://' + stServer + ':' + stPort + '/api/v2.0/'
 basicAuth = base64.b64encode((stUser + ':' + stPassword).encode()).decode()
 ```
 
 **If your script writes to more than one object, give it a `dryRun` flag and
-default it to `True`.** The four bulk scripts do. It is what makes them safe to
-hand to someone else.
+default it to `True`, and let `--apply` on the command line turn it off.** The
+eight bulk scripts do. It is what makes them safe to hand to someone else. A
+script that deletes does not match by "contains": it matches the start of a name,
+takes the prefix as an argument and lists what it would delete.
+
+**A script that cannot be taken back asks for a word, never a default.**
+`stGraceful.py` stops nothing without `--yes`.
+
+A script that starts worker processes hands each one everything it needs as plain
+arguments, ends the queue with one `None` per worker, and counts with
+`counter.get_lock()` (see the gotchas).
 
 ## Before you call it done
 
 - [ ] `bash -n` passes on every shell file you touched, matched case-insensitively
 - [ ] python compiles: `python3 -m py_compile`
+- [ ] a python example is in the `CASES` of `tests/checks/test_python_scripts_run.py`
+      (csrfToken, exit codes and failures, all at once) and has a `# Risk:` line
+      (`tests/checks/check_python_risk.py`)
 - [ ] the bat twin exists and behaves the same
 - [ ] the `Script Name:` header matches the filename
 - [ ] the `Risk:` line is there, the same in both twins

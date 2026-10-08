@@ -30,10 +30,16 @@
 # APIs used - /myself ( ST login and logout ) POST, DELETE
 #             /subscriptions  GET, PATCH
 #
-# Usage: python3 stUpdateAllSubscriptions.py
+# Usage: python3 stUpdateAllSubscriptions.py [--apply]
 #
-#        Set dryRun to True in the configuration section to see what would be
-#        changed without changing anything. Start there.
+#        Without --apply (or with dryRun left True in the configuration section) the
+#        script says what it would change and changes nothing. Start there.
+#
+# Risk: write - patches subscriptions (every one, or those of the type chosen in the configuration section) (with --apply)
+#
+# Notes:
+# - Exit codes: 0 done, 1 anything failed (a PATCH the server refused included), 2 an
+#   argument is not understood.
 #
 # Outputs:
 #    A summary of the subscriptions inspected and patched, on standard output.
@@ -57,7 +63,7 @@ def stLogout(session, token):
                'csrfToken': token,
                'Accept': 'application/json'}
     try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.delete(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -71,8 +77,11 @@ def stLogout(session, token):
         print('Unknown Error: ' + str(e))
         sys.exit(1)
     else:
-        print('Session Mgt Logged Out')
         numAPIs.value += 1
+        if response.status_code != 200:
+            print('Logout answered ' + str(response.status_code))
+            sys.exit(1)
+        print('Session Mgt Logged Out')
         return True
 
 
@@ -91,7 +100,7 @@ def stLogin(basicAuth, session):
                'Authorization': authString}
 
     try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
+        response = session.post(url, headers=headers, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + stUrl + ' ' + str(ec))
         sys.exit(1)
@@ -154,7 +163,7 @@ def stPatchSubscription(session, csrftoken, subscriptionId):
         return True
 
     try:
-        response = session.patch(url, headers=headers, json=jsonIn, verify=False, timeout=stTimeout)
+        response = session.patch(url, headers=headers, json=jsonIn, verify=stVerify, timeout=stTimeout)
     except requests.ConnectionError as ec:
         print('I cannot connect to ' + url + ' ' + str(ec))
         sys.exit(1)
@@ -173,6 +182,7 @@ def stPatchSubscription(session, csrftoken, subscriptionId):
             print('   Patch of subscription ' + str(subscriptionId) +
                   ' returned ' + str(response.status_code))
             print('   ' + str(response.text))
+            numFailed.value += 1
             return False
         print('   Patched subscription ' + str(subscriptionId))
         return True
@@ -199,7 +209,7 @@ def stProcessSubscriptions(session, csrftoken):
                '&limit=' + str(numberObjectsToFetchPerCall))
 
         try:
-            response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
+            response = session.get(url, headers=headers, verify=stVerify, timeout=stTimeout)
         except requests.ConnectionError as ec:
             print('I cannot connect to ' + url + ' ' + str(ec))
             sys.exit(1)
@@ -274,8 +284,17 @@ if __name__ == "__main__":
     referer = 'THIS_IS_A_RANDOM_TEXT'
 
     # Report what would change, without changing anything. Run with this set to
-    # True first, and read the output, before you let it write.
+    # True first, and read the output, before you let it write. --apply on the
+    # command line sets it to False.
     dryRun = True
+
+    arguments = sys.argv[1:]
+    if '--apply' in arguments:
+        dryRun = False
+        arguments.remove('--apply')
+    if arguments:
+        print('Usage: python3 stUpdateAllSubscriptions.py [--apply]')
+        sys.exit(2)
 
     # Leave empty to process every subscription, or set a type such as
     # 'SharedFolder' to restrict the run.
@@ -298,7 +317,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -307,7 +326,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -321,13 +343,15 @@ if __name__ == "__main__":
     # -------------------------------------------------------------------------------
 
     numAPIs = Value('i', 0)                  # counter to see how many APIs we sent
+    numFailed = Value('i', 0)                # patches the server refused
 
     if dryRun:
         print('Running in DRY RUN mode, nothing will be changed.')
         print('')
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session....
     sessionMgt = requests.Session()
@@ -343,3 +367,6 @@ if __name__ == "__main__":
 
     stLogout(sessionMgt, csrftoken)
     print('Completed Run, number of APIs issued: ' + str(numAPIs.value))
+    if numFailed.value:
+        print('FAILED: the server refused ' + str(numFailed.value) + ' patch(es).')
+        sys.exit(1)

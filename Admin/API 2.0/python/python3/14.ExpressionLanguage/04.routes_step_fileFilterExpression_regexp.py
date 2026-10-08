@@ -25,6 +25,8 @@
 #
 # Usage: python3 04.routes_step_fileFilterExpression_regexp.py
 #
+# Risk: write - creates three throwaway routes and deletes them again, by the id each was created with; a route that was there already is never deleted
+#
 # Notes:
 # - Confirmed directly against a real server: fileFilterExpression with
 #   fileFilterExpressionType=REGEXP is a raw regular expression string,
@@ -44,6 +46,7 @@ import el_client  # noqa: E402
 
 config = el_client.load_config()
 client = el_client.ELClient(config)
+created = []
 
 PATTERNS = [
     ("xmlOrTxt", r".*\.(xml|txt)"),
@@ -51,40 +54,39 @@ PATTERNS = [
     ("negativeLookahead", r"^(?!.*__TID\d{6}__[A-Za-z0-9]{16}).*$"),
 ]
 
-for suffix, pattern in PATTERNS:
-    name = "ZZTEST_EL_regexp_" + suffix
-    print("\nCreating %s with fileFilterExpression: %s" % (name, pattern))
-    response = client.post("routes", {
-        "name": name,
-        "type": "SIMPLE",
-        "conditionType": "ALWAYS",
-        "steps": [{
-            "type": "EncodingConversion",
-            "status": "ENABLED",
+try:
+    for suffix, pattern in PATTERNS:
+        name = "ZZTEST_EL_regexp_" + suffix
+        print("\nCreating %s with fileFilterExpression: %s" % (name, pattern))
+        response = client.post("routes", {
+            "name": name,
+            "type": "SIMPLE",
             "conditionType": "ALWAYS",
-            "usePrecedingStepFiles": False,
-            "fileFilterExpression": pattern,
-            "fileFilterExpressionType": "REGEXP",
-            "inputCharset": "UTF-8",
-            "outputCharset": "UTF-8",
-            "actionOnStepFailure": "PROCEED",
-        }],
-    })
-    print(response.status_code)
+            "steps": [{
+                "type": "EncodingConversion",
+                "status": "ENABLED",
+                "conditionType": "ALWAYS",
+                "usePrecedingStepFiles": False,
+                "fileFilterExpression": pattern,
+                "fileFilterExpressionType": "REGEXP",
+                "inputCharset": "UTF-8",
+                "outputCharset": "UTF-8",
+                "actionOnStepFailure": "PROCEED",
+            }],
+        })
+        print(response.status_code)
+        client.expect(response, [201], "Creating " + name)
+        client.track(created, "routes", response, name)
 
-print("\nReading all three back, and cleaning each up...")
-for suffix, _ in PATTERNS:
-    name = "ZZTEST_EL_regexp_" + suffix
-    response = client.get("routes", params={
-        "name": name, "fields": "name,steps.fileFilterExpression,steps.fileFilterExpressionType"})
-    print("\n%s:" % name)
-    print(response.text)
+    print("\nReading all three back...")
+    for suffix, _ in PATTERNS:
+        name = "ZZTEST_EL_regexp_" + suffix
+        response = client.get("routes", params={
+            "name": name, "fields": "name,steps.fileFilterExpression,steps.fileFilterExpressionType"})
+        client.expect(response, [200], "Reading " + name)
+        print("\n%s:" % name)
+        print(response.text)
 
-    response = client.get("routes", params={"name": name, "fields": "id"})
-    result = response.json().get("result", [])
-    if result:
-        route_id = result[0]["id"]
-        client.delete("routes/" + route_id)
-        print("deleted %s (%s)" % (name, route_id))
-
-client.logout()
+    print("\nCleaning up the three throwaway routes...")
+finally:
+    client.finish(created)

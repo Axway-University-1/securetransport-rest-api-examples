@@ -12,8 +12,14 @@
 #  be responsible for any loss or damage to data that is a result of this tool.  #
 ##################################################################################
 #
-# V2.00 Ian Percival   16-Jun-2023   Fix errors + csrf compliant 
-#                                    This code assumes that Webservices.Admin.CsrfToken.enabled is set to 'true' which is the default 
+# V3.00 Plamen Milenkov  08-Oct-2026  The baseline is a JSON file (it was a pickle, which runs
+#                                     code when it is loaded), found next to the script or
+#                                     where you say, and written readable by its owner only.
+#                                     The comparison runs in both directions, so an option that
+#                                     is gone from the live system is reported too. Every failure
+#                                     exits 1, a bad argument exits 2.
+# V2.00 Ian Percival   16-Jun-2023   Fix errors + csrf compliant
+#                                    This code assumes that Webservices.Admin.CsrfToken.enabled is set to 'true' which is the default
 #                                    for ST after and including the 20230525 release.
 # V1.01 Ian Percival   20-Jul-2021   Python3 version
 # V1.00 Ian Percival   28-Oct-2020
@@ -25,8 +31,24 @@
 # APIs used - /myself ( ST login and logout )
 #             /configurations/options  GET
 #
-# Usage: ./stConfigScan.py MAKEBASELINE
-#        ./stConfigScan.py COMPAREBASELINE
+# Usage: python3 stConfigScan.py MAKEBASELINE [BASELINE_FILE]
+#        python3 stConfigScan.py COMPAREBASELINE [BASELINE_FILE]
+#
+#        BASELINE_FILE  where the baseline is written and read. When it is left out:
+#                       st_config_baseline from the config file, or else a file named
+#                       stConfig.baseline next to this script.
+#
+# Risk: read
+#
+# Notes:
+# - It only reads the server. It does write the baseline file, as JSON, readable by its
+#   owner only: the options of a server can hold secrets, so keep the file as private as
+#   the server. *.baseline is in the .gitignore of this repository.
+# - A COMPAREBASELINE reports what changed, what is new on the live system and what is in
+#   the baseline but no longer on it. The differences are the output, not an error: the
+#   exit code is 0 when it ran.
+# - Exit codes: 0 done, 1 anything failed (no baseline to compare with included), 2 the
+#   arguments are wrong.
 #
 # Outputs:
 #    A logfile provides run time information
@@ -37,6 +59,17 @@
 #
 # All functions are defined first below this header.
 
+import base64
+import datetime
+import json
+import os
+import sys
+
+import requests
+
+from multiprocessing import Value
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
 
 # ---------------------
 # Supporting Functions
@@ -45,31 +78,46 @@
 # Use a commin logFile in case running in batch etc
 def writeLog(logString, severity):
     # This is the logfile for our python script
-    global logFile
     print(logString)
 
     tstamp = datetime.datetime.now()
-    if severity == 'SUCCESS':
-        inString = str(tstamp) + ' ' + severity + '     ' + logString + '\n'
-    elif severity == 'WARNING':
-        inString = str(tstamp) + ' ' + severity + '     ' + logString + '\n'
-    else:
-        inString = str(tstamp) + ' ' + severity + ' ' + logString + '\n'
+    inString = str(tstamp) + ' ' + severity + ' ' + logString + '\n'
     try:
         fHandle = open(logFile, 'a+')
         fHandle.write(inString)
         fHandle.close()
-    except:
+    except IOError:
         print('Problem writing to log')
-        return
-
-    return
 
 
-def stGetConfig(counter, session, token):
-    global referer
-    global stTimeout
-    global stUrl
+# Send one request. Anything that keeps the call from completing is fatal: the script
+# says what failed and exits 1. An HTTP status is not an exception, so the caller
+# looks at it (see stExpect).
+def stCall(session, method, url, **kwargs):
+    try:
+        response = getattr(session, method.lower())(url, verify=stVerify, timeout=stTimeout, **kwargs)
+    except requests.exceptions.Timeout as et:
+        writeLog('Timeout talking to ' + url + ': ' + str(et), 'FATAL')
+        sys.exit(1)
+    except requests.exceptions.ConnectionError as ec:
+        writeLog('I cannot connect to ' + url + ': ' + str(ec), 'FATAL')
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        writeLog('The request to ' + url + ' failed: ' + str(e), 'FATAL')
+        sys.exit(1)
+    numAPIs.value += 1
+    return response
+
+
+# Exit 1 unless the status is the one expected
+def stExpect(response, expected, what):
+    if response.status_code != expected:
+        writeLog(what + ' answered ' + str(response.status_code) + ', not ' + str(expected) +
+                 ': ' + str(response.text)[:300], 'FATAL')
+        sys.exit(1)
+
+
+def stGetConfig(session, token):
 
     windowSize = 100
     offset = 0
@@ -85,130 +133,121 @@ def stGetConfig(counter, session, token):
 
         url = stUrl + 'configurations/options?offset=' + str(offset) + '&limit=' + str(windowSize)
 
-        try:
-            response = session.get(url, headers=headers, verify=False, timeout=stTimeout)
-        except requests.ConnectionError as ec:
-            writeLog('I cannot connect to ' + stUrl,'FATAL')
-            writeLog(str(ec),'FATAL')
-            sys.exit(1)
-        except requests.exceptions.HTTPError as eh:
-            writeLog('HTTP Error','FATAL')
-            raise SystemExit(eh)
-        except requests.exceptions.Timeout as et:
-            writeLog('Timeout Error:' + str(et),'FATAL')
-        except requests.exceptions.RequestException as e:
-            raise SystemExit(e)
-        else:
-            counter.value+=1
-            configs = response.json()
+        response = stCall(session, 'GET', url, headers=headers)
+        stExpect(response, 200, 'Reading the configuration options')
 
-            resultSet = configs['resultSet']
-            returnCount = resultSet['returnCount']
+        configs = response.json()
 
-            if returnCount < windowSize:
-                getMore = False
+        returnCount = configs.get('resultSet', {}).get('returnCount', 0)
 
-            results = configs['result']
+        if returnCount < windowSize:
+            getMore = False
 
-            for item in results:
-                parameterName =  item.get('name')
-                parameterValue = item.get('values')
-                liveConfigs[parameterName] = parameterValue
+        for item in configs.get('result', []):
+            parameterName = item.get('name')
+            parameterValue = item.get('values')
+            if parameterName is None:
+                continue
+            liveConfigs[parameterName] = parameterValue
 
-            offset += windowSize
+        offset += windowSize
 
     return liveConfigs
 
 
-# Login to ST using session management
+# Compare the baseline with the live configuration, in both directions.
+# Returns (changed, new, gone): the names whose value differs, the names only on the
+# live system, and the names only in the baseline.
+def stCompare(baselineConfig, liveConfigs):
+
+    changed = sorted(k for k in liveConfigs if k in baselineConfig and liveConfigs[k] != baselineConfig[k])
+    new = sorted(k for k in liveConfigs if k not in baselineConfig)
+    gone = sorted(k for k in baselineConfig if k not in liveConfigs)
+    return changed, new, gone
+
+
+# Write the baseline as JSON, readable by its owner only (the options can hold secrets).
+def stWriteBaseline(path, configs):
+
+    try:
+        descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(descriptor, 'w') as f:
+            json.dump(configs, f, indent=1, sort_keys=True)
+            f.write('\n')
+        os.chmod(path, 0o600)       # a file that was there already keeps its old mode otherwise
+    except (IOError, OSError) as e:
+        writeLog('I cannot write the baseline ' + path + ': ' + str(e), 'FATAL')
+        sys.exit(1)
+
+
+# Read the baseline back. JSON, so reading it cannot run anything.
+def stReadBaseline(path):
+
+    try:
+        with open(path, 'r') as f:
+            baseline = json.load(f)
+    except IOError:
+        writeLog('I cannot read the baseline ' + path + '. Run MAKEBASELINE first.', 'FATAL')
+        sys.exit(1)
+    except ValueError:
+        writeLog('The baseline ' + path + ' is not JSON. It was written by an older version of this script, '
+                 'or by something else: run MAKEBASELINE again.', 'FATAL')
+        sys.exit(1)
+    if not isinstance(baseline, dict):
+        writeLog('The baseline ' + path + ' does not hold a set of options.', 'FATAL')
+        sys.exit(1)
+    return baseline
+
+
+# Login to ST using session management, and return the csrfToken the server answers with
 #
-# This is the ST api/v1.4/myself POST method
+# This is the ST api/v2.0/myself POST method
 #
 def stLogin(basicAuth, session):
-
-    global referer
-    global stTimeout
-    global stUrl
 
     url = stUrl + 'myself'
 
     authString = 'Basic ' + basicAuth
     headers = {'Referer': referer,
-              'Accept': 'application/json',
-              'Authorization': authString}
+               'Accept': 'application/json',
+               'Authorization': authString}
 
-    try:
-        response = session.post(url, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        writeLog('I cannot connect to ' + stUrl,'FATAL')
-        writeLog(str(ec),'FATAL')
+    response = stCall(session, 'POST', url, headers=headers)
+    stExpect(response, 200, 'Login')
+
+    # Successful login
+    # {
+    #     "message" : "Logged in"
+    # }
+    if response.json().get('message') != 'Logged in':
+        writeLog('The login did not answer "Logged in"', 'FATAL')
         sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        writeLog('HTTP Error','FATAL')
-        sys.exit(1)
-    except requests.exceptions.Timeout as et:
-        writeLog('Timeout Error:' + str(et),'FATAL')
-    except requests.exceptions.RequestException as e:
-        sys.exit(1)
-    else:
-        if response.status_code != 200:
-            print("Cannot login ", response.status_code)
-            sys.exit(1)
-        jsonResponse = response.json()
-        csrftoken = response.headers.get('csrfToken')
-        message = jsonResponse.get("message")
-        if 'Logged in' == message:
-            writeLog('Session Login', 'INFORMATION')
-            return csrftoken
-        else:
-            print("Login Failure ",response.status_code)
-            sys.exit(0)
-
-        # Successful login
-
-        # {
-        #     "message" : "Logged in"
-        # }
-
+    writeLog('Session Login', 'INFORMATION')
+    # Present from the 20230525 release, and to be sent back on every later call
+    return response.headers.get('csrfToken')
 
 
 # This is the ST logout session management
 #
-# This is the ST api/v1.4/myself DELETE method
+# This is the ST api/v2.0/myself DELETE method
 #
 def stLogout(session, token):
-
-    global referer
-    global stTimeout
-    global stUrl
 
     url = stUrl + 'myself'
 
     headers = {'Referer': referer,
                'csrfToken': token,
-              'Accept': 'application/json'}
-    try:
-        response = session.delete(url, headers=headers, verify=False, timeout=stTimeout)
-    except requests.ConnectionError as ec:
-        writeLog('I cannot connect to ' + stUrl,'FATAL')
-        writeLog(str(ec), 'FATAL')
-        sys.exit(1)
-    except requests.exceptions.HTTPError as eh:
-        writeLog('HTTP Error','FATAL')
-        raise SystemExit(eh)
-    except requests.exceptions.Timeout as et:
-        writeLog('Timeout Error:' + str(et),'FATAL')
-    except requests.exceptions.RequestException as e:
-        raise SystemExit(e)
-    else:
-        writeLog('Session Mgt Logged Out','SUCCESS')
-        return True
+               'Accept': 'application/json'}
 
-        # Successful logout
+    response = stCall(session, 'DELETE', url, headers=headers)
+    stExpect(response, 200, 'Logout')
 
-        # {
-        #     "message" : "Logged out"
-        # }
+    # Successful logout
+    # {
+    #     "message" : "Logged out"
+    # }
+    writeLog('Session Mgt Logged Out', 'SUCCESS')
+    return True
 
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -218,39 +257,21 @@ def stLogout(session, token):
 
 if __name__ == "__main__":
 
-    import base64
-    import datetime
-    import json
-    import multiprocessing
-    import os
-    import pickle
-    import requests
-    import ssl
-    import string
-    import sys
+    usage = 'Usage: python3 stConfigScan.py MAKEBASELINE|COMPAREBASELINE [BASELINE_FILE]'
 
-    from multiprocessing import Queue
-    from multiprocessing import Process
-    from multiprocessing import Value
-
-    from requests.auth import HTTPBasicAuth
-    from requests.packages.urllib3.exceptions import InsecureRequestWarning
-
-    global logFile
-    global referer
-    global stTimeout
-    global stUrl
+    if len(sys.argv) < 2 or len(sys.argv) > 3 or sys.argv[1] not in ('MAKEBASELINE', 'COMPAREBASELINE'):
+        print('Please provide argument 1 - either MAKEBASELINE or COMPAREBASELINE')
+        print(usage)
+        sys.exit(2)
+    mode = sys.argv[1]
 
     # --------------------------------------------------------------------------------
     # BEGIN Configuration Section
     # --------------------------------------------------------------------------------
     # Please modify the below to match your environment
 
-    # define how many parallel procs we will create
-    numberParallelProcs = 10
     stTimeout = 120
 
-    baselineFile = '/home/axway/stConfig.baseline'
     logFile = 'checkConfig.log'
 
     referer = 'THIS_IS_A_RANDOM_TEXT'
@@ -271,7 +292,7 @@ if __name__ == "__main__":
     except IOError:
         print('I cannot find the configuration file: ' + configFile)
         print('Copy config.example to config and set the values for your environment.')
-        sys.exit(0)
+        sys.exit(1)
 
     stServer = stConfig.get('st_server', '')
     stPort = stConfig.get('st_port', '')
@@ -280,7 +301,10 @@ if __name__ == "__main__":
 
     if not stServer or not stPort or not stUser or not stPassword:
         print('The configuration file must set st_server, st_port, st_user and st_password.')
-        sys.exit(0)
+        sys.exit(1)
+
+    # Verify the server's certificate when st_ca_bundle (a file) or st_verify=yes is set
+    stVerify = stConfig.get('st_ca_bundle', '') or stConfig.get('st_verify', 'no').lower() in ('yes', 'true', '1')
 
     #
     # Build the values the API calls need. The base64 Authorization value is
@@ -289,93 +313,66 @@ if __name__ == "__main__":
     stUrl = 'https://' + stServer + ':' + stPort + '/api/v2.0/'
     basicAuth = base64.b64encode((stUser + ':' + stPassword).encode()).decode()
 
+    # The baseline: the argument, else the config file, else next to this script
+    baselineFile = (sys.argv[2] if len(sys.argv) > 2 else stConfig.get('st_config_baseline', '')
+                    or os.path.join(os.path.dirname(os.path.abspath(__file__)), 'stConfig.baseline'))
+
     # -------------------------------------------------------------------------------
     # END Configuration Section
     # -------------------------------------------------------------------------------
 
+    numAPIs = Value('i', 0)                  # counter to see how many APIs we sent
 
-    APICounter = Value('i', 0)
-
-    try:
-        mode = sys.argv[1]
-    except IndexError:
-        errText = 'Please provide argument 1 - either MAKEBASELINE or COMPAREBASELINE'
-        print(errText)
-        sys.exit(0)
-
-    if 'MAKEBASELINE' in mode or 'COMPAREBASELINE' in mode:
-        t = 'Program called with argument ' + mode
-        writeLog(t, 'INFORMATION')
-    else:
-        errText = 'Please provide argument 1 - either MAKEBASELINE or COMPAREBASELINE'
-        print(errText)
-        sys.exit(0)
+    t = 'Program called with argument ' + mode
+    writeLog(t, 'INFORMATION')
 
     outputString = 'Starting at ' + str(datetime.datetime.now())
     writeLog(outputString, 'INFORMATION')
 
-    logEntry = 'Number of CPUs available to this server: ' + str(multiprocessing.cpu_count())
-    writeLog(logEntry, 'INFORMATION')
-
-    logEntry = 'Commencing Run Using ' + str(numberParallelProcs) + ' threads\n'
-    writeLog(logEntry, 'INFORMATION')
+    # A baseline to compare with has to be there before anything is asked of the server
+    baselineConfig = None
+    if mode == 'COMPAREBASELINE':
+        baselineConfig = stReadBaseline(baselineFile)
 
     # Before we do anything, lets authenticate to ST
     # We'll use session management as this avoids having to authenticate on every API call
-    #  and we plan to issue potentially millions of APIs!
     # Doing this saves a LOT of overhead and time.
 
     # We are turning off Cert validation - stop the warning messages
-    requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+    if not stVerify:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
     # Now create our session....
     sessionMgt = requests.Session()
 
-
-
-    # Now use Session Management
-
     csrftoken = stLogin(basicAuth, sessionMgt)
-    APICounter.value += 1
-
 
     # We won't use multiprocessing here as we are not doing too much
     # STEP 1 -
     # Read in the System Configs
-    cConfigs = stGetConfig(APICounter, sessionMgt, csrftoken)
+    cConfigs = stGetConfig(sessionMgt, csrftoken)
 
     # See if we need to create a new baseline file containing all parameters.
     if mode == 'MAKEBASELINE':
-        pickle.dump(cConfigs, open(baselineFile, 'wb'))
-    elif mode == 'COMPAREBASELINE':
-        baselineConfig = pickle.load( open(baselineFile, 'rb'))
+        stWriteBaseline(baselineFile, cConfigs)
+        writeLog('Wrote the baseline of ' + str(len(cConfigs)) + ' options to ' + baselineFile, 'INFORMATION')
+    else:
         # cConfigs are the live system configs
-        # compare these to what was there before
-        for key, value in cConfigs.items():
-            # Does this key exist in the baseline?
-            if key in baselineConfig:
-                # As the Key IS there - compare the values
-                if value == baselineConfig[key]:
-                    continue
-                else:
-                    # We have a difference in values
-                    t = key + ' has changed from ' +  str(baselineConfig[key]) + '  to ' + str(value)
-                    writeLog(t, 'WARNING')
-                    continue
-            else:
-                t = key + ' with value ' + str(value) + ' does not exist in the baseline'
-                writeLog(t, 'WARNING')
-                continue
-
-
+        # compare these to what was there before, both ways
+        changed, new, gone = stCompare(baselineConfig, cConfigs)
+        for key in changed:
+            t = key + ' has changed from ' + str(baselineConfig[key]) + '  to ' + str(cConfigs[key])
+            writeLog(t, 'WARNING')
+        for key in new:
+            t = key + ' with value ' + str(cConfigs[key]) + ' does not exist in the baseline'
+            writeLog(t, 'WARNING')
+        for key in gone:
+            t = key + ' with value ' + str(baselineConfig[key]) + ' is in the baseline but not on the live system'
+            writeLog(t, 'WARNING')
+        writeLog('Differences: ' + str(len(changed)) + ' changed, ' + str(len(new)) + ' new, ' +
+                 str(len(gone)) + ' gone', 'INFORMATION')
 
     # Completion Section
-
     stLogout(sessionMgt, csrftoken)
-    APICounter.value += 1
-    infoText = 'Completed Run. Number of APIs issued: ' + str(APICounter.value)
+    infoText = 'Completed Run. Number of APIs issued: ' + str(numAPIs.value)
     writeLog(infoText, 'INFORMATION')
-
-# ------------------------------------------------------------------------------------
-#
-

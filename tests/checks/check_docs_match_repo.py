@@ -178,7 +178,11 @@ for f in ("Admin/API 2.0/bash/set_variables.local.example.sh",
 dry = [os.path.basename(p) for p in
        glob.glob(os.path.join(REPO, "Admin/API 2.0/python/**/*.py"), recursive=True)
        if "dryRun = True" in open(p).read() or "createOnTarget = False" in open(p).read()]
-chk("4 scripts default to a dry run", len(dry) == 4, sorted(dry))
+chk("8 scripts default to a dry run", len(dry) == 8, sorted(dry))
+chk("the orientation skill says so", "default to a dry run" in pack_text and "eight scripts" in pack_text)
+risk_claim = "Every example's header has a `Risk:` line"
+chk("the README's claim that every example has a Risk line holds for the python ones too: check_python_risk.py is named next to it",
+    risk_claim in README and "check_python_risk.py" in README.split(risk_claim, 1)[1][:400])
 
 print()
 if failed:

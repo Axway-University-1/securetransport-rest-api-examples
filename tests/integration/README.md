@@ -14,13 +14,13 @@ tests/integration/run_integration.sh --mock     against the bundled mock, no ser
 ```
 
 Checks `15` through `18` run the real Admin API 2.0 **python3** examples,
-which import `requests` (and one, `requests_toolbelt`) - third-party
-libraries the harness itself deliberately does not depend on. Those checks
+which import `requests` - a third-party
+library the harness itself deliberately does not depend on. Those checks
 need a one-time venv, gitignored under `tests/local/`:
 
 ```
 python3 -m venv tests/local/pyvenv
-tests/local/pyvenv/bin/pip install requests requests_toolbelt
+tests/local/pyvenv/bin/pip install requests
 ```
 
 Without it, checks `15`-`18` and `20` report a clean skip rather than fail
@@ -40,12 +40,18 @@ tests.
 
 The mock is not a SecureTransport simulator and does not try to be.
 
-**`04.accounts_scripts.py` fails against `--mock --write`.** Five of its
-assertions fail: the exists check of `03`, the contact added by `06`, the contact
-from the patch file, and the three deletes of `07`. Every script it runs sends
-the `Referer`, so that is not the reason, and the cause has not been found yet.
-Run this check against a real server to see it pass. Everything else passes
-against the mock, with and without `--write`.
+`04.accounts_scripts.py` passes against `--mock --write`. It used to fail there,
+on five assertions (the exists check of `03`, the contact added by `06`, the
+contact from the patch file, and the three deletes of `07`), and the cause was in
+two places, now fixed. In the scripts: `03` and `07` read the HTTP status with
+`curl ... 2>&1 | grep HTTP | awk '{print $2}'`, and the mock answers with a
+`Server: BaseHTTP/0.6 Python/3.14.4` header that also contains `HTTP`, so the
+"status" came out as two words and was never `200` (a real server, whose header
+is `Server: Linux`, never showed it); they now read the status with `curl -w`.
+In the mock: it read the JSON Patch path `/addressBookSettings/contacts/-` as a
+top level field with that name, so the contacts never arrived (it now applies a
+nested path, `tests/checks/test_mock_st.py`), and it did not decode `%2C` in a
+query. Everything passes against the mock, with and without `--write`.
 
 ## Pointing it at your own server
 
@@ -90,8 +96,8 @@ assumption about the API.
 | `01.connect.py` | no | Login, the CSRF handshake, `/myself`, `/version`, logout. Also whether your server really does reject a call with no `Referer`. Run this first: if it fails, nothing else will work and the reason is here. |
 | `02.read.py` | no | The behaviours every example depends on: the `result` and `resultSet.returnCount` envelope, paging that does not overlap or repeat, `fields=` narrowing the response while `type` still comes back, HEAD as an existence check, 404 for a missing object, and that a type specific field needs `type=`. |
 | `03.lifecycle.py` | **yes** | The full cycle on one account, through a harness-written client: POST returning 201 with a `Location` header, GET and HEAD, PATCH returning 204, `replace` on an unset field being rejected, PUT replacing the object while preserving other fields, the object appearing in the collection, and DELETE really removing it. |
-| `04.accounts_scripts.py` | **yes** | The same cycle, but by running the real `01` through `07` scripts in `Admin/API 2.0/bash/05.Accounts` and verifying each step independently through the API. Touches the literal accounts those scripts create (`UserAccount`, `ServiceAccount`, `TemplateAccount`), not a `ZZTEST_` prefixed name — see its own docstring for the safety rules around that, and around the `john` account two of the scripts depend on. If `john` already exists, `06` and its `_with_file` twin run as name-substituted copies against a throwaway `john_test` instead of being skipped — see "Substituted-copy fallbacks" below. |
-| `05.applications_scripts.py` | **yes** | The real `02` through `07` scripts in `Admin/API 2.0/bash/04.Applications`. If this server already has an application of type `AccountFilePurge` under any name - only one is allowed per server, confirmed directly, and this is exactly the gap that had left `07...DELETE.sh` cleaning up the wrong objects until it was fixed (see the gotchas skill) - `04` through `06` run as name-substituted copies targeting `HumanSystem Application` instead of skipping the whole check. |
+| `04.accounts_scripts.py` | **yes** | The same cycle, but by running the real `01` through `07` scripts in `Admin/API 2.0/bash/05.Accounts` and verifying each step independently through the API. The scripts act on harmless accounts of their own (`example_user`, `example_service`, `example_template`) and on no other: the check keeps the list of accounts and the whole of `john`, and compares them at the end. It also runs them the ways they refuse (too many arguments, an empty name, a missing or bad patch file, an account that is not there) and checks the exit codes, the `HTTP <code>` they print, the old value `05` and `06` print and the command or body that puts it back (and runs that). Under `--mock` it passes: it used to fail there (see its docstring: `grep HTTP` read the mock's `Server: BaseHTTP` header, and the mock read a nested JSON Patch path as a top level field). |
+| `05.applications_scripts.py` | **yes** | The real `01` through `07` scripts in `Admin/API 2.0/bash/04.Applications`, acting on `example_humansystem` (a flow application), `example_filepurge` (a File Maintenance application with no schedule, so it never runs) and, made by the check through the API, `example_archive` (an ArchiveMaint with a ONCE schedule, so that `03` to `07` run on an application that has one: the start date patch, and the body `06` prints that restores the schedule exactly). If this server already has an application of type `AccountFilePurge` under any name - only one is allowed per server, confirmed directly - `02` says so and creates the flow application only; nothing is run as a substituted copy any more. Compares the list of applications at the end. Skips under `--mock` (no `/applications`). |
 | `06.servers_scripts.py` | **yes** | The real `07` through `12` scripts in `Admin/API 2.0/bash/03.Connect` - server create, read, update, delete. Deliberately not `01`-`05` or `13`: those read or change a daemon (a singleton, not a disposable object) or start and stop real daemons and servers. |
 | `07.businessunits_scripts.py` | **yes** | The real `01.businessUnits_POST.sh`, verified and cleaned up through the API (`38` runs the folder's other examples). If a business unit named `Finance` already exists, this runs a name-substituted copy targeting a throwaway `Finance_test` instead of skipping. |
 | `08.transfersites_scripts.py` | **yes** | The real `01.sites_POST.sh`, the same way as business units. A site is addressed by a generated `id`, not by name - confirmed directly, and found via `GET /sites?name=...`. If a site named `HTTP` on account `john` already exists, this runs a name-substituted copy targeting `HTTP_test` on the same, unmodified `john` account instead of skipping. |
@@ -99,17 +105,17 @@ assumption about the API.
 | `10.configurations_read.py` | no | The shape of a Server Configuration Option response, and that a made up option returns 404. Deliberately never runs either PATCH script in `13.Configurations` - a Configuration Option is a real, persistent server setting, not a disposable object. |
 | `11.enduser_scripts.py` | **yes** | The full `EndUser/API 2.0/bash` cycle for real: login, list, upload, download, bulk upload and download, logout. Needs no separate end user account configured ahead of time - it creates its own throwaway one through the admin API and deletes it afterward, the same pattern `04.accounts_scripts.py` uses for `john`. Found and fixed a real bug in the process: both download scripts were writing the HTTP status code onto the end of every downloaded file. |
 | `12.myself_and_version_scripts.py` | no | The real scripts in `Admin/API 2.0/bash/01.Authentication` and `02.Introduction`: login with and without a cookie jar, `/version`, `/myself`, and logout. No object is created, so this needs no `--write`. Verifies session reuse and logout independently by reusing the cookie jar a script wrote, in a fresh request the script itself never checks the result of. Deliberately excludes `02.Introduction/04.myself_PATCH.sh`, covered separately below. |
-| `13.myself_patch_scripts.py` | **yes** | The real `02.Introduction/04.myself_PATCH.sh` - the one script `12` excludes, because it changes the currently authenticated user's own password. Run instead against a throwaway administrator this check creates through `/administrators` (a different resource from `/accounts`, confirmed directly) and deletes afterward - the real file runs completely unmodified, since it is not parameterised by account name at all. |
-| `14.daemon_write_scripts.py` | **yes** | The real `03.daemons_name_PUT.sh` and `04.daemons_name_PATCH.sh` against the one daemon `/daemons/{name}` will ever address - `ssh` - since no other name is valid regardless of what exists on the server. Reads the daemon's real settings first, runs both scripts, verifies each change, then restores the original settings and verifies the restore. See "What is not covered yet" for the reasoning; this needed an explicit, informed decision before it was added. |
+| `13.myself_patch_scripts.py` | **yes** | The real `02.Introduction/04.myself_PATCH.sh` - the one script `12` excludes, because it changes the currently authenticated user's own password. Run instead against a throwaway administrator this check creates through `/administrators` (a different resource from `/accounts`, confirmed directly) and deletes afterward - the real file runs completely unmodified, since it is not parameterised by account name at all. The new password comes from `ST_NEW_PASSWORD`: the script exits 2 and sends nothing without it (proved first: the old password still works), exits 1 on a refusal (a wrong current password, 401), and the change and its reversal are checked by logging in. |
+| `14.daemon_write_scripts.py` | **yes** | The real `03.daemons_name_PUT.sh` and `04.daemons_name_PATCH.sh` against the one daemon `/daemons/{name}` will ever address - `ssh` - since no other name is valid regardless of what exists on the server; the scripts take the daemon and the values as arguments. Reads the daemon's real settings first, runs both scripts, verifies each change, then restores the original settings and verifies the restore. It also runs 03, 04 and 05 with no arguments (and 05 with a stop but no or a wrong confirmation word): exit 2, nothing sent, the status of every daemon compared. It never runs 05 with a daemon, an operation and the confirmation word: that stops the daemon (`23`). See "What is not covered yet" for the reasoning; this needed an explicit, informed decision before it was added. |
 | `15.python_read_scripts.py` | no | The real `stGetAccountsAfterDate.py` and `stConfigScan.py` (both modes) from `Admin/API 2.0/python/python3`. No object is created, so this needs no `--write`, just the venv above. `stConfigScan.py` runs as a name-substituted copy, retargeting its hardcoded `/home/axway/stConfig.baseline` at `tests/local` - that path only exists on a real ST host. |
 | `16.python_build_delete_accounts.py` | **yes** | The real `stDeleteTestAccounts.py`, and a count-and-name-substituted copy of `stBuildTestAccounts.py` (3 accounts and 1 process instead of 100 and 3, and its unconditional business unit renamed to a throwaway `ZZTEST_` name) - the pairing the scripts' own naming convention (`ZZ` + index, matched by `stDeleteTestAccounts.py`'s hardcoded substring filter) already anticipates. |
 | `17.python_login_restriction.py` | **yes** | The real, completely unmodified `stAddLoginRestrictionRule.py`, against a throwaway login restriction policy this check creates and deletes - the script takes the policy name as a real argument, so no substitution is needed at all. |
 | `18.python_replace_sites.py` | **yes** | The real, completely unmodified `stReplaceSites.py`, against every real SSH-protocol site on the server - there is no disposable stand-in, since the script has no name or prefix filter at all. Reads every site's full object first, runs the script, verifies each site's `keyExchangeAlgorithms`, then restores every site to its original object and verifies the restore, including that each site's already-encrypted password field survives unchanged. This needed an explicit, informed decision before it was added - this server had real-looking partner sites in scope. See "What is not covered yet". |
 | `19.bash_expression_language.py` | **yes** | The real, unmodified Expression Language exercises in `Admin/API 2.0/bash/14.ExpressionLanguage` (8 scripts) - a login restriction rule, an EL route condition, a route step's GLOB and REGEXP file filters, the nested EL-plus-JSON backslash doubling case, a rename expression, and a transfer site's `downloadPattern` and dynamic-property fields. Each script is self-contained (creates, shows, deletes its own throwaway objects); this check verifies each script's own printed output shows the exact expression text expected, then independently confirms nothing named `ZZTEST_EL_*` is left in routes, sites or loginRestrictionPolicies. |
 | `20.python_expression_language.py` | **yes** | The same eight exercises, run through their python3 twins in `Admin/API 2.0/python/python3/14.ExpressionLanguage`. Same verification approach as `19`. |
-| `21.configurations_write_scripts.py` | **yes** | The real `01.configurations_PATCH.sh` and `02.configurations_PATCH_UsageReporting.sh` in `13.Configurations`. A Server Configuration Option is a real, server-wide setting, so this reads every option's value first, runs both scripts, verifies each new value, then restores every option and verifies the restore. Found that an option GET reports as `readOnly` can still be patched. |
+| `21.configurations_write_scripts.py` | **yes** | The real `01.configurations_PATCH.sh` and `02.configurations_PATCH_UsageReporting.sh` in `13.Configurations`. A Server Configuration Option is a real, server-wide setting, so this reads every option's value first, proves both scripts send nothing when run bare (exit 2, every option unchanged), runs `01` with the value the option already has and with a harmless change to the days of the report, and `02` with ten `ST_USAGE_*` variables of its own, verifies each new value and the old values the scripts print, then restores every option and verifies the restore. Found that an option GET reports as `readOnly` can still be patched. |
 | `22.routetemplates_compositeroutes_scripts.py` | **yes** | `08.RouteTemplates/02.routes_POST.sh`, trimmed from its 163 template names to 3 (keeping `RouteFromAccountant`, which the next script needs), then the real, unmodified `09.CompositeRoutes/02.routes_POST.sh`. Refuses to run if any of the names it creates already exist, and deletes every route it made. |
-| `23.connect_operations_scripts.py` | **yes** | The real `05.daemons_operations_POST.sh` and `13.servers_operations_POST.sh` in `03.Connect`, which stop and start real daemons and servers. Records every daemon and server state first, runs both, verifies the stop and the start, then restores AS2 to stopped and waits for every daemon and server to match its original state. `13` only starts what is not running, so on its own it is a safe no-op. Needed an explicit decision before it was added. |
+| `23.connect_operations_scripts.py` | **yes** | The real `05.daemons_operations_POST.sh` and `13.servers_operations_POST.sh` in `03.Connect`, which stop and start real daemons and servers. `05` is given its daemon, its operation and the confirmation word of a stop (`http stop stop-the-http-daemon false`, then `ssh stop stop-the-ssh-daemon true 600`); run bare it exits 2 and sends nothing. Records every daemon and server state first, runs both, verifies the stop and the start, then restores AS2 to stopped and waits for every daemon and server to match its original state. `13` only starts what is not running, so on its own it is a safe no-op. Needed an explicit decision before it was added: run it only on a lab you can restart. |
 | `24.python_read_reports.py` | no | The real `stUsersPerSharedFolder.py` and `stCertificateExpiry.py`. Both only read, so this needs no `--write`, just the venv above. Each count they report is checked against an independent GET. |
 | `25.python_update_route_with_put.py` | **yes** | The real `stUpdateRouteWithPut.py` in its default `insert` mode, on a throwaway route it creates: reads the route, inserts a step at offset 0, PUTs the whole object back. Runs as a copy with `dryRun` off; verifies the step landed, then deletes the route. |
 | `26.python_get_private_cert.py` | **yes** | The real `stGetPrivateCert.py`, exporting a private certificate this check generates for a throwaway account through `POST /certificates`. Needs this server's CA password in `st_ca_password`, and skips itself when that is blank. Verifies a real private key was exported, then removes the certificate, the account and the files written. |
@@ -156,37 +162,34 @@ about, but it is not a broken example.
 
 ## Substituted-copy fallbacks
 
-Four objects these checks depend on - the account `john`, the application
-`AccountFilePurge Application`, the business unit `Finance`, the site `HTTP`
-on `john` - are not created by the folders being tested and are not
-guaranteed to be disposable. Earlier versions of these checks simply skipped
-the affected scripts when one of these already existed on the target server.
-
-That leaves real coverage on the table for anyone whose server happens to
-already have a `john` or a `Finance`, so each of these four checks now falls
+Three objects these checks depend on - the account `john` (`06` and the
+`_with_file` twin used to act on it), the business unit `Finance` and the site
+`HTTP` on `john` - are not created by the folders being tested and are not
+guaranteed to be disposable. Where a check cannot avoid one of them, it falls
 back instead of skipping outright: it creates a throwaway, similarly-named
-object (`john_test`, `Finance_test`, `HTTP_test`, or retargets at the
-already-created `HumanSystem Application`) and runs a name-substituted copy of
-the affected script against that (`script_runner.substituted_copy`) - never
-the real object.
+object (`Finance_test`, `HTTP_test`) and runs a name-substituted copy of the
+affected script against that (`script_runner.substituted_copy`) - never the
+real object.
 
-**This is not the same as running the real file.** A substituted copy proves
-the same request bodies and the same PATCH/PUT/jq logic behave correctly
-under a different name; it does not prove the literal shipped script runs
-without modification. Every check that takes this path says so plainly in
-its own output, labeling each assertion it makes this way, rather than
-reporting it as if the unmodified file had been exercised.
-
-The applications case is not a plain name collision but a schema one: only
+`04.accounts_scripts.py` and `05.applications_scripts.py` no longer need this.
+The `05.Accounts` and `04.Applications` scripts now act on `example_*` objects
+by default and take the name as an argument, so the real files run, with no
+copy, against objects of their own, and the checks only compare the rest of the
+server (the list of accounts, the whole of `john`, the list of applications)
+before and after. The one limit that remains is the one the server sets: only
 one application of a given maintenance type is allowed per server, and a
-different maintenance type does not accept the same fields (confirmed
-directly - an `AccountTTL` application rejects the `AccountFilePurge`-shaped
-body this script sends, with a 400). Swapping to a different name of the same
-type was not possible, so `05.applications_scripts.py` retargets at
-`HumanSystem Application` instead - a flow type application `02` creates
-regardless, with no such singleton constraint - at the cost of not exercising
-the schedule-startDate half of `06`'s PATCH, which only applies to a
-maintenance type application in the first place.
+different maintenance type does not accept the same fields (confirmed directly -
+an `AccountTTL` application rejects the `AccountFilePurge`-shaped body, with a
+400), so on a server that already has an `AccountFilePurge` application `02`
+says so and creates only the flow application, and `03` to `06` are run on that
+and on an `ArchiveMaint` application the check makes itself.
+
+**A substituted copy is not the same as running the real file.** It proves the
+same request bodies and the same PATCH/PUT/jq logic behave correctly under a
+different name; it does not prove the literal shipped script runs without
+modification. Every check that takes this path says so plainly in its own
+output, labeling each assertion it makes this way, rather than reporting it as
+if the unmodified file had been exercised.
 
 Where a check needs an endpoint the bundled mock does not implement -
 `/applications`, `/servers`, `/businessUnits`, `/sites`, `/configurations`,
@@ -315,7 +318,9 @@ restored).
   human decision on, from inside the admin UI rather than this harness.
 `14.daemon_write_scripts.py` deserves a specific note: `03.daemons_name_PUT.sh`
 and `04.daemons_name_PATCH.sh` change a live daemon's real configuration -
-`maxConnections`, `banner`, `preferBouncyCastleProvider`. Confirmed directly,
+`maxConnections`, `banner`, `preferBouncyCastleProvider` - and take the daemon
+and the values as arguments (they used to default to `ssh` and fixed values,
+and changed it when run bare). Confirmed directly,
 `/daemons/{name}` rejects every protocol name except `"ssh"` with a 400
 (`"Invalid value for parameter name, expected (ssh)"`), regardless of which
 daemons exist or are running on the server - unlike the Applications
@@ -333,7 +338,9 @@ stops real daemons and servers". Confirmed directly, `13` never stops
 anything at all - it only starts a server or daemon already found not
 running, and is a safe no-op against a server where everything is already
 up. `05` is the one that actually stops anything (the live http daemon
-forcefully, the live ssh daemon gracefully). This check runs both for real,
+forcefully, the live ssh daemon gracefully); it now does so only for a daemon
+and an operation given as arguments and, for a stop, the word
+`stop-the-<daemon>-daemon`. This check runs both for real,
 restores every daemon and server to its original state, and additionally
 found (and restores) a side effect: `13` also *attempts* to start this
 server's AS2 daemon, which cannot succeed because the AS2 listener is

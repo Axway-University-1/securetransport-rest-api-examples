@@ -163,7 +163,7 @@ c = fake_st.Checker("stCertificateExpiry.py")
 ns = fake_st.load("stCertificateExpiry.py", expiryFieldName="",
                   expiryFieldCandidates=["endDate", "validTo", "notAfter",
                                          "expiryDate", "expirationDate",
-                                         "certificateEndDate"])
+                                         "certificateEndDate", "expirationTime"])
 import datetime  # noqa: E402
 parse = ns["parseExpiry"]
 find = ns["findExpiryField"]
@@ -177,10 +177,14 @@ c.check("epoch seconds", parse(1780000000).year == 2026)
 c.check("epoch as a string matches the integer", parse("1780000000000") == parse(1780000000000))
 c.check("None stays None", parse(None) is None)
 c.check("garbage stays None", parse("not a date") is None)
+c.check("RFC 2822 with an offset, as 5.5-20260924 writes expirationTime, is converted to UTC",
+        parse("Tue, 31 Dec 2030 22:59:59 +0200") == datetime.datetime(2030, 12, 31, 20, 59, 59), parse("Tue, 31 Dec 2030 22:59:59 +0200"))
+c.check("a date that is not a date, in RFC 2822 clothes, stays None", parse("Foo, 99 Zzz 2030 99:99:99 +0200") is None)
 c.check("an absurd number does not raise", parse(9 ** 30) is None)
 c.check("finds the first candidate present", find({"notAfter": "x", "endDate": "y"}) == "endDate")
 c.check("skips a null value", find({"endDate": None, "validTo": "2026-01-01"}) == "validTo")
 c.check("returns None when no candidate is present", find({"name": "c"}) is None)
+c.check("finds expirationTime, the field of 5.5-20260924", find({"name": "c", "expirationTime": "Tue, 31 Dec 2030 22:59:59 +0200"}) == "expirationTime")
 failures += 0 if c.summary() else 1
 
 
@@ -234,6 +238,55 @@ s = fake_st.FakeSession(totals={"logs/transfers": billable})
 c.check("the report adds up the days", ns["stReportBillable"](s, "T", 3, "") == 13)
 c.check("one call per day", len(s.reads) == 3, len(s.reads))
 c.check("it only reads", s.writes == [], s.writes)
+failures += 0 if c.summary() else 1
+
+
+# ------------------------------------------------- a call that cannot complete is exit 1
+print()
+c = fake_st.Checker("stCall: every way a request can fail to complete ends the script with exit code 1")
+req = fake_st.requests.exceptions
+
+
+class Raising:
+    """A session whose every call raises the exception it was made with."""
+
+    def __init__(self, error):
+        self.error = error
+
+    def get(self, *a, **k):
+        raise self.error
+
+    post = put = patch = delete = get
+
+
+c.check("the stand-in has the real library's exception classes, which are three different things",
+        req.Timeout is not req.ConnectionError and req.HTTPError is not req.ConnectionError
+        and issubclass(req.ConnectTimeout, req.ConnectionError) and issubclass(req.ConnectTimeout, req.Timeout),
+        [req.Timeout, req.ConnectionError])
+for script in ("stGraceful.py", "stAddLoginRestrictionRule.py", "stUpdateAllAccounts.py", "stConfigScan.py",
+               "stGetAccountsAfterDate.py", "stGetPrivateCert.py", "stReplaceSites.py"):
+    ns = fake_st.load(script)
+    for name, error in (("a connection error", req.ConnectionError("down")), ("a timeout", req.Timeout("slow")),
+                        ("a connect timeout", req.ConnectTimeout("slow")), ("a read timeout", req.ReadTimeout("slow")),
+                        ("any other request error", req.RequestException("odd"))):
+        try:
+            ns["stCall"](Raising(error), "GET", "https://st.example.com:8444/api/v2.0/accounts")
+            code = "no exit: it returned"
+        except SystemExit as e:
+            code = e.code
+        c.check("%s: %s is exit 1, not a return and not a loop" % (script, name), code == 1, code)
+failures += 0 if c.summary() else 1
+
+
+# ------------------------------------------------------ the configuration baseline
+print()
+c = fake_st.Checker("stConfigScan.py: the comparison")
+ns = fake_st.load("stConfigScan.py")
+changed, new, gone = ns["stCompare"]({"a": ["1"], "b": ["2"], "c": ["3"]}, {"a": ["1"], "b": ["9"], "d": ["4"]})
+c.check("a value that changed", changed == ["b"], changed)
+c.check("an option only on the live system", new == ["d"], new)
+c.check("an option only in the baseline, which the one way comparison missed", gone == ["c"], gone)
+c.check("two equal sets have no difference", ns["stCompare"]({"a": ["1"]}, {"a": ["1"]}) == ([], [], []))
 failures += 0 if c.summary() else 1
 
 

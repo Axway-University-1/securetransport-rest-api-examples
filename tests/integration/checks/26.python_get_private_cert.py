@@ -21,11 +21,15 @@ check uses exactly that to create the one thing this project never had
 before: a real private certificate, owned by a throwaway account, that
 `stGetPrivateCert.py` can actually export.
 
-Separately confirmed: the `password` query parameter `stGetPrivateCert.py`
-sends on the export call itself (hardcoded `12345678` in the shipped
-script) is not validated against anything - it is the passphrase the
-*exported* file gets encrypted with, freely chosen by the caller, not a
-secret you need to already know. Only the CA password above gates anything.
+Separately confirmed: the password of the export is not validated against
+anything - it is the passphrase the *exported* file gets encrypted with, freely
+chosen by the caller, not a secret you need to already know. Only the CA
+password above gates anything. stGetPrivateCert.py used to send it in the URL
+(GET with exportPrivateKey=true&password=...); it now asks the export
+operation (POST /certificates/{id}/operations?operation=export&format=pkcs12)
+and sends it as a form field, read from ST_EXPORT_PASSWORD, which this check sets.
+The file it writes must be readable by its owner only, and must open with that
+password and hold the private key (checked with openssl, when it is on this machine).
 
 Needs --write, st_allow_writes="yes", AND a real st_ca_password set in
 integration.conf - this check skips itself, rather than fail, when that is
@@ -35,6 +39,8 @@ cannot ship a working default for it.
 import email
 import json
 import os
+import shutil
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
@@ -49,7 +55,7 @@ def json_body(response):
     header (st_client's default on every call) does not change that.
     st_client.py stays stdlib only, so this pulls the one application/json
     part out by hand with the stdlib email parser, rather than pull in
-    requests_toolbelt (which stGetPrivateCert.py itself needs) just for this.
+    requests_toolbelt just for this.
     """
     content_type = response.headers.get("Content-Type") or response.headers.get("content-type", "")
     if "multipart" not in content_type:
@@ -87,7 +93,8 @@ PY_DIR = os.path.join(PY_TREE, "python3")
 SCRIPT = os.path.join(PY_DIR, "stGetPrivateCert.py")
 ACCOUNT = config.get("st_object_prefix", "ZZTEST_") + "certaccount"
 CERT_NAME = config.get("st_object_prefix", "ZZTEST_") + "privcert"
-PKEY_FILE = os.path.join(PY_DIR, "exportedPrivateKey")
+PKEY_FILE = os.path.join(PY_DIR, "exportedPrivateKey.p12")
+EXPORT_PASSWORD = "ZzTest_export_pw_1"
 LOG_FILE = os.path.join(PY_DIR, "my.log")
 
 client = st_client.connect(config, c)
@@ -137,15 +144,28 @@ try:
             "trusted" in str(cert.get("validationStatus", "")).lower(),
             cert.get("validationStatus"))
 
-    with runner.real_credentials_python(PY_TREE, config):
-        result = runner.run_python(SCRIPT, [cert_id])
+    os.environ["ST_EXPORT_PASSWORD"] = EXPORT_PASSWORD
+    try:
+        with runner.real_credentials_python(PY_TREE, config):
+            result = runner.run_python(SCRIPT, [cert_id])
+    finally:
+        del os.environ["ST_EXPORT_PASSWORD"]
     c.check("stGetPrivateCert.py runs without a shell level error",
             result.returncode == 0,
-            result.stderr.strip()[-300:] if result.returncode else "")
+            (result.stdout + result.stderr).strip()[-300:] if result.returncode else "")
     c.check("its own output confirms the export",
             "Private Key exported with filename" in result.stdout, result.stdout[-300:])
+    c.check("the password is not in its output", EXPORT_PASSWORD not in result.stdout + result.stderr)
 
     c.check("the exported private key file was written", os.path.exists(PKEY_FILE))
+    if os.path.exists(PKEY_FILE):
+        c.check("and is readable by its owner only (0600)",
+                (os.stat(PKEY_FILE).st_mode & 0o777) == 0o600, oct(os.stat(PKEY_FILE).st_mode))
+        if shutil.which("openssl"):
+            info = subprocess.run(["openssl", "pkcs12", "-in", PKEY_FILE, "-passin", "pass:" + EXPORT_PASSWORD,
+                                   "-info", "-noout"], capture_output=True, text=True)
+            c.check("openssl opens it with that password, and it holds the private key",
+                    info.returncode == 0 and "Shrouded Keybag" in info.stderr, info.stderr[-300:])
     if os.path.exists(PKEY_FILE):
         with open(PKEY_FILE, "rb") as f:
             content = f.read()

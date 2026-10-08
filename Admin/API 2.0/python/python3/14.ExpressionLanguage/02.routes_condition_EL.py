@@ -25,6 +25,8 @@
 #
 # Usage: python3 02.routes_condition_EL.py
 #
+# Risk: write - creates three throwaway routes and deletes them again, by the id each was created with; a route that was there already is never deleted
+#
 # Notes:
 # - Confirmed directly against a real server: conditionType accepts
 #   MATCH_ALL, MATCH_FIRST, ALWAYS or EL. When it is EL, the expression text
@@ -41,6 +43,7 @@ import el_client  # noqa: E402
 
 config = el_client.load_config()
 client = el_client.ELClient(config)
+created = []
 
 ROUTES = [
     ("ZZTEST_EL_route_disabled", "${account.disabled != '0'}"),
@@ -48,25 +51,22 @@ ROUTES = [
     ("ZZTEST_EL_route_bytesGE20", "${transfer.transferredBytes ge 20}"),
 ]
 
-for name, condition in ROUTES:
-    print("\nCreating %s with condition: %s" % (name, condition))
-    response = client.post("routes", {
-        "name": name, "type": "SIMPLE", "conditionType": "EL", "condition": condition,
-    })
-    print(response.status_code)
+try:
+    for name, condition in ROUTES:
+        print("\nCreating %s with condition: %s" % (name, condition))
+        response = client.post("routes", {
+            "name": name, "type": "SIMPLE", "conditionType": "EL", "condition": condition,
+        })
+        print(response.status_code)
+        client.expect(response, [201], "Creating " + name)
+        client.track(created, "routes", response, name)
 
-print("\nReading all three back...")
-for name, _ in ROUTES:
-    response = client.get("routes", params={"name": name, "fields": "name,condition,conditionType"})
-    print(response.text)
+    print("\nReading all three back...")
+    for name, _ in ROUTES:
+        response = client.get("routes", params={"name": name, "fields": "name,condition,conditionType"})
+        client.expect(response, [200], "Reading " + name)
+        print(response.text)
 
-print("\nCleaning up all three throwaway routes...")
-for name, _ in ROUTES:
-    response = client.get("routes", params={"name": name, "fields": "id"})
-    result = response.json().get("result", [])
-    if result:
-        route_id = result[0]["id"]
-        client.delete("routes/" + route_id)
-        print("deleted %s (%s)" % (name, route_id))
-
-client.logout()
+    print("\nCleaning up all three throwaway routes...")
+finally:
+    client.finish(created)
