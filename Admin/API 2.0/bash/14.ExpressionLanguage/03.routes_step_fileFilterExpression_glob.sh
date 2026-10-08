@@ -18,8 +18,7 @@
 #   *.[0-9]     any file with a single digit extension
 #   *.[!0-9]    any file with a single non-digit-character extension
 #
-# APIs used - /myself ( ST login and logout )
-#             /routes ( POST, GET, DELETE )
+# APIs used - /routes ( POST, GET, DELETE )
 #
 # Usage:
 # ./03.routes_step_fileFilterExpression_glob.sh

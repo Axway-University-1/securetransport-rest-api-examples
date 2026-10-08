@@ -18,8 +18,7 @@
 #                                     transfer site's download pattern field,
 #                                     per the source document.
 #
-# APIs used - /myself ( ST login and logout )
-#             /routes ( POST, GET, DELETE )
+# APIs used - /routes ( POST, GET, DELETE )
 #
 # Usage:
 # ./04.routes_step_fileFilterExpression_regexp.sh

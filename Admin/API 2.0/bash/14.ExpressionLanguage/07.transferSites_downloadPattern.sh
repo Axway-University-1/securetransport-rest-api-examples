@@ -17,8 +17,7 @@
 #   glob:  *.[0-9]                   files with a single digit extension
 #   regex: .*\.(xml|txt)             files ending in .xml or .txt
 #
-# APIs used - /myself ( ST login and logout )
-#             /sites ( POST, GET, DELETE )
+# APIs used - /sites ( POST, GET, DELETE )
 #
 # Usage:
 # ./07.transferSites_downloadPattern.sh

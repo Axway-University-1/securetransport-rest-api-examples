@@ -25,8 +25,7 @@
 #   ${account.name}_${basename(transfer.target)}
 #       prefixes the file name with the current account's name.
 #
-# APIs used - /myself ( ST login and logout )
-#             /routes ( POST, GET, DELETE )
+# APIs used - /routes ( POST, GET, DELETE )
 #
 # Usage:
 # ./06.routes_step_renameExpression.sh

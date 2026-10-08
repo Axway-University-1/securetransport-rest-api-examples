@@ -19,8 +19,7 @@
 # is not attached to anything (no business unit, not the default policy), so
 # it has no effect on any real login while it exists.
 #
-# APIs used - /myself ( ST login and logout )
-#             /loginRestrictionPolicies ( POST, GET, PATCH, DELETE )
+# APIs used - /loginRestrictionPolicies ( POST, GET, PATCH, DELETE )
 #
 # Usage:
 # ./01.loginRestrictionPolicy_sessionExpression.sh

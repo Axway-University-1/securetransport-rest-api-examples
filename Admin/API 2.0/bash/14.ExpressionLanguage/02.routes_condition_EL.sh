@@ -15,8 +15,7 @@
 #   2. ${!empty account.email}             - the empty operator (conditional)
 #   3. ${transfer.transferredBytes ge 20}  - a numeric comparison (arithmetic)
 #
-# APIs used - /myself ( ST login and logout )
-#             /routes ( POST, GET, DELETE )
+# APIs used - /routes ( POST, GET, DELETE )
 #
 # Usage:
 # ./02.routes_condition_EL.sh

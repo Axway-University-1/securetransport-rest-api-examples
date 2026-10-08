@@ -36,8 +36,7 @@
 #                        matches once it actually runs - it is not merely
 #                        cosmetic.
 #
-# APIs used - /myself ( ST login and logout )
-#             /routes ( POST, GET, DELETE )
+# APIs used - /routes ( POST, GET, DELETE )
 #
 # Usage:
 # ./05.routes_step_condition_matches_backslashDoubling.sh

@@ -14,8 +14,7 @@
 # which this script does not call - only the site side of the pattern is
 # shown here.
 #
-# APIs used - /myself ( ST login and logout )
-#             /sites ( POST, GET, DELETE )
+# APIs used - /sites ( POST, GET, DELETE )
 #
 # Usage:
 # ./08.transferSites_dynamicProperties.sh
