@@ -773,6 +773,15 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   it needs real platform credentials, and the server calls a `Platform.API` that must be HTTPS, which no stand-in here is. The check points only the token address
   at a `FakeToken` stand-in (and puts it back), so the real platform is never contacted.
 
+- **Transaction Manager** (`/transactionManager`; examples `34.TransactionManager`, check 57): one GET answers `{"status": "Running."}` (a free
+  text, with the full stop; `stGraceful.py` looks for the word `Running`). `fields=` is ignored (even an unknown one), HEAD is 200, PUT, PATCH
+  and DELETE are 405 on it and on `/transactionManager/operations`, GET on `/operations` is 405, XML and CSV are 406, a sub path is 404. What
+  a stopped or stopping Transaction Manager answers was **not seen**: the stop is server wide and cannot be undone (see "The Transaction
+  Manager has no start operation"), so it was **never sent to the lab**, not even with a wrong value. `02.transactionManager_operations_POST_stop.sh`
+  is written from the reference and `stGraceful.py` and tested only against a stub `curl`; it sends nothing unless the first argument is the word
+  `stop-the-transaction-manager` (exit 2 otherwise), and check 57 runs only its refusals, behind a fake `curl`. The reference's `graceful` is false when
+  left out, an immediate stop; the script sends it always and defaults to true.
+
 - **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
   the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
   An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST

@@ -47,7 +47,7 @@ Covered, in reference order: accessPolicies, accountSetup, accounts,
 addressBook, administrativeRoles, administrators, applications, businessUnits,
 certificates, configurations, daemons, deniedUsers, events, icapServers,
 ldapDomains, loginRestrictionPolicies (the API only: see below), logs (cancel works only
-for a transfer the server flags cancelable: check 48), mailTemplates, myself, routes (08 to 10 in `09.CompositeRoutes` added to the earlier create, list and delete), routeStepsMetadata (read only: one GET, `30.RouteStepsMetadata`), routeStepsCharsets (read only: one GET, `31.RouteStepsCharsets`), servers, sessions (list, read, end one session, two statistics: `32.Sessions`, check 53), sites (05 to 11 in `06.TransferSites` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the connection test of a saved and of a new site, the remote folder listing; check 54), statisticsSummary (read only: the usage report for a period, the users who have logged in, the platform connection test, whose success was not seen: `33.StatisticsSummary`, check 55), subscriptions (05 to 13 in `07.Subscriptions` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the Pull, ClearPullHistory and Purge operations, and a subscription of each of four other types with its deletion by `purge=true`; check 56), transfers, version.
+for a transfer the server flags cancelable: check 48), mailTemplates, myself, routes (08 to 10 in `09.CompositeRoutes` added to the earlier create, list and delete), routeStepsMetadata (read only: one GET, `30.RouteStepsMetadata`), routeStepsCharsets (read only: one GET, `31.RouteStepsCharsets`), servers, sessions (list, read, end one session, two statistics: `32.Sessions`, check 53), sites (05 to 11 in `06.TransferSites` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the connection test of a saved and of a new site, the remote folder listing; check 54), statisticsSummary (read only: the usage report for a period, the users who have logged in, the platform connection test, whose success was not seen: `33.StatisticsSummary`, check 55), subscriptions (05 to 13 in `07.Subscriptions` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the Pull, ClearPullHistory and Purge operations, and a subscription of each of four other types with its deletion by `purge=true`; check 56), transactionManager (the status, and the stop, which was never sent to the lab and is written from the reference: `34.TransactionManager`, check 57 sends nothing but reads and refusals), transfers, version.
 
 Left out until a lab can show it: **siteTemplates** (the lab has no Connect:Direct: every create is
 400 "Site template protocol cd is not valid. Connect:Direct protocol not available.", and `custom` and every
@@ -60,7 +60,7 @@ still counts these 13 configurations operations and 2 clusterServices ones as
 missing; that is expected.
 
 **Next, in order:**
-transactionManager, transferProfiles, userClasses, zones. Run `coverage.py` for
+transferProfiles, userClasses, zones. Run `coverage.py` for
 the operations still missing in the partly covered ones. Update this list when
 a resource is done.
 

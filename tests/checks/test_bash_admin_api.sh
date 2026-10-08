@@ -2339,6 +2339,78 @@ GET_BODY=
 STATUS=
 
 echo
+echo "=== 34.TransactionManager ==="
+F=34.TransactionManager
+T="${BASE}/transactionManager"
+GET_BODY=$(body tm_running '{"status":"Running."}')
+run "${F}/01.transactionManager_GET.sh"
+expect "01 status: one GET of /transactionManager, exit 0 when running" "${RC}:$(calls)" "0:GET ${T}"
+has "01 status: prints the server's text" "Transaction Manager status: Running."
+expect "01 status: sends the Referer" "$(has_header 'Referer: THIS_IS_A_RANDOM_TEXT')" "1"
+GET_BODY=$(body tm_stopped '{"status":"Stopped."}')
+run "${F}/01.transactionManager_GET.sh"
+expect "01 status: a status that is not Running exits 1" "${RC}" "1"
+has "01 status: and prints it" "Transaction Manager status: Stopped."
+GET_BODY=$(body tm_stopping '{"status":"Shutdown in progress."}')
+run "${F}/01.transactionManager_GET.sh"
+expect "01 status: shutdown in progress exits 1" "${RC}" "1"
+GET_BODY=$(body tm_nostatus '{}')
+run "${F}/01.transactionManager_GET.sh"
+has "01 status: an answer with no status says unknown" "Transaction Manager status: unknown"
+expect "01 status: and exits 1" "${RC}" "1"
+GET_BODY=$(body tm_406 '{"message":"HTTP 406 Not Acceptable"}')
+STATUS=406 run "${F}/01.transactionManager_GET.sh"
+expect "01 status: a refusal exits 1" "${RC}" "1"
+has "01 status: with the code and the reason" "HTTP 406"
+GET_BODY=
+STATUS=
+
+# The stop is server wide and cannot be undone: the guard is tested first, and every refusal must send nothing
+S=02.transactionManager_operations_POST_stop.sh
+CW=stop-the-transaction-manager
+for args in "" "yes" "STOP" "stop" "${CW}x" "x${CW}" "${CW} maybe" "${CW} false 30" "${CW} true 3x" "${CW} true -5" "${CW} true 10 more" "true" "true 30"; do
+    # shellcheck disable=SC2086
+    run "${F}/${S}" ${args}
+    expect "02 stop: arguments (${args:-none}) exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' '):$(printf '%s\n' "${OUT}" | grep -c '^METHOD:')" "2:0:0"
+done
+run "${F}/${S}"
+has "02 stop: with no confirmation it says that nothing was sent" "Nothing was sent."
+has "02 stop: and which word to give" "give the word ${CW} as the first argument"
+run "${F}/${S}" ""
+expect "02 stop: an empty confirmation sends nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+# the confirmation cannot come from the environment or be a default
+STOP_CONFIRM="${CW}" CONFIRM="${CW}" CONFIRMATION="${CW}" run "${F}/${S}"
+expect "02 stop: no environment variable stands in for the confirmation" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+expect "02 stop: the word is on the command line only, no default in the script" "$(grep -c "\${1:-" "${ADMIN_TREE}/${F}/${S}")" "0"
+
+POST_BODY=$(body tm_stop_ok '{"message":"Transaction Manager stopped.","isSuccessful":true}')
+STATUS=200 run "${F}/${S}" "${CW}"
+expect "02 stop: the word alone is one POST, graceful by default, no timeout, no body" "${RC}:$(calls)" "0:POST ${T}/operations?operation=stop&graceful=true"
+expect "02 stop: sends no body" "$(payload 1)" ""
+expect "02 stop: sends the Referer" "$(has_header 'Referer: THIS_IS_A_RANDOM_TEXT')" "1"
+has "02 stop: prints the code" "HTTP 200"
+has "02 stop: and the server's message" "Transaction Manager stopped."
+STATUS=200 run "${F}/${S}" "${CW}" true 45
+expect "02 stop: a graceful stop with a timeout" "$(calls)" "POST ${T}/operations?operation=stop&graceful=true&timeout=45"
+STATUS=200 run "${F}/${S}" "${CW}" false
+expect "02 stop: an immediate stop" "$(calls)" "POST ${T}/operations?operation=stop&graceful=false"
+STATUS=200 run "${F}/${S}" "${CW}" true 0
+expect "02 stop: a timeout of 0 is sent" "$(calls)" "POST ${T}/operations?operation=stop&graceful=true&timeout=0"
+POST_BODY=$(body tm_stop_failed '{"message":"Transaction Manager could not be stopped.","isSuccessful":false}')
+STATUS=200 run "${F}/${S}" "${CW}"
+expect "02 stop: 200 with isSuccessful false exits 1" "${RC}" "1"
+has "02 stop: and prints the message" "could not be stopped"
+POST_BODY=$(body tm_stop_403 '{"message":"HTTP 403 Forbidden"}')
+STATUS=403 run "${F}/${S}" "${CW}"
+expect "02 stop: a refusal exits 1" "${RC}" "1"
+has "02 stop: with the code and the reason" "HTTP 403"
+POST_BODY=$(body tm_stop_400 '{"message":"Error validating request","validationErrors":["stopGracefully.arg1 must match"]}')
+STATUS=400 run "${F}/${S}" "${CW}"
+has "02 stop: a validation error prints its first line" "stopGracefully.arg1 must match"
+POST_BODY=
+STATUS=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

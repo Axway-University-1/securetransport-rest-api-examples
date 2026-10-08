@@ -51,8 +51,8 @@ writes_called_read = [e["path"] for e in items if e["method"] in ("POST", "PUT",
 chk("a POST, PUT, PATCH or DELETE is a read only when it is a login, logout or test", not writes_called_read, writes_called_read[:5])
 
 disruptive = sorted(os.path.basename(e["path"]) for e in items if e["risk"] == "disruptive")
-chk("the disruptive ones are exactly the daemon and server operations, maintenance mode and the keystore password",
-    disruptive == ["05.daemons_operations_POST.sh", "13.servers_operations_POST.sh",
+chk("the disruptive ones are exactly the Transaction Manager stop, the daemon and server operations, maintenance mode and the keystore password",
+    disruptive == ["02.transactionManager_operations_POST_stop.sh", "05.daemons_operations_POST.sh", "13.servers_operations_POST.sh",
                    "25.configurations_maintenance_operations_POST.sh", "28.configurations_keystorePassword_PUT.sh"], disruptive)
 chk("every disruptive or config example of the Admin API says why, or is in a config topic",
     all(e["risk_note"] or e["topic"] in ("13.Configurations", "17.AccessPolicies") for e in items if e["risk"] in ("config", "disruptive")))
