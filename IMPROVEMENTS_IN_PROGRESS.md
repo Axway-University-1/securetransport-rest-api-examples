@@ -1,119 +1,45 @@
-# Repository Improvements - Completion Status
+# Repository improvements: what was found, what is done, what is open
 
-This document tracks the systematic improvements to the examples repository identified in the full repo scan (October 2025).
+Four read-only reviews of the whole repository (the example scripts, the test harness, the
+documentation and skills, the python examples and the repository hygiene) found about forty
+things. This is the ledger. Delete it when the open list is empty.
 
-## Completed (5 commits)
+## Done
 
-### Priority 0: Safety ✅
-1. **Config file protection** - Script harness now writes backups to disk and restores on SIGTERM, preventing loss of developer config when process is killed
-2. **Password literals** - Replaced 4 hardcoded passwords in stBuildFullTestAccount.py with "change_me" placeholder
-3. **Hygiene check extended** - Credential scan now covers Python files, rejecting any password line unless explicitly "change_me"
+| Area | What | Where |
+| ---- | ---- | ----- |
+| Harness | Never writes over your `set_variables.local.sh` or `integration.conf`: temporary files named by `ST_ADMIN_LOCAL_VARIABLES`, `ST_ENDUSER_LOCAL_VARIABLES`, `ST_INTEGRATION_CONF`; the python config is kept on disk and restored on exit, SIGTERM, and by the next run after a SIGKILL | `tests/integration/lib/script_runner.py`, `run_integration.sh` |
+| Harness | A check that asserts nothing is a skip, not a pass; output streams; timings; a name filter; number order past 99 | `run_integration.sh`, `st_client.py` |
+| Harness | The mock no longer leaves its key in the temp folder, and passes check 12 and 04 | `tests/integration/mock/mock_st.py` |
+| Harness | Checks that compare days wait out midnight | `st_client.avoid_midnight` |
+| Secrets | Hardcoded passwords out of `stBuildFullTestAccount.py`; the credential scan covers python | `check_hygiene.sh` |
+| Python | Every example: CSRF token on every write, every failure exits non-zero, every status checked, bounded waits, `daemon=` (not `serverName=`) to stop a daemon, dry run by default where it deletes, a Risk line, optional `st_verify` | `Admin/API 2.0/python`, `test_python_*.py`, `tests/lib/fake_requests` |
+| Admin bash and bat | 19 scripts that changed real or server wide things when run bare, and 35 write scripts that could not fail: arguments or `example_*` defaults, `HTTP <code>`, exit 1 and 2, jq, encoded names | `test_bash_admin_api.sh`, `test_bash_admin_sweep_a.sh`, `_b.sh` |
+| Admin bash | `14.ExpressionLanguage` tested and made refuse to touch what exists | `test_bash_expression_language.sh` |
+| Acknowledgment | Exit codes, paging past 100 transfers, the bat twins | `90.EndToEndAcknowledgment`, `test_bash_pesit_ack.sh` |
+| EndUser | Logout ended the wrong session, bash 3.2, exit 0 on failure, the tracked `test.txt`, base64 wrapping | `EndUser/API 2.0/bash`, `test_bash_enduser_api.sh` |
+| Repository | `.gitattributes` (CRLF for `.bat`) and the hygiene check that reads CRLF | `.gitattributes` |
+| Docs | The gotchas entries later findings contradicted; an index; README, Features README, CLAUDE.md, tests README (every check named, guarded by `check_docs_match_repo.py`) | |
 
-### Priority 1a: Python script errors ✅
-- Fixed undefined names in 7 python scripts (et→e in exception handlers, urlrl→stUrl, writelog→writeLog, stURL→stUrl)
-- Result: error paths no longer crash with NameError/TypeError
+## Open
 
-### Priority 1b: Line endings ✅
-- Added `.gitattributes` forcing CRLF for `.bat` files to prevent cmd.exe label resolution bugs in files >512 bytes
-
-### Priority 3a/3b: README documentation ✅
-- Added 14.ExpressionLanguage to Admin table
-- Fixed parity claim (bash/bat match except EL)
-- Updated intro and glossary
-- Fixed stale "not covered" list
-
----
-
-## Remaining Work (Organized by Priority)
-
-### Priority 1c: Dangerous script defaults - DONE for the 14 scripts below (bash, bat twin, offline tests, lab checks)
-These scripts changed the server when run with default arguments. Each now defaults to an `example_*` object or requires
-its input (exit 2, nothing sent), prints `HTTP <code>`, exits 1 on a refusal and prints the old value and how to put it back:
-
-| Script | Now |
-|--------|-----|
-| `02.Introduction/04.myself_PATCH.sh` | needs `ST_NEW_PASSWORD` (exit 2 without it) |
-| `03.Connect/03.daemons_name_PUT.sh`, `04.daemons_name_PATCH.sh` | need the daemon and the values as arguments |
-| `03.Connect/05.daemons_operations_POST.sh` | needs the daemon, the operation and, for a stop, `stop-the-<daemon>-daemon` |
-| `13.Configurations/01.configurations_PATCH.sh` | needs the new value (and optionally the option) |
-| `13.Configurations/02.configurations_PATCH_UsageReporting.sh` | needs ten `ST_USAGE_*` variables, none a placeholder |
-| `05.Accounts/02` to `07` (7 scripts) | act on `example_user`, `example_service`, `example_template` |
-| `04.Applications/02` to `07` (6 scripts) | act on `example_humansystem` and `example_filepurge` (no schedule unless asked) |
-
-**Testing:** `tests/checks/test_bash_admin_api.sh` (bare run exits 2 and sends nothing, the exact bodies, the HTTP code, exit 1
-on a refusal, the old value printed); integration checks 04, 05, 13, 14, 21 on the lab (23, which stops daemons, was updated for the
-new arguments and not run). The `.bat` twins cannot be run on macOS: they were re-read against the bash ones.
-
-### Priority 1d: Exit codes (88 bash + 79 bat scripts)
-Most scripts ignore HTTP errors and always exit 0. Fix pattern:
-
-```bash
-# Check status and exit on error
-HTTP_CODE=$(curl ... -w "\n%{http_code}" ... | tail -1)
-[ "$HTTP_CODE" = "204" ] || exit 1
-```
-
-**Affects:** All 02/03 folders plus any PUT/PATCH/DELETE.
-**Testing:** Verify script exits 1 when server returns 400 or 500.
-
-### Priority 1e: Broken bat files (4 files)
-| File | Issue | Fix |
-|------|-------|-----|
-| `03.Connect/11.servers_name_PATCH.bat` | PATCH sends object, not array | Use `ConvertTo-Json -InputObject @(...)` |
-| `04.Applications/02.applications_POST.bat` | PowerShell null bug (IF "%NAME%"=="null") | DONE: rewritten with subroutines, no null compare, no block variable read |
-| `90.Acknowledgment.bat` | Unquoted URL has &, Get-Date broken | Quote safely, fix format string |
-| `90.IteratePesitInbounds.bat` | Double CALL expansion corrupts URL | Use `%~2` not `%2` |
-
-### Priority 1f: EndUser bash scripts (7 scripts)
-| Issue | Scripts | Fix |
-|-------|---------|-----|
-| Bare exit after error | 01/01, 01/02, 02/03, 02/05, 02/06 (×2), 02/07 | Replace `exit` with `exit 1` |
-| bash 3.2 substring error | `01.Authenticate/01.myself_POST.sh` | Use `printf` instead of `${...:-3}` |
-| Overwrites cookie jar | `02.myself_DELETE.sh` | Use `-b` (read jar) not `--cookie-jar` |
-| Appends to tracked file | `02.Files/04.files_filepath_POST.sh` | Use temp file, not tracked `test.txt` |
-| base64 line wrapping | `set_variables.sh` | Pipe through `tr -d '\n'` on Linux |
-
-### Priority 2: Test harness (61 integration checks)
-Major gaps (estimated 2-3 days of work):
-
-- **Missing offline tests:** folders 01-05 (200+ scripts), 14.ExpressionLanguage (8 scripts), 10 python programs
-- **Flaky checks:** 56, 43, 48, 55, 30 use sleep-based assertions or absolute dates
-- **Duplicated helpers:** `script()` (34 copies), `wait_until` (9), port lookups (19) - move to `tests/integration/lib`
-- **Temp file leaks:** 89 leftover `mock_st_*` directories; mock_st.py never removes them
-- **Mock failures:** 
-  - Check 12: version/myself endpoints lack fields
-  - ~29 checks report "PASS 0 assertions" instead of SKIP
-
-**Fix sequence:** helpers first, then flakiness, then missing tests.
-
-### Priority 3: Documentation restructure (20+ hrs)
-
-- **Gotchas skill:** 1500 lines, 10 contradictions, no index. Needs: index, one section per resource, cross-cutting tables.
-- **Test READMEs:** stale counts, wrong mock failure reason
-- **Orientation skill:** out-of-order task index, stale descriptions
-- **CLAUDE.md:** obsolete "add next resource" instructions
-
----
-
-## How to Continue
-
-**Start with Priority 1c** (5 scripts) → **Priority 1d** (pattern fix for 167 scripts) → **Priority 1e/1f** → **Priority 2** → **Priority 3**.
-
-Each priority is independent. Can parallelize 1c and 1d, or do them serially then test batch.
-
-Every change should be tested with:
-```bash
-./tests/run_all.sh                           # offline
-python3 tests/integration/checks/NN.*.py     # on lab
-```
-
-Then committed as a batch: `Priority 1c: <concise summary>`, etc.
-
----
-
-## Notes for Next Session
-
-- All 5 completed batches pass `./tests/run_all.sh` offline (17 checks).
-- No integration lab tests were run for the fixes yet.
-- `.gitattributes` is in place but files haven't been re-normalized yet (optional; happens on next clone if users run `git reset --hard`).
-- The harness backup mechanism uses `tests/.harness_backups/` on disk to survive SIGTERM; can be cleaned up if runs complete normally.
+1. **The 33 read scripts** that pipe a list into jq and never look at the status (`01.Authentication`,
+   `02.Introduction` 01 to 03 and 05, `03.Connect` 01, 02, 06, 08, 09, `04.Applications/01`, `05.Accounts/01`, the
+   `01.*_GET` of folders 06 to 37). A 401 prints nothing and exits 0. `03.Connect` 08 (HEAD) and 09 say a missing
+   server is a 404: the lab says 400.
+2. **Leftovers of the sweeps:** `change_me` default passwords in `18.AccountSetup` 01 and 03 (bash and bat);
+   `20.AdministrativeRoles/05` checks its GET with `jq -e` only; `09.CompositeRoutes` 02 and 05.
+3. **Harness:** `script()`, `wait_until` and the port lookups are copied into dozens of checks
+   (`tests/integration/lib`); fixed sleeps stand in for a wait in checks 43, 48 and 56; checks 41, 53 and 55 assume a quiet
+   server; `mkdtemp` without cleanup in 31, 32, 33, 47, 48, 49 and 52; no per-check timeout; the stub curl has grown by
+   accident. Two runs at once delete each other's `tests/output`.
+4. **Consistency:** 31 scripts need the account `john`; port 8022 is hard coded in several; some objects are not
+   named `example_*` (`SSH_TEST_SERVER_*`, `RouteFrom*`, `SimpleRouteName`, `Finance`); the trigger-route feature lacks the
+   self healing account and the exit codes of the billable one; the EndUser tree has no bat twins (decide: add them, or
+   say so plainly).
+5. **The bat twins have never run:** none of the bat changes could be run (no Windows here).
+6. **Docs:** the 550 line per resource list in the gotchas is still one list; incident and history entries belong in a
+   changelog; the orientation task index is out of order.
+7. **For the owner:** the password that was in `stBuildFullTestAccount.py` is still in git history (rotate it if it was ever
+   real); `st_callback_host` in `tests/local/integration.conf` is stale, so checks 40 and 47 fail on it; the trainer kit needs
+   the new arguments of the changed scripts and a new `python.tsv`.

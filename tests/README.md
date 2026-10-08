@@ -9,16 +9,16 @@ network.
 You need `bash`, `python3` and `jq`. On macOS: `brew install jq`. On Debian or
 Ubuntu: `sudo apt install jq`.
 
-**1. Run the tests** (about 5 seconds), from the repository root:
+**1. Run the tests** (about three minutes), from the repository root:
 
 ```
 ./tests/run_all.sh
 ```
 
-**2. Read the result.** A good run ends with:
+**2. Read the result.** A good run ends with (the number is how many checks there are, and grows):
 
 ```
-# ALL CHECKS PASSED  (13)
+# ALL CHECKS PASSED  (26)
 ```
 
 If something fails, scroll up. Each line starts with `PASS` or `FAIL`, and a
@@ -69,6 +69,14 @@ server](#against-a-real-server).
 | `checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: README coverage tables whose counts differ from the directories, and `.claude` skills that describe a layout, file or variable that no longer exists. |
 | `checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
 | `checks/test_bash_reads_and_deletes.sh` | The examples that look up, read and delete, and the EndUser examples that open their own session: a DELETE going to an id the lookup did not find, or to anything when the lookup found nothing; composite routes not deleted before the simple routes they run; a count read from `returnCount` instead of `totalCount`; an EndUser call without the `csrfToken` its login returned. |
+| `checks/check_risk_headers.py` | An example whose header has no `Risk:` line, an unknown level, a bat twin that says something else, a read that writes (or a write called read), and the list of the disruptive ones changing unnoticed. |
+| `checks/test_bash_admin_api.sh` | The Admin examples of the resource folders (the biggest check: hundreds of runs against the stub curl): the method, URL with its query, body and headers each sends, the answers it acts on, and its exit code. For the examples that were brought up to the house rules, a bare run exiting 2 with nothing sent, the HTTP code printed, exit 1 on a 4xx or 5xx. |
+| `checks/test_bash_admin_sweep_a.sh`, `test_bash_admin_sweep_b.sh` | The older Admin write examples (servers, sites, subscriptions, routes, business units, configurations, access policies, roles, administrators) that used to ignore the status: arguments validated before anything is sent, JSON built by jq, names encoded, the code printed from `curl -w`, exit 1 on a refusal, a delete that matches exact names and refuses an ambiguous one, and the logged in administrator never deleted. Their bat twins are read as text. |
+| `checks/test_bash_expression_language.sh` | The `14.ExpressionLanguage` examples: the exact expression strings that reach the server (the `${...}` not expanded by the shell, one or two backslashes, the regular expressions), the objects each creates, and that it deletes only what it created, by the id from `Location`, also after a refused create. |
+| `checks/test_mock_st.py` | The bundled mock behaving like the real server where the accounts examples need it: a nested JSON Patch path, and a type specific field carried by the whole object. |
+| `checks/test_python_names.py` | A python example with a name defined nowhere it can be reached, or an `except ... as x` that uses another handler's name: errors that only run when something goes wrong. |
+| `checks/test_dummy_servers.py` | The stand-in servers the integration checks point SecureTransport at (the capturing proxy, the PeSIT frame decoder, the fake services): each answers the way the real one does and records what it was asked. |
+| `checks/test_authoring_tools.py` | The tools new Admin examples are written with (spec reader, bash and bat writers, docs sync): a wrong header from them would spread to every file written next. |
 | `checks/test_python_logic.py` | The python examples doing the wrong thing, by running them against a fake ST that serves paged collections and records what they would write. Also a request that cannot complete (a connection error, any kind of timeout) ending the script with exit 1. |
 | `checks/test_python_scripts_run.py` | Every python example run as a whole, as its own process, against an in-memory fake ST that does what the documentation says and the lab does not insist on: it refuses a write with no `csrfToken` (the logout too), a call with no or another `Referer`, a call with no timeout. Then it makes the server fail every way it can (a connection error, a timeout, 401 and 500 on the login, after it, on one verb) and wants a non-zero exit code, no traceback and no loop that does not end. Also `st_verify` and `st_ca_bundle` reaching every call. |
 | `checks/test_python_safety.py` | What each python example does with what it can destroy, the secrets it handles and the files it writes: a delete by prefix, not by substring, that is a dry run unless `--apply`; workers that start fresh (`spawn`); a private key written 0600 with its password out of the URL and the output; a JSON baseline compared in both directions; a cleanup that deletes only what the run created; every missing config, argument or bad value, exit 1 or 2 with nothing sent. |

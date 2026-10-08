@@ -184,6 +184,12 @@ risk_claim = "Every example's header has a `Risk:` line"
 chk("the README's claim that every example has a Risk line holds for the python ones too: check_python_risk.py is named next to it",
     risk_claim in README and "check_python_risk.py" in README.split(risk_claim, 1)[1][:400])
 
+print("=== tests/README.md names every check ===")
+tests_readme = open(os.path.join(REPO, "tests", "README.md")).read()
+unlisted = sorted(f for f in os.listdir(os.path.join(REPO, "tests", "checks"))
+                  if f.endswith((".sh", ".py")) and f not in tests_readme)
+chk("every file of tests/checks is named in tests/README.md", not unlisted, ", ".join(unlisted))
+
 print()
 if failed:
     print("check_docs_match_repo: FAIL (%d)" % failed)

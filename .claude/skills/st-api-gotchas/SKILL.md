@@ -1034,6 +1034,54 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   back as `["03:00"]`), and sending the old date back, as the ISO date taken from the milliseconds, restores both exactly; on an
   application with no schedules the path is 400 `Missing field "schedules"`.
 
+- **Older examples that could not fail, now checked** (`03.Connect` 07 and 10 to 13, `06.TransferSites`,
+  `07.Subscriptions`, `08.RouteTemplates`, `09.CompositeRoutes`, `12.BusinessUnits/01`, `13.Configurations` 39 to 47,
+  `14.ExpressionLanguage`, `15.Transfers/01`, `17.AccessPolicies/02`, `18.AccountSetup`, `20.AdministrativeRoles`,
+  `21.Administrators`; checks 06, 07, 08, 19, 22, 31, 34, 35, 37, 38, 40, 56). Every one prints `HTTP <code>` taken from
+  `curl -w` (the head of a headers file is a `100 Continue` or a redirect now and then), exits 1 on a refusal and 2 on a bad
+  argument. Seen on the lab, 5.5-20260924: **Servers**: `POST /servers` of a minimal ssh server is 201 with no body and a
+  `Location` that is a search (`/servers?serverName=NAME`), not a path; the new server is inactive, `port` is null and
+  `isSftpEnabled` false; a duplicate name is 409 "Server with name X already exist."; a port another server uses is accepted
+  while it is inactive; an http server with no port or certificate alias is 400 "HTTPS is enabled, but the certificate alias is
+  mandatory.; Missing HTTPS port.". **A server that is not there answers differently by method**: GET is 404 with an HTML page,
+  **HEAD is a bodiless 400**, DELETE and PATCH are 400 "Server with name X does not exist.", PUT is 400 "Could not update server
+  with name X.". A PUT with only name, protocol and port is 204 but **resets** `clientPasswordAuth`, `ciphers` and
+  `keyExchangeAlgorithms` to empty text; a PUT of the whole object read back is 204. A PATCH whose body is an object, not an
+  array, is 400 "Incorrect JSON format" (PowerShell: `@($x) | ConvertTo-Json` unrolls a one element array to an object; use
+  `ConvertTo-Json -InputObject @($x)`). `replace`, `add` and `remove` on `/port` all work on a null port; 99999 is 400 "mPort must
+  be less than or equal to 65535", text 400 "Something went wrong while patching the entity"; `publicKeys` is one comma separated
+  string and `replace` takes an empty string or a non algorithm name unchecked; `GET /servers?fields=port` alone is 400 "Field
+  port does not exist." (it needs `protocol=ssh`); `limit=200` is accepted. **`POST /servers/operations`** answers 200 with
+  `serverStatuses[{serverName, message, isSuccessful}]` **even when it failed** (an unknown server is `isSuccessful` false "Server
+  with name X does not exist."): read `isSuccessful`, not the status; no `serverName` is 400 "Specify at least one server name to
+  start.", an `operation` other than start or stop 400 `must match "(?i)start|(?i)stop"`, a repeated `serverName` gives several
+  results (no start or stop of a real server was sent). **Sites, subscriptions, routes**: a site POST is 201 with the id at the
+  end of `Location`, a duplicate on one account 409 "Entry already exist."; the HTTP site 01 creates has a null password and an
+  SSH site's reads back as `{AES128}`; a second application of one name is 400 "An application with this name already exists.",
+  a second subscription on one folder 400 "...unique anchor..."; a DELETE of an unknown site, subscription or application is a JSON
+  404 ("... not found or not accessible.", for a route "Route is not found."); **two simple routes with one name are both created
+  (201)**, so a delete by name is ambiguous and the scripts delete by the id in `Location`; `name=` ignores case on routes,
+  policies and sites. The 163 route templates took about 53 seconds to create and 54 to delete. **Business units**: a name that
+  exists is 400 (not 409) "Business unit name already exists. Business unit base folder is already in use or it is not valid.",
+  a `baseFolder` that is not absolute 400 "Folder name is not absolute: home/x", an empty name 400 "name cannot be empty", a missing
+  `baseFolder` 400; a name with a space is accepted. **External stores and S3**: DELETE of an unknown store is 400 "Cannot delete
+  External Store with name: X. Cannot find External Store or External Store configuration is not accessible" (the GET and the
+  operations are 404), a PATCH of an unknown one 404 "External Stores configuration DB error"; `%2F` in a store name is a 400 with an
+  HTML page from the web server and a raw `/` a 404, so such a name cannot be addressed (the scripts refuse it); a storage profile
+  test of an unknown name is 404 "Storage profile 'X' not found."; **when the settings PUT of an S3 register is refused (400), the
+  name stays in `StorageProfiles.S3.Registry` with every option empty**, so "nothing is saved" is true of the settings only.
+  **Roles and administrators**: a role that exists is 409 "Administrative role with the same name already exist on the server.",
+  an unknown menu 400 "List contains unsupported menu." (POST and PATCH), an unknown role 404 "No such administrative role." on
+  PATCH, DELETE and DELETE with an unknown `targetRoleName`; a duplicate administrator is 409 "Entry already exist.", an unknown
+  role 400 "An admin role with the specified roleName not found.", an empty password 400 "The password cannot be empty.", a name with
+  a space 400 "Spaces are not allowed in an Administrator Name.", an unknown administrator 404 "Admin not found - X" (GET, PATCH,
+  DELETE); an administrator that deletes itself gets 400 "Administrator cannot be deleted.", and the delete script refuses the
+  logged in one before sending anything. **Access policies, pull, login restriction rules**: a bad `authMethod` is 400 "Valid auth
+  method values are: reject, trust, scram-sha-256, md5, password." and changes nothing; `POST /transfers/operations?operation=pull`
+  answers 202, an unknown account 404 "Cannot find account with name X or it is not accessible", an unknown site 400 "X site does not
+  exist"; a rule patched without `clientAddress`, or with a type other than ALLOW or DENY, is 400 with the reasons in
+  `validationErrors`; a duplicate login restriction policy is 409.
+
 - **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
   the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
   An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST
