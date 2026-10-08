@@ -27,7 +27,9 @@ REM ============================================================================
 
 REM The test account. 00.run_all.bat and 99.cleanup_DELETE.bat take another name
 REM on the command line (BT_RUN_ACCOUNT, applied below, after settings.local.bat).
-SET BT_TEST_ACCOUNT=btTestAccount
+REM When nobody chose a name, 00.run_all.bat may move to <default>_2, _3 and so on.
+SET BT_DEFAULT_ACCOUNT=btTestAccount
+SET BT_TEST_ACCOUNT=%BT_DEFAULT_ACCOUNT%
 REM The password of all three accounts
 SET BT_ACCOUNT_PASSWORD=
 

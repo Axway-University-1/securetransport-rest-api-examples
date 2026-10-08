@@ -41,6 +41,16 @@
 #   starting HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing
 #   is cleaned up, so you can look.
 # - Needs settings.local.sh with BT_ACCOUNT_PASSWORD. See settings.sh.
+# - A stale home folder: an account's home folder stays on disk, with its owner,
+#   when the account is deleted, and a new account with another uid cannot
+#   create a folder directly in it (a 403 in step 04). So, only when no account
+#   name was chosen (no ACCOUNT, no BT_RUN_ACCOUNT, no BT_TEST_ACCOUNT in
+#   settings.local.sh), the run checks right after step 01 that the test account
+#   can create a folder directly in its home (bt_home_probe, made and removed
+#   again). If not, it deletes that test account only (never a partner), and
+#   moves to the next free name: <default>_2, _3, up to _9. It stops after _9.
+#   The report, --cleanup and the cleanup hint use the name it ended on.
+#   A name you chose is never changed: step 04 then fails, with a hint.
 # - The partners are shared by every test account. A run of another test
 #   account on the same day, at the same time, adds to their counts too.
 # ==============================================================================
@@ -81,9 +91,17 @@ done
 [ -n "${POSITIONAL[1]}" ] && export BT_RUN_INBOUND_ONLY="${POSITIONAL[1]}"
 [ -n "${POSITIONAL[2]}" ] && export BT_RUN_IN_AND_OUT="${POSITIONAL[2]}"
 
+# Was an account name given on the command line or in the environment?
+ACCOUNT_CHOSEN=0
+[ -n "${BT_RUN_ACCOUNT}" ] && ACCOUNT_CHOSEN=1
+
 # Loaded after the arguments, so settings.sh applies them, and every step this
 # runs inherits them
 source "${SCRIPT_DIR}/settings.sh"
+
+# Was the account name chosen: on the command line, in the environment, or in
+# settings.local.sh? Then it is never changed.
+[ "${BT_TEST_ACCOUNT}" != "${BT_DEFAULT_ACCOUNT}" ] && ACCOUNT_CHOSEN=1
 
 printf "Account %s: scenario 2.1 with %s file(s), scenario 2.2 with %s file(s).\n" \
   "${BT_TEST_ACCOUNT}" "${BT_INBOUND_ONLY_COUNT}" "${BT_IN_AND_OUT_COUNT}"
@@ -115,24 +133,97 @@ done
 
 TOTAL=${#STEPS[@]}
 N=0
+
+# run_step STEP: runs one setup step; ends this script when it fails
+run_step() {
+    local step="$1" LOG RC
+    LOG=$(mktemp)
+    bash "${step}" 2>&1 | tee "${LOG}"
+    RC=${PIPESTATUS[0]}
+    if [ "${RC}" -ne 0 ] || grep -qE '^HTTP [45][0-9][0-9]' "${LOG}"; then
+        rm -f "${LOG}"
+        printf "\nStopped at step %s of %s: %s failed.\n" "${N}" "${TOTAL}" "$(basename "${step}")"
+        printf "Nothing after it was run, and nothing was cleaned up.\n"
+        printf "Fix it, run ./99.cleanup_DELETE.sh %s, and start again.\n" "${BT_TEST_ACCOUNT}"
+        exit 1
+    fi
+    rm -f "${LOG}"
+}
+
+# use_account NAME: the rest of this run, and everything it starts, uses NAME
+use_account() {
+    export BT_RUN_ACCOUNT="$1"
+    source "${SCRIPT_DIR}/settings.sh"
+}
+
+# home_probe: can the test account create a folder directly in its home? Makes
+# the folder bt_home_probe and removes it again. Returns 0 yes, 1 the home is
+# stale (a 403 "Error occurred while creating file"), 2 could not tell (the
+# login failed, or another error), which 04 then reports as it always did.
+home_probe() {
+    local rc=2
+    bt_login_as "${BT_TEST_ACCOUNT}" >/dev/null || return 2
+    ar_enduser_call POST "files/bt_home_probe" "application/json" \
+      "$(jq -n '{isDirectory: true, isRegularFile: false, isSymbolicLink: false, isOther: false, isShared: false}')"
+    case "${AR_EU_CODE}" in
+        2*) rc=0; ar_enduser_call DELETE "files/bt_home_probe" "" ;;
+        403) [[ "${AR_EU_BODY}" == *"Error occurred while creating file"* ]] && rc=1 ;;
+    esac
+    ar_enduser_logout >/dev/null
+    return "${rc}"
+}
+
+# ensure_usable_home: after step 01. Only when no account name was chosen.
+ensure_usable_home() {
+    local n=1 next
+    [ "${ACCOUNT_CHOSEN}" -eq 1 ] && return 0
+    while true; do
+        home_probe
+        [ $? -ne 1 ] && return 0
+        n=$((n + 1))
+        while [ "${n}" -le 9 ] && curl -s -k -o /dev/null --head -u "${ST_USER}:${ST_PASSWORD}" \
+              "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${BT_DEFAULT_ACCOUNT}_${n}" \
+              -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT" -w "%{http_code}" | grep -q '^200$'; do
+            n=$((n + 1))
+        done
+        if [ "${n}" -gt 9 ]; then
+            printf "\nThe home folder of %s is left over from an earlier run, and so is every name up to %s_9\n" "${BT_TEST_ACCOUNT}" "${BT_DEFAULT_ACCOUNT}"
+            printf "(or the account exists). Remove the old home folders, or run ./00.run_all.sh ANOTHER_NAME.\n"
+            printf "Run ./99.cleanup_DELETE.sh %s to remove what this created.\n" "${BT_TEST_ACCOUNT}"
+            exit 1
+        fi
+        next="${BT_DEFAULT_ACCOUNT}_${n}"
+        printf "\nThe home folder of %s is left over from an earlier run and belongs to another uid,\n" "${BT_TEST_ACCOUNT}"
+        printf "so the account cannot create folders in it. A new name is used: %s.\n" "${next}"
+        printf "Deleting the account %s (its home folder stays)...\n" "${BT_TEST_ACCOUNT}"
+        curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X DELETE \
+          "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/${BT_TEST_ACCOUNT}" \
+          -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT" -w "\nHTTP %{http_code}\n"
+        use_account "${next}"
+        printf "\nAccount %s: scenario 2.1 with %s file(s), scenario 2.2 with %s file(s).\n" \
+          "${BT_TEST_ACCOUNT}" "${BT_INBOUND_ONLY_COUNT}" "${BT_IN_AND_OUT_COUNT}"
+        printf "\n--- again: 01.accounts_POST.sh for %s ---\n" "${BT_TEST_ACCOUNT}"
+        run_step "${SCRIPT_DIR}/01.accounts_POST.sh"
+        # The count before the run is the new account's own
+        REPORT_LOG=$(mktemp)
+        bash "${SCRIPT_DIR}/billable_GET_report.sh" "before" > "${REPORT_LOG}"
+        BEFORE_TEST=$(today_count "${REPORT_LOG}" "${BT_TEST_ACCOUNT}")
+        rm -f "${REPORT_LOG}"
+    done
+}
+
 printf "\n=== Step 2: perform the transfers ===\n"
 for step in "${STEPS[@]}"; do
     N=$((N + 1))
     NAME=$(basename "${step}")
     printf "\n--- %s of %s: %s ---\n" "${N}" "${TOTAL}" "${NAME}"
 
-    LOG=$(mktemp)
-    bash "${step}" 2>&1 | tee "${LOG}"
-    RC=${PIPESTATUS[0]}
+    run_step "${step}"
 
-    if [ "${RC}" -ne 0 ] || grep -qE '^HTTP [45][0-9][0-9]' "${LOG}"; then
-        rm -f "${LOG}"
-        printf "\nStopped at step %s of %s: %s failed.\n" "${N}" "${TOTAL}" "${NAME}"
-        printf "Nothing after it was run, and nothing was cleaned up.\n"
-        printf "Fix it, run ./99.cleanup_DELETE.sh, and start again.\n"
-        exit 1
-    fi
-    rm -f "${LOG}"
+    # The accounts exist now: is the test account's home folder usable?
+    case "${NAME}" in
+        01.*) ensure_usable_home ;;
+    esac
 
     # The pull (11) triggers routes and pushes that run asynchronously
     case "${NAME}" in

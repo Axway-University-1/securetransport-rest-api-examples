@@ -4,9 +4,16 @@
 
 SecureTransport classifies each transfer as billable or not, and that
 classification is what the `ST.Transfers` usage count is built from. This is
-visible three ways: the **Billable** column in **Operations > File Tracking**,
-the `isBillable` filter on `GET /logs/transfers`, and an MCP-enabled AI
-assistant reading the same endpoint.
+visible four ways: the **Billable** column in **Operations > File Tracking**,
+the `isBillable` filter on `GET /logs/transfers`, an MCP-enabled AI assistant
+reading the same endpoint, and the usage report, `ST.Transfers` in
+`GET /statisticsSummary/generateReport` (one entry per day, for the whole
+server, not per account: see
+[`33.StatisticsSummary/01`](../../Admin/API%202.0/bash/33.StatisticsSummary/01.statisticsSummary_generateReport_GET.sh)).
+`ST.Transfers` is the billable count, not `ST.TransfersIn` plus
+`ST.TransfersOut`: one upload followed by two downloads of it adds 1 to In, 2
+to Out and 2 to `ST.Transfers`, because the first outbound is free. Its
+numbers follow the transfers within a few seconds.
 
 **The rule, from the Admin Guide:**
 
@@ -34,7 +41,7 @@ accounts on the same server, reached through its own SSH listener.
 | Account | Its part | Its folders |
 | ------- | -------- | ----------- |
 | `partner_to_pull_from` | holds the sample files, which are uploaded to it | `<account>/outbound-drop` |
-| the test account (`btTestAccount` by default) | pulls the files in, routes them, pushes them out: what is being measured | `subscription/s1` to `s6` |
+| the test account (`btTestAccount` by default, see [the test account's name](#the-test-accounts-name)) | pulls the files in, routes them, pushes them out: what is being measured | `subscription/s1` to `s6` |
 | `partner_to_push_to` | receives the pushes, as two "remote partners" | `<account>/delivered-1`, `<account>/delivered-2` |
 
 The test account owns everything else: the six pull sites (logging in as
@@ -142,20 +149,56 @@ $EDITOR settings.local.sh                             # set BT_ACCOUNT_PASSWORD
 ./00.run_all.sh test_account 6 12 --cleanup
 ```
 
-- `ACCOUNT` is the test account to create and use, `btTestAccount` by default.
-  The partners keep their names: they are shared.
+- `ACCOUNT` is the test account to create and use. Without it the run starts
+  with `btTestAccount`, and moves to another name when that one cannot be used:
+  see [the test account's name](#the-test-accounts-name). The partners keep
+  their names: they are shared.
 - `INBOUND_ONLY` and `IN_AND_OUT` are how many files scenarios 2.1 and 2.2 run,
   1 each by default. With 1 the files keep their plain names
   (`only_inbound.txt`); with more they are numbered (`only_inbound_1.txt` to
   `only_inbound_6.txt`). The other four scenarios always run as described above.
 - To clean up or report on a named account by hand, give it the same name:
   `./99.cleanup_DELETE.sh test_account`, `./billable_GET_report.sh after test_account`.
+  If the run chose the name itself, use the one it printed (for example
+  `./99.cleanup_DELETE.sh btTestAccount_2`), also after a run that stopped
+  half way: a stopped run cleans up nothing.
 - A partner that already exists, from another test account's run, is reused.
   `99.cleanup_DELETE.sh` removes only this test account's folder in each
   partner, and deletes a partner only when no other test account's site still
   logs in as it.
 - The partners' counts include every test account's runs on the same day. Run
   one test account at a time to read them cleanly.
+
+### The test account's name
+
+You can run `./00.run_all.sh` with no arguments, again and again, and it works.
+The reason it needs care: an account's home folder stays on disk, with its
+owner, when the account is deleted. A new account with another uid (the
+examples use 41733) cannot create a folder directly in such a home, and step 04
+gets a 403 "Error occurred while creating file: null". Folders below an
+existing one still work, which hides the cause. A lab that ran these examples
+before the uid was changed from 1001 to 41733 has such a home for
+`btTestAccount`, and the API cannot remove it.
+
+So, when you did **not** choose a name, `00.run_all.sh` checks right after
+step 01 whether the test account can create a folder in its home (a throwaway
+folder, `bt_home_probe`, which it removes at once):
+
+- **It can** (a new lab, or a home the account owns): nothing changes, the
+  account is `btTestAccount`.
+- **It cannot** (403 "Error occurred while creating file"): it says so, deletes
+  only the test account, and moves to `btTestAccount_2`, then `_3` and so on up
+  to `_9`, skipping a name that already exists as an account. The report,
+  `--cleanup` and the `99.cleanup_DELETE.sh NAME` hint use the name it ended
+  on. Partners are never deleted by this.
+- **Any other result** (a failed login, a 403 with another message): no change.
+  Step 04 reports it.
+
+A name you choose (an argument, `BT_RUN_ACCOUNT`, or a `BT_TEST_ACCOUNT` other
+than the default in `settings.local`) is never changed: step 04 stops with a
+hint to use another name. Running the scripts by hand has no such check; give
+step 01 and the rest a new name yourself. Every run leaves the empty home
+folders of the names it used on the server: they are harmless.
 
 On Windows: `00.run_all.bat`, with the same arguments. See
 [Configuration](../../README.md#configuration) first if you have not set up the

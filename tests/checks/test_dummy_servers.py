@@ -55,6 +55,21 @@ with dummy_servers.FakeVault() as vault:
           [r["method"] for r in vault.requests] == ["POST", "GET", "GET", "GET"]
           and b'"role_id"' in vault.requests[0]["body"], [r["path"] for r in vault.requests])
 
+print("=== FakeToken ===")
+with dummy_servers.FakeToken() as token_server:
+    base = "http://127.0.0.1:%d/token" % token_server.port
+    form = b"grant_type=client_credentials&client_id=example_id&client_secret=example_secret"
+    status, body, _ = call("POST", base, form, {"Content-Type": "application/x-www-form-urlencoded"})
+    check("by default a token request is refused: 401 and an invalid_client error", status == 401
+          and json.loads(body)["error"] == "invalid_client", (status, body))
+    check("the form it received is read back", token_server.form() == {
+        "grant_type": "client_credentials", "client_id": "example_id", "client_secret": "example_secret"}, token_server.requests[-1]["body"])
+    token_server.status, token_server.answer = 200, {"access_token": "example", "token_type": "Bearer"}
+    status, body, _ = call("POST", base, form)
+    check("with a status and answer set, that is what comes back", status == 200 and json.loads(body)["access_token"] == "example", (status, body))
+    check("a GET is 404, and every request is recorded", call("GET", base)[0] == 404 and [r["method"] for r in token_server.requests] == ["POST", "POST", "GET"],
+          [r["method"] for r in token_server.requests])
+
 print("=== FakeS3 ===")
 with dummy_servers.FakeS3() as s3:
     base = "http://127.0.0.1:%d" % s3.port

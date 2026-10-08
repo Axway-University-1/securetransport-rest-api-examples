@@ -22,6 +22,10 @@ REM - Which folders is set by AR_CREATE_FOLDERS: outbound-drop, where the pull
 REM   finds its files, and delivered, where the push puts them.
 REM - Uses PowerShell to build the JSON body.
 REM - The port is AR_ENDUSER_PORT, 8443 by default. It is not the Admin port.
+REM - Confirmed directly: an account's home folder stays on disk, with its owner, when the account is
+REM   deleted. A new account with ANOTHER uid cannot create a folder directly in it: every such POST is 403
+REM   "Error occurred while creating file: null" (folders below an existing one still work, which hides it).
+REM   The script prints a hint; the fix is another account name, which gets a new home folder.
 REM - The folder's name goes in the URL, and the body says it is a directory. POST
 REM   /files with the name in the body is refused with a 409, whatever the body.
 REM ==============================================================================
@@ -56,5 +60,6 @@ CALL "%~dp0..\lib\enduser.bat" call POST "files/%FOLDER_NAME%" "application/json
 echo HTTP %EU_CODE%
 TYPE "%EU_BODY_FILE%"
 echo.
+IF "%EU_CODE%"=="403" FINDSTR /C:"Error occurred while creating file" "%EU_BODY_FILE%" >NUL && echo Hint: a 403 "Error occurred while creating file" for a folder directly in an account's home usually means the home folder is left over from an earlier run and belongs to another uid ^(it stays on disk when the account is deleted^). Use another AR_TEST_ACCOUNT ^(in settings.local.bat^), so that the account gets a new home folder.
 IF EXIST "%BODY_FILE%" DEL "%BODY_FILE%"
 EXIT /B 0

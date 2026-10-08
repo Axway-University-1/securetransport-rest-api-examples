@@ -750,6 +750,48 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   and follows the sessions as they open and close; `/sessions/statistics/bandwidth` stayed `[]` while an FTP client
   uploaded 6 MB (no bandwidth limit on the lab), so its shape is the reference's, unseen.
 
+- **Statistics summary** (`/statisticsSummary`; examples `33.StatisticsSummary`, check 55): it is the **usage report** the server can send to the Amplify
+  Platform, not a live gauge of the server, and it has three operations. `generateReport` takes `startDate` and `endDate`, both required, as **dd/MM/yyyy
+  only** (`2026-10-01` and `01-10-2026` are 400; `1/10/2026` is accepted); the end day is **included**; a start after the end, an end after today and a day that
+  does not exist are 400. The answer is **one entry per day** (`granularity` 86400000), keyed by the start of the day in the server's time zone with its offset, in
+  a map (not an array), plus a `meta` with the product, version, plugins and `reportSummary` (totals). Confirmed directly that it is live, not cached (the new
+  counts were there within 5 seconds) and what it counts: `ST.TransfersIn` +1 for each file received, `ST.TransfersOut` +1 for each file sent (EndUser API or FTP
+  download), a file deleted through the API or FTP (logged as an outgoing transfer) counts in neither, and **`ST.Transfers` is the billable count, not In + Out**:
+  an upload then two downloads gave In +1, Out +2, Transfers +2 (the first outbound of a file is free, as in "Billing" above, over FTP as well as the EndUser API).
+  **`ST.ActiveUsers` and `ST.Volume` read 0 in every call** (also with `includeActiveUsersCount=true` and `includeIncomingFileVolume=true`, a 3 MB upload and many
+  logins; any value for a flag, even `abc`, is accepted): what makes them move was not seen, and the transfer log's `size` is null for these transfers.
+  `activeUsers` lists the **users who have ever logged in**, with `lastAccessTime` as text for people (`October 8, 2026, 8:43 AM`, to the minute, with a U+202F
+  before AM), `{resultSet, result}`; a user is listed from the first login over any protocol, a wrong password does not move the time, the administrator making
+  the call is not listed, and **a deleted account stays in the list for good**. `name=` is a **part of the name, case sensitive**, no `*`; `lastAccessTime.from`
+  and `.to` take yyyy-MM-dd, RFC 2822 or milliseconds (anything else 400); `limit=0` lists all, a negative one is 400, `fields=` works. `testConnection`
+  (`POST /statisticsSummary/operations?operation=testConnection`) **really connects**: it posts `grant_type=client_credentials` with the id and secret of the body
+  (or the saved `StatisticsSummaryReport.*` ones) to `Platform.Authentication`, then calls `Platform.API` with the token. **The platform's refusal comes back with
+  the platform's own status and body**: a 401 `{"error":"invalid_client",...}` is Axway's answer, not your administrator login failing, and a stand-in's 500 came back
+  as 500. A failure the server finds itself is **406** (not 400) "Test connection to the Amplify Platform failed...": a body with no `type` (even `{}`), a `type`
+  that is not exactly `testConnection`, or a non-empty `networkZone` (nothing is sent to the token address then); with a wrong or missing `type` and a `clientId`
+  it is 400 "Unsupported parameter - clientId". `operation=nope` and `operation=TestConnection` still run the test; none at all is 400. A success was **not seen**:
+  it needs real platform credentials, and the server calls a `Platform.API` that must be HTTPS, which no stand-in here is. The check points only the token address
+  at a `FakeToken` stand-in (and puts it back), so the real platform is never contacted.
+
+- **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
+  the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
+  An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST
+  is 403 "Error occurred while creating file: null", and so is a DELETE of a folder there, while a folder below an
+  existing one still works because the server creates missing parents itself, which hides the cause (the
+  audit-billable-transfers feature hit this when its example uid changed from 1001 to 41733). Changing the uid again
+  does not fix a home with mixed owners. Use another account name, so that it gets a new home folder; the features'
+  04 scripts print this hint, and `00.run_all.sh ANOTHER_NAME` takes the name. audit-billable-transfers'
+  `00.run_all` does it by itself when no name was chosen: after step 01 it POSTs and DELETEs a throwaway top-level
+  folder `bt_home_probe` as the test account, and on that 403 deletes only that account and moves to `<name>_2` ..
+  `_9` (confirmed on 5.5-20260924). Probe with a top-level folder: a nested one succeeds and hides the problem.
+- **Site templates** (`/siteTemplates`, not covered): the reference defines only two types, `cd` (Connect:Direct)
+  and `custom`, not per-protocol templates; a site names one in `siteTemplate`, on Connect:Direct sites only. On a
+  lab without Connect:Direct nothing can be created: a complete `cd` body is 400 "Site template protocol cd is not
+  valid. Connect:Direct protocol not available.", and `custom`, `s3`, `smb`, `ssh`, `ftp`, `http` and the rest are 400
+  "Protocol X is not supported." (so `custom` fails too, though the reference lists it). The list is `{resultSet, result}`
+  and empty; HEAD of an unknown id is a bodiless 404, GET and PATCH a JSON 404, DELETE a 400 whose only message is the
+  id. Create, read, replace, patch and delete of a real template were never seen working: do not copy behaviour from
+  the reference alone; probe it on a lab with Connect:Direct first.
 - **Sites** (`/sites`; examples `06.TransferSites` 05 to 11): a site is addressed by a generated **id**, so every
   example looks it up by account and name. **The `name=` filter ignores case and takes a `*`**: `example_x` and
   `EXAMPLE_X` are two sites (creation is case sensitive, a second `example_x` on the same account is 409 "Entry

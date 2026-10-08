@@ -41,6 +41,16 @@ REM - It stops at the first setup step that fails: a non-zero exit, or a line
 REM   starting HTTP 4xx or 5xx in its output. Nothing after it runs, and nothing
 REM   is cleaned up, so you can look.
 REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
+REM - A stale home folder: an account's home folder stays on disk, with its owner,
+REM   when the account is deleted, and a new account with another uid cannot
+REM   create a folder directly in it (a 403 in step 04). So, only when no account
+REM   name was chosen (no ACCOUNT, no BT_RUN_ACCOUNT, no BT_TEST_ACCOUNT in
+REM   settings.local.bat), the run checks right after step 01 that the test account
+REM   can create a folder directly in its home (bt_home_probe, made and removed
+REM   again). If not, it deletes that test account only (never a partner), and
+REM   moves to the next free name: <default>_2, _3, up to _9. It stops after _9.
+REM   The report, --cleanup and the cleanup hint use the name it ended on.
+REM   A name you chose is never changed: step 04 then fails, with a hint.
 REM - The partners are shared by every test account. A run of another test
 REM   account on the same day, at the same time, adds to their counts too.
 REM ==============================================================================
@@ -72,9 +82,16 @@ IF DEFINED ARG_ERROR (
     EXIT /B 2
 )
 
+REM Was an account name given on the command line or in the environment?
+SET ACCOUNT_CHOSEN=0
+IF DEFINED BT_RUN_ACCOUNT SET ACCOUNT_CHOSEN=1
+
 REM Loaded after the arguments, so settings.bat applies them, and every step this
 REM runs inherits them
 CALL "%~dp0settings.bat"
+
+REM Or in settings.local.bat? Then it is never changed.
+IF NOT "%BT_TEST_ACCOUNT%"=="%BT_DEFAULT_ACCOUNT%" SET ACCOUNT_CHOSEN=1
 
 echo Account %BT_TEST_ACCOUNT%: scenario 2.1 with %BT_INBOUND_ONLY_COUNT% file^(s^), scenario 2.2 with %BT_IN_AND_OUT_COUNT% file^(s^).
 
@@ -178,8 +195,19 @@ IF "%NAME:~0,2%"=="99" EXIT /B 0
 SET /A N=%N%+1
 echo.
 echo --- %N% of %TOTAL%: %NAME% ---
+CALL :run_one "%NAME%"
+IF DEFINED STEP_FAILED EXIT /B 1
+REM The accounts exist now: is the test account's home folder usable?
+IF "%NAME:~0,2%"=="01" CALL :ensure_usable_home
+IF DEFINED STEP_FAILED EXIT /B 1
+REM The pull (11) triggers routes and pushes that run asynchronously
+IF "%NAME:~0,2%"=="11" CALL :pause_steps
+EXIT /B 0
+
+REM run_one FILE: runs one setup step, and sets STEP_FAILED when it fails
+:run_one
 SET LOG=%TEMP%\bt_run_%RANDOM%.log
-CALL "%~dp0%NAME%" > "%LOG%" 2>&1
+CALL "%~dp0%~1" > "%LOG%" 2>&1
 SET STEP_RC=%ERRORLEVEL%
 TYPE "%LOG%"
 SET LOG_HAS_ERROR=
@@ -188,15 +216,77 @@ IF EXIST "%LOG%" DEL "%LOG%"
 IF NOT "%STEP_RC%"=="0" SET LOG_HAS_ERROR=1
 IF DEFINED LOG_HAS_ERROR (
     echo.
-    echo Stopped at step %N% of %TOTAL%: %NAME% failed.
+    echo Stopped at step %N% of %TOTAL%: %~1 failed.
     echo Nothing after it was run, and nothing was cleaned up.
-    echo Fix it, run 99.cleanup_DELETE.bat, and start again.
+    echo Fix it, run 99.cleanup_DELETE.bat %BT_TEST_ACCOUNT%, and start again.
     SET STEP_FAILED=1
     EXIT /B 1
 )
-REM The pull (11) triggers routes and pushes that run asynchronously
-IF "%NAME:~0,2%"=="11" CALL :pause_steps
 EXIT /B 0
+
+REM home_probe: can the test account create a folder directly in its home? Makes
+REM the folder bt_home_probe and removes it again. Sets PROBE_RC: 0 yes, 1 the home
+REM is stale (a 403 "Error occurred while creating file"), 2 could not tell (the
+REM login failed, or another error), which 04 then reports as it always did.
+:home_probe
+SET PROBE_RC=2
+SET EU_ACCOUNT=%BT_TEST_ACCOUNT%
+CALL "%~dp0..\lib\enduser.bat" login >NUL
+IF ERRORLEVEL 1 EXIT /B 0
+SET PROBE_BODY=%TEMP%\bt_probe_%RANDOM%.json
+powershell -NoProfile -Command "@{ isDirectory=$true; isRegularFile=$false; isSymbolicLink=$false; isOther=$false; isShared=$false } | ConvertTo-Json -Compress" > "%PROBE_BODY%"
+CALL "%~dp0..\lib\enduser.bat" call POST "files/bt_home_probe" "application/json" "%PROBE_BODY%"
+IF EXIST "%PROBE_BODY%" DEL "%PROBE_BODY%"
+SET PROBE_CODE=%EU_CODE%
+IF "%PROBE_CODE:~0,1%"=="2" SET PROBE_RC=0
+IF "%PROBE_CODE:~0,1%"=="2" CALL "%~dp0..\lib\enduser.bat" call DELETE "files/bt_home_probe" ""
+IF "%PROBE_CODE%"=="403" FINDSTR /C:"Error occurred while creating file" "%EU_BODY_FILE%" >NUL && SET PROBE_RC=1
+CALL "%~dp0..\lib\enduser.bat" logout >NUL
+EXIT /B 0
+
+REM ensure_usable_home: after step 01. Only when no account name was chosen.
+:ensure_usable_home
+IF "%ACCOUNT_CHOSEN%"=="1" EXIT /B 0
+SET PROBE_N=1
+:probe_again
+CALL :home_probe
+IF NOT "%PROBE_RC%"=="1" EXIT /B 0
+SET /A PROBE_N=PROBE_N+1
+:next_name
+IF %PROBE_N% GTR 9 GOTO :names_used_up
+SET EXISTS_CODE=
+FOR /F %%C IN ('curl -s -o nul -w "%%{http_code}" -k -u "%ST_USER%:%ST_PASSWORD%" --head "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts/%BT_DEFAULT_ACCOUNT%_%PROBE_N%" -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT"') DO SET EXISTS_CODE=%%C
+IF NOT "%EXISTS_CODE%"=="200" GOTO :name_free
+SET /A PROBE_N=PROBE_N+1
+GOTO :next_name
+:name_free
+echo.
+echo The home folder of %BT_TEST_ACCOUNT% is left over from an earlier run and belongs to another uid,
+echo so the account cannot create folders in it. A new name is used: %BT_DEFAULT_ACCOUNT%_%PROBE_N%.
+echo Deleting the account %BT_TEST_ACCOUNT% ^(its home folder stays^)...
+curl -s -k -u "%ST_USER%:%ST_PASSWORD%" -X DELETE "https://%ST_SERVER%:%ST_PORT%/api/v2.0/accounts/%BT_TEST_ACCOUNT%" ^
+  -H "accept: */*" -H "Referer: THIS_IS_A_RANDOM_TEXT" -w "\nHTTP %%{http_code}\n"
+SET BT_RUN_ACCOUNT=%BT_DEFAULT_ACCOUNT%_%PROBE_N%
+CALL "%~dp0settings.bat"
+echo.
+echo Account %BT_TEST_ACCOUNT%: scenario 2.1 with %BT_INBOUND_ONLY_COUNT% file^(s^), scenario 2.2 with %BT_IN_AND_OUT_COUNT% file^(s^).
+echo.
+echo --- again: 01.accounts_POST.bat for %BT_TEST_ACCOUNT% ---
+CALL :run_one 01.accounts_POST.bat
+IF DEFINED STEP_FAILED EXIT /B 1
+REM The count before the run is the new account's own
+SET REPORT_LOG=%TEMP%\bt_report_%RANDOM%.log
+CALL "%~dp0billable_GET_report.bat" before > "%REPORT_LOG%"
+CALL :today_count "%BT_TEST_ACCOUNT%" BEFORE_TEST
+IF EXIST "%REPORT_LOG%" DEL "%REPORT_LOG%"
+GOTO :probe_again
+:names_used_up
+echo.
+echo The home folder of %BT_TEST_ACCOUNT% is left over from an earlier run, and so is every name up to %BT_DEFAULT_ACCOUNT%_9
+echo ^(or the account exists^). Remove the old home folders, or run 00.run_all.bat ANOTHER_NAME.
+echo Run 99.cleanup_DELETE.bat %BT_TEST_ACCOUNT% to remove what this created.
+SET STEP_FAILED=1
+EXIT /B 1
 
 :pause_steps
 SET /A PING_COUNT=%BT_STEP_PAUSE_SECONDS%+1

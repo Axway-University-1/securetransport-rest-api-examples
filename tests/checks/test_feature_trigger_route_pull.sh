@@ -116,6 +116,14 @@ BODIES=$(echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | while read -r b; do echo
 run 04.files_POST_folders.sh "${SERVER_NEW}" x 401
 if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Could not log in"* ]] && [[ "${OUT}" == *"HTTP 401"* ]] && [[ "${OUT}" == *"Response headers"* ]] && ! calls | grep -q '/files$'; then pass "a failed login says so, and creates nothing"; else fail "went on after a failed login (exit ${RC})"; fi
 
+FORBIDDEN="${WORK}/forbidden.json"
+echo '{"message":"Error validating request","validationErrors":["Error occurred while creating file: null"]}' > "${FORBIDDEN}"
+OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${SERVER_NEW}" STUB_CURL_POST_BODY="${FORBIDDEN}" \
+      STUB_CURL_STATUS=201 STUB_CURL_STATUS_FILES=403 STUB_CURL_CSRF="csrf-abc" bash "./04.files_POST_folders.sh" 2>&1)
+if [[ "${OUT}" == *"HTTP 403"* ]] && [[ "${OUT}" == *"Hint: a 403"* ]] && [[ "${OUT}" == *"another uid"* ]]; then pass "a 403 'Error occurred while creating file' says the home folder probably belongs to another uid"; else fail "no hint for the 403 (output: ${OUT:0:300})"; fi
+run 04.files_POST_folders.sh "${SERVER_NEW}"
+[[ "${OUT}" != *"Hint:"* ]] && pass "no hint when the folders are created" || fail "a hint without a 403"
+
 echo
 echo "=== 05.files_upload_POST.sh ==="
 echo '{"id":"op-42","status":"RUNNING"}' > "${WORK}/operation.json"

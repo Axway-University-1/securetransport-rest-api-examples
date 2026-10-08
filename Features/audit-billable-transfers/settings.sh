@@ -26,7 +26,10 @@
 
 # The test account. 00.run_all.sh and 99.cleanup_DELETE.sh take another name on
 # the command line (BT_RUN_ACCOUNT, applied below, after settings.local.sh).
-export BT_TEST_ACCOUNT="btTestAccount"
+# When nobody chose a name, 00.run_all.sh may move to <default>_2, _3 and so on:
+# see "A stale home folder" in its notes.
+export BT_DEFAULT_ACCOUNT="btTestAccount"
+export BT_TEST_ACCOUNT="${BT_DEFAULT_ACCOUNT}"
 # The password of all three accounts
 export BT_ACCOUNT_PASSWORD=""
 

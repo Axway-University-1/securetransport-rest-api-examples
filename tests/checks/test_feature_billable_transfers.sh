@@ -119,6 +119,14 @@ FOLDER_CALLS=$(calls | grep '^POST .*files/' | sed 's#.*/files/##' | tr '\n' ' '
 FOLDER_BODY=$(payloads | jq -s -c '.[0]')
 [ "$(echo "${FOLDER_BODY}" | jq -c .isDirectory)" = "true" ] && pass "each is created as a directory" || fail "folder body: ${FOLDER_BODY}"
 
+FORBIDDEN="${WORK}/forbidden.json"
+echo '{"message":"Error validating request","validationErrors":["Error occurred while creating file: null"]}' > "${FORBIDDEN}"
+OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${SERVER_NEW}" STUB_CURL_POST_BODY="${FORBIDDEN}" \
+      STUB_CURL_STATUS=201 STUB_CURL_STATUS_FILES=403 STUB_CURL_CSRF="csrf-abc" bash "./04.files_POST_folders.sh" 2>&1)
+if [[ "${OUT}" == *"HTTP 403"* ]] && [[ "${OUT}" == *"Hint: a 403"* ]] && [[ "${OUT}" == *"another uid"* ]]; then pass "a 403 'Error occurred while creating file' says the home folder probably belongs to another uid"; else fail "no hint for the 403 (output: ${OUT:0:300})"; fi
+run 04.files_POST_folders.sh "${SERVER_NEW}"
+[[ "${OUT}" != *"Hint:"* ]] && pass "no hint when the folders are created" || fail "a hint without a 403"
+
 echo
 echo "=== 05.applications_POST.sh ==="
 run 05.applications_POST.sh "${SERVER_NEW}"
@@ -329,6 +337,73 @@ else
 fi
 master --bogus
 [ "${RC}" -eq 2 ] && pass "an unknown option is refused" || fail "--bogus exit ${RC}"
+
+echo
+echo "=== 00.run_all.sh: the home folder of the default account ==="
+# A clean lab: the probe folder is made and removed, nothing else changes
+SEQ="${WORK}/files_seq.txt"
+STALE_BODY="${WORK}/stale.json"
+echo '{"message":"Error validating request","validationErrors":["Error occurred while creating file: null"]}' > "${STALE_BODY}"
+probe_run() {
+    rm -f "${SEQ}.served"
+    export STUB_CURL_FILES_POST_SEQUENCE="${SEQ}"
+    rm -f "${RUN:?}/state.local.sh"
+    STATUS=201 master "$@"
+    unset STUB_CURL_FILES_POST_SEQUENCE
+}
+printf '201\n' > "${SEQ}"
+probe_run
+[ "${RC}" -eq 0 ] && pass "clean lab: the run completes" || fail "clean lab: exit ${RC}: $(echo "${OUT}" | tail -5)"
+PROBES=$(calls | grep -c 'files/bt_home_probe$')
+[ "${PROBES}" -eq 2 ] && calls | grep -q '^POST .*files/bt_home_probe$' && calls | grep -q '^DELETE .*files/bt_home_probe$' \
+    && pass "clean lab: one probe, a POST and a DELETE of bt_home_probe" || fail "probe calls: ${PROBES}"
+[ "$(calls | grep -c '^POST .*/accounts$')" -eq 3 ] && [ "$(calls | grep -c '^DELETE .*/accounts/')" -eq 0 ] \
+    && pass "clean lab: the accounts are created once, and none is deleted" || fail "account calls: $(calls | grep '/accounts')"
+[[ "${OUT}" == *"Account btTestAccount: scenario"* ]] && [[ "${OUT}" != *"btTestAccount_2"* ]] && [[ "${OUT}" == *"Run ./99.cleanup_DELETE.sh btTestAccount to remove"* ]] \
+    && pass "clean lab: the plain default name is kept to the end" || fail "clean lab name"
+
+# A stale home: the first probe is refused, the second works
+printf '403\t%s\n201\n' "${STALE_BODY}" > "${SEQ}"
+probe_run
+[ "${RC}" -eq 0 ] && pass "stale home: the run completes" || fail "stale home: exit ${RC}: $(echo "${OUT}" | tail -8)"
+[[ "${OUT}" == *"The home folder of btTestAccount is left over from an earlier run and belongs to another uid"* ]] \
+    && [[ "${OUT}" == *"A new name is used: btTestAccount_2."* ]] && pass "stale home: says why, and the new name" || fail "no switch message"
+[ "$(calls | grep '^DELETE .*/accounts/' | sed 's#.*/accounts/##' | tr '\n' ' ')" = "btTestAccount " ] \
+    && pass "stale home: deletes only the test account, never a partner" || fail "deleted: $(calls | grep '^DELETE .*/accounts/')"
+PAYLOAD_NAMES=$(echo "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | while read -r b; do echo "$b" | base64 -d; echo; done | jq -r 'select(.type=="user") | .name' 2>/dev/null | tr '\n' ' ')
+[ "${PAYLOAD_NAMES}" = "btTestAccount partner_to_pull_from partner_to_push_to btTestAccount_2 partner_to_pull_from partner_to_push_to " ] \
+    && pass "stale home: step 01 runs again for btTestAccount_2 (the stub answers 201 to the existence check, so it creates the partners; a real server says Reused)" || fail "account names: ${PAYLOAD_NAMES}"
+[ "$(calls | grep -c '^POST .*files/bt_home_probe$')" -eq 2 ] && [ "$(calls | grep -c '^DELETE .*files/bt_home_probe$')" -eq 1 ] \
+    && pass "stale home: two probes, and the probe folder is removed once it was made" || fail "probe calls"
+[[ "${OUT}" == *"Account btTestAccount_2: scenario"* ]] && [[ "${OUT}" == *"Run ./99.cleanup_DELETE.sh btTestAccount_2 to remove"* ]] \
+    && pass "stale home: the cleanup hint names the final account" || fail "cleanup hint: $(echo "${OUT}" | tail -3)"
+[ "$(echo "${OUT}" | grep -c '/btTestAccount_2/outbound-drop')" -gt 0 ] && pass "stale home: the drop folder follows the final name" || fail "drop folder"
+probe_run --cleanup
+calls | grep -q '^HEAD .*/accounts/btTestAccount_2$' && ! calls | grep -q '^HEAD .*/accounts/btTestAccount$' \
+    && pass "stale home: --cleanup cleans up the final name" || fail "cleanup target: $(calls | grep '^HEAD')"
+
+# A name the user chose is never changed
+printf '403\t%s\n' "${STALE_BODY}" > "${SEQ}"
+probe_run test_account
+[ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Stopped at step 4 of 12: 04.files_POST_folders.sh failed"* ]] && [[ "${OUT}" == *"Hint: a 403"* ]] \
+    && pass "explicit name: no switch, step 04 fails with the hint" || fail "explicit name: exit ${RC}: $(echo "${OUT}" | tail -6)"
+[ "$(calls | grep -c 'bt_home_probe')" -eq 0 ] && [ "$(calls | grep -c '^DELETE .*/accounts/')" -eq 0 ] \
+    && pass "explicit name: no probe, nothing deleted" || fail "explicit name made calls"
+export BT_RUN_ACCOUNT=btTestAccount
+probe_run
+unset BT_RUN_ACCOUNT
+[ "${RC}" -eq 1 ] && [ "$(calls | grep -c 'bt_home_probe')" -eq 0 ] \
+    && pass "BT_RUN_ACCOUNT, even the default name, counts as chosen" || fail "BT_RUN_ACCOUNT: exit ${RC}"
+
+# Every name up to _9 is stale
+printf '403\t%s\n' "${STALE_BODY}" > "${SEQ}"
+probe_run
+[ "${RC}" -eq 1 ] && [[ "${OUT}" == *"every name up to btTestAccount_9"* ]] && [[ "${OUT}" == *"Run ./99.cleanup_DELETE.sh btTestAccount_9 to remove"* ]] \
+    && pass "exhaustion: stops with a clear message after _9, naming the account to clean up" || fail "exhaustion: exit ${RC}: $(echo "${OUT}" | tail -5)"
+DELETED=$(calls | grep '^DELETE .*/accounts/' | sed 's#.*/accounts/##' | tr '\n' ' ')
+[ "${DELETED}" = "btTestAccount btTestAccount_2 btTestAccount_3 btTestAccount_4 btTestAccount_5 btTestAccount_6 btTestAccount_7 btTestAccount_8 " ] \
+    && pass "exhaustion: deleted only the names this run created, never a partner" || fail "deleted: ${DELETED}"
+[[ "${OUT}" != *"2 of 12"* ]] && pass "exhaustion: nothing after step 01 ran" || fail "ran on"
 
 echo
 echo "=== Another account name, and more files for scenarios 2.1 and 2.2 ==="

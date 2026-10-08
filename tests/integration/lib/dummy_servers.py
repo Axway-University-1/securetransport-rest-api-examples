@@ -6,6 +6,9 @@ real HashiCorp Vault, S3 bucket or Axway Sentinel:
 
 - FakeVault  answers an AppRole login and KV version 2 secret reads, the two
              calls an ST external store makes.
+- FakeToken  an OAuth token endpoint: answers any POST (a client credentials request) with a status
+             and body you set, and records the form it received. For the Amplify Platform login of
+             the usage report's connection test.
 - FakeS3     answers path-style S3 requests with any credentials, keeping
              objects in memory - enough for an S3 storage profile's test.
 - TcpSink    accepts connections and keeps what it receives, for Sentinel.
@@ -29,7 +32,7 @@ machine's address as the server sees it.
         ...
         assert any(r["path"].endswith("/approle/login") for r in vault.requests)
 
-Run on its own to keep one up by hand:  python3 dummy_servers.py vault|s3|sink|junk|icap [PORT]
+Run on its own to keep one up by hand:  python3 dummy_servers.py vault|token|s3|sink|junk|icap [PORT]
 """
 import hashlib
 import json
@@ -127,6 +130,33 @@ class FakeVault(_HttpDummy):
         super().__init__(port)
         self.secrets = secrets if secrets is not None else {
             "example/db": {"username": "example_user", "password": "example_password"}}
+
+
+class _TokenHandler(_Reply):
+    def do_POST(self):
+        body = self.body()
+        self.record(body)
+        dummy = self.server.dummy
+        self.reply(dummy.status, dummy.answer)
+
+    def do_GET(self):
+        self.record()
+        self.reply(404, {"error": "not found"})
+
+
+class FakeToken(_HttpDummy):
+    """An OAuth token endpoint. Every POST gets `status` and `answer` (change them between calls to
+    make it refuse); each request is recorded, and form(n) reads request n's form fields."""
+    handler = _TokenHandler
+
+    def __init__(self, port=0, status=401, answer=None):
+        super().__init__(port)
+        self.status = status
+        self.answer = answer if answer is not None else {"error": "invalid_client", "error_description": "Invalid client"}
+
+    def form(self, index=-1):
+        from urllib.parse import parse_qs
+        return {k: v[0] for k, v in parse_qs(self.requests[index]["body"].decode()).items()}
 
 
 class _S3Handler(_Reply):
@@ -504,9 +534,9 @@ class FakeIcap:
 
 
 if __name__ == "__main__":
-    kinds = {"vault": FakeVault, "s3": FakeS3, "sink": TcpSink, "junk": JunkServer, "icap": FakeIcap}  # SlowProxy needs a target: use it from code
+    kinds = {"vault": FakeVault, "token": FakeToken, "s3": FakeS3, "sink": TcpSink, "junk": JunkServer, "icap": FakeIcap}  # SlowProxy needs a target: use it from code
     if len(sys.argv) < 2 or sys.argv[1] not in kinds:
-        sys.exit("usage: dummy_servers.py vault|s3|sink|junk|icap [PORT]")
+        sys.exit("usage: dummy_servers.py vault|token|s3|sink|junk|icap [PORT]")
     with kinds[sys.argv[1]](int(sys.argv[2]) if len(sys.argv) > 2 else 0) as dummy:
         print("%s listening on port %d; Ctrl-C to stop" % (sys.argv[1], dummy.port), flush=True)
         try:

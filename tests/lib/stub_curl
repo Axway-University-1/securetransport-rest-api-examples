@@ -67,14 +67,30 @@ fi
 
 # An example that wants the response headers (-D file) gets a status line and,
 # when STUB_CURL_LOCATION_ID is set, a Location header ending in that id.
+# STUB_CURL_STATUS_FILES does so for a URL with /files/ in it (the End User API's folders and files).
+# STUB_CURL_FILES_POST_SEQUENCE points at a file with one line per POST to a URL
+# with /files/ in it: "STATUS" or "STATUS<tab>BODY_FILE". Each such POST takes the
+# next line, the last repeating; it wins over STUB_CURL_STATUS_FILES, and the body
+# file, when there is one, is the response body instead of STUB_CURL_POST_BODY.
 # STUB_CURL_STATUS overrides the status, 201 by default; STUB_CURL_STATUS_DELETE
 # and STUB_CURL_STATUS_GET do so for DELETE or GET only. STUB_CURL_CSRF adds a
 # csrfToken header, as a login does. Every -H header is echoed as HEADER: ...
+files_seq_status=""; files_seq_body=""
+if [[ "${method}" == "POST" && "${url}" == */files/* && -n "${STUB_CURL_FILES_POST_SEQUENCE}" && -f "${STUB_CURL_FILES_POST_SEQUENCE}" ]]; then
+    counter="${STUB_CURL_FILES_POST_SEQUENCE}.served"
+    n=$(( $(cat "${counter}" 2>/dev/null || echo 0) + 1 ))
+    total=$(grep -c '' "${STUB_CURL_FILES_POST_SEQUENCE}")
+    [[ "${n}" -gt "${total}" ]] && n="${total}"
+    echo "${n}" > "${counter}"
+    IFS=$'\t' read -r files_seq_status files_seq_body < <(sed -n "${n}p" "${STUB_CURL_FILES_POST_SEQUENCE}")
+fi
 if [[ -n "${header_file}" ]]; then
     {
         status="${STUB_CURL_STATUS:-201}"
         [[ "${method}" == "DELETE" && -n "${STUB_CURL_STATUS_DELETE}" ]] && status="${STUB_CURL_STATUS_DELETE}"
         [[ "${method}" == "GET" && -n "${STUB_CURL_STATUS_GET}" ]] && status="${STUB_CURL_STATUS_GET}"
+        [[ "${url}" == */files/* && -n "${STUB_CURL_STATUS_FILES}" ]] && status="${STUB_CURL_STATUS_FILES}"
+        [[ -n "${files_seq_status}" ]] && status="${files_seq_status}"
         printf 'HTTP/1.1 %s Stub\r\n' "${status}"
         [[ -n "${STUB_CURL_LOCATION_ID}" ]] && printf 'Location: %s/%s\r\n' "${url%%\?*}" "${STUB_CURL_LOCATION_ID}"
         [[ -n "${STUB_CURL_CSRF}" ]] && printf 'csrfToken: %s\r\n' "${STUB_CURL_CSRF}"
@@ -130,7 +146,9 @@ if [[ "${method}" == "GET" && -n "${get_body}" && -f "${get_body}" ]]; then
     serve "${get_body}"
 fi
 
-if [[ "${method}" == "POST" && -n "${STUB_CURL_POST_BODY}" && -f "${STUB_CURL_POST_BODY}" ]]; then
+if [[ -n "${files_seq_body}" && -f "${files_seq_body}" ]]; then
+    serve "${files_seq_body}"
+elif [[ "${method}" == "POST" && -n "${STUB_CURL_POST_BODY}" && -f "${STUB_CURL_POST_BODY}" ]]; then
     serve "${STUB_CURL_POST_BODY}"
 fi
 

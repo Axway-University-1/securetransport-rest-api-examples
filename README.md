@@ -298,6 +298,7 @@ already exists.
 | 30. Route Steps Metadata | `/routeStepsMetadata`, the route step types the server knows, how a step names one and the smallest step of each: list (read only) | 1 | 1 |
 | 31. Route Steps Charsets | `/routeStepsCharsets`, the character sets a route step may name, and a check of a step against them: list (read only) | 1 | 1 |
 | 32. Sessions | `/sessions`, the sessions open now: list, read one, end one (a client is disconnected), and the bandwidth and user class statistics | 5 | 5 |
+| 33. Statistics Summary | `/statisticsSummary`, the usage report: the transfers in and out for each day of a period, the users who have logged in, and a test of the connection to the Amplify Platform it is sent to (read only) | 3 | 3 |
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same

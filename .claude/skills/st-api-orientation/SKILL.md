@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     227 curl examples, numbered by topic
-    bat/      219 of them, for Windows
+    bash/     230 curl examples, numbered by topic
+    bat/      222 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -86,6 +86,7 @@ create, read, update, delete cycle for that object.
 | List the route step types the server knows (the `type` of a step in a route) | `bash/30.RouteStepsMetadata/` |
 | List the character sets a route step may name, or check a step's `inputCharset` and `outputCharset` against them | `bash/31.RouteStepsCharsets/` |
 | See who is connected now, end one session (disconnect a client), or count sessions by user class | `bash/32.Sessions/` |
+| Report how many files came in and went out each day (the usage report), list the users who have logged in, or test the connection to the Amplify Platform | `bash/33.StatisticsSummary/` |
 | Manage the embedded database's access rules (pg_hba.conf) | `bash/17.AccessPolicies/` |
 | Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
 | Change an address book source | `bash/19.AddressBook/` |

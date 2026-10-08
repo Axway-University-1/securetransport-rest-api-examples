@@ -1991,6 +1991,108 @@ for args in "john x sideFolder" "john x downloadFolder abc" "john x downloadFold
 done
 
 echo
+echo "=== 33.StatisticsSummary ==="
+F=33.StatisticsSummary
+U="${BASE}/statisticsSummary"
+REPORT='{"envId":"Test_ID","schemaId":"https://platform.example.com/schemas/report.json","timestamp":"2026-10-08T08:00:00.000+03:00","granularity":86400000,"report":{"2026-10-08T00:00:00.000+03:00":{"product":"SecureTransport","usage":{"ST.ActiveUsers":0,"ST.TransfersOut":4,"ST.TransfersIn":46,"ST.Transfers":47,"ST.Volume":0},"meta":{}},"2026-10-07T00:00:00.000+03:00":{"product":"SecureTransport","usage":{"ST.ActiveUsers":2,"ST.TransfersOut":6,"ST.TransfersIn":98,"ST.Transfers":98,"ST.Volume":1024},"meta":{}}},"meta":{"companyName":"Example, Inc.","productName":"SecureTransport","productVersion":"5.5-20260101","reportTimeframe":{"startDate":"2026-10-07T00:00:00.000+03:00","endDate":"2026-10-09T00:00:00.000+03:00"},"reportSummary":{"ST.ActiveUsers":2,"ST.TransfersOut":10,"ST.TransfersIn":144,"ST.Transfers":145,"ST.Volume":1024}}}'
+GET_BODY=$(body stats_report "${REPORT}")
+run "${F}/01.statisticsSummary_generateReport_GET.sh"
+expect "01 report: one GET, both dates today, no flags sent" "${RC}:$(calls)" "0:GET ${U}/generateReport?startDate=$(date +%d/%m/%Y)&endDate=$(date +%d/%m/%Y)"
+has "01 report: the product and the day length" "Statistics summary of SecureTransport 5.5-20260101, environment Test_ID, one entry per 24 hours"
+has "01 report: the period and the number of days" "Period: 2026-10-07T00:00:00.000+03:00 to 2026-10-09T00:00:00.000+03:00 (2 days)"
+has "01 report: a day, in date order, from the key" "  2026-10-07  in 98  out 6  transfers 98  users 2  volume 1024"
+expect "01 report: the days come in date order, though the server's map has them the other way" "$(printf '%s\n' "${OUT}" | grep -o '^  2026-10-0[78]' | tr '\n' ' ')" "  2026-10-07   2026-10-08 "
+has "01 report: the totals" "Total: in 144  out 10  transfers 145  users 2  volume 1024"
+run "${F}/01.statisticsSummary_generateReport_GET.sh" 07/10/2026 08/10/2026 true true
+expect "01 report: both dates and both flags are sent" "$(calls)" "GET ${U}/generateReport?startDate=07/10/2026&endDate=08/10/2026&includeActiveUsersCount=true&includeIncomingFileVolume=true"
+run "${F}/01.statisticsSummary_generateReport_GET.sh" 1/10/2026
+expect "01 report: one date is both the start and the end, a short day and month are fine" "$(calls)" "GET ${U}/generateReport?startDate=1/10/2026&endDate=1/10/2026"
+run "${F}/01.statisticsSummary_generateReport_GET.sh" 07/10/2026 08/10/2026 false true
+expect "01 report: a false flag is not sent" "$(calls)" "GET ${U}/generateReport?startDate=07/10/2026&endDate=08/10/2026&includeIncomingFileVolume=true"
+GET_BODY=$(body stats_report_sparse '{"envId":"x","granularity":86400000,"report":{"2026-10-07T00:00:00.000+03:00":{"usage":{}}},"meta":{"reportSummary":{}}}')
+run "${F}/01.statisticsSummary_generateReport_GET.sh" 07/10/2026
+has "01 report: a day or a total with missing counters reads as 0" "  2026-10-07  in 0  out 0  transfers 0  users 0  volume 0"
+GET_BODY=
+for args in "2026-10-01" "01-10-2026" "01/10/2026 x" "07/10/2026 08/10/2026 yes" "07/10/2026 08/10/2026 true maybe" "07/10/2026 08/10/2026 true true more" "07/10/2026 08/10/2026 TRUE"; do
+    # shellcheck disable=SC2086
+    run "${F}/01.statisticsSummary_generateReport_GET.sh" ${args}
+    expect "01 report: bad arguments (${args}) exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+GET_BODY=$(body stats_report_400 '{"message":"Error validating request","validationErrors":["Incorrect date frame. '"'"'startDate'"'"' must be before '"'"'endDate'"'"'."]}')
+STATUS=400 run "${F}/01.statisticsSummary_generateReport_GET.sh" 08/10/2026 05/10/2026
+expect "01 report: a refusal exits 1" "${RC}" "1"
+has "01 report: prints the code" "HTTP 400"
+has "01 report: and the server's reason" "Incorrect date frame."
+GET_BODY=
+STATUS=
+
+USERS='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"name":"example_a","lastAccessTime":"October 8, 2026, 8:43 AM","lastAdhocAccessTime":""},{"name":"example_b","lastAccessTime":"October 2, 2026, 7:02 PM","lastAdhocAccessTime":"October 3, 2026, 9:00 AM"}]}'
+GET_BODY=$(body stats_users "${USERS}")
+run "${F}/02.statisticsSummary_activeUsers_GET.sh"
+expect "02 users: one page asked for, 100 at offset 0, no filter" "${RC}:$(calls)" "0:GET ${U}/activeUsers?limit=100&offset=0"
+has "02 users: the count" "Users who have logged in: 2"
+has "02 users: a user with no ad hoc access shows -" "  example_a  October 8, 2026, 8:43 AM  -"
+has "02 users: and one with it shows the time" "  example_b  October 2, 2026, 7:02 PM  October 3, 2026, 9:00 AM"
+expect "02 users: a short page ends it, one call" "$(calls | wc -l | tr -d ' ')" "1"
+run "${F}/02.statisticsSummary_activeUsers_GET.sh" example_a 2026-10-08 2026-10-09
+expect "02 users: the name, from and to are sent as lastAccessTime.from and .to" "$(calls)" "GET ${U}/activeUsers?name=example_a&lastAccessTime.from=2026-10-08&lastAccessTime.to=2026-10-09&limit=100&offset=0"
+run "${F}/02.statisticsSummary_activeUsers_GET.sh" "" 2026-10-08
+expect "02 users: an empty name is left out, from is sent" "$(calls)" "GET ${U}/activeUsers?lastAccessTime.from=2026-10-08&limit=100&offset=0"
+FULL=$(jq -cn '{resultSet:{returnCount:100,totalCount:102},result:[range(100) | {name:"example_\(.)",lastAccessTime:"October 8, 2026, 8:43 AM",lastAdhocAccessTime:""}]}')
+REST=$(jq -cn '{resultSet:{returnCount:2,totalCount:102},result:[range(2) | {name:"example_last_\(.)",lastAccessTime:"October 8, 2026, 8:43 AM",lastAdhocAccessTime:""}]}')
+GET_BODY=
+SEQUENCE=$(sequence stats_users_pages "${FULL}" "${REST}")
+run "${F}/02.statisticsSummary_activeUsers_GET.sh"
+expect "02 users: a full page is followed by the next one, at offset 100, and a short one ends it" "${RC}:$(calls)" "0:GET ${U}/activeUsers?limit=100&offset=0
+GET ${U}/activeUsers?limit=100&offset=100"
+expect "02 users: every user of both pages is printed, the count once" "$(printf '%s\n' "${OUT}" | grep -c '^  example_')" "102"
+expect "02 users: the header is printed once" "$(printf '%s\n' "${OUT}" | grep -c 'Users who have logged in: 102')" "1"
+SEQUENCE=
+GET_BODY=$(body stats_users_none '{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}')
+run "${F}/02.statisticsSummary_activeUsers_GET.sh" nobody
+expect "02 users: nobody found is exit 0" "${RC}" "0"
+has "02 users: says 0" "Users who have logged in: 0"
+run "${F}/02.statisticsSummary_activeUsers_GET.sh" a b c d
+expect "02 users: four arguments exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=$(body stats_users_400 '{"message":"Error validating request","validationErrors":["Invalid date format. Format must be *EEE, dd MMM yyyy HH:mm:ss Z*, *yyyy-MM-dd* or a timestamp."]}')
+STATUS=400 run "${F}/02.statisticsSummary_activeUsers_GET.sh" "" x
+expect "02 users: a refusal exits 1 after one call" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+has "02 users: with the server's reason" "Invalid date format."
+GET_BODY=
+STATUS=
+
+POST_BODY=$(body stats_test_ok '{"message":"Connection successful."}')
+STATUS=200 run "${F}/03.statisticsSummary_operations_POST_testConnection.sh"
+expect "03 test: POST operation=testConnection" "${RC}:$(calls)" "0:POST ${U}/operations?operation=testConnection"
+expect "03 test: with no argument and no secret the body is the type alone" "$(payload 1 | jq -c .)" '{"type":"testConnection"}'
+has "03 test: says it is using the saved settings" "with the saved settings"
+has "03 test: prints the code" "HTTP 200"
+has "03 test: and the server's message" "Connection successful."
+AMPLIFY_CLIENT_SECRET='example secret "x"' run "${F}/03.statisticsSummary_operations_POST_testConnection.sh" example_client example_zone example_env
+expect "03 test: the client id, the secret from the environment, the zone and the environment go in the body" "$(payload 1 | jq -c .)" \
+  '{"type":"testConnection","clientId":"example_client","clientSecret":"example secret \"x\"","networkZone":"example_zone","envId":"example_env"}'
+has "03 test: says which client" "as client example_client"
+expect "03 test: the secret is in the body only, never in the URL" "$(calls | grep -c 'example secret')" "0"
+STATUS=202 run "${F}/03.statisticsSummary_operations_POST_testConnection.sh"
+expect "03 test: 202 is a success too" "${RC}" "0"
+POST_BODY=$(body stats_test_platform '{"error":"invalid_client","error_description":"Invalid client or Invalid client credentials","code":401}')
+STATUS=401 run "${F}/03.statisticsSummary_operations_POST_testConnection.sh"
+expect "03 test: the platform's refusal exits 1" "${RC}" "1"
+has "03 test: shows the code" "HTTP 401"
+has "03 test: and that it is the platform that answered, with its reason" "The platform answered: invalid_client: Invalid client or Invalid client credentials"
+POST_BODY=$(body stats_test_406 '{"message":"Error validating request","validationErrors":["Test connection to the Amplify Platform failed. Please check the options."]}')
+STATUS=406 run "${F}/03.statisticsSummary_operations_POST_testConnection.sh"
+expect "03 test: the server's own failure (406) exits 1" "${RC}" "1"
+has "03 test: with its reason" "Test connection to the Amplify Platform failed."
+POST_BODY=$(body stats_test_apikey '{"code":401,"description":"Invalid access token"}')
+STATUS=401 run "${F}/03.statisticsSummary_operations_POST_testConnection.sh"
+has "03 test: a token the platform does not accept" "Invalid access token"
+run "${F}/03.statisticsSummary_operations_POST_testConnection.sh" a b c d
+expect "03 test: four arguments exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+POST_BODY=
+STATUS=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else
