@@ -1668,6 +1668,116 @@ has "01 GET: and prints the code" "HTTP 403"
 GET_BODY=
 
 echo
+echo "=== 32.Sessions ==="
+F=32.Sessions
+U="${BASE}/sessions"
+SESSIONS='[{"id":"FTP:aa11:24539","userName":"example_user","host":"client.example.com","protocol":"FTP","userClass":"VirtClass","currentTransferBandwidth":"-1","command":"IDLE","sessionCreationTime":"Wed, 7 Oct 2026 19:17:06 +0300","nodeIp":"Local \n (node.example.com)","serverName":"Ftp Default"},{"id":"HTTP:bb22","userName":"example_user","host":"client.example.com","protocol":"HTTP","userClass":"VirtClass","currentTransferBandwidth":"-1","command":"","sessionCreationTime":"Wed, 7 Oct 2026 19:17:07 +0300","nodeIp":"Local","serverName":"Http Default"},{"id":"SSH:cc33","userName":"example_other","host":"other.example.com","protocol":"SSH","userClass":"VirtClass","currentTransferBandwidth":"-1","command":"","sessionCreationTime":"Wed, 7 Oct 2026 19:18:00 +0300","nodeIp":"Local","serverName":"Ssh Default"}]'
+GET_BODY=$(body sessions "${SESSIONS}")
+run "${F}/01.sessions_GET.sh"
+expect "01 GET: one call, GET /sessions, no type sent" "${RC}:$(calls)" "0:GET ${U}"
+has "01 GET: counts the sessions (a plain array)" "Sessions: 3"
+has "01 GET: an FTP session, with its command" "  FTP:aa11:24539  example_user  FTP  client.example.com  IDLE  Wed, 7 Oct 2026 19:17:06 +0300"
+has "01 GET: an empty command is shown as -" "  HTTP:bb22  example_user  HTTP  client.example.com  -  Wed, 7 Oct 2026 19:17:07 +0300"
+run "${F}/01.sessions_GET.sh" SSH
+expect "01 GET SSH: sends type=SSH" "${RC}:$(calls)" "0:GET ${U}?type=SSH"
+has "01 GET SSH: and keeps only the SSH ones itself, since the server ignores type" "Sessions: 1"
+expect "01 GET SSH: no FTP line" "$(printf '%s\n' "${OUT}" | grep -c 'FTP:')" "0"
+run "${F}/01.sessions_GET.sh" all example_user
+has "01 GET USER: only that user's sessions" "Sessions: 2"
+expect "01 GET USER: the other user's session is left out" "$(printf '%s\n' "${OUT}" | grep -c 'example_other')" "0"
+run "${F}/01.sessions_GET.sh" FTP nobody
+has "01 GET: no match is an empty list, exit 0" "Sessions: 0"
+GET_BODY=$(body no_sessions '[]')
+run "${F}/01.sessions_GET.sh"
+expect "01 GET: no session open, exit 0" "${RC}" "0"
+has "01 GET: says 0" "Sessions: 0"
+for args in "ftp" "XYZ" "FTP a b"; do
+    run "${F}/01.sessions_GET.sh" ${args}
+    expect "01 GET: bad arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS=403 run "${F}/01.sessions_GET.sh"
+expect "01 GET: a refusal exits 1" "${RC}" "1"
+has "01 GET: and prints the code" "HTTP 403"
+
+ONE='{"id":"FTP:aa11:24539","userName":"example_user","host":"client.example.com","protocol":"FTP","userClass":"VirtClass","currentTransferBandwidth":"-1","command":"STOR","sessionCreationTime":"Wed, 7 Oct 2026 19:17:06 +0300","nodeIp":"Local","serverName":"Ftp Default"}'
+GET_BODY=$(body one_session "${ONE}")
+run "${F}/02.sessions_id_GET.sh" "FTP:aa11:24539"
+expect "02 GET: one call, the id URL-encoded once" "${RC}:$(calls)" "0:GET ${U}/FTP%3Aaa11%3A24539"
+has "02 GET: the summary" "  FTP session of example_user from client.example.com, on Ftp Default"
+has "02 GET: the command and the start" "  command STOR, since Wed, 7 Oct 2026 19:17:06 +0300"
+GET_BODY=$(body sessions "${SESSIONS}")
+SEQUENCE=$(sequence first_session '[{"id":"FTP:aa11:24539"}]' "${ONE}")
+GET_BODY= run "${F}/02.sessions_id_GET.sh"
+expect "02 GET: with no id it asks for the first session, then reads it" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=id
+GET ${U}/FTP%3Aaa11%3A24539"
+SEQUENCE=
+GET_BODY=$(body no_sessions '[]')
+run "${F}/02.sessions_id_GET.sh"
+expect "02 GET: with no id and no session, exit 1 after one call" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+has "02 GET: says so" "There are no sessions to read."
+GET_BODY=$(body not_found '{"message":"Error validating request","validationErrors":["Session with id HTTP:zz was not found."]}')
+STATUS_GET=404 run "${F}/02.sessions_id_GET.sh" "HTTP:zz"
+expect "02 GET: a session that is gone, exit 1" "${RC}" "1"
+has "02 GET: prints the server's reason" "Session with id HTTP:zz was not found."
+run "${F}/02.sessions_id_GET.sh" a b
+expect "02 GET: two arguments exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STATUS_GET=
+
+GET_BODY=$(body one_session "${ONE}")
+STATUS=204 STATUS_GET=200 run "${F}/03.sessions_id_DELETE.sh" "FTP:aa11:24539" example_user
+expect "03 DELETE: reads the session, then deletes that id" "${RC}:$(calls)" "0:GET ${U}/FTP%3Aaa11%3A24539
+DELETE ${U}/FTP%3Aaa11%3A24539"
+has "03 DELETE: says whose session it ends" "Ending the FTP session of example_user..."
+has "03 DELETE: prints the code" "HTTP 204"
+STATUS=204 STATUS_GET=200 run "${F}/03.sessions_id_DELETE.sh" "FTP:aa11:24539"
+expect "03 DELETE: with no user given it still ends the session" "${RC}:$(calls | tail -1)" "0:DELETE ${U}/FTP%3Aaa11%3A24539"
+STATUS=204 STATUS_GET=200 run "${F}/03.sessions_id_DELETE.sh" "FTP:aa11:24539" someone_else
+expect "03 DELETE: another user's session is NOT ended, exit 1, only the read was sent" "${RC}:$(calls)" "1:GET ${U}/FTP%3Aaa11%3A24539"
+has "03 DELETE: says nothing was ended" "That is a FTP session of example_user, not of someone_else: nothing was ended."
+GET_BODY=$(body not_found '{"message":"Error validating request","validationErrors":["Session with id HTTP:zz was not found."]}')
+STATUS=204 STATUS_GET=404 run "${F}/03.sessions_id_DELETE.sh" "HTTP:zz"
+expect "03 DELETE: a session that is gone is not deleted, exit 1" "${RC}:$(calls | grep -c DELETE)" "1:0"
+GET_BODY=$(body one_session "${ONE}")
+GET_BODY=$(body gone '{"message":"Error validating request","validationErrors":["Session with id FTP:aa11:24539 not found"]}')
+STATUS=404 STATUS_GET=200 run "${F}/03.sessions_id_DELETE.sh" "FTP:aa11:24539"
+expect "03 DELETE: a refusal of the delete exits 1" "${RC}" "1"
+has "03 DELETE: prints the code and the reason" "HTTP 404"
+for args in "" "nocolon" "FTP:a user x" ; do
+    run "${F}/03.sessions_id_DELETE.sh" ${args}
+    expect "03 DELETE: bad arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+
+BANDWIDTH='[{"loginName":"example_user","bandwidthUsageStats":{"inbound":100,"outbound":0},"sessions":{"total":2,"http":0,"ftp":2,"ssh":0},"maxAllowedBandwidth":{"inbound":500,"outbound":600}},{"loginName":"example_other","bandwidthUsageStats":{"inbound":0,"outbound":7},"sessions":{"total":1,"http":1,"ftp":0,"ssh":0}}]'
+GET_BODY=$(body bandwidth "${BANDWIDTH}")
+run "${F}/04.sessions_statistics_bandwidth_GET.sh"
+expect "04 GET: one call" "${RC}:$(calls)" "0:GET ${U}/statistics/bandwidth"
+has "04 GET: counts the login names" "Login names using bandwidth: 2"
+has "04 GET: a login name with its sessions, rates and limit" "  example_user  2 sessions (ftp 2, http 0, ssh 0)  in 100, out 0  max in 500, out 600"
+has "04 GET: no limit set shows -" "  example_other  1 sessions (ftp 0, http 1, ssh 0)  in 0, out 7  max in -, out -"
+run "${F}/04.sessions_statistics_bandwidth_GET.sh" 5
+expect "04 GET: a limit goes into the query" "${RC}:$(calls)" "0:GET ${U}/statistics/bandwidth?limit=5"
+GET_BODY=$(body no_bandwidth '[]')
+run "${F}/04.sessions_statistics_bandwidth_GET.sh"
+has "04 GET: an empty answer is 0 login names" "Login names using bandwidth: 0"
+for args in "0" "-1" "abc" "5 6"; do
+    run "${F}/04.sessions_statistics_bandwidth_GET.sh" ${args}
+    expect "04 GET: bad arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS=403 run "${F}/04.sessions_statistics_bandwidth_GET.sh"
+expect "04 GET: a refusal exits 1" "${RC}" "1"
+
+USER_CLASSES='[{"userClass":"VirtClass","maxAllowed":"unlimited","instantaneousFTPBandwidth":"N/A","bandwidthUsageStats":{"inbound":0,"outbound":0},"globalLoggedInCounters":{"total":3,"http":1,"ftp":1,"ssh":1},"localLoggedInCounters":{"total":2,"http":1,"ftp":1,"ssh":0}},{"userClass":"RealClass","maxAllowed":"unlimited","instantaneousFTPBandwidth":"N/A","bandwidthUsageStats":{"inbound":0,"outbound":0},"globalLoggedInCounters":{"total":0,"http":0,"ftp":0,"ssh":0},"localLoggedInCounters":{"total":0,"http":0,"ftp":0,"ssh":0}}]'
+GET_BODY=$(body user_classes "${USER_CLASSES}")
+run "${F}/05.sessions_statistics_userClass_GET.sh"
+expect "05 GET: one call" "${RC}:$(calls)" "0:GET ${U}/statistics/userClass"
+has "05 GET: counts the classes" "Sessions by user class: 2 classes"
+has "05 GET: a class with the sessions on the server and on this node" "  VirtClass  3 sessions (ftp 1, http 1, ssh 1)  here 2  in 0, out 0  max unlimited"
+has "05 GET: a class with none" "  RealClass  0 sessions (ftp 0, http 0, ssh 0)  here 0  in 0, out 0  max unlimited"
+STATUS=403 run "${F}/05.sessions_statistics_userClass_GET.sh"
+expect "05 GET: a refusal exits 1" "${RC}" "1"
+GET_BODY=
+
+echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
 else

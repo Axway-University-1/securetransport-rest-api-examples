@@ -77,6 +77,7 @@ rows = [("01. Authentication", "01.Authentication"),
         ("29. Mail Templates", "29.MailTemplates"),
         ("30. Route Steps Metadata", "30.RouteStepsMetadata"),
         ("31. Route Steps Charsets", "31.RouteStepsCharsets"),
+        ("32. Sessions", "32.Sessions"),
         ("90. End To End Acknowledgment", "90.EndToEndAcknowledgment")]
 
 for label, folder in rows:

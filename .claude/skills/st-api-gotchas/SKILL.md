@@ -735,6 +735,21 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   EncodingConversion) is in the list. `01 step FILE` checks a step, a list of steps or a route against it;
   `tests/integration/checks/52.route_steps_charsets_scripts.py` covers it.
 
+- **Sessions** (`/sessions`; examples `32.Sessions`): the list is not stable: a call right after clients connect, or even later, can lack sessions that are open (one protocol of several) or answer `[]`, and the next call has them again, so read it twice before acting and never conclude from one read that a session is gone (check 53 waits for a complete list); a session exists only while a client is connected, so on a quiet
+  server the list is `[]`. Plain arrays, not `{resultSet, result}`. Confirmed directly: an FTP, HTTP (an EndUser API
+  login) and SSH client each give one session, with an id `FTP:<hash>:<number>`, `HTTP:<hash>` or `SSH:<hash>`; the
+  administrator's own API login is not listed. The reference spells a field `currentTransferBandwith` (the server writes
+  `...Bandwidth`) and lists only FTP and HTTP. **`type=` is ignored** (type=SSH, type=XX, type=ftp all answer every
+  session), so filter the answer yourself; `limit=0` or a negative is 400, `limit=abc` a bare 404, `fields=` works,
+  `localDaemonReturn=` changes nothing. A session's `command` is IDLE or STOR for FTP and empty for HTTP and SSH.
+  `DELETE /sessions/{id}` answers 204 and disconnects the client at once (an idle FTP client gets EOF, an upload a
+  broken pipe, an SSH client exits, the EndUser API answers 401 on the next call); only that session goes, the user's
+  others stay, and the account is not locked. The colon may be sent as `%3A`. A session already gone is 404; a
+  malformed id is 400 for DELETE but **404 for GET**, "The format of the session is incorrect"; the protocol must be in
+  capitals. `/sessions/statistics/userClass` always lists VirtClass and RealClass (counts 0 when nothing is connected)
+  and follows the sessions as they open and close; `/sessions/statistics/bandwidth` stayed `[]` while an FTP client
+  uploaded 6 MB (no bandwidth limit on the lab), so its shape is the reference's, unseen.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root
