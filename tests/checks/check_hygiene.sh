@@ -177,9 +177,24 @@ else
     diff <(echo "${FB}") <(echo "${FT}") | sed 's/^/        /'
 fi
 
+# .gitattributes makes a Linux checkout write the bat files with CRLF, so the
+# name must be read without the carriage return. The self-test proves it with a
+# CRLF file, because a macOS working tree is not converted and would hide it.
+script_name_of() {
+    grep -m1 -E "^(#|REM) Script Name:" "$1" 2>/dev/null | tr -d '\r' | sed -E 's/^(#|REM) Script Name:[[:space:]]*//'
+}
+CRLF_SAMPLE=$(mktemp)
+printf 'REM Script Name: sample.bat\r\nREM Author: x\r\n' > "${CRLF_SAMPLE}"
+if [ "$(script_name_of "${CRLF_SAMPLE}")" = "sample.bat" ]; then
+    pass "a Script Name header is read correctly from a CRLF file"
+else
+    fail "a Script Name header is not read correctly from a CRLF file"
+fi
+rm -f "${CRLF_SAMPLE}"
+
 # Script Name header must match the filename
 BADHDR=$(git ls-files -z "*.sh" "*.bat" | tr '\0' '\n' | while IFS= read -r f; do
-    name=$(grep -m1 -E "^(#|REM) Script Name:" "$f" 2>/dev/null | sed -E 's/^(#|REM) Script Name:[[:space:]]*//')
+    name=$(script_name_of "$f")
     [ -n "$name" ] && [ "$name" != "$(basename "$f")" ] && echo "$f -> $name"
 done)
 if [ -n "${BADHDR}" ]; then
