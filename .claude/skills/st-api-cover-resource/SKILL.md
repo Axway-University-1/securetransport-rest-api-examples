@@ -1,12 +1,11 @@
 ---
 name: st-api-cover-resource
-description: The full procedure for covering one Admin API 2.0 resource (tag) with examples, from the API reference to a pushed commit - read the reference, probe the lab with throwaway objects, write the bash examples and their bat twins with the bundled generators, add offline stub tests and a real-server integration check, update the docs, run the suite. Use this skill whenever someone asks to "cover", "add examples for", "do the next resource", "continue down the Admin reference", or names an Admin tag (deniedUsers, events, icapServers, ldapDomains, mailTemplates, siteTemplates, userClasses, zones, ...) to add examples for. Also use it to resume that work in a new session. Bundles tools in scripts/ for the spec, coverage, the lab, file generation and the docs.
+description: The full procedure for covering one Admin API 2.0 resource (tag) with examples, from the API reference to a pushed commit - read the reference, probe the lab with throwaway objects, write the bash examples and their bat twins with the bundled generators, add offline stub tests and a real-server integration check, update the docs, run the suite. Every tag of the reference is covered or left out on purpose (see the list in this skill), so use it when a new release adds a tag or an operation, when someone asks to "cover" or "add examples for" an Admin tag, or for siteTemplates on a lab that has Connect:Direct. Also use it to resume that work in a new session. Bundles tools in scripts/ for the spec, coverage, the lab, file generation and the docs.
 ---
 
 # Covering an Admin API resource, end to end
 
-This is the procedure that produced `11.Certificates`, `12.BusinessUnits`,
-`13.Configurations` and `17` to `21`. Follow it in order. Each step names the
+This is the procedure that produced every folder from `11.Certificates` to `37.Zones`. Follow it in order. Each step names the
 file to imitate; open that file rather than writing from memory.
 
 Read **st-api-gotchas** before the first call, and **st-api-add-example** for
@@ -43,11 +42,43 @@ Delete them when the probe is done.
 
 ## Where the work stands
 
-Covered, in reference order: accessPolicies, accountSetup, accounts,
-addressBook, administrativeRoles, administrators, applications, businessUnits,
-certificates, configurations, daemons, deniedUsers, events, icapServers,
-ldapDomains, loginRestrictionPolicies (the API only: see below), logs (cancel works only
-for a transfer the server flags cancelable: check 48), mailTemplates, myself, routes (08 to 10 in `09.CompositeRoutes` added to the earlier create, list and delete), routeStepsMetadata (read only: one GET, `30.RouteStepsMetadata`), routeStepsCharsets (read only: one GET, `31.RouteStepsCharsets`), servers, sessions (list, read, end one session, two statistics: `32.Sessions`, check 53), sites (05 to 11 in `06.TransferSites` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the connection test of a saved and of a new site, the remote folder listing; check 54), statisticsSummary (read only: the usage report for a period, the users who have logged in, the platform connection test, whose success was not seen: `33.StatisticsSummary`, check 55), subscriptions (05 to 13 in `07.Subscriptions` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the Pull, ClearPullHistory and Purge operations, and a subscription of each of four other types with its deletion by `purge=true`; check 56), transactionManager (the status, and the stop, which was never sent to the lab and is written from the reference: `34.TransactionManager`, check 57 sends nothing but reads and refusals), transferProfiles (PeSIT only: list, create, HEAD, read, PUT, PATCH, delete, led by `advancedSettings` with the plain fields as the additional form: `35.TransferProfiles`, check 58; and what every option does to the bytes of a file, sent and stored, on 116 real pulls: check 59, with `CapturingProxy` and `pesit_wire.py`), transfers, userClasses (list, create, HEAD, read, PUT, PATCH, delete, and what a class does to the next login of an account, seen in the `userClass` of an FTP session: `36.UserClasses`, check 60; membership by an LDAP attribute was not seen), version, zones (list, create, HEAD, read, PUT, PATCH, delete, by name; what naming a zone in a business unit changes, seen over SFTP, HTTP and FTP: `37.Zones`, check 61; the effect behind a real edge was not seen).
+Covered, in reference order (`coverage.py` lists the operations still missing in each):
+
+| Tag | Folders | Notes |
+| --- | ------- | ----- |
+| accessPolicies | 17 |  |
+| accountSetup | 18 |  |
+| accounts | 05, 18 |  |
+| addressBook | 19 |  |
+| administrativeRoles | 20 |  |
+| administrators | 21 |  |
+| applications | 04, 07 |  |
+| businessUnits | 12 |  |
+| certificates | 11 |  |
+| configurations | 13 |  |
+| daemons | 03 |  |
+| deniedUsers | 22 |  |
+| events | 23 |  |
+| icapServers | 24 |  |
+| ldapDomains | 25 |  |
+| loginRestrictionPolicies | 26 | the API only: see below |
+| logs | 16, 27, 28 | cancel works only for a transfer the server flags cancelable: check 48 |
+| mailTemplates | 29 |  |
+| myself | 01, 02 |  |
+| routes | 08, 09 | 08 to 10 in `09.CompositeRoutes` added to the earlier create, list and delete |
+| routeStepsMetadata | 30 | read only: one GET, `30.RouteStepsMetadata` |
+| routeStepsCharsets | 31 | read only: one GET, `31.RouteStepsCharsets` |
+| servers | 03 |  |
+| sessions | 32 | list, read, end one session, two statistics: `32.Sessions`, check 53 |
+| sites | 06 | 05 to 11 in `06.TransferSites` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the connection test of a saved and of a new site, the remote folder listing; check 54 |
+| statisticsSummary | 33 | read only: the usage report for a period, the users who have logged in, the platform connection test, whose success was not seen: `33.StatisticsSummary`, check 55 |
+| subscriptions | 07 | 05 to 13 in `07.Subscriptions` added to the earlier create, list and delete: HEAD, GET one, PUT, PATCH, the Pull, ClearPullHistory and Purge operations, and a subscription of each of four other types with its deletion by `purge=true`; check 56 |
+| transactionManager | 34 | the status, and the stop, which was never sent to the lab and is written from the reference: `34.TransactionManager`, check 57 sends nothing but reads and refusals |
+| transferProfiles | 35 | PeSIT only: list, create, HEAD, read, PUT, PATCH, delete, led by `advancedSettings` with the plain fields as the additional form: `35.TransferProfiles`, check 58; and what every option does to the bytes of a file, sent and stored, on 116 real pulls: check 59, with `CapturingProxy` and `pesit_wire.py` |
+| transfers | 15 |  |
+| userClasses | 36 | list, create, HEAD, read, PUT, PATCH, delete, and what a class does to the next login of an account, seen in the `userClass` of an FTP session: `36.UserClasses`, check 60; membership by an LDAP attribute was not seen |
+| version | 02 |  |
+| zones | 37 | list, create, HEAD, read, PUT, PATCH, delete, by name; what naming a zone in a business unit changes, seen over SFTP, HTTP and FTP: `37.Zones`, check 61; the effect behind a real edge was not seen |
 
 Left out until a lab can show it: **siteTemplates** (the lab has no Connect:Direct: every create is
 400 "Site template protocol cd is not valid. Connect:Direct protocol not available.", and `custom` and every
@@ -220,8 +251,8 @@ python3 .claude/skills/st-api-cover-resource/scripts/sync_docs.py 22.DeniedUsers
 ./tests/run_all.sh
 ```
 
-Also: a row in the task index of **st-api-orientation**; the "Next, in order"
-list above; every `Confirmed directly` finding that would surprise someone
+Also: a row in the task index of **st-api-orientation**; the table of covered
+tags above; every `Confirmed directly` finding that would surprise someone
 calling the API by hand goes into **st-api-gotchas**, under "The Admin API,
 against its own reference".
 

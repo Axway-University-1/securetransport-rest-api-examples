@@ -1,6 +1,6 @@
 ---
 name: st-api-resource-author
-description: Covers one Admin API 2.0 resource (tag) of the SecureTransport REST API with examples, end to end, by the st-api-cover-resource procedure - reference, lab probe, bash examples and bat twins, offline tests, integration check, docs, suite. Use when asked to cover a named Admin resource or "the next one", while the calling session plans and reviews. Give it the tag name. It writes files and probes the lab with throwaway objects; it does not commit.
+description: Covers one Admin API 2.0 resource (tag) of the SecureTransport REST API with examples, end to end, by the st-api-cover-resource procedure - reference, lab probe, bash examples and bat twins, offline tests, integration check, docs, suite. Use when asked to cover a named Admin resource (a tag a new release added, or one left out for want of a lab), while the calling session plans and reviews. Give it the tag name. It writes files and probes the lab with throwaway objects; it does not commit.
 tools: Read, Write, Edit, Bash, Grep, Glob
 model: sonnet
 ---

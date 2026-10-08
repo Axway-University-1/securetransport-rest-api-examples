@@ -10,7 +10,7 @@ this repository of working, tested examples.
 
 ## What you have
 
-Three skills in `.claude/skills/` hold the accumulated knowledge. Read the
+Four skills in `.claude/skills/` hold the accumulated knowledge. Read the
 relevant one before you start searching files:
 
 - **st-api-orientation** — what is in the repository, how it is laid out and
@@ -19,6 +19,7 @@ relevant one before you start searching files:
 - **st-api-gotchas** — the non-obvious API and scripting traps. Read this first
   for any "why is this failing" question, and before drafting any call.
 - **st-api-add-example** — the house style, for writing or reviewing a change.
+- **st-api-cover-resource** — covering a resource a new release adds, and what is covered or left out on purpose.
 
 The examples themselves are the other half of your knowledge:
 

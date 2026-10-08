@@ -9,18 +9,20 @@ This repository holds working examples of the **Axway SecureTransport REST API 2
 in three languages, for two API surfaces. This skill tells you what is here and how
 to find the right example, so you do not have to read the tree to find out.
 
-Two companion skills carry the rest of the knowledge:
+Three companion skills carry the rest of the knowledge:
 
 - **st-api-gotchas** — the non-obvious API and scripting traps. Read it before
   writing or debugging any call. It is the highest-value file in this pack.
 - **st-api-add-example** — the house style, for when you add an example.
+- **st-api-cover-resource** — the procedure, and the tools, for covering a resource a new
+  release adds, and the list of what is covered and what is left out by design.
 
 ## The two API surfaces
 
 | Tree | Port (non-root / root) | What it covers |
 | ---- | ---------------------- | -------------- |
 | `Admin/API 2.0/` | 8444 / 444 | The full administrator API |
-| `EndUser/API 2.0/` | 8443 / 443 | The small end-user API: login and file transfer |
+| `EndUser/API 2.0/` | 8443 / 443 | The small end-user API: login, files and file operations, the user's own account, password and address book, transfers, the server time |
 
 Getting the port wrong is the most common first-run failure. The admin API is
 not served on the user port and vice versa.
@@ -49,7 +51,7 @@ you change any other bash example, change its bat twin too.
 ## How to find an example
 
 The bash and bat examples are named `NN.resource_METHOD.ext`, numbered by topic
-and then by HTTP method. So `04.Applications/02.applications_POST.sh` is the POST
+and then by HTTP method (the scripts of `90.EndToEndAcknowledgment` are named by what they do). So `04.Applications/02.applications_POST.sh` is the POST
 example for applications. Reading a topic folder in order walks the full
 create, read, update, delete cycle for that object.
 
@@ -78,9 +80,19 @@ create, read, update, delete cycle for that object.
 | Fetch secrets from a HashiCorp Vault (external stores) | `bash/13.Configurations/` 37 to 44 |
 | Add and test an S3 storage profile | `bash/13.Configurations/` 45 to 47 |
 | Set up usage reporting to the Axway Platform | `bash/13.Configurations/02.configurations_PATCH_UsageReporting.sh` |
+| Use SecureTransport's Expression Language in a route condition, a file filter, a rename pattern or a login restriction rule | `bash/14.ExpressionLanguage/` (also in `python/python3/14.ExpressionLanguage/`) |
 | Start a pull from a partner on demand | `bash/15.Transfers/` |
 | Read the transfer log, or count billable transfers per day | `bash/16.TransferLogs/` 01 and 02 |
 | Read one transfer, resubmit or acknowledge it, or count what a pull transferred | `bash/16.TransferLogs/` 03 to 05 |
+| Manage the embedded database's access rules (pg_hba.conf) | `bash/17.AccessPolicies/` |
+| Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
+| Change an address book source | `bash/19.AddressBook/` |
+| Create administrative roles and administrators; lock one; give one an API key | `bash/20.AdministrativeRoles/`, `bash/21.Administrators/` |
+| Block a login name, for good or for hours, list the blocked ones, unblock one | `bash/22.DeniedUsers/` |
+| List the tasks the server is processing now, read one, delete a stuck one | `bash/23.Events/` |
+| Add an antivirus or DLP (ICAP) scan server, switch it on or off, see which business units use it | `bash/24.IcapServers/` |
+| Add an LDAP domain, change it, test the connection to one of its servers | `bash/25.LdapDomains/` |
+| Create a login restriction policy, add, disable or remove its rules, assign it to a business unit | `bash/26.LoginRestrictionPolicies/` (one more example, with a session limit rule, in `bash/14.ExpressionLanguage/`) |
 | See who changed what on the server, when and from where, or export the audit log | `bash/27.AuditLogs/` |
 | Search what the protocol servers logged (a login, a failure), or export the server log | `bash/28.ServerLogs/` |
 | Add, replace, read or delete a mail template (the XHTML behind the notification e-mails) | `bash/29.MailTemplates/` |
@@ -92,17 +104,7 @@ create, read, update, delete cycle for that object.
 | List, create, read, replace, patch or delete the transfer profile of an account (PeSIT: which file it sends, what a file it receives is called, and with `advancedSettings` what happens to its bytes: character set, records, padding, line ending; the account needs a PeSIT site). What each setting does is in st-api-gotchas, "What a transfer profile does to the bytes of a file" | `bash/35.TransferProfiles/` |
 | Create, list, change, reorder or delete a user class (the rule that puts an account in VirtClass, RealClass or a class of your own at login, by user name pattern, type and a membership expression; the first enabled class that fits wins). See st-api-gotchas, "User classes" | `bash/36.UserClasses/` |
 | Create, list, read, replace, patch or delete a network (DMZ) zone: its edges (title, addresses, protocols and ports, proxies), whether it is the default, and which business units name it (a unit's `dmz`). The lab has one zone, `Private`: never change it. See st-api-gotchas, "Zones" | `bash/37.Zones/` |
-| Manage the embedded database's access rules (pg_hba.conf) | `bash/17.AccessPolicies/` |
-| Set up an account with its sites and profiles in one call | `bash/18.AccountSetup/` |
-| Change an address book source | `bash/19.AddressBook/` |
-| Create administrative roles and administrators; lock one; give one an API key | `bash/20.AdministrativeRoles/`, `bash/21.Administrators/` |
-| Block a login name, for good or for hours, list the blocked ones, unblock one | `bash/22.DeniedUsers/` |
-| List the tasks the server is processing now, read one, delete a stuck one | `bash/23.Events/` |
-| Add an antivirus or DLP (ICAP) scan server, switch it on or off, see which business units use it | `bash/24.IcapServers/` |
-| Add an LDAP domain, change it, test the connection to one of its servers | `bash/25.LdapDomains/` |
-| Create a login restriction policy, add, disable or remove its rules, assign it to a business unit | `bash/26.LoginRestrictionPolicies/` (one more example, with a session limit rule, in `bash/14.ExpressionLanguage/`) |
 | Correlate PeSIT transfers and send ACK or NACK | `bash/90.EndToEndAcknowledgment/` |
-| Use SecureTransport's Expression Language in a route condition, a file filter, a rename pattern or a login restriction rule | `bash/14.ExpressionLanguage/` (also in `python/python3/14.ExpressionLanguage/`) |
 | Upload or download files as an end user | `EndUser/API 2.0/bash/02.Files/` |
 | Create a folder, or upload to a chosen path, as an end user, with the csrfToken | `EndUser/API 2.0/bash/02.Files/02.files_name_POST_folder.sh`, `08.fileOperations_POST_upload.sh` |
 | List files with paging, sorting, metadata or a glob; rename; share a folder | `EndUser/API 2.0/bash/02.Files/` 09 to 15 |
@@ -111,8 +113,8 @@ create, read, update, delete cycle for that object.
 | Pull, push or run a folder monitor as an end user, and read the user's own transfer log | `EndUser/API 2.0/bash/05.Transfers/` |
 
 The numbering has one gap: 10 is free. Folders 17 and up follow the Admin API
-reference's order, one resource each; see **st-api-cover-resource** for how they
-are added and what is next.
+reference's order, one resource each; see **st-api-cover-resource** for how a new
+one is added, and for what is left out on purpose.
 
 ## The python examples are a different kind of thing
 
