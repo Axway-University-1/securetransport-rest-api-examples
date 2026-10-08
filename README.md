@@ -19,7 +19,7 @@
 11. [License and Support](#license-and-support)
 
 ## Introduction
-SecureTransport 5.5, released in June 2020, introduced REST API 2.0. The prior API release is version 1.4.
+SecureTransport 5.5 (current), introduces REST API 2.0. The prior API release is version 1.4.
 Currently supported APIs are V1.4 and V2.0 – both are available in ST release V5.5.
 
 This github project looks at use cases from a specific viewpoint. Many clients and Axway themselves have implemented mechanisms to on-board clients and file transfer flows in an automated manner using APIs, rather than the alternative method of manual setups via the admin GUI of ST. Automation brings a reduced risk of introducing errors and also assists in adhering to any standards enforced by the owning institution in naming standards, security profiles etc.
@@ -206,7 +206,7 @@ The following table shows a list of terms and acronyms used throughout this proj
 | MFT | Managed File Transfer |
 | PGP | Pretty Good Privacy |
 | ReST | Representational State Transfer |
-| SaaS | Solution as a Service |
+| SaaS | Software as a Service |
 | SFTP | SSH File Transfer Protocol |
 | ST | SecureTransport |
 | TLS | Transport Layer Security |
