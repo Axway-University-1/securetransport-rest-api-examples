@@ -125,13 +125,22 @@ BY_54 = {"06.TransferSites/05.sites_id_HEAD.sh", "06.TransferSites/06.sites_id_G
          "06.TransferSites/08.sites_id_PATCH.sh", "06.TransferSites/09.sites_operations_POST_test.sh",
          "06.TransferSites/10.sites_operations_POST_test_new.sh",
          "06.TransferSites/11.sites_operations_POST_list.sh"}  # 54.sites_scripts.py runs these, on sites of its own
+BY_56 = {"07.Subscriptions/05.subscriptions_id_HEAD.sh", "07.Subscriptions/06.subscriptions_id_GET.sh",
+         "07.Subscriptions/07.subscriptions_id_PUT.sh", "07.Subscriptions/08.subscriptions_id_PATCH.sh",
+         "07.Subscriptions/09.subscriptions_id_operations_POST_pull.sh",
+         "07.Subscriptions/10.subscriptions_id_operations_POST_clearPullHistory.sh",
+         "07.Subscriptions/11.subscriptions_id_operations_POST_purge.sh", "07.Subscriptions/12.subscriptions_POST_types.sh",
+         "07.Subscriptions/13.subscriptions_id_DELETE_types.sh"}  # 56.subscriptions_scripts.py runs these, on subscriptions of its own
 missing = sorted(os.path.join(folder, f) for folder in NEW for f in os.listdir(os.path.join(BASH, folder))
-                 if f.endswith(".sh") and os.path.join(folder, f) not in set(scripts) | OLDER | BY_47 | BY_50 | BY_54)
+                 if f.endswith(".sh") and os.path.join(folder, f) not in set(scripts) | OLDER | BY_47 | BY_50 | BY_54 | BY_56)
 check("every example in %s is run against a real server" % ", ".join(NEW), not missing, missing)
 text_47 = open(os.path.join(REPO, "tests", "integration", "checks", "47.logs_scripts.py")).read()
 check("and 47.logs_scripts.py names each one it is said to run", all(os.path.basename(f) in text_47 for f in BY_47),
       [f for f in BY_47 if os.path.basename(f) not in text_47])
 text_54 = open(os.path.join(REPO, "tests", "integration", "checks", "54.sites_scripts.py")).read()
+text_56 = open(os.path.join(REPO, "tests", "integration", "checks", "56.subscriptions_scripts.py")).read()
+check("and 56.subscriptions_scripts.py names each one it is said to run", all(os.path.basename(f) in text_56 for f in BY_56),
+      [f for f in BY_56 if os.path.basename(f) not in text_56])
 check("and 54.sites_scripts.py names each one it is said to run", all(os.path.basename(f) in text_54 for f in BY_54),
       [f for f in BY_54 if os.path.basename(f) not in text_54])
 

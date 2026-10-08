@@ -22,8 +22,9 @@
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
 # - The account "john" and its site SSH_PULL must already exist. Run
 #   06.TransferSites/02.sites_POST_ssh.sh first.
-# - If the application already exists, its POST answers 409 and the
-#   subscription is created against the existing one.
+# - If the application already exists, its POST is refused (400 "An application with
+#   this name already exists.", not a 409) and the subscription is created against
+#   the existing one.
 # - A route only runs on what arrives in the folder once a composite route is
 #   linked to the subscription. See
 #   09.CompositeRoutes/05.routes_POST_composite_subscription.sh.

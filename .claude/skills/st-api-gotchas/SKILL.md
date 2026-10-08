@@ -833,6 +833,52 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   folders there (403 "Error occurred while creating file: null"), and a fresh home can refuse the first folder for a
   moment.
 
+- **Subscriptions** (`/subscriptions`; examples `07.Subscriptions` 05 to 13, check 56): a subscription is addressed by a
+  generated **id**, and **account plus application is not unique**: one account has several subscriptions on one
+  application as long as their folders differ (a second one on the same folder is 400 "All subscriptions to an application
+  should have a unique anchor", and for StandardRouter the anchor includes the `subscriberID`). So the examples look an id
+  up by account, application **and folder**. Unlike sites, **`account=` and `application=` are exact, case sensitive, no `*`**
+  (capitals or a wildcard find nothing, no error); `folder=` takes a `*` (and `/inbox*` finds `/inbox2`); `type=` with a
+  value that is no type finds nothing; `limit=-1` is 400, `fields=` keeps the keys named plus `type`. The list is not
+  stable (read it again before concluding something is gone). **The `type` of a subscription is the type of its
+  application**: a body that says another is accepted (201) and the application's type wins. Created with only type,
+  account, application and folder: AdvancedRouting, Basic, HumanSystem (`rules`), MBFT, StandardRouter (needs `subscriberID`,
+  400 without it). SharedFolder and SiteMailbox need more of their application first (`sharedFolder`; `inboxFolder` and
+  `outboxFolder`), and a SiteMailbox subscription 400 "requires inbound transfer configuration". A POST of an application
+  that exists is **400 "An application with this name already exists.", not 409**; an application that still has a
+  subscription cannot be deleted (400 "has active subscriptions"); deleting the account deletes its subscriptions. **A
+  subscription's folder is not made by the POST**: it appears in the home folder at the account's next login (or at the
+  first pull); `DELETE ?purge=true` and the `Purge` operation remove the whole folder, a plain DELETE leaves it. HEAD is 200
+  or a bodiless 404; GET of an unknown id a JSON 404 ("Subscription with id X not found or not accessible."); `type=` on a
+  GET of one is ignored. **PUT replaces the whole subscription**: a body with only type, account, application and folder
+  answers 204 and drops the transfer configurations (the pull sites), the flow attributes and every other setting; the read
+  object sent back (nested `metadata` and all) changes nothing. A transfer configuration sent with no `id` gets a new one, and
+  one with an id that no longer exists is 400 "you are trying to update transfer configuration with id X that does not
+  exists" (read again before sending back). **PUT of an unknown id is 400 "Subscription for ID: X not found", not the 404 the
+  reference lists** (PATCH, GET, DELETE and the operations answer 404). No `type` is 400 "Invalid discriminator value."; another
+  `type` 400 with a misleading "Unsupported parameter - postClientDownloads"; `application` in the body is accepted and ignored;
+  `folder` moves it; an `account` that does not exist is 404, or a bare 403 "unable to comply" when the body carries a transfer
+  configuration. `fileRetentionPeriod` (0 to 36500) needs a pull site ("Cannot set file retention period without setting
+  transfer site."), a negative `maxParallelSitPulls` is 400. A flow attribute key must start with `userVars.`, hold only
+  letters, digits, `.` and `_`, and not repeat `userVars.`; the "10 characters" minimum of the reference is not enforced
+  (`userVars.a` works); the value is 1 to 4000 characters, blank is 400. **PATCH**: `add` of a flow attribute works whether or
+  not it exists (it overwrites), `replace` of one that is not there is 400 `Missing field`, contrary to the usual rule `replace`
+  of a **null** field works (`maxParallelSitPulls`), `remove` of it sets null; `type` is read only (400); `replace` of `/id` and
+  `/application` answer 204 and do nothing; `/folder` moves it; an unknown path is 400 `Missing field`; an empty patch is 204.
+  **Operations** (`POST /subscriptions/{id}/operations?operation=`, the name is case sensitive: `pull` and `Nope` are a bare
+  404 "HTTP 404 Not Found"): `Pull` needs the body `{"type":"pull","site":...}` (none is a 403 "unable to comply"; a site that
+  does not exist is 406 "Site 'X' was not found."; a subscription with no transfer configuration 400 "No transfer
+  configuration found for this subscription."; a wrong `type` 400 with a misleading "Unsupported parameter - site"), answers 202
+  with `message` and a `link` holding the `operationIndex`, and the file arrives in the subscription's folder within seconds and
+  stays on the partner; `createFilesListEnabled` and `createFilesListFilename` in the body write a listing of the pulled files
+  into the folder. With a **pull history** (the subscription's `fileRetentionPeriod` more than 0; the reference says SFTP sites only, an SSH site was the only one tried) a file already
+  pulled is not pulled again, even if it was deleted from the folder, until `ClearPullHistory` (202, message; an optional body
+  `{"type":"clearPullHistory","fileRetentionPeriod":N}` is accepted, 0 to 36500 else 400, and what it changes was not seen).
+  A second pull started at once, as soon as the file had arrived, fetched it again; with 5 seconds in between it did not (the
+  history seems to be written a moment after the file arrives). `Purge` is
+  204 and removes the whole folder, not only its files; the subscription stays and a later pull makes the folder again.
+  `tests/integration/checks/56.subscriptions_scripts.py` covers all of it.
+
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
 This project documents 8444/8443 for a non root install and 444/443 for a root

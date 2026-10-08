@@ -29,8 +29,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     230 curl examples, numbered by topic
-    bat/      222 of them, for Windows
+    bash/     239 curl examples, numbered by topic
+    bat/      231 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -63,7 +63,8 @@ create, read, update, delete cycle for that object.
 | Send a PATCH body from a file | `bash/05.Accounts/06.accounts_name_PATCH_with_file.sh` |
 | Create, list or delete a transfer site, including SSH pull and push sites that rename | `bash/06.TransferSites/` (01 to 04) |
 | Check, read, replace (PUT) or patch one transfer site by its id; test a site's connection (saved, or before saving it); list a folder on the partner | `bash/06.TransferSites/05.sites_id_HEAD.sh` to `11.sites_operations_POST_list.sh` |
-| Subscribe a folder to Advanced Routing, with or without a trigger file | `bash/07.Subscriptions/` |
+| Subscribe a folder to Advanced Routing, with or without a trigger file | `bash/07.Subscriptions/` (01 to 04) |
+| Check, read, replace (PUT) or patch one subscription (found by account, application and folder); pull into its folder now, clear its pull history, purge its folder; subscribe to a Basic, HumanSystem, MBFT or StandardRouter application and delete those with their folders | `bash/07.Subscriptions/05.subscriptions_id_HEAD.sh` to `13.subscriptions_id_DELETE_types.sh` |
 | Create route templates in bulk | `bash/08.RouteTemplates/` |
 | Create a composite route, with or without an extension | `bash/09.CompositeRoutes/` |
 | Compress or decompress in a route, then send to a partner | `bash/09.CompositeRoutes/03.routes_POST_simple_compress.sh`, `04.routes_POST_simple_decompress.sh` |

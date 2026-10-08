@@ -22,8 +22,9 @@ REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - The account "john" and its site SSH_PULL must already exist. Run
 REM   06.TransferSites\02.sites_POST_ssh.bat first.
-REM - If the application already exists, its POST answers 409 and the
-REM   subscription is created against the existing one.
+REM - If the application already exists, its POST is refused (400 "An application with
+REM   this name already exists.", not a 409) and the subscription is created against
+REM   the existing one.
 REM - A route only runs on what arrives in the folder once a composite route is
 REM   linked to the subscription. See
 REM   09.CompositeRoutes\05.routes_POST_composite_subscription.bat.

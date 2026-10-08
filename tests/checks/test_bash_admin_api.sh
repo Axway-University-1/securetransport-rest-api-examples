@@ -2092,6 +2092,252 @@ expect "03 test: four arguments exit 2 and send nothing" "${RC}:$(calls | wc -l 
 POST_BODY=
 STATUS=
 
+echo "=== 07.Subscriptions (05 to 13: the subscriptions operations not called before) ==="
+F=07.Subscriptions
+S="${BASE}/subscriptions"
+LOOK="${S}?account=example_acct&application=example_app&fields=id,application,folder"
+ONE_SUB='{"resultSet":{"returnCount":1,"totalCount":1},"result":[{"id":"u1id","application":"example_app","folder":"/example_folder"}]}'
+# the list of the account answers every folder of the application: only the exact folder counts
+MORE_SUB='{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"id":"u2id","application":"example_app","folder":"/example_folder2"},{"id":"u1id","application":"example_app","folder":"/example_folder"},{"id":"u3id","application":"example_app","folder":"/Example_folder"}]}'
+TWO_SAME_SUB='{"resultSet":{"returnCount":2,"totalCount":2},"result":[{"id":"u1id","application":"example_app","folder":"/example_folder"},{"id":"u4id","application":"example_app","folder":"/example_folder"}]}'
+NO_SUB='{"resultSet":{"returnCount":0,"totalCount":0},"result":[]}'
+SUB_FULL='{"type":"AdvancedRouting","id":"u1id","folder":"/example_folder","account":"example_acct","application":"example_app","maxParallelSitPulls":null,"fileRetentionPeriod":null,"flowAttributes":{"userVars.example_kept":"k"},"schedules":[],"transferConfigurations":[{"id":"t1id","site":"example_site","tag":"PARTNER-IN","outbound":false,"dataTransformations":[],"transferProfile":null,"metadata":{"links":{"site":"https://st.example.com:8444/api/v2.0/sites/s1id"}}}],"metadata":{"links":{"account":"https://st.example.com:8444/api/v2.0/accounts/example_acct"}},"subscriptionEncryptMode":"DEFAULT","createFilesList":{"createFilesListEnabled":null,"createFilesListFilename":null}}'
+SUB_BASIC='{"type":"Basic","id":"u1id","folder":"/example_folder","account":"example_acct","application":"example_app","maxParallelSitPulls":6,"fileRetentionPeriod":30,"flowAttributes":{},"schedules":[],"transferConfigurations":[],"metadata":{"links":{}}}'
+SUB_BARE='{"type":"AdvancedRouting","id":"u1id","folder":"/example_folder","account":"example_acct","application":"example_app","flowAttributes":{},"schedules":[],"transferConfigurations":[],"metadata":{"links":{}}}'
+ARGS="example_acct example_app /example_folder"
+
+GET_BODY=$(body sub_one "${ONE_SUB}")
+run "${F}/05.subscriptions_id_HEAD.sh" ${ARGS}
+expect "05 HEAD: looks the id up by account, application and folder, then HEADs the id" "${RC}:$(calls)" "0:GET ${LOOK}
+HEAD ${S}/u1id"
+has "05 HEAD: says the subscription exists, with its id" "The subscription of example_acct on example_app, folder /example_folder, exists, id u1id."
+run "${F}/05.subscriptions_id_HEAD.sh"
+expect "05 HEAD: the subscription of john on /inbox by default" "$(calls | head -1)" "GET ${S}?account=john&application=AdvancedRoutingApplication&fields=id,application,folder"
+STATUS=404 run "${F}/05.subscriptions_id_HEAD.sh" ${ARGS}
+expect "05 HEAD: 404 is 'does not exist', exit 1" "${RC}" "1"
+GET_BODY=$(body sub_more "${MORE_SUB}")
+run "${F}/05.subscriptions_id_HEAD.sh" ${ARGS}
+expect "05 HEAD: other folders and another case are not counted, the exact folder is used" "${RC}:$(calls | tail -1)" "0:HEAD ${S}/u1id"
+run "${F}/05.subscriptions_id_HEAD.sh" example_acct example_app "/example_*"
+expect "05 HEAD: a wildcard is not a folder: none found, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+GET_BODY=$(body sub_same "${TWO_SAME_SUB}")
+run "${F}/05.subscriptions_id_HEAD.sh" ${ARGS}
+expect "05 HEAD: two matches, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+has "05 HEAD: says how many it found" "Found 2 subscriptions of the account example_acct"
+GET_BODY=$(body sub_none "${NO_SUB}")
+run "${F}/05.subscriptions_id_HEAD.sh" ${ARGS}
+expect "05 HEAD: no such subscription, exit 1, no HEAD" "${RC}:$(calls | grep -c HEAD)" "1:0"
+has "05 HEAD: says none was found" "Found 0 subscriptions"
+GET_BODY=
+
+SEQUENCE=$(sequence sub_get "${ONE_SUB}" "${SUB_FULL}" "${SUB_FULL}")
+run "${F}/06.subscriptions_id_GET.sh" ${ARGS}
+expect "06 GET: looks the id up, reads the subscription, then reads only some fields" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/u1id
+GET ${S}/u1id?fields=id,folder,fileRetentionPeriod"
+has "06 GET: the type" "  type:              AdvancedRouting"
+has "06 GET: the retention is - when not set" "  retention (days):  -"
+has "06 GET: the pull site" "  pull sites:        example_site"
+has "06 GET: the number of flow attributes" "  flow attributes:   1"
+SEQUENCE=$(sequence sub_get_basic "${ONE_SUB}" "${SUB_BASIC}")
+run "${F}/06.subscriptions_id_GET.sh" ${ARGS}
+has "06 GET: the retention when set" "  retention (days):  30"
+has "06 GET: the parallel pulls when set" "  parallel pulls:    6"
+has "06 GET: no pull site is -" "  pull sites:        -"
+SEQUENCE=$(sequence sub_get_unknown "${ONE_SUB}" '{"message":"Error validating request","validationErrors":["Subscription with id u1id not found or not accessible."]}')
+run "${F}/06.subscriptions_id_GET.sh" ${ARGS}
+expect "06 GET: an answer with no id, exit 1" "${RC}" "1"
+SEQUENCE=
+
+SEQUENCE=$(sequence sub_put "${ONE_SUB}" "${SUB_FULL}")
+STATUS=204 run "${F}/07.subscriptions_id_PUT.sh" ${ARGS} 9
+expect "07 PUT: looks the id up, reads the subscription, PUTs it" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/u1id
+PUT ${S}/u1id"
+expect "07 PUT: sends the whole subscription back, pull site and its id kept, only the limit changed, the top level metadata dropped" \
+  "$(payload 1 | jq -c .)" \
+  '{"type":"AdvancedRouting","id":"u1id","folder":"/example_folder","account":"example_acct","application":"example_app","maxParallelSitPulls":9,"fileRetentionPeriod":null,"flowAttributes":{"userVars.example_kept":"k"},"schedules":[],"transferConfigurations":[{"id":"t1id","site":"example_site","tag":"PARTNER-IN","outbound":false,"dataTransformations":[],"transferProfile":null,"metadata":{"links":{"site":"https://st.example.com:8444/api/v2.0/sites/s1id"}}}],"subscriptionEncryptMode":"DEFAULT","createFilesList":{"createFilesListEnabled":null,"createFilesListFilename":null}}'
+has "07 PUT: prints the value before" "maxParallelSitPulls of the subscription is now (not set)."
+has "07 PUT: prints the code" "HTTP 204"
+SEQUENCE=$(sequence sub_put_basic "${ONE_SUB}" "${SUB_BASIC}")
+STATUS=204 run "${F}/07.subscriptions_id_PUT.sh" ${ARGS}
+has "07 PUT: prints the value before when set" "maxParallelSitPulls of the subscription is now 6."
+expect "07 PUT: 2 by default, a number" "$(payload 1 | jq -c .maxParallelSitPulls)" "2"
+SEQUENCE=$(sequence sub_put_zero "${ONE_SUB}" "${SUB_FULL}")
+STATUS=204 run "${F}/07.subscriptions_id_PUT.sh" ${ARGS} 0
+expect "07 PUT: 0, no limit, is a value (a number, not a string)" "$(payload 1 | jq -c .maxParallelSitPulls)" "0"
+SEQUENCE=$(sequence sub_put_refused "${ONE_SUB}" "${SUB_FULL}")
+STATUS=400 run "${F}/07.subscriptions_id_PUT.sh" ${ARGS} 3
+expect "07 PUT: a refusal exits 1" "${RC}" "1"
+SEQUENCE=$(sequence sub_put_unreadable "${ONE_SUB}" '{"message":"Error validating request"}')
+STATUS=204 run "${F}/07.subscriptions_id_PUT.sh" ${ARGS} 3
+expect "07 PUT: a subscription that cannot be read: exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+SEQUENCE=
+GET_BODY=$(body sub_none "${NO_SUB}")
+run "${F}/07.subscriptions_id_PUT.sh" ${ARGS} 3
+expect "07 PUT: no such subscription, exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+GET_BODY=
+for args in "" "example_acct" "example_acct example_app" "${ARGS} abc" "${ARGS} -1" "${ARGS} 2.5"; do
+    run "${F}/07.subscriptions_id_PUT.sh" ${args}
+    expect "07 PUT: arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+
+SEQUENCE=$(sequence sub_patch "${ONE_SUB}" "${SUB_FULL}")
+STATUS=204 run "${F}/08.subscriptions_id_PATCH.sh" ${ARGS}
+expect "08 PATCH: looks the id up, reads the subscription, PATCHes it" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/u1id
+PATCH ${S}/u1id"
+expect "08 PATCH: adds the flow attribute, with the default value" "$(payload 1 | jq -c .)" \
+  '[{"op":"add","path":"/flowAttributes/userVars.example_note","value":"example"}]'
+has "08 PATCH: the attribute was not set" "The flow attribute userVars.example_note is now (not set)."
+has "08 PATCH: prints the code" "HTTP 204"
+SEQUENCE=$(sequence sub_patch_value "${ONE_SUB}" "$(printf '%s' "${SUB_FULL}" | jq -c '.flowAttributes["userVars.example_note"] = "before"')")
+STATUS=204 run "${F}/08.subscriptions_id_PATCH.sh" ${ARGS} "a value with spaces"
+expect "08 PATCH: the value given is sent as a string" "$(payload 1 | jq -c .)" \
+  '[{"op":"add","path":"/flowAttributes/userVars.example_note","value":"a value with spaces"}]'
+has "08 PATCH: prints the value before" "The flow attribute userVars.example_note is now before."
+SEQUENCE=$(sequence sub_patch_refused "${ONE_SUB}" "${SUB_FULL}")
+STATUS=400 run "${F}/08.subscriptions_id_PATCH.sh" ${ARGS}
+expect "08 PATCH: a refusal exits 1" "${RC}" "1"
+SEQUENCE=
+for args in "" "example_acct" "example_acct example_app"; do
+    run "${F}/08.subscriptions_id_PATCH.sh" ${args}
+    expect "08 PATCH: arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+run "${F}/08.subscriptions_id_PATCH.sh" ${ARGS} " "
+expect "08 PATCH: a blank value exits 2 and sends nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=$(body sub_none "${NO_SUB}")
+run "${F}/08.subscriptions_id_PATCH.sh" ${ARGS}
+expect "08 PATCH: no such subscription, exit 1, no PATCH" "${RC}:$(calls | grep -c PATCH)" "1:0"
+GET_BODY=
+
+PULL_ANSWER='{"message":"Transfer pull event has been successfully submitted for processing","link":"https://st.example.com:8444/api/v2.0/logs/transfers?operationIndex=abc-123&startTimeAfter=Thu%2C+08+Oct+2026"}'
+SEQUENCE=$(sequence sub_pull "${ONE_SUB}" "${SUB_FULL}")
+POST_BODY=$(body sub_pull_answer "${PULL_ANSWER}")
+STATUS=202 run "${F}/09.subscriptions_id_operations_POST_pull.sh" ${ARGS}
+expect "09 Pull: looks the id up, reads the subscription, POSTs the operation" "${RC}:$(calls)" "0:GET ${LOOK}
+GET ${S}/u1id
+POST ${S}/u1id/operations?operation=Pull"
+expect "09 Pull: pulls with the PARTNER-IN site of the subscription" "$(payload 1 | jq -c .)" '{"type":"pull","site":"example_site"}'
+has "09 Pull: prints the code" "HTTP 202"
+has "09 Pull: prints the message" "Transfer pull event has been successfully submitted for processing"
+has "09 Pull: prints the operationIndex, to follow it in the transfer log" "operationIndex: abc-123"
+SEQUENCE=$(sequence sub_pull_site "${ONE_SUB}" "${SUB_FULL}")
+STATUS=202 run "${F}/09.subscriptions_id_operations_POST_pull.sh" ${ARGS} other_site
+expect "09 Pull: a site given is used" "$(payload 1 | jq -c .)" '{"type":"pull","site":"other_site"}'
+SEQUENCE=$(sequence sub_pull_bare "${ONE_SUB}" "${SUB_BARE}")
+STATUS=202 run "${F}/09.subscriptions_id_operations_POST_pull.sh" ${ARGS}
+expect "09 Pull: no pull site and none given: exit 1, no POST" "${RC}:$(calls | grep -c POST)" "1:0"
+has "09 Pull: says so" "The subscription has no pull site"
+SEQUENCE=$(sequence sub_pull_bare_site "${ONE_SUB}" "${SUB_BARE}")
+STATUS=202 run "${F}/09.subscriptions_id_operations_POST_pull.sh" ${ARGS} other_site
+expect "09 Pull: no pull site of its own but one given: it pulls with that" "${RC}:$(payload 1 | jq -c .site)" '0:"other_site"'
+SEQUENCE=$(sequence sub_pull_refused "${ONE_SUB}" "${SUB_FULL}")
+POST_BODY=$(body sub_pull_406 '{"message":"Error validating request","validationErrors":["Site '"'"'x'"'"' was not found."]}')
+STATUS=406 run "${F}/09.subscriptions_id_operations_POST_pull.sh" ${ARGS} x
+expect "09 Pull: a refusal exits 1" "${RC}" "1"
+has "09 Pull: with the code" "HTTP 406"
+has "09 Pull: and the server's answer" "was not found."
+SEQUENCE=
+POST_BODY=
+for args in "" "example_acct" "example_acct example_app"; do
+    run "${F}/09.subscriptions_id_operations_POST_pull.sh" ${args}
+    expect "09 Pull: arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+GET_BODY=$(body sub_none "${NO_SUB}")
+run "${F}/09.subscriptions_id_operations_POST_pull.sh" ${ARGS}
+expect "09 Pull: no such subscription, exit 1, no POST" "${RC}:$(calls | grep -c POST)" "1:0"
+GET_BODY=
+
+GET_BODY=$(body sub_one "${ONE_SUB}")
+POST_BODY=$(body sub_clear_answer '{"message":"Clear pull history for subscription with id u1id was successfully submitted for processing."}')
+STATUS=202 run "${F}/10.subscriptions_id_operations_POST_clearPullHistory.sh" ${ARGS}
+expect "10 ClearPullHistory: looks the id up, POSTs the operation, no body" "${RC}:$(calls):$(payload 1)" "0:GET ${LOOK}
+POST ${S}/u1id/operations?operation=ClearPullHistory:"
+has "10 ClearPullHistory: prints the code" "HTTP 202"
+has "10 ClearPullHistory: prints the message" "Clear pull history for subscription with id u1id was successfully submitted for processing."
+POST_BODY=$(body sub_clear_404 '{"message":"HTTP 404 Not Found"}')
+STATUS=404 run "${F}/10.subscriptions_id_operations_POST_clearPullHistory.sh" ${ARGS}
+expect "10 ClearPullHistory: a refusal exits 1 and shows the answer" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'HTTP 404 Not Found')" "1:1"
+POST_BODY=
+for args in "" "example_acct" "example_acct example_app"; do
+    run "${F}/10.subscriptions_id_operations_POST_clearPullHistory.sh" ${args}
+    expect "10 ClearPullHistory: arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+GET_BODY=$(body sub_none "${NO_SUB}")
+run "${F}/10.subscriptions_id_operations_POST_clearPullHistory.sh" ${ARGS}
+expect "10 ClearPullHistory: no such subscription, exit 1, no POST" "${RC}:$(calls | grep -c POST)" "1:0"
+
+GET_BODY=$(body sub_one "${ONE_SUB}")
+STATUS=204 run "${F}/11.subscriptions_id_operations_POST_purge.sh" ${ARGS}
+expect "11 Purge: looks the id up, POSTs the operation, no body" "${RC}:$(calls):$(payload 1)" "0:GET ${LOOK}
+POST ${S}/u1id/operations?operation=Purge:"
+has "11 Purge: prints the code" "HTTP 204"
+STATUS=404 run "${F}/11.subscriptions_id_operations_POST_purge.sh" ${ARGS}
+expect "11 Purge: a refusal exits 1" "${RC}" "1"
+for args in "" "example_acct" "example_acct example_app"; do
+    run "${F}/11.subscriptions_id_operations_POST_purge.sh" ${args}
+    expect "11 Purge: arguments '${args}' exit 2 and send nothing" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+GET_BODY=$(body sub_none "${NO_SUB}")
+run "${F}/11.subscriptions_id_operations_POST_purge.sh" ${ARGS}
+expect "11 Purge: no such subscription, exit 1, no POST" "${RC}:$(calls | grep -c POST)" "1:0"
+GET_BODY=
+
+STATUS=201 LOCATION=newid run "${F}/12.subscriptions_POST_types.sh" example_acct
+expect "12 POST types: an application and a subscription for each of four types" "${RC}:$(calls)" "0:POST ${BASE}/applications
+POST ${S}
+POST ${BASE}/applications
+POST ${S}
+POST ${BASE}/applications
+POST ${S}
+POST ${BASE}/applications
+POST ${S}"
+expect "12 POST types: the Basic application" "$(payload 1 | jq -c .)" '{"type":"Basic","name":"ExampleBasicApplication","notes":"Created by 07.Subscriptions"}'
+expect "12 POST types: the Basic subscription, with only the four fields" "$(payload 2 | jq -c .)" \
+  '{"type":"Basic","account":"example_acct","application":"ExampleBasicApplication","folder":"/example_Basic"}'
+expect "12 POST types: the HumanSystem subscription has a rule" "$(payload 4 | jq -c .)" \
+  '{"type":"HumanSystem","account":"example_acct","application":"ExampleHumanSystemApplication","folder":"/example_HumanSystem","rules":[{"enabled":true,"recipientPattern":"*","fileFilterPattern":"*.txt","targetFolder":"/example_targets"}]}'
+expect "12 POST types: the MBFT subscription" "$(payload 6 | jq -c .)" \
+  '{"type":"MBFT","account":"example_acct","application":"ExampleMBFTApplication","folder":"/example_MBFT"}'
+expect "12 POST types: the StandardRouter application and subscription, with the subscriber's ID" "$(payload 7 | jq -c .type):$(payload 8 | jq -c .)" \
+  '"StandardRouter":{"type":"StandardRouter","account":"example_acct","application":"ExampleStandardRouterApplication","folder":"/example_StandardRouter","subscriberID":"EXAMPLE_SUBSCRIBER"}'
+expect "12 POST types: prints each new id four times" "$(printf '%s\n' "${OUT}" | grep -c 'New subscription ID: newid')" "4"
+run "${F}/12.subscriptions_POST_types.sh"
+expect "12 POST types: john by default" "$(payload 2 | jq -r .account)" "john"
+STATUS=400 run "${F}/12.subscriptions_POST_types.sh" example_acct
+expect "12 POST types: a refused subscription exits 1, the other types are still tried" "${RC}:$(calls | grep -c "POST ${S}$")" "1:4"
+STATUS=
+
+GET_BODY=$(body sub_types '{"result":[{"id":"b1id","application":"ExampleBasicApplication","folder":"/example_Basic"},{"id":"h1id","application":"ExampleHumanSystemApplication","folder":"/example_HumanSystem"},{"id":"m1id","application":"ExampleMBFTApplication","folder":"/example_MBFT"},{"id":"r1id","application":"ExampleStandardRouterApplication","folder":"/example_StandardRouter"}]}')
+STATUS=204 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+expect "13 DELETE types: for each type, a lookup, the subscription with purge=true, the application" "${RC}:$(calls)" "0:GET ${S}?account=example_acct&application=ExampleBasicApplication&fields=id,application,folder
+DELETE ${S}/b1id?purge=true
+DELETE ${BASE}/applications/ExampleBasicApplication
+GET ${S}?account=example_acct&application=ExampleHumanSystemApplication&fields=id,application,folder
+DELETE ${S}/h1id?purge=true
+DELETE ${BASE}/applications/ExampleHumanSystemApplication
+GET ${S}?account=example_acct&application=ExampleMBFTApplication&fields=id,application,folder
+DELETE ${S}/m1id?purge=true
+DELETE ${BASE}/applications/ExampleMBFTApplication
+GET ${S}?account=example_acct&application=ExampleStandardRouterApplication&fields=id,application,folder
+DELETE ${S}/r1id?purge=true
+DELETE ${BASE}/applications/ExampleStandardRouterApplication"
+expect "13 DELETE types: prints the code eight times" "$(printf '%s\n' "${OUT}" | grep -c 'HTTP 204')" "8"
+run "${F}/13.subscriptions_id_DELETE_types.sh"
+expect "13 DELETE types: john by default" "$(calls | head -1)" "GET ${S}?account=john&application=ExampleBasicApplication&fields=id,application,folder"
+STATUS=400 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+expect "13 DELETE types: a refused delete exits 1" "${RC}" "1"
+GET_BODY=$(body sub_none "${NO_SUB}")
+STATUS=204 run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+expect "13 DELETE types: no subscription found: only the applications are deleted, exit 0" "${RC}:$(calls | grep -c '^DELETE .*/applications/'):$(calls | grep -c '^DELETE .*/subscriptions/')" "0:4:0"
+has "13 DELETE types: says none was deleted" "none deleted"
+GET_BODY=$(body sub_two '{"result":[{"id":"b1id","application":"ExampleBasicApplication","folder":"/example_Basic"},{"id":"b2id","application":"ExampleBasicApplication","folder":"/example_Basic"}]}')
+run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
+expect "13 DELETE types: two matches: nothing deleted, exit 1" "${RC}:$(calls | grep -c '^DELETE .*/subscriptions/')" "1:0"
+GET_BODY=
+STATUS=
+
 echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_admin_api: PASS"
