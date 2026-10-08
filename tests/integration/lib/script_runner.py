@@ -8,13 +8,14 @@ script's own directory, picking up credentials from set_variables.local.sh.
 A bug in the curl invocation itself - bad quoting, a stale field name, a
 broken jq filter - is what this catches that a reimplemented client cannot.
 """
-import atexit
 import contextlib
 import os
 import re
+import shlex
 import shutil
 import signal
 import subprocess
+import tempfile
 
 REPO_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."))
@@ -25,95 +26,51 @@ def path(*parts):
     return os.path.join(REPO_ROOT, *parts)
 
 
-def _restore_config_file(target, backup_file, existed):
-    """Restore a config file from disk backup, or remove it if it didn't exist."""
-    try:
-        if existed and os.path.exists(backup_file):
-            shutil.copy(backup_file, target)
-            os.remove(backup_file)
-        elif not existed and os.path.exists(target):
-            os.remove(target)
-    except OSError:
-        pass
+def _on_sigterm(signum, frame):
+    # Turn a kill into an exit that runs the finally blocks below, so a temporary
+    # file is removed and the python config is put back.
+    raise SystemExit(128 + signum)
 
 
-def _restore_all_backups():
-    """Restore any stale config file backups from a previous run that was killed."""
-    backup_dir = os.path.join(REPO_ROOT, "tests", ".harness_backups")
-    if not os.path.isdir(backup_dir):
-        return
-    for backup_file in os.listdir(backup_dir):
-        if backup_file.endswith(".backup"):
-            try:
-                with open(os.path.join(backup_dir, backup_file), "r") as f:
-                    meta = f.readline().rstrip()  # "EXISTED:TARGET"
-                if ":" in meta:
-                    existed, target = meta.split(":", 1)
-                    existed = existed == "1"
-                    backup_path = os.path.join(backup_dir, backup_file)
-                    _restore_config_file(target, backup_path, existed)
-            except OSError:
-                pass
-
-
-_restore_all_backups()
+try:
+    signal.signal(signal.SIGTERM, _on_sigterm)
+except ValueError:  # imported from a thread other than the main one
+    pass
 
 
 @contextlib.contextmanager
 def real_credentials(tree_dir, config):
     """
-    Temporarily write set_variables.local.sh in tree_dir with the server and
-    credentials from config, so the scripts in that tree pick them up exactly
-    as they would for a person who has configured them by hand.
+    Give the scripts in tree_dir the server and credentials from config, as they
+    would have them for a person who has filled in set_variables.local.sh.
 
-    Backs up to disk (not just memory) and restores whatever was already there -
-    including nothing at all - so this never overwrites a real working
-    configuration, even if the process is killed.
+    The values go into a temporary file that set_variables.sh reads instead of
+    set_variables.local.sh (named by ST_ADMIN_LOCAL_VARIABLES, or
+    ST_ENDUSER_LOCAL_VARIABLES for the EndUser tree). Nothing in the repository
+    is written and your own local file is never touched, whatever happens to
+    this process. The variable is put back on exit, so contexts can nest.
     """
-    target = os.path.join(tree_dir, "set_variables.local.sh")
-    existed = os.path.exists(target)
-    backup_dir = os.path.join(REPO_ROOT, "tests", ".harness_backups")
-    os.makedirs(backup_dir, exist_ok=True)
-
-    backup_file = os.path.join(backup_dir, os.path.basename(target) + ".backup")
-
-    if existed:
-        shutil.copy(target, backup_file)
-        with open(backup_file + ".meta", "w") as f:
-            f.write("1:%s" % target)
-    else:
-        with open(backup_file + ".meta", "w") as f:
-            f.write("0:%s" % target)
-
-    content = (
-        "#!/bin/bash\n"
-        "# Written by the integration test harness (script_runner.py).\n"
-        "# Restored to what it was before on exit - see real_credentials().\n"
-        'export ST_SERVER="%s"\n'
-        'export ST_PORT="%s"\n'
-        'export ST_USER="%s"\n'
-        'export ST_PASSWORD="%s"\n'
-    ) % (config["st_server"], config["st_port"], config["st_user"], config["st_password"])
-
-    with open(target, "w") as f:
+    name = "ST_ENDUSER_LOCAL_VARIABLES" if "EndUser" in tree_dir else "ST_ADMIN_LOCAL_VARIABLES"
+    content = "#!/bin/bash\n" + "".join(
+        "export %s=%s\n" % (var, shlex.quote(str(config[key])))
+        for var, key in (("ST_SERVER", "st_server"), ("ST_PORT", "st_port"),
+                         ("ST_USER", "st_user"), ("ST_PASSWORD", "st_password")))
+    fd, temp_file = tempfile.mkstemp(prefix="st_harness_", suffix=".sh")
+    with os.fdopen(fd, "w") as f:
         f.write(content)
-
-    def cleanup_credentials():
-        _restore_config_file(target, backup_file, existed)
-        try:
-            os.remove(backup_file + ".meta")
-        except OSError:
-            pass
-
-    # Register cleanup for normal exit, SIGTERM, and SIGINT
-    atexit.register(cleanup_credentials)
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(sig, lambda s, f: (cleanup_credentials(), exit(128 + sig)))
-
+    previous = os.environ.get(name)
+    os.environ[name] = temp_file
     try:
         yield
     finally:
-        cleanup_credentials()
+        if previous is None:
+            os.environ.pop(name, None)
+        else:
+            os.environ[name] = previous
+        try:
+            os.remove(temp_file)
+        except OSError:
+            pass
 
 
 def run(script_path, args=None, timeout=60):
@@ -153,29 +110,57 @@ def python_available():
     return os.path.exists(PY_INTERPRETER)
 
 
+# The python examples read a file named config, one folder above themselves, and
+# there is no way to name another one, so this one is written in place. The
+# original is first copied to tests/local (git ignored) with a note of where it
+# goes, and put back on exit, on a kill, and by the next run if even that failed.
+BACKUP_DIR = path("tests", "local", "harness_backups")
+_NOTE = os.path.join(BACKUP_DIR, "python_config.target")
+_ORIG = os.path.join(BACKUP_DIR, "python_config.orig")
+_ABSENT = os.path.join(BACKUP_DIR, "python_config.absent")
+_python_depth = 0
+
+
+def restore_python_config():
+    """Put back the python config a run left behind. True when there was one to put back."""
+    if not os.path.exists(_NOTE):
+        return False
+    with open(_NOTE) as f:
+        target = f.read().strip()
+    if os.path.exists(_ORIG):
+        shutil.copyfile(_ORIG, target)
+    elif os.path.exists(_ABSENT) and os.path.exists(target):
+        os.remove(target)
+    for leftover in (_NOTE, _ORIG, _ABSENT):
+        if os.path.exists(leftover):
+            os.remove(leftover)
+    return True
+
+
 @contextlib.contextmanager
 def real_credentials_python(tree_dir, config):
     """
     Same idea as real_credentials(), for the python3 examples: they each
     read st_server/st_port/st_user/st_password (and optionally
     st_edge_server, only stGraceful.py uses it) from a file named 'config'
-    one directory above themselves - not set_variables.local.sh. Backs up
-    to disk and restores whatever was already there, including nothing at all.
+    one directory above themselves, not set_variables.local.sh. The file that
+    was there is kept on disk and put back, so a kill cannot lose it.
     """
+    global _python_depth
     target = os.path.join(tree_dir, "config")
-    existed = os.path.exists(target)
-    backup_dir = os.path.join(REPO_ROOT, "tests", ".harness_backups")
-    os.makedirs(backup_dir, exist_ok=True)
-
-    backup_file = os.path.join(backup_dir, "python_config.backup")
-
-    if existed:
-        shutil.copy(target, backup_file)
-        with open(backup_file + ".meta", "w") as f:
-            f.write("1:%s" % target)
+    if _python_depth == 0:
+        restore_python_config()  # a run that was killed before this one
+        os.makedirs(BACKUP_DIR, exist_ok=True)
+        if os.path.exists(target):
+            shutil.copyfile(target, _ORIG)
+        else:
+            open(_ABSENT, "w").close()
+        with open(_NOTE, "w") as f:  # last, so a note means a complete backup
+            f.write(target)
+        outer = None
     else:
-        with open(backup_file + ".meta", "w") as f:
-            f.write("0:%s" % target)
+        outer = open(target).read() if os.path.exists(target) else None
+    _python_depth += 1
 
     lines = [
         'st_server="%s"' % config["st_server"],
@@ -185,23 +170,20 @@ def real_credentials_python(tree_dir, config):
     ]
     if config.get("st_edge_server"):
         lines.append('st_edge_server="%s"' % config["st_edge_server"])
-
     with open(target, "w") as f:
         f.write("\n".join(lines) + "\n")
-
-    def cleanup_python_config():
-        _restore_config_file(target, backup_file, existed)
-        try:
-            os.remove(backup_file + ".meta")
-        except OSError:
-            pass
-
-    atexit.register(cleanup_python_config)
 
     try:
         yield
     finally:
-        cleanup_python_config()
+        _python_depth -= 1
+        if _python_depth == 0:
+            restore_python_config()
+        elif outer is None:
+            os.remove(target)
+        else:
+            with open(target, "w") as f:
+                f.write(outer)
 
 
 def run_python(script_path, args=None, timeout=60):

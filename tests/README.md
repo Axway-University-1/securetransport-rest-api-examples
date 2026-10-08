@@ -45,10 +45,11 @@ repository:
 tests/integration/run_integration.sh --mock
 ```
 
-Expect `6 passed, 22 skipped, 1 failed`. The one failure is
-`12.myself_and_version_scripts` and is expected against the mock. The mock
-enforces a `Referer` header on calls that don't send one, and the run says
-"expect failures" before it starts.
+Read only, expect `9 passed, 52 skipped`. With `--write`, expect
+`56 passed, 4 skipped, 1 failed`: the failure is `04.accounts_scripts.py`, see
+[the integration README](integration/README.md). The numbers move when
+a check is added; the point is that nothing else fails. The mock never touches
+your own `tests/local/integration.conf`: it writes a temporary one.
 
 To run against your own lab server, see [Against a real
 server](#against-a-real-server).

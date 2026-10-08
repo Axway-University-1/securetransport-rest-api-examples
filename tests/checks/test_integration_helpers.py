@@ -189,6 +189,163 @@ try:
 finally:
     tried.cleanup()
 
+print("=== the harness never writes over your own configuration ===")
+import shutil as _shutil  # noqa: E402
+import subprocess as _subprocess  # noqa: E402
+import tempfile as _tempfile  # noqa: E402
+
+ADMIN_TREE = runner.path("Admin", "API 2.0", "bash")
+EU_TREE = runner.path("EndUser", "API 2.0", "bash")
+CFG = {"st_server": "h.example", "st_port": "444", "st_user": "adm", "st_password": "p$w\"x'y"}
+EU_CFG = dict(CFG, st_port="8443", st_user="enduser", st_password="eupass")
+
+
+def sees(tree, var):
+    """What a script sees in var after it sources the tree's set_variables.sh."""
+    out = _subprocess.run(["bash", "-c", 'source ./set_variables.sh >/dev/null 2>&1; printf "%s" "${!1}"', "_", var],
+                          cwd=tree, capture_output=True, text=True)
+    return out.stdout
+
+
+def local_state(tree):
+    f = os.path.join(tree, "set_variables.local.sh")
+    return open(f).read() if os.path.exists(f) else None
+
+
+before = (local_state(ADMIN_TREE), local_state(EU_TREE))
+with runner.real_credentials(ADMIN_TREE, CFG):
+    var_file = os.environ.get("ST_ADMIN_LOCAL_VARIABLES")
+    check("the scripts read the credentials from a temporary file", bool(var_file) and os.path.exists(var_file), var_file)
+    check("that file is readable by its owner only", (os.stat(var_file).st_mode & 0o777) == 0o600)
+    check("a script sourcing set_variables.sh sees the server", sees(ADMIN_TREE, "ST_SERVER") == "h.example", sees(ADMIN_TREE, "ST_SERVER"))
+    check("a password with $, a double and a single quote arrives as it was", sees(ADMIN_TREE, "ST_PASSWORD") == CFG["st_password"], sees(ADMIN_TREE, "ST_PASSWORD"))
+    check("your own set_variables.local.sh is not touched while it runs", local_state(ADMIN_TREE) == before[0])
+    with runner.real_credentials(EU_TREE, EU_CFG):
+        check("the Admin and the EndUser tree each get their own credentials inside each other",
+              (sees(ADMIN_TREE, "ST_USER"), sees(EU_TREE, "ST_USER")) == ("adm", "enduser"),
+              (sees(ADMIN_TREE, "ST_USER"), sees(EU_TREE, "ST_USER")))
+    check("leaving the inner one leaves the outer one in place", sees(ADMIN_TREE, "ST_USER") == "adm")
+    with runner.real_credentials(ADMIN_TREE, dict(CFG, st_user="inner")):
+        check("an inner context on the same tree wins", sees(ADMIN_TREE, "ST_USER") == "inner")
+    check("and the outer one is back after it", sees(ADMIN_TREE, "ST_USER") == "adm")
+check("the temporary file is gone afterwards", not os.path.exists(var_file))
+check("the variable is gone afterwards", "ST_ADMIN_LOCAL_VARIABLES" not in os.environ and "ST_ENDUSER_LOCAL_VARIABLES" not in os.environ)
+check("your own local files are exactly as they were", (local_state(ADMIN_TREE), local_state(EU_TREE)) == before)
+try:
+    with runner.real_credentials(ADMIN_TREE, CFG):
+        var_file = os.environ["ST_ADMIN_LOCAL_VARIABLES"]
+        raise RuntimeError("a check failed")
+except RuntimeError:
+    pass
+check("an exception inside the block still cleans up", not os.path.exists(var_file) and "ST_ADMIN_LOCAL_VARIABLES" not in os.environ)
+
+work = _tempfile.mkdtemp(prefix="harness_test_")
+child = """
+import os, signal, sys, time
+sys.path.insert(0, sys.argv[1])
+import script_runner as r
+with r.real_credentials(sys.argv[2], {"st_server": "h", "st_port": "1", "st_user": "u", "st_password": "p"}):
+    print(os.environ["ST_ADMIN_LOCAL_VARIABLES"], flush=True)
+    os.kill(os.getpid(), signal.SIGTERM)
+    time.sleep(5)
+"""
+killed = _subprocess.run([sys.executable, "-c", child, os.path.join(REPO, "tests", "integration", "lib"), ADMIN_TREE],
+                         capture_output=True, text=True, timeout=30)
+check("a process killed with SIGTERM leaves no credentials file behind",
+      killed.returncode == 143 and killed.stdout.strip() != "" and not os.path.exists(killed.stdout.strip()),
+      (killed.returncode, killed.stdout, killed.stderr[-200:]))
+
+saved = (runner.BACKUP_DIR, runner._NOTE, runner._ORIG, runner._ABSENT)
+backups = os.path.join(work, "backups")
+runner.BACKUP_DIR, runner._NOTE, runner._ORIG, runner._ABSENT = (
+    backups, backups + "/python_config.target", backups + "/python_config.orig", backups + "/python_config.absent")
+tree = os.path.join(work, "py")
+os.makedirs(tree)
+config_file = os.path.join(tree, "config")
+
+
+def leftovers():
+    return sorted(os.listdir(backups)) if os.path.isdir(backups) else []
+
+
+try:
+    open(config_file, "w").write("mine\n")
+    with runner.real_credentials_python(tree, CFG):
+        check("the python config is written for the run", 'st_user="adm"' in open(config_file).read())
+        check("your own one is kept on disk meanwhile", open(runner._ORIG).read() == "mine\n")
+    check("your own python config is back, byte for byte", open(config_file).read() == "mine\n")
+    check("and no backup is left", leftovers() == [], leftovers())
+
+    os.remove(config_file)
+    with runner.real_credentials_python(tree, CFG):
+        pass
+    check("with no python config before, there is none after", not os.path.exists(config_file) and leftovers() == [])
+
+    open(config_file, "w").write("mine\n")
+    try:
+        with runner.real_credentials_python(tree, CFG):
+            raise RuntimeError("a check failed")
+    except RuntimeError:
+        pass
+    check("an exception inside the block puts it back too", open(config_file).read() == "mine\n")
+
+    with runner.real_credentials_python(tree, CFG):
+        with runner.real_credentials_python(tree, dict(CFG, st_user="inner")):
+            check("an inner python context wins", 'st_user="inner"' in open(config_file).read())
+        check("and the outer one is back after it", 'st_user="adm"' in open(config_file).read())
+    check("nesting still ends with your own config", open(config_file).read() == "mine\n" and leftovers() == [])
+
+    child_py = """
+import os, signal, sys, time
+sys.path.insert(0, sys.argv[1])
+import script_runner as r
+b = sys.argv[3]
+r.BACKUP_DIR, r._NOTE, r._ORIG, r._ABSENT = b, b + "/python_config.target", b + "/python_config.orig", b + "/python_config.absent"
+with r.real_credentials_python(sys.argv[2], {"st_server": "h", "st_port": "1", "st_user": "u", "st_password": "p"}):
+    os.kill(os.getpid(), getattr(signal, sys.argv[4]))
+    time.sleep(5)
+"""
+    lib = os.path.join(REPO, "tests", "integration", "lib")
+
+    def run_child(sig):
+        return _subprocess.run([sys.executable, "-c", child_py, lib, tree, backups, sig], capture_output=True, text=True, timeout=30)
+
+    killed = run_child("SIGTERM")
+    check("a process killed with SIGTERM puts the python config back",
+          killed.returncode == 143 and open(config_file).read() == "mine\n" and leftovers() == [],
+          (killed.returncode, killed.stderr[-200:]))
+
+    # SIGKILL cannot be caught: nothing runs, so the harness copy and the backup stay
+    killed = run_child("SIGKILL")
+    check("a process killed with SIGKILL leaves the harness copy, and your config safe in a backup",
+          killed.returncode == -9 and 'st_user="u"' in open(config_file).read() and open(runner._ORIG).read() == "mine\n",
+          (killed.returncode, leftovers()))
+    with runner.real_credentials_python(tree, dict(CFG, st_user="second")):
+        check("the next run keeps your config, not the killed run's copy", open(runner._ORIG).read() == "mine\n")
+    check("and ends with your own config again", open(config_file).read() == "mine\n" and leftovers() == [])
+finally:
+    runner.BACKUP_DIR, runner._NOTE, runner._ORIG, runner._ABSENT = saved
+    runner._python_depth = 0
+    _shutil.rmtree(work, ignore_errors=True)
+
+check("the python backups live under tests/local, which git ignores",
+      os.path.relpath(runner.BACKUP_DIR, REPO).startswith(os.path.join("tests", "local")))
+
+print("=== the mock run does not move your integration.conf ===")
+old = os.environ.pop("ST_INTEGRATION_CONF", None)
+try:
+    check("config_path is tests/local/integration.conf by default",
+          st_client.config_path() == os.path.join(REPO, "tests", "local", "integration.conf"), st_client.config_path())
+    os.environ["ST_INTEGRATION_CONF"] = "/tmp/some_other.conf"
+    check("ST_INTEGRATION_CONF names another one", st_client.config_path() == "/tmp/some_other.conf")
+finally:
+    os.environ.pop("ST_INTEGRATION_CONF", None)
+    if old is not None:
+        os.environ["ST_INTEGRATION_CONF"] = old
+runner_text = open(os.path.join(REPO, "tests", "integration", "run_integration.sh")).read()
+check("run_integration.sh --mock uses its own temporary config instead of moving yours",
+      "ST_INTEGRATION_CONF" in runner_text and 'mv "${CONF}"' not in runner_text and "realbackup" not in runner_text)
+
 print()
 if failed:
     print("test_integration_helpers: FAIL (%d)" % failed)

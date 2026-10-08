@@ -249,14 +249,18 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "version":
-            return self._send(200, {"version": "5.5-mock", "serverType": "mock"})
+            # os is here because 02.Introduction/02.version_GET.sh ends with a grep for it
+            return self._send(200, {"version": "5.5-mock", "serverType": "mock", "os": "MockOS"})
 
         if path == "myself":
             # Confirmed against a real 5.5 server: the login name is the top
             # level loginName field, not "name" and not nested. This mock
             # matched that shape only after being run against a real server -
             # do not go back to guessing a shape here.
-            return self._send(200, {"type": "admin", "loginName": VALID_USER})
+            # lastPasswordChangeTime is here because 02.Introduction/03.myself_GET.sh
+            # ends with a grep for it, as the real server returns it
+            return self._send(200, {"type": "admin", "loginName": VALID_USER,
+                                    "lastPasswordChangeTime": "2026-01-01T00:00:00Z"})
 
         if path == "accounts":
             offset = int(params.get("offset", 0))

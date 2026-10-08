@@ -30,7 +30,9 @@ export ST_PASSWORD=""
 # Load the local overrides, if present. Keep your real server and credentials
 # here so that they stay out of the repository.
 #
-LOCAL_VARIABLES="$(dirname "${BASH_SOURCE[0]}")/set_variables.local.sh"
+# ST_ADMIN_LOCAL_VARIABLES names another file to read instead; the test harness
+# uses it so that it never has to write over your own set_variables.local.sh.
+LOCAL_VARIABLES="${ST_ADMIN_LOCAL_VARIABLES:-$(dirname "${BASH_SOURCE[0]}")/set_variables.local.sh}"
 if [ -f "${LOCAL_VARIABLES}" ]; then
     # shellcheck source=/dev/null
     source "${LOCAL_VARIABLES}"

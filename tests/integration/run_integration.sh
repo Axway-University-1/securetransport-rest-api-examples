@@ -22,7 +22,7 @@
 # ==============================================================================
 cd "$(dirname "$0")" || exit 1
 HERE="$(pwd)"
-CONF="${HERE}/../local/integration.conf"
+CONF="${ST_INTEGRATION_CONF:-${HERE}/../local/integration.conf}"
 
 WRITE=""
 MOCK=""
@@ -41,8 +41,7 @@ cleanup() {
         kill "${MOCK_PID}" 2>/dev/null
         wait "${MOCK_PID}" 2>/dev/null   # suppress the shell's job termination notice
     fi
-    [ -n "${MOCK_CONF_BACKUP}" ] && mv -f "${MOCK_CONF_BACKUP}" "${CONF}" 2>/dev/null
-    [ -n "${MOCK}" ] && [ -z "${MOCK_CONF_BACKUP}" ] && rm -f "${CONF}"
+    [ -n "${MOCK_CONF}" ] && rm -f "${MOCK_CONF}"
 }
 trap cleanup EXIT
 
@@ -53,13 +52,13 @@ if [ -n "${MOCK}" ]; then
     PORT="${MOCK_PORT:-18444}"
     echo "Starting the mock SecureTransport on port ${PORT}"
 
-    mkdir -p "${HERE}/../local"
-    if [ -f "${CONF}" ]; then
-        MOCK_CONF_BACKUP="${CONF}.realbackup"
-        mv "${CONF}" "${MOCK_CONF_BACKUP}"
-    fi
+    # Its own config file, named to the checks by ST_INTEGRATION_CONF: your own
+    # tests/local/integration.conf is never moved or touched.
+    MOCK_CONF="$(mktemp)"
+    CONF="${MOCK_CONF}"
+    export ST_INTEGRATION_CONF="${CONF}"
     cat > "${CONF}" <<EOF
-# Written by run_integration.sh --mock. Removed when the run finishes.
+# Written by run_integration.sh --mock to a temporary file. Removed when the run finishes.
 st_server="127.0.0.1"
 st_port="${PORT}"
 st_user="apiadmin"

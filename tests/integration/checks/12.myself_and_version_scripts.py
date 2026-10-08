@@ -16,18 +16,10 @@ account this whole suite authenticates as would lock every other check out of
 that account, on this and every future run - not something to do
 automatically against a real credential. It is not covered by any check.
 
-Known: this still does not fully pass against --mock, for reasons that have
-nothing to do with Referer or CSRF (both are now handled correctly by every
-script this check runs - see .claude/skills/st-api-gotchas/SKILL.md). The
-mock's own `/version` and `/myself` responses are deliberately minimal
-(`{"version": ..., "serverType": ...}` and `{"type": ..., "loginName": ...}`
-respectively) and never include an `os` or `lastPasswordChangeTime` field at
-all - so `02.version_GET.sh` and `03.myself_GET.sh`'s own final `grep`, which
-is the last command in each script, exits non-zero when neither field is
-there to find, and that becomes the whole script's own exit code. Confirmed:
-against a real server, which does return both fields, this check passes
-completely (18/18). Run this against a real server for the authoritative
-result.
+Against --mock this passes too: the mock's /version and /myself answers carry
+the `os` and `lastPasswordChangeTime` fields that 02.version_GET.sh and
+03.myself_GET.sh end with a grep for, since a script's exit code is that of its
+last command and a grep that finds nothing exits non-zero.
 """
 import os
 import subprocess
@@ -84,10 +76,6 @@ def get_with_cookie_jar(jar_path):
 
 
 client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the mock enforces Referer on calls that do not send one - see "
-           "this check's own docstring. Running anyway; expect failures.")
 
 with runner.real_credentials(BASH_TREE, config):
 

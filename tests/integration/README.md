@@ -40,12 +40,12 @@ tests.
 
 The mock is not a SecureTransport simulator and does not try to be.
 
-**`04.accounts_scripts.py` will fail against `--mock`, on purpose.** It runs
-the real `Admin/API 2.0/bash/05.Accounts` scripts, and none of them send a
-`Referer` header — the mock enforces it, matching the documented contract,
-where the real lab this was validated against does not. That gap is itself a
-real, confirmed finding (see the gotchas skill), not a mock bug — run this
-particular check against a real server rather than `--mock` to see it pass.
+**`04.accounts_scripts.py` fails against `--mock --write`.** Five of its
+assertions fail: the exists check of `03`, the contact added by `06`, the contact
+from the patch file, and the three deletes of `07`. Every script it runs sends
+the `Referer`, so that is not the reason, and the cause has not been found yet.
+Run this check against a real server to see it pass. Everything else passes
+against the mock, with and without `--write`.
 
 ## Pointing it at your own server
 

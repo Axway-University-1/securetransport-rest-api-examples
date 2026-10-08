@@ -229,6 +229,9 @@ class STClient:
 # Configuration, read from tests/local/integration.conf which git ignores
 # --------------------------------------------------------------------------
 def config_path():
+    """tests/local/integration.conf, or the file named by ST_INTEGRATION_CONF (the mock run uses it)."""
+    if os.environ.get("ST_INTEGRATION_CONF"):
+        return os.path.abspath(os.environ["ST_INTEGRATION_CONF"])
     here = os.path.dirname(os.path.abspath(__file__))
     return os.path.abspath(os.path.join(here, "..", "..", "local", "integration.conf"))
 
