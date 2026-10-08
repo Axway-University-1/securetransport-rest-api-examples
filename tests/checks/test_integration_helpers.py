@@ -346,6 +346,60 @@ runner_text = open(os.path.join(REPO, "tests", "integration", "run_integration.s
 check("run_integration.sh --mock uses its own temporary config instead of moving yours",
       "ST_INTEGRATION_CONF" in runner_text and 'mv "${CONF}"' not in runner_text and "realbackup" not in runner_text)
 
+
+print("=== a check that asserts nothing is a skip, not a pass ===")
+import contextlib as _contextlib  # noqa: E402
+import io as _io  # noqa: E402
+
+buffer = _io.StringIO()
+with _contextlib.redirect_stdout(buffer):
+    empty = st_client.Checker("nothing asserted")
+    empty.done()
+check("Checker.done() with no assertion says SKIP", "SKIP  no assertion was made" in buffer.getvalue(), buffer.getvalue())
+buffer = _io.StringIO()
+with _contextlib.redirect_stdout(buffer):
+    one = st_client.Checker("one assertion")
+    one.check("it holds", True)
+    one.done()
+check("and with an assertion it does not", "SKIP" not in buffer.getvalue(), buffer.getvalue())
+
+work = _tempfile.mkdtemp(prefix="runner_test_")
+try:
+    integration = os.path.join(work, "integration")
+    os.makedirs(os.path.join(integration, "checks"))
+    _shutil.copy(os.path.join(REPO, "tests", "integration", "run_integration.sh"), integration)
+    fake = {"01.ok.py": 'print("  3 passed, 0 failed")',
+            "02.zero.py": 'print("  0 passed, 0 failed")',
+            "03.skip.py": 'print("  SKIP  no server")',
+            "04.fail.py": 'import sys\nprint("  1 passed, 1 failed")\nprint("  SKIP  a note")\nsys.exit(1)',
+            "100.ok.py": 'print("  1 passed, 0 failed")'}
+    for name, code in fake.items():
+        with open(os.path.join(integration, "checks", name), "w") as f:
+            f.write(code + "\n")
+    conf = os.path.join(work, "integration.conf")
+    with open(conf, "w") as f:
+        f.write('st_server="127.0.0.1"\nst_port="1"\nst_user="u"\nst_password="p"\nst_confirm_lab="yes"\n')
+    env = dict(os.environ, ST_INTEGRATION_CONF=conf)
+
+    def run_runner(*args):
+        return _subprocess.run(["bash", os.path.join(integration, "run_integration.sh")] + list(args),
+                               capture_output=True, text=True, env=env, timeout=60)
+
+    result = run_runner()
+    order = re.findall(r"\((\d+\.\w+\.py): \d+ s\)", result.stdout)
+    check("the checks run in number order, 100 after 04", order == ["01.ok.py", "02.zero.py", "03.skip.py", "04.fail.py", "100.ok.py"], order)
+    check("a pass, a zero-assertion check, a skip, a failure and a pass count as 2 passed, 2 skipped, 1 failed",
+          "1 INTEGRATION CHECK(S) FAILED, 2 passed, 2 skipped" in result.stdout, result.stdout[-300:])
+    check("a failure counts even when it also printed a SKIP line, and the exit status is 1",
+          result.returncode == 1 and "04.fail.py" in result.stdout.split("INTEGRATION CHECK(S) FAILED")[-1])
+    result = run_runner("ok")
+    check("a word on the command line runs only the checks with it in their name",
+          re.findall(r"\((\d+\.\w+\.py): ", result.stdout) == ["01.ok.py", "100.ok.py"] and "INTEGRATION PASSED  (2 check(s), 0 skipped" in result.stdout,
+          result.stdout[-200:])
+    result = run_runner("--no-such-option")
+    check("an unknown option is refused", result.returncode == 2, result.returncode)
+finally:
+    _shutil.rmtree(work, ignore_errors=True)
 print()
 if failed:
     print("test_integration_helpers: FAIL (%d)" % failed)

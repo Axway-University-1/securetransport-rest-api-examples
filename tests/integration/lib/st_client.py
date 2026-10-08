@@ -294,6 +294,10 @@ class Checker:
 
     def done(self):
         print("  %d passed, %d failed" % (self.passed, self.failed))
+        if self.passed == 0 and self.failed == 0:
+            # A check that bailed out (the mock cannot do this one, an object it needs
+            # is missing) asserted nothing: that is a skip, not a pass
+            print("  SKIP  no assertion was made")
         return 0 if self.failed == 0 else 1
 
 

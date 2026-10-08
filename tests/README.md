@@ -45,11 +45,14 @@ repository:
 tests/integration/run_integration.sh --mock
 ```
 
-Read only, expect `9 passed, 52 skipped`. With `--write`, expect
-`56 passed, 4 skipped, 1 failed`: the failure is `04.accounts_scripts.py`, see
-[the integration README](integration/README.md). The numbers move when
-a check is added; the point is that nothing else fails. The mock never touches
-your own `tests/local/integration.conf`: it writes a temporary one.
+Read only, expect `3 passed, 58 skipped`. With `--write`, expect
+`4 passed, 56 skipped, 1 failed`: the failure is `04.accounts_scripts.py`, see
+[the integration README](integration/README.md). Most checks skip because the mock
+does not implement what they need, so the mock proves the harness, not the
+examples: a check that makes no assertion counts as skipped, not passed. The
+numbers move when a check is added; the point is that nothing else fails. To run
+some of the checks only, name them: `run_integration.sh --mock 12 zones`. The mock
+never touches your own `tests/local/integration.conf`: it writes a temporary one.
 
 To run against your own lab server, see [Against a real
 server](#against-a-real-server).

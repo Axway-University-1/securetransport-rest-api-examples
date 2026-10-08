@@ -5,6 +5,7 @@
 #   tests/integration/run_integration.sh            read only
 #   tests/integration/run_integration.sh --write    also exercise the lifecycle
 #   tests/integration/run_integration.sh --mock     run against the bundled mock
+#   tests/integration/run_integration.sh 46 zones   only the checks whose file name has one of these words
 #
 # Safety, in the order it is applied:
 #
@@ -26,12 +27,14 @@ CONF="${ST_INTEGRATION_CONF:-${HERE}/../local/integration.conf}"
 
 WRITE=""
 MOCK=""
+FILTERS=()
 for arg in "$@"; do
     case "${arg}" in
         --write) WRITE="--write" ;;
         --mock)  MOCK="yes" ;;
         -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-        *) echo "unknown option: ${arg}"; exit 2 ;;
+        -*) echo "unknown option: ${arg}"; exit 2 ;;
+        *) FILTERS+=("${arg}") ;;
     esac
 done
 
@@ -139,33 +142,48 @@ PASSED=0
 FAILED=0
 SKIPPED=0
 FAILED_NAMES=()
+OUTPUT_FILE="$(mktemp)"
+trap 'rm -f "${OUTPUT_FILE}"; cleanup' EXIT
+START=${SECONDS}
 
-# Only the numbered .py files directly in checks/. Python leaves compiled
-# copies in checks/__pycache__, whose names also start with the number.
-for check in $(find checks -maxdepth 1 -name '[0-9]*.py' -type f | sort); do
+# Only the numbered .py files directly in checks/, in number order (sort -n, so
+# that 100 comes after 99). Python leaves compiled copies in checks/__pycache__,
+# whose names also start with the number.
+for check in $(find checks -maxdepth 1 -name '[0-9]*.py' -type f | sort -t. -k1,1n); do
     name=$(basename "${check}")
+    if [ "${#FILTERS[@]}" -gt 0 ]; then
+        wanted=""
+        for word in "${FILTERS[@]}"; do [[ "${name}" == *"${word}"* ]] && wanted="yes"; done
+        [ -z "${wanted}" ] && continue
+    fi
     echo "----------------------------------------------------------------------"
-    out=$(python3 "${check}" ${WRITE} 2>&1)
-    status=$?
-    echo "${out}"
-    if echo "${out}" | grep -q "  SKIP  "; then
-        SKIPPED=$((SKIPPED + 1))
-    elif [ "${status}" -eq 0 ]; then
-        PASSED=$((PASSED + 1))
-    else
+    check_start=${SECONDS}
+    # Shown as it happens, so a check of several minutes is not silent, and kept to be read
+    python3 "${check}" ${WRITE} 2>&1 | tee "${OUTPUT_FILE}"
+    status=${PIPESTATUS[0]}
+    echo "  (${name}: $((SECONDS - check_start)) s)"
+    # A failure counts whatever else was printed. Otherwise it is a pass only if
+    # something was asserted: a check that skipped, or bailed out with 0 passed,
+    # is a skip, which is not the same as a pass.
+    passes=$(sed -n 's/^  \([0-9][0-9]*\) passed, .*/\1/p' "${OUTPUT_FILE}" | tail -n 1)
+    if [ "${status}" -ne 0 ]; then
         FAILED=$((FAILED + 1))
         FAILED_NAMES+=("${name}")
+    elif [ "${passes:-0}" -gt 0 ]; then
+        PASSED=$((PASSED + 1))
+    else
+        SKIPPED=$((SKIPPED + 1))
     fi
     echo
 done
 
 echo "######################################################################"
 if [ "${FAILED}" -eq 0 ]; then
-    echo "# INTEGRATION PASSED  (${PASSED} check(s), ${SKIPPED} skipped)"
+    echo "# INTEGRATION PASSED  (${PASSED} check(s), ${SKIPPED} skipped, $((SECONDS - START)) s)"
     echo "######################################################################"
     exit 0
 fi
-echo "# ${FAILED} INTEGRATION CHECK(S) FAILED, ${PASSED} passed, ${SKIPPED} skipped"
+echo "# ${FAILED} INTEGRATION CHECK(S) FAILED, ${PASSED} passed, ${SKIPPED} skipped, $((SECONDS - START)) s"
 for n in "${FAILED_NAMES[@]}"; do echo "#   ${n}"; done
 echo "######################################################################"
 exit 1
