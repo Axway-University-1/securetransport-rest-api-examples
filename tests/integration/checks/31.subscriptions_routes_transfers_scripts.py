@@ -22,16 +22,21 @@ route, and lands in the account's own /delivered folder as
 compressed_files.zip_PUSHED. The partner is SecureTransport itself, over SSH,
 logged in as the same account.
 
-The Admin examples are written for the account "john" and for fixed object
-names. They run here as name-substituted copies (see "Substituted-copy
-fallbacks" in the README), so that nothing already on the server is touched:
+The Admin examples are written for the account "john", the SSH port 8022 and
+fixed object names. The account and the port are settings of the examples
+(ST_EXAMPLE_ACCOUNT and ST_SSH_PORT), so they run with the throwaway account and
+the configured port in their environment, as a person would set them. The
+object names have no setting: the scripts run as name-substituted copies (see
+"Substituted-copy fallbacks" in the README), so that nothing already on the
+server is touched:
 
-  "john"                       -> <prefix>chain, created and deleted here
+  ST_EXAMPLE_ACCOUNT (john)    = <prefix>chain, created and deleted here
+  ST_SSH_PORT (8022)           = st_ssh_port from the config
   AdvancedRoutingApplication   -> <prefix>ARApplication
   SimpleRoute_Compress, SimpleRoute_Decompress, SimpleRouteName
                                -> the same names with the prefix
   RouteFromPartner             -> <prefix>RouteTemplate, created and deleted here
-  PARTNER_HOST, PARTNER_SSH_PORT -> st_ssh_host and st_ssh_port from the config
+  PARTNER_HOST                 -> st_ssh_host from the config
 
 The request bodies and the lookups are the scripts' own. The EndUser examples
 need no substitution: they run as the throwaway account, through
@@ -86,8 +91,9 @@ BASH_TREE = runner.path("Admin", "API 2.0", "bash")
 ENDUSER_TREE = runner.path("EndUser", "API 2.0", "bash")
 FILES_DIR = os.path.join(ENDUSER_TREE, "02.Files")
 
-# The scripts this check runs as name-substituted copies, in order. The offline
-# suite checks that every name in SUBS is substituted out of each of them.
+# The scripts this check runs, in order, as name-substituted copies with the account and the port in their environment. The offline
+# suite checks that every name in SUBS is substituted out of each of them, and that none names john or port 8022 except as the
+# default of its setting.
 ADMIN_SCRIPTS = [
     "06.TransferSites/02.sites_POST_ssh.sh", "06.TransferSites/03.sites_GET.sh",
     "07.Subscriptions/02.subscriptions_POST.sh", "07.Subscriptions/03.subscriptions_POST_triggerfile.sh",
@@ -102,16 +108,17 @@ ADMIN_SCRIPTS = [
 
 
 def admin_script(relative, args=None):
-    """Run a name-substituted copy of an Admin bash example, and check it ran."""
+    """Run a name-substituted copy of an Admin bash example, with the throwaway account and the SSH port set, and check it ran."""
     with runner.substituted_copy(os.path.join(BASH_TREE, relative), SUBS) as copy:
         # Never run a copy that still names a real object: a renamed variable in
         # an example would otherwise send it at "john" or the real application
         with open(copy) as f:
-            still = runner.unsubstituted(f.read(), SUBS)
+            text = f.read()
+        still = runner.unsubstituted(text, SUBS) + runner.hardcoded_settings(text)
         if still:
             c.check("%s: every name was substituted before running it" % relative, False, still)
             raise SystemExit
-        result = runner.run(copy, args, timeout=120)
+        result = runner.run(copy, args, timeout=120, env=SETTINGS)
     c.check("%s runs without an error (name-substituted copy)" % relative,
             result.returncode == 0, (result.stdout + result.stderr).strip()[-300:])
     return result
@@ -160,7 +167,9 @@ client = harness.connect(config, c, mock=("the bundled mock does not implement /
                                           "/transfers or the EndUser API; run this against a real server to exercise it"))
 
 SSH_PORT = harness.ports(config, client).ssh
-SUBS = runner.chain_substitutions(PREFIX, SSH_HOST, SSH_PORT)
+SUBS = runner.chain_substitutions(PREFIX, SSH_HOST)
+SETTINGS = runner.chain_environment(PREFIX, SSH_PORT)
+assert SETTINGS["ST_EXAMPLE_ACCOUNT"] == ACCOUNT  # the scripts act on the account this check creates and deletes
 
 new_release = st_client.server_release_at_least(client, NEW_RELEASE)
 if not new_release:

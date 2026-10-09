@@ -13,7 +13,7 @@ REM
 REM Usage:
 REM 01.transfers_operations_POST_pull.bat [ACCOUNT [SITE [DESTINATION_FOLDER]]]
 REM
-REM   ACCOUNT             the account that pulls (default john)
+REM   ACCOUNT             the account that pulls (default john, or ST_EXAMPLE_ACCOUNT)
 REM   SITE                the transfer site of that account to pull with (default SSH_PULL)
 REM   DESTINATION_FOLDER  the folder of the account the files land in (default /inbox)
 REM
@@ -45,7 +45,8 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET USAGE=Usage: 01.transfers_operations_POST_pull.bat [ACCOUNT [SITE [DESTINATION_FOLDER]]]
 
 SET "ACCOUNT=%~1"
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET "PULL_SITE=%~2"
 IF "%PULL_SITE%"=="" SET PULL_SITE=SSH_PULL
 SET "DESTINATION_FOLDER=%~3"

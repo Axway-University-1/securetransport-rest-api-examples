@@ -54,7 +54,7 @@ if [ "$#" -ne 0 ]; then
     exit 2
 fi
 
-ACCOUNT="john"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
 APPLICATION="AdvancedRoutingApplication"
 FOLDER="/inbox"
 PULL_SITE="SSH_PULL"

@@ -27,6 +27,19 @@ export ST_USER=""
 export ST_PASSWORD=""
 
 #
+# Two optional settings, not needed to run anything. A few examples need an
+# account that already exists and, for the SSH sites, the partner's SSH port.
+# They use john and 8022 unless you say otherwise. To change either, set it in
+# set_variables.local.sh (or in the environment); an argument given to an
+# example still wins over it. Leave them commented out to keep the defaults.
+#
+#   ST_EXAMPLE_ACCOUNT  the account those examples use (default john)
+#   ST_SSH_PORT         the partner's SSH port, where an example names one (default 8022)
+#
+# export ST_EXAMPLE_ACCOUNT="john"
+# export ST_SSH_PORT="8022"
+
+#
 # Load the local overrides, if present. Keep your real server and credentials
 # here so that they stay out of the repository.
 #

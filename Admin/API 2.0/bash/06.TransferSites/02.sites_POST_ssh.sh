@@ -19,7 +19,7 @@
 #
 #   PARTNER_PASSWORD  the password the sites log in with, from the environment (required: without it, or with the placeholder
 #                     change_me, the script prints this usage, sends nothing and exits 2)
-#   PORT              the partner's SSH port, 1 to 65535 (default 8022)
+#   PORT              the partner's SSH port, 1 to 65535 (default 8022, or ST_SSH_PORT)
 #
 # Risk: write
 #
@@ -54,12 +54,12 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
 USAGE="Usage: export PARTNER_PASSWORD='...'; ./02.sites_POST_ssh.sh [PORT]"
 
-ACCOUNT="john"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
 PARTNER_HOST="${ST_SERVER}"
-PARTNER_SSH_PORT="8022"
-PARTNER_USER="john"
+PARTNER_SSH_PORT="${ST_SSH_PORT:-8022}"
+PARTNER_USER="${ST_EXAMPLE_ACCOUNT:-john}"
 
-# The port may be given as the first argument; 8022 above is the default
+# The port may be given as the first argument; without it, ST_SSH_PORT or else 8022 above is used
 PARTNER_SSH_PORT="${1:-${PARTNER_SSH_PORT}}"
 if [ "$#" -gt 1 ] || ! [[ "${PARTNER_SSH_PORT}" =~ ^[0-9]+$ ]] || [ "${PARTNER_SSH_PORT}" -lt 1 ] || [ "${PARTNER_SSH_PORT}" -gt 65535 ]; then
     printf "PORT is a number from 1 to 65535. Nothing was sent.\n%s\n" "${USAGE}"

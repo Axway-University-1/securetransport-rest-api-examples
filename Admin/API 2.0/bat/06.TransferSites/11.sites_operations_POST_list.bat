@@ -13,7 +13,7 @@ REM
 REM Usage:
 REM 11.sites_operations_POST_list.bat [ACCOUNT [NAME [FOLDER [LIMIT [FOLDERS]]]]]
 REM
-REM   ACCOUNT  the account the site belongs to (default john)
+REM   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.bat creates)
 REM   FOLDER   downloadFolder or uploadFolder (default downloadFolder)
 REM   LIMIT    how many entries to list, -1 for all (default 20)
@@ -49,7 +49,8 @@ CALL ..\set_variables.bat
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/sites
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET NAME=%~2
 IF "%NAME%"=="" SET NAME=SSH_PULL
 SET FOLDER_TO_LIST=%~3

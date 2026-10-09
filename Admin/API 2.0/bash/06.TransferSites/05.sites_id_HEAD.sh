@@ -13,7 +13,7 @@
 # Usage:
 # ./05.sites_id_HEAD.sh [ACCOUNT [NAME]]
 #
-#   ACCOUNT  the account the site belongs to (default john)
+#   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.sh creates)
 #
 # Risk: read
@@ -39,7 +39,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 NAME="${2:-SSH_PULL}"
 
 # The one site of that account with that name: "1 <id>", or how many there are.

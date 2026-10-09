@@ -16,7 +16,7 @@ REM
 REM Usage:
 REM 01.logs_transfers_GET.bat [ACCOUNT]
 REM
-REM   ACCOUNT  the account whose transfers to read (default john)
+REM   ACCOUNT  the account whose transfers to read (default john, or ST_EXAMPLE_ACCOUNT)
 REM
 REM Risk: read
 REM
@@ -43,7 +43,8 @@ SET RESPONSE_FILE=%TEMP%\logs_%RANDOM%.json
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/logs/transfers
 
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 IF NOT "%~2"=="" GOTO usage
 
 CALL :main

@@ -17,3 +17,9 @@ export ST_PORT="8444"
 # An administrator account and its password, in plain text
 export ST_USER="apiadmin"
 export ST_PASSWORD="change_me"
+
+# Optional. Some examples need an account that already exists and, for the SSH
+# sites, the partner's SSH port. They use john and 8022; remove the # to use
+# your own. An argument given to an example still wins over these.
+# export ST_EXAMPLE_ACCOUNT="john"
+# export ST_SSH_PORT="8022"

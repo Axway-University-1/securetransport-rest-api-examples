@@ -4,10 +4,12 @@ Check the integration helpers that decide what a real-server run touches,
 without a server.
 
 31.subscriptions_routes_transfers_scripts.py runs the Admin examples as
-name-substituted copies, so that they act on throwaway objects and never on
-the account "john" or an application or route someone already has. If an
-example is changed so that a substitution no longer applies, the copy would act
-on the real name. This finds that here, before anyone runs --write.
+name-substituted copies, with the throwaway account and the SSH port in their
+environment (ST_EXAMPLE_ACCOUNT, ST_SSH_PORT), so that they act on throwaway
+objects and never on the account "john" or an application or route someone
+already has. If an example is changed so that a substitution no longer applies,
+or it names john or port 8022 without reading the setting, the copy would act on
+the real name. This finds that here, before anyone runs --write.
 
 Also checks release_at_least(), which decides whether the checks for
 5.5-20260924 features run at all.
@@ -84,9 +86,11 @@ scripts = next(ast.literal_eval(node.value) for node in ast.walk(tree)
                and any(getattr(t, "id", None) == "ADMIN_SCRIPTS" for t in node.targets))
 
 BASH = os.path.join(REPO, "Admin", "API 2.0", "bash")
-subs = runner.chain_substitutions("ZZTEST_", "ssh.example.com", "2222")
-# Real names that must not reach a line that runs, in any spelling
-REAL = re.compile(r"\bjohn\b|(?<![A-Za-z0-9_])(AdvancedRoutingApplication|SimpleRoute|RouteFrom)")
+subs = runner.chain_substitutions("ZZTEST_", "ssh.example.com")
+settings = runner.chain_environment("ZZTEST_", "2222")
+# Real names that must not reach a line that runs, in any spelling. john and 8022 are checked by hardcoded_settings(): they may
+# stand in the code only as the default of the setting that changes them.
+REAL = re.compile(r"(?<![A-Za-z0-9_])(AdvancedRoutingApplication|SimpleRoute|RouteFrom)")
 
 for rel in scripts:
     path = os.path.join(BASH, rel)
@@ -96,20 +100,77 @@ for rel in scripts:
     text = runner.substitute(open(path).read(), subs)
     code = [line for line in text.splitlines() if not line.lstrip().startswith("#")]
     left = runner.unsubstituted(text, subs)
-    real = [line.strip() for line in code if REAL.search(line)]
+    real = [line.strip() for line in code if REAL.search(line)] + runner.hardcoded_settings(text)
     check(rel + ": no real name is left in it", not left and not real, left or real[:3])
 
-# With the defaults, st_server and port 8022, the host and port substitutions
-# leave the text as it was. That is not a real name left behind.
-defaults = runner.chain_substitutions("ZZTEST_", "${ST_SERVER}", "8022")
+# With the default host, st_server, the host substitution leaves the text as it was.
+# That is not a real name left behind.
+defaults = runner.chain_substitutions("ZZTEST_", "${ST_SERVER}")
 for rel in scripts:
     text = runner.substitute(open(os.path.join(BASH, rel)).read(), defaults)
     left = runner.unsubstituted(text, defaults)
-    check(rel + ": with the default SSH host and port, nothing is left", not left, left)
+    check(rel + ": with the default SSH host, nothing is left", not left, left)
 
 pull = runner.substitute(open(os.path.join(BASH, "06.TransferSites/02.sites_POST_ssh.sh")).read(), subs)
-check("the SSH sites point at the configured host and port",
-      'PARTNER_HOST="ssh.example.com"' in pull and 'PARTNER_SSH_PORT="2222"' in pull)
+check("the SSH sites point at the configured host", 'PARTNER_HOST="ssh.example.com"' in pull)
+check("and the port and the account are the examples' own settings, which 31 gives",
+      settings == {"ST_EXAMPLE_ACCOUNT": "ZZTEST_chain", "ST_SSH_PORT": "2222"}
+      and "${ST_SSH_PORT:-8022}" in pull and "${ST_EXAMPLE_ACCOUNT:-john}" in pull, settings)
+# Every one of the scripts that names the account or the port reads the setting, and nothing but the setting's default is left
+for rel in scripts:
+    text = open(os.path.join(BASH, rel)).read()
+    code = "\n".join(line for line in text.splitlines() if not line.lstrip().startswith("#"))
+    if re.search(r"\bjohn\b", code):
+        check(rel + ": names john only as the default of ST_EXAMPLE_ACCOUNT",
+              "ST_EXAMPLE_ACCOUNT:-john" in code and not runner.hardcoded_settings(text), runner.hardcoded_settings(text))
+    if "8022" in code:
+        check(rel + ": names 8022 only as the default of ST_SSH_PORT",
+              "ST_SSH_PORT:-8022" in code and not runner.hardcoded_settings(text), runner.hardcoded_settings(text))
+
+# The guard must still fail when a script gets the account or the port some other way
+for label, text, caught in (
+        ("a hard-coded account", 'ACCOUNT="john"\n', True),
+        ("the old default of an argument", 'ACCOUNT="${1:-john}"\n', True),
+        ("john in a JSON body", '  \\"account\\": \\"john\\",\n', True),
+        ("a hard-coded SSH port", 'PARTNER_SSH_PORT="8022"\n', True),
+        ("a port in a JSON body", 'jq -n \'{port: "8022"}\'\n', True),
+        ("the account read from the setting", 'ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"\n', False),
+        ("an argument over the setting", 'ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"\n', False),
+        ("the port read from the setting", 'PARTNER_SSH_PORT="${ST_SSH_PORT:-8022}"\n', False),
+        ("john in a comment", '# the account john must exist (default 8022)\n', False),
+        ("a name that only contains john", 'ACCOUNT="johnny"\n', False),
+        ("a port that only contains 8022", 'X="180221"\n', False)):
+    got = bool(runner.hardcoded_settings(text))
+    check("hardcoded_settings: %s is %s" % (label, "caught" if caught else "not a fault"), got is caught, got)
+check("john next to a setting's default is still caught",
+      bool(runner.hardcoded_settings('A="${ST_EXAMPLE_ACCOUNT:-john}"; B="john"\n')))
+
+# The optional settings never reach a script from the environment of whoever runs the suite
+saved = {k: os.environ.get(k) for k in runner.EXAMPLE_SETTINGS}
+try:
+    for k in runner.EXAMPLE_SETTINGS:
+        os.environ[k] = "from_the_shell"
+    merged = runner._environment(None)
+    check("a setting exported in the shell is not passed to a script", all(k not in merged for k in runner.EXAMPLE_SETTINGS),
+          [k for k in runner.EXAMPLE_SETTINGS if k in merged])
+    merged = runner._environment({"ST_EXAMPLE_ACCOUNT": "ZZTEST_chain", "ST_SSH_PORT": 2222, "PARTNER_PASSWORD": "x"})
+    check("... but one a check gives is", merged.get("ST_EXAMPLE_ACCOUNT") == "ZZTEST_chain" and merged.get("ST_SSH_PORT") == "2222"
+          and merged.get("PARTNER_PASSWORD") == "x", merged)
+    import tempfile as _t  # noqa: E402
+    with _t.TemporaryDirectory() as probe_dir:
+        probe = os.path.join(probe_dir, "probe.sh")
+        with open(probe, "w") as f:
+            f.write('printf "%s|%s" "${ST_EXAMPLE_ACCOUNT-unset}" "${ST_SSH_PORT-unset}"\n')
+        check("a script run by the harness sees neither setting from the shell",
+              runner.run(probe).stdout == "unset|unset", runner.run(probe).stdout)
+        check("... and sees what the check gave",
+              runner.run(probe, env={"ST_EXAMPLE_ACCOUNT": "ZZTEST_chain", "ST_SSH_PORT": "2222"}).stdout == "ZZTEST_chain|2222")
+finally:
+    for k, v in saved.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
 check("a prefixed name is not mistaken for the real one",
       runner.unsubstituted("ZZTEST_SimpleRoute_Compress", subs) == []
       and runner.unsubstituted('X="SimpleRoute_Compress"', subs) == ["SimpleRoute_Compress"])

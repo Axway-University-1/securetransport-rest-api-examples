@@ -14,7 +14,7 @@
 # Usage:
 # ./06.subscriptions_id_GET.sh [ACCOUNT [APPLICATION [FOLDER]]]
 #
-#   ACCOUNT      the account that subscribes (default john)
+#   ACCOUNT      the account that subscribes (default john, or ST_EXAMPLE_ACCOUNT)
 #   APPLICATION  the application it subscribes to (default AdvancedRoutingApplication)
 #   FOLDER       the folder of the subscription (default /inbox)
 #
@@ -52,7 +52,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/subscriptions"
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 APPLICATION="${2:-AdvancedRoutingApplication}"
 FOLDER="${3:-/inbox}"
 if [ "$#" -gt 3 ]; then

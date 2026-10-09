@@ -53,7 +53,7 @@ fi
 HEADERS_FILE=$(mktemp)
 trap 'rm -f "${HEADERS_FILE}"' EXIT
 
-ACCOUNT="john"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
 APPLICATION="AdvancedRoutingApplication"
 FOLDER="/inbox-trigger"
 PULL_SITE="SSH_PULL"

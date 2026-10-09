@@ -39,7 +39,8 @@ CALL ..\set_variables.bat
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/routes
-SET ACCOUNT=john
+SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET RESPONSE_FILE=%TEMP%\route_response_%RANDOM%.json
 SET BODY_FILE=%TEMP%\route_body_%RANDOM%.json
 SET HEADERS_FILE=%TEMP%\route_headers_%RANDOM%.txt

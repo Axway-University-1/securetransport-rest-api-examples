@@ -27,6 +27,19 @@ set ST_USER=
 set ST_PASSWORD=
 
 REM
+REM Two optional settings, not needed to run anything. A few examples need an
+REM account that already exists and, for the SSH sites, the partner's SSH port.
+REM They use john and 8022 unless you say otherwise. To change either, set it in
+REM set_variables.local.bat (or in the environment); an argument given to an
+REM example still wins over it. Leave them as comments to keep the defaults.
+REM
+REM   ST_EXAMPLE_ACCOUNT  the account those examples use (default john)
+REM   ST_SSH_PORT         the partner's SSH port, where an example names one (default 8022)
+REM
+REM set ST_EXAMPLE_ACCOUNT=john
+REM set ST_SSH_PORT=8022
+
+REM
 REM Load the local overrides, if present. Keep your real server and credentials
 REM here so that they stay out of the repository.
 REM

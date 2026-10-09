@@ -55,6 +55,8 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
+ACCOUNT_JSON=$(jq -n --arg account "${ACCOUNT}" '$account')
 
 HEADERS_FILE=$(mktemp)
 CREATED=()          # "id name" of every object this script created, to delete again
@@ -166,12 +168,12 @@ create_object "${NAME} with templated host and downloadPattern fields..." "${NAM
   \"name\": \"${NAME}\",
   \"type\": \"http\",
   \"protocol\": \"http\",
-  \"account\": \"john\",
+  \"account\": ${ACCOUNT_JSON},
   \"host\": \"\${DXAGENT_TRANSFERSAPI_SERVER}\",
   \"port\": \"443\",
   \"downloadPattern\": \"\${DXAGENT_TRANSFERSAPI_FILE}\",
   \"uploadFolder\": \"/\",
-  \"userName\": \"john\"
+  \"userName\": ${ACCOUNT_JSON}
 }"
 
 printf "\nReading it back - both fields should still hold the literal template text:\n"

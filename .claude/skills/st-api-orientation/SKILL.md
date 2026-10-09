@@ -155,6 +155,10 @@ reads the same four names from a file that git ignores:
 
 `ST_SERVER`, `ST_PORT`, `ST_USER`, `ST_PASSWORD`
 
+Two optional settings change what the Admin examples act on, and default to what they always did:
+`ST_EXAMPLE_ACCOUNT` (the account the examples need, `john`; an argument still wins) and `ST_SSH_PORT`
+(the SSH port of the server, `8022`).
+
 Copy the example, fill in your copy:
 
 | Tree | Copy | To |

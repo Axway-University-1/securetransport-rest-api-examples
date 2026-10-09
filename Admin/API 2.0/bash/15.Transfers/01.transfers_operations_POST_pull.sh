@@ -13,7 +13,7 @@
 # Usage:
 # ./01.transfers_operations_POST_pull.sh [ACCOUNT [SITE [DESTINATION_FOLDER]]]
 #
-#   ACCOUNT             the account that pulls (default john)
+#   ACCOUNT             the account that pulls (default john, or ST_EXAMPLE_ACCOUNT)
 #   SITE                the transfer site of that account to pull with (default SSH_PULL)
 #   DESTINATION_FOLDER  the folder of the account the files land in (default /inbox)
 #
@@ -47,7 +47,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 USAGE="Usage: ./01.transfers_operations_POST_pull.sh [ACCOUNT [SITE [DESTINATION_FOLDER]]]"
 
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 PULL_SITE="${2:-SSH_PULL}"
 DESTINATION_FOLDER="${3:-/inbox}"
 if [ "$#" -gt 3 ]; then

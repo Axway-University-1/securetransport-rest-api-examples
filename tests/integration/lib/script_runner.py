@@ -73,12 +73,21 @@ def real_credentials(tree_dir, config):
             pass
 
 
+# The two optional settings of the Admin examples (see set_variables.local.example.sh). A script that reads them uses the account
+# and the SSH port they name, so a check must be the one to say which: whatever the person running the suite exported in their own
+# shell must not reach a script. A check that wants a throwaway account or another port passes them in env=.
+EXAMPLE_SETTINGS = ("ST_EXAMPLE_ACCOUNT", "ST_SSH_PORT")
+
+
 def _environment(env):
-    """os.environ with `env` on top (a value of None removes the variable), or None for the plain environment."""
-    if not env:
-        return None
+    """
+    os.environ with `env` on top (a value of None removes the variable), and without the optional settings of the
+    examples (EXAMPLE_SETTINGS) unless `env` gives them.
+    """
     merged = dict(os.environ)
-    for key, value in env.items():
+    for key in EXAMPLE_SETTINGS:
+        merged.pop(key, None)
+    for key, value in (env or {}).items():
         if value is None:
             merged.pop(key, None)
         else:
@@ -91,6 +100,9 @@ def run(script_path, args=None, timeout=60, env=None):
     Run a shipped script from its own directory, the way its own header says
     to ("./02.accounts_POST.sh"), and return the CompletedProcess. `env` adds
     variables to the script's environment only: this process's own is not changed.
+    The optional settings ST_EXAMPLE_ACCOUNT and ST_SSH_PORT are not passed on from
+    this process's environment: a check gives them in `env`, or the examples use
+    their defaults (john, 8022).
 
     Never raises on a non-zero exit. Most examples now read the status with
     curl -w and exit 1 when the server refuses and 2 on a bad argument, but a
@@ -217,25 +229,58 @@ def run_python(script_path, args=None, timeout=60, env=None):
                           timeout=timeout, env=_environment(env))
 
 
-def chain_substitutions(prefix, ssh_host, ssh_port):
+def chain_substitutions(prefix, ssh_host):
     """
     The substitutions 31.subscriptions_routes_transfers_scripts.py applies to
     the Admin examples it runs: every fixed name they use, mapped to a
-    throwaway name carrying prefix, and the partner's host and SSH port mapped
-    to the configured ones. Kept here, rather than in the check, so the offline
-    suite can confirm each one still applies to the scripts as they are.
+    throwaway name carrying prefix, and the partner's host mapped to the
+    configured one. Kept here, rather than in the check, so the offline suite
+    can confirm each one still applies to the scripts as they are.
+
+    The account (john) and the SSH port (8022) are no longer substituted in
+    the text: the examples read them from ST_EXAMPLE_ACCOUNT and ST_SSH_PORT,
+    which chain_environment() gives.
     """
     return {
-        '"john"': '"%schain"' % prefix,
-        "${1:-john}": "${1:-%schain}" % prefix,
         "AdvancedRoutingApplication": prefix + "ARApplication",
         "SimpleRoute_Compress": prefix + "SimpleRoute_Compress",
         "SimpleRoute_Decompress": prefix + "SimpleRoute_Decompress",
         '"SimpleRouteName"': '"%sSimpleRouteName"' % prefix,
         "RouteFromPartner": prefix + "RouteTemplate",
         'PARTNER_HOST="${ST_SERVER}"': 'PARTNER_HOST="%s"' % ssh_host,
-        'PARTNER_SSH_PORT="8022"': 'PARTNER_SSH_PORT="%s"' % ssh_port,
     }
+
+
+def chain_environment(prefix, ssh_port):
+    """
+    The environment 31 runs the Admin examples in: the throwaway account
+    <prefix>chain, and the partner's SSH port, as the examples' own optional
+    settings. Together with chain_substitutions() it replaces every name those
+    examples hard-coded before they read the settings.
+    """
+    return {"ST_EXAMPLE_ACCOUNT": prefix + "chain", "ST_SSH_PORT": str(ssh_port)}
+
+
+# How an example spells the default of each setting. These are the only places john and 8022 may stand in the code of an example
+# a check runs: anywhere else the account or the port is fixed in the script, and no setting can change it.
+SETTING_DEFAULTS = ("${ST_EXAMPLE_ACCOUNT:-john}", "${ST_SSH_PORT:-8022}")
+
+
+def hardcoded_settings(text):
+    """
+    The lines of code (not comments) of a bash example that still name the account john or the port 8022 other than as the
+    default of the setting that changes them. A check that runs the real script with ST_EXAMPLE_ACCOUNT and ST_SSH_PORT set must
+    not run one of these: it would act on john's objects, or on port 8022, whatever the check gave.
+    """
+    found = []
+    for line in text.splitlines():
+        if line.lstrip().startswith("#"):
+            continue
+        for default in SETTING_DEFAULTS:
+            line = line.replace(default, "")
+        if re.search(r"(?<![A-Za-z0-9_])john(?![A-Za-z0-9_])|(?<![0-9])8022(?![0-9])", line):
+            found.append(line.strip())
+    return found
 
 
 def substitute(text, substitutions):

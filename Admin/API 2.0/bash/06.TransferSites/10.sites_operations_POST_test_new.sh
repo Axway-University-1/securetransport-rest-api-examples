@@ -13,10 +13,10 @@
 # Usage:
 # ./10.sites_operations_POST_test_new.sh [ACCOUNT [PROTOCOL [HOST [PORT [USER [SECURE]]]]]]
 #
-#   ACCOUNT   the account the site would belong to (default john)
+#   ACCOUNT   the account the site would belong to (default john, or ST_EXAMPLE_ACCOUNT)
 #   PROTOCOL  ssh, ftp or http (default ssh)
 #   HOST      the partner's host (default ST_SERVER)
-#   PORT      the partner's port (default 8022)
+#   PORT      the partner's port (default 8022, or ST_SSH_PORT)
 #   USER      the login (default: the account)
 #   SECURE    true or false, for an FTP or HTTP partner over TLS (default false)
 #
@@ -51,10 +51,10 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 PROTOCOL="${2:-ssh}"
 PARTNER_HOST="${3:-${ST_SERVER}}"
-PARTNER_PORT="${4:-8022}"
+PARTNER_PORT="${4:-${ST_SSH_PORT:-8022}}"
 PARTNER_USER="${5:-${ACCOUNT}}"
 SECURE="${6:-false}"
 [[ "${PROTOCOL}" =~ ^(ssh|ftp|http)$ ]] || { printf "PROTOCOL is ssh, ftp or http, not %s.\n" "${PROTOCOL}"; exit 2; }

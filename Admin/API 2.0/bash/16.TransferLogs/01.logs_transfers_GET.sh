@@ -16,7 +16,7 @@
 # Usage:
 # ./01.logs_transfers_GET.sh [ACCOUNT]
 #
-#   ACCOUNT  the account whose transfers to read (default john)
+#   ACCOUNT  the account whose transfers to read (default john, or ST_EXAMPLE_ACCOUNT)
 #
 # Risk: read
 #
@@ -43,7 +43,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 if [ "$#" -gt 1 ]; then
     printf "Usage: ./01.logs_transfers_GET.sh [ACCOUNT]\n"
     exit 2

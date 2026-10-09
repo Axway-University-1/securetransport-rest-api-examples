@@ -43,7 +43,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0"
 
-ACCOUNT="john"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
 ROUTE_NAME="CompositeRoute_Subscription"
 ROUTE_TEMPLATE_NAME="RouteFromPartner"
 SUBSCRIPTION_FOLDER="/inbox"

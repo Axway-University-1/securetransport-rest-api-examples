@@ -32,6 +32,7 @@ REM   of the way - for example a transfer profile on an account with no PeSIT
 REM   site, "Account does not contain any PeSIT transfer sites." - answers 400,
 REM   yet what came before it in the body has been created.
 REM - The answer lists one message per object, with its URL.
+REM - The site logs in over SSH on port 8022, or on ST_SSH_PORT when that is set (see set_variables.local.example.bat).
 REM - Certificates are imported with a multipart/mixed body instead; see the API
 REM   reference.
 REM - 04.accounts_name_DELETE.bat removes the account, its sites and its profiles.
@@ -48,6 +49,8 @@ CALL ..\set_variables.bat
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 
 SET ACCOUNT=example_setup
+SET "SSH_PORT=%ST_SSH_PORT%"
+IF "%SSH_PORT%"=="" SET "SSH_PORT=8022"
 SET BODY_FILE=%TEMP%\setup_body_%RANDOM%.json
 SET RESPONSE_FILE=%TEMP%\setup_response_%RANDOM%.json
 
@@ -60,7 +63,7 @@ IF NOT DEFINED ACCOUNT_PASSWORD (
     SET GENERATED=yes
 )
 
-powershell -NoProfile -Command "@{ accountSetup = @{ account = @{ name=$env:ACCOUNT; type='user'; uid='41733'; gid='41733'; homeFolder=('/home/' + $env:ACCOUNT); user=@{ name=$env:ACCOUNT; passwordCredentials=@{ password=$env:ACCOUNT_PASSWORD } } }; sites = @(@{ type='ssh'; protocol='ssh'; name=($env:ACCOUNT + '_site'); account=$env:ACCOUNT; host=$env:ST_SERVER; port='8022'; userName=$env:ACCOUNT; usePassword=$true; password=$env:ACCOUNT_PASSWORD; transferType='partner'; uploadFolder='/out' }) } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
+powershell -NoProfile -Command "@{ accountSetup = @{ account = @{ name=$env:ACCOUNT; type='user'; uid='41733'; gid='41733'; homeFolder=('/home/' + $env:ACCOUNT); user=@{ name=$env:ACCOUNT; passwordCredentials=@{ password=$env:ACCOUNT_PASSWORD } } }; sites = @(@{ type='ssh'; protocol='ssh'; name=($env:ACCOUNT + '_site'); account=$env:ACCOUNT; host=$env:ST_SERVER; port=$env:SSH_PORT; userName=$env:ACCOUNT; usePassword=$true; password=$env:ACCOUNT_PASSWORD; transferType='partner'; uploadFolder='/out' }) } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Setting up the account %ACCOUNT% and its site, in one call...
 SET HTTP_CODE=

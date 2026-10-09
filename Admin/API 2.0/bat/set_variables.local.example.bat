@@ -17,3 +17,9 @@ set ST_PORT=8444
 REM An administrator account and its password, in plain text
 set ST_USER=apiadmin
 set ST_PASSWORD=change_me
+
+REM Optional. Some examples need an account that already exists and, for the SSH
+REM sites, the partner's SSH port. They use john and 8022; remove the REM to use
+REM your own. An argument given to an example still wins over these.
+REM set ST_EXAMPLE_ACCOUNT=john
+REM set ST_SSH_PORT=8022

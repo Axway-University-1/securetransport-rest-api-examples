@@ -19,7 +19,7 @@
 # Usage:
 # ./02.transferProfiles_POST.sh [ACCOUNT [NAME [SEND_MAPPING [RECEIVE_MAPPING [TRANSCODING]]]]]
 #
-#   ACCOUNT          the account the profile is for (default john; it needs a PeSIT site)
+#   ACCOUNT          the account the profile is for (default john, or ST_EXAMPLE_ACCOUNT; it needs a PeSIT site)
 #   NAME             the profile's name (default example_profile)
 #   SEND_MAPPING     the file to send (default /example_file.txt)
 #   RECEIVE_MAPPING  what to call a file received; may not contain * or ? (default: none)
@@ -67,7 +67,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/transferProfiles"
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 NAME="${2:-example_profile}"
 SEND_MAPPING="${3:-/example_file.txt}"
 RECEIVE_MAPPING="$4"

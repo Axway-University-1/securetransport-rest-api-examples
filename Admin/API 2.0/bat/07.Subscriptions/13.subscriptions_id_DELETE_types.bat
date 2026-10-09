@@ -16,7 +16,7 @@ REM
 REM Usage:
 REM 13.subscriptions_id_DELETE_types.bat [ACCOUNT]
 REM
-REM   ACCOUNT  the account that was subscribed (default john)
+REM   ACCOUNT  the account that was subscribed (default john, or ST_EXAMPLE_ACCOUNT)
 REM
 REM Risk: write - deletes the subscriptions of 12 and, with purge=true, their folders
 REM
@@ -43,7 +43,8 @@ CALL ..\set_variables.bat
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/subscriptions
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 IF NOT "%~2"=="" (
     echo Usage: 13.subscriptions_id_DELETE_types.bat [ACCOUNT]
     EXIT /B 2

@@ -36,7 +36,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
 
-ACCOUNT="john"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
 
 # st_get CURL_ARGUMENTS...: a GET of the URL given (with any curl options, such as -G --data-urlencode ...). The answer
 # is left in RESPONSE. A status other than 200 ends the script with exit 1, after printing the status and the answer.

@@ -19,7 +19,7 @@ REM
 REM Usage:
 REM 02.transferProfiles_POST.bat [ACCOUNT [NAME [SEND_MAPPING [RECEIVE_MAPPING [TRANSCODING]]]]]
 REM
-REM   ACCOUNT          the account the profile is for (default john; it needs a PeSIT site)
+REM   ACCOUNT          the account the profile is for (default john, or ST_EXAMPLE_ACCOUNT; it needs a PeSIT site)
 REM   NAME             the profile's name (default example_profile)
 REM   SEND_MAPPING     the file to send (default /example_file.txt)
 REM   RECEIVE_MAPPING  what to call a file received; may not contain * or ? (default: none)
@@ -65,7 +65,8 @@ CALL ..\set_variables.bat
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/transferProfiles
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET NAME=%~2
 IF "%NAME%"=="" SET NAME=example_profile
 SET SEND_MAPPING=%~3

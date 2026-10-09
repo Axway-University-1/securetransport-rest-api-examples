@@ -51,7 +51,7 @@ if [ "$#" -ne 0 ]; then
     exit 2
 fi
 
-ACCOUNT="john"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
 FAILED=0
 
 # The answer to a refused call: the server's own messages, or the text as it is

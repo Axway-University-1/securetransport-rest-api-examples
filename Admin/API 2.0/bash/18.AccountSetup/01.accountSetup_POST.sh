@@ -32,6 +32,7 @@
 #   site, "Account does not contain any PeSIT transfer sites." - answers 400,
 #   yet what came before it in the body has been created.
 # - The answer lists one message per object, with its URL.
+# - The site logs in over SSH on port 8022, or on ST_SSH_PORT when that is set (see set_variables.local.example.sh).
 # - Certificates are imported with a multipart/mixed body instead; see the API
 #   reference.
 # - 04.accounts_name_DELETE.sh removes the account, its sites and its profiles.
@@ -59,12 +60,12 @@ if [ -z "${PASSWORD}" ]; then
 fi
 
 # The account and its site, with the password
-BODY=$(jq -n --arg name "${ACCOUNT}" --arg password "${PASSWORD}" --arg host "${ST_SERVER}" \
+BODY=$(jq -n --arg name "${ACCOUNT}" --arg password "${PASSWORD}" --arg host "${ST_SERVER}" --arg sshport "${ST_SSH_PORT:-8022}" \
   '{accountSetup: {
       account: {name: $name, type: "user", uid: "41733", gid: "41733", homeFolder: ("/home/" + $name),
                 user: {name: $name, passwordCredentials: {password: $password}}},
       sites: [{type: "ssh", protocol: "ssh", name: ($name + "_site"), account: $name,
-               host: $host, port: "8022", userName: $name, usePassword: true, password: $password,
+               host: $host, port: $sshport, userName: $name, usePassword: true, password: $password,
                transferType: "partner", uploadFolder: "/out"}]}}')
 
 printf "Setting up the account %s and its site, in one call...\n" "${ACCOUNT}"

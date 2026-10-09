@@ -51,8 +51,8 @@ if [ "$#" -ne 0 ]; then
 fi
 
 SITE_NAME="HTTP"
-ACCOUNT="john"
-PARTNER_USER="john"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
+PARTNER_USER="${ST_EXAMPLE_ACCOUNT:-john}"
 HEADERS_FILE=$(mktemp)
 trap 'rm -f "${HEADERS_FILE}"' EXIT
 

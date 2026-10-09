@@ -13,10 +13,10 @@ REM
 REM Usage:
 REM 10.sites_operations_POST_test_new.bat [ACCOUNT [PROTOCOL [HOST [PORT [USER [SECURE]]]]]]
 REM
-REM   ACCOUNT   the account the site would belong to (default john)
+REM   ACCOUNT   the account the site would belong to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   PROTOCOL  ssh, ftp or http (default ssh)
 REM   HOST      the partner's host (default ST_SERVER)
-REM   PORT      the partner's port (default 8022)
+REM   PORT      the partner's port (default 8022, or ST_SSH_PORT)
 REM   USER      the login (default: the account)
 REM   SECURE    true or false, for an FTP or HTTP partner over TLS (default false)
 REM
@@ -49,13 +49,15 @@ CALL ..\set_variables.bat
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/sites
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET PROTOCOL=%~2
 IF "%PROTOCOL%"=="" SET PROTOCOL=ssh
 SET PARTNER_HOST=%~3
 IF "%PARTNER_HOST%"=="" SET PARTNER_HOST=%ST_SERVER%
 SET PARTNER_PORT=%~4
-IF "%PARTNER_PORT%"=="" SET PARTNER_PORT=8022
+IF "%PARTNER_PORT%"=="" SET "PARTNER_PORT=%ST_SSH_PORT%"
+IF "%PARTNER_PORT%"=="" SET "PARTNER_PORT=8022"
 SET PARTNER_USER=%~5
 IF "%PARTNER_USER%"=="" SET PARTNER_USER=%ACCOUNT%
 SET SECURE=%~6

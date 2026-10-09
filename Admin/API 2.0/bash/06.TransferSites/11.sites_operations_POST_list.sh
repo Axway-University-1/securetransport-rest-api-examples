@@ -13,7 +13,7 @@
 # Usage:
 # ./11.sites_operations_POST_list.sh [ACCOUNT [NAME [FOLDER [LIMIT [FOLDERS]]]]]
 #
-#   ACCOUNT  the account the site belongs to (default john)
+#   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.sh creates)
 #   FOLDER   downloadFolder or uploadFolder (default downloadFolder)
 #   LIMIT    how many entries to list, -1 for all (default 20)
@@ -51,7 +51,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 NAME="${2:-SSH_PULL}"
 FOLDER_TO_LIST="${3:-downloadFolder}"
 [[ "${FOLDER_TO_LIST}" =~ ^(downloadFolder|uploadFolder)$ ]] || { printf "FOLDER is downloadFolder or uploadFolder, not %s.\n" "${FOLDER_TO_LIST}"; exit 2; }

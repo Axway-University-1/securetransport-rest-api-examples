@@ -13,7 +13,7 @@ REM
 REM Usage:
 REM 04.transferProfiles_id_GET.bat [ACCOUNT [NAME]]
 REM
-REM   ACCOUNT  the account the profile belongs to (default john)
+REM   ACCOUNT  the account the profile belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the profile (default TP)
 REM
 REM Risk: read
@@ -40,7 +40,8 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET RESPONSE_FILE=%TEMP%\tprof_%RANDOM%.json
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/transferProfiles
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET NAME=%~2
 IF "%NAME%"=="" SET NAME=TP
 IF NOT "%~3"=="" GOTO usage

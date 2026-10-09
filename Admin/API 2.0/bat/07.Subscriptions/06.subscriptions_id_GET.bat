@@ -14,7 +14,7 @@ REM
 REM Usage:
 REM 06.subscriptions_id_GET.bat [ACCOUNT [APPLICATION [FOLDER]]]
 REM
-REM   ACCOUNT      the account that subscribes (default john)
+REM   ACCOUNT      the account that subscribes (default john, or ST_EXAMPLE_ACCOUNT)
 REM   APPLICATION  the application it subscribes to (default AdvancedRoutingApplication)
 REM   FOLDER       the folder of the subscription (default /inbox)
 REM
@@ -51,7 +51,8 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET RESPONSE_FILE=%TEMP%\subscription_%RANDOM%.json
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/subscriptions
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET APPLICATION=%~2
 IF "%APPLICATION%"=="" SET APPLICATION=AdvancedRoutingApplication
 SET FOLDER=%~3

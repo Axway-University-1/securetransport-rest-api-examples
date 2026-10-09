@@ -51,7 +51,8 @@ IF NOT "%~1"=="" (
     EXIT /B 2
 )
 
-SET ACCOUNT=john
+SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET APPLICATION=AdvancedRoutingApplication
 SET FOLDER=/inbox
 SET PULL_SITE=SSH_PULL

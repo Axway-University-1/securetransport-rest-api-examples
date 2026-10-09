@@ -27,6 +27,7 @@ REM   account exists, so its own password is not touched; the site gets this one
 REM - Confirmed directly: it answers 200, with "Account with name example_setup
 REM   skipped because it already exists." and "Site with name example_setup_site2
 REM   created.", each with its URL.
+REM - The site logs in over SSH on port 8022, or on ST_SSH_PORT when that is set (see set_variables.local.example.bat).
 REM - 04.accounts_name_DELETE.bat removes the account and both sites.
 REM - PowerShell is used to build the body, in place of jq.
 REM - The password is never in the file: no placeholder is used, so the site is never created with a password anyone could guess.
@@ -40,6 +41,8 @@ CALL ..\set_variables.bat
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 
 SET ACCOUNT=example_setup
+SET "SSH_PORT=%ST_SSH_PORT%"
+IF "%SSH_PORT%"=="" SET "SSH_PORT=8022"
 SET BODY_FILE=%TEMP%\setup_body_%RANDOM%.json
 SET RESPONSE_FILE=%TEMP%\setup_response_%RANDOM%.json
 
@@ -53,7 +56,7 @@ IF NOT DEFINED ACCOUNT_PASSWORD (
 )
 
 REM The account as it is, and the one new site
-powershell -NoProfile -Command "@{ accountSetup = @{ account = @{ name=$env:ACCOUNT; type='user'; uid='41733'; gid='41733'; homeFolder=('/home/' + $env:ACCOUNT); user=@{ name=$env:ACCOUNT; passwordCredentials=@{ password=$env:ACCOUNT_PASSWORD } } }; sites = @(@{ type='ssh'; protocol='ssh'; name=($env:ACCOUNT + '_site2'); account=$env:ACCOUNT; host=$env:ST_SERVER; port='8022'; userName=$env:ACCOUNT; usePassword=$true; password=$env:ACCOUNT_PASSWORD; transferType='partner'; downloadFolder='/in'; downloadPattern='*' }) } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
+powershell -NoProfile -Command "@{ accountSetup = @{ account = @{ name=$env:ACCOUNT; type='user'; uid='41733'; gid='41733'; homeFolder=('/home/' + $env:ACCOUNT); user=@{ name=$env:ACCOUNT; passwordCredentials=@{ password=$env:ACCOUNT_PASSWORD } } }; sites = @(@{ type='ssh'; protocol='ssh'; name=($env:ACCOUNT + '_site2'); account=$env:ACCOUNT; host=$env:ST_SERVER; port=$env:SSH_PORT; userName=$env:ACCOUNT; usePassword=$true; password=$env:ACCOUNT_PASSWORD; transferType='partner'; downloadFolder='/in'; downloadPattern='*' }) } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Adding a site to the existing account %ACCOUNT%...
 SET HTTP_CODE=

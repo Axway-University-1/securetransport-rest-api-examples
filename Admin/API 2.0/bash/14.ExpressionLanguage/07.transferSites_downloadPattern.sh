@@ -61,6 +61,8 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
+ACCOUNT="${ST_EXAMPLE_ACCOUNT:-john}"
+ACCOUNT_JSON=$(jq -n --arg account "${ACCOUNT}" '$account')
 
 HEADERS_FILE=$(mktemp)
 CREATED=()          # "id name" of every object this script created, to delete again
@@ -174,14 +176,14 @@ create_site() {
       \"name\": \"${name}\",
       \"type\": \"ssh\",
       \"protocol\": \"ssh\",
-      \"account\": \"john\",
+      \"account\": ${ACCOUNT_JSON},
       \"host\": \"${ST_SERVER}\",
       \"port\": \"22\",
       \"downloadFolder\": \"/tmp\",
       \"downloadPattern\": \"${pattern}\",
       \"downloadPatternType\": \"${pattern_type}\",
       \"uploadFolder\": \"/\",
-      \"userName\": \"john\",
+      \"userName\": ${ACCOUNT_JSON},
       \"usePassword\": true,
       \"password\": \"placeholder\"
     }"

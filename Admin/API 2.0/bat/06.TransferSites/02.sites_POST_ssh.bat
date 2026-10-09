@@ -19,7 +19,7 @@ REM 02.sites_POST_ssh.bat [PORT]
 REM
 REM   PARTNER_PASSWORD  the password the sites log in with, from the environment (required: without it, or with the placeholder
 REM                     change_me, the script prints this usage, sends nothing and exits 2)
-REM   PORT              the partner's SSH port, 1 to 65535 (default 8022)
+REM   PORT              the partner's SSH port, 1 to 65535 (default 8022, or ST_SSH_PORT)
 REM
 REM Risk: write
 REM
@@ -51,12 +51,15 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/sites
 SET "USAGE=Usage: SET PARTNER_PASSWORD=the password ^& 02.sites_POST_ssh.bat [PORT]"
 
-SET ACCOUNT=john
+SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET PARTNER_HOST=%ST_SERVER%
-SET PARTNER_SSH_PORT=8022
-SET PARTNER_USER=john
+SET "PARTNER_SSH_PORT=%ST_SSH_PORT%"
+IF "%PARTNER_SSH_PORT%"=="" SET "PARTNER_SSH_PORT=8022"
+SET "PARTNER_USER=%ST_EXAMPLE_ACCOUNT%"
+IF "%PARTNER_USER%"=="" SET "PARTNER_USER=john"
 
-REM The port may be given as the first argument; 8022 above is the default
+REM The port may be given as the first argument; without it, ST_SSH_PORT or else 8022 above is used
 IF NOT "%~1"=="" SET "PARTNER_SSH_PORT=%~1"
 IF NOT "%~2"=="" GOTO usage
 powershell -NoProfile -Command "if ($env:PARTNER_SSH_PORT -match '^[0-9]+$' -and $env:PARTNER_SSH_PORT.Length -le 5 -and [int]$env:PARTNER_SSH_PORT -ge 1 -and [int]$env:PARTNER_SSH_PORT -le 65535) { exit 0 } else { exit 1 }"

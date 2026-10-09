@@ -104,6 +104,18 @@ The same four names are used everywhere, so there is one set to learn:
 | `ST_USER` | The account to authenticate as |
 | `ST_PASSWORD` | That account's password, in plain text |
 
+Two more settings are optional, and only the `Admin/API 2.0` bash and bat
+examples read them. Some of those examples need an account that already exists,
+and four name the partner's SSH port. They use `john` and `8022`; if your server
+has no `john`, or its SSH port is not 8022, set these instead of editing the
+examples. Leave them out and nothing changes. An argument given to an example
+still wins over them.
+
+| Variable | Meaning | Default |
+| -------- | ------- | ------- |
+| `ST_EXAMPLE_ACCOUNT` | The account the examples of sites, subscriptions, routes, transfers, transfer logs and transfer profiles use | `john` |
+| `ST_SSH_PORT` | The SSH port of the partner in the SSH site examples, the connection test and the account setup | `8022` |
+
 Copy the example file for the examples you want to run and edit your copy:
 
 | Examples | Copy this | To this |

@@ -15,7 +15,7 @@ REM
 REM Usage:
 REM 06.sites_id_GET.bat [ACCOUNT [NAME]]
 REM
-REM   ACCOUNT  the account the site belongs to (default john)
+REM   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.bat creates)
 REM
 REM Risk: read
@@ -45,7 +45,8 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET RESPONSE_FILE=%TEMP%\site_%RANDOM%.json
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/sites
 SET ACCOUNT=%~1
-IF "%ACCOUNT%"=="" SET ACCOUNT=john
+IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"
+IF "%ACCOUNT%"=="" SET "ACCOUNT=john"
 SET NAME=%~2
 IF "%NAME%"=="" SET NAME=SSH_PULL
 IF NOT "%~3"=="" GOTO usage

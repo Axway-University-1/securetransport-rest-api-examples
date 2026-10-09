@@ -27,6 +27,7 @@
 # - Confirmed directly: it answers 200, with "Account with name example_setup
 #   skipped because it already exists." and "Site with name example_setup_site2
 #   created.", each with its URL.
+# - The site logs in over SSH on port 8022, or on ST_SSH_PORT when that is set (see set_variables.local.example.sh).
 # - 04.accounts_name_DELETE.sh removes the account and both sites.
 # - Requires `jq`, which builds the body.
 # - The password is never in the file: no placeholder is used, so the site is never created with a password anyone could guess.
@@ -51,12 +52,12 @@ if [ -z "${PASSWORD}" ]; then
 fi
 
 # The account as it is, and the one new site
-BODY=$(jq -n --arg name "${ACCOUNT}" --arg password "${PASSWORD}" --arg host "${ST_SERVER}" \
+BODY=$(jq -n --arg name "${ACCOUNT}" --arg password "${PASSWORD}" --arg host "${ST_SERVER}" --arg sshport "${ST_SSH_PORT:-8022}" \
   '{accountSetup: {
       account: {name: $name, type: "user", uid: "41733", gid: "41733", homeFolder: ("/home/" + $name),
                 user: {name: $name, passwordCredentials: {password: $password}}},
       sites: [{type: "ssh", protocol: "ssh", name: ($name + "_site2"), account: $name,
-               host: $host, port: "8022", userName: $name, usePassword: true, password: $password,
+               host: $host, port: $sshport, userName: $name, usePassword: true, password: $password,
                transferType: "partner", downloadFolder: "/in", downloadPattern: "*"}]}}')
 
 printf "Adding a site to the existing account %s...\n" "${ACCOUNT}"

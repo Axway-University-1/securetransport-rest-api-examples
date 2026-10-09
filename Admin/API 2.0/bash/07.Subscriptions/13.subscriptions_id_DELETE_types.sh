@@ -16,7 +16,7 @@
 # Usage:
 # ./13.subscriptions_id_DELETE_types.sh [ACCOUNT]
 #
-#   ACCOUNT  the account that was subscribed (default john)
+#   ACCOUNT  the account that was subscribed (default john, or ST_EXAMPLE_ACCOUNT)
 #
 # Risk: write - deletes the subscriptions of 12 and, with purge=true, their folders
 #
@@ -45,7 +45,7 @@ source "${SCRIPT_DIR}/../set_variables.sh"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/subscriptions"
-ACCOUNT="${1:-john}"
+ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 if [ "$#" -gt 1 ] || [ -z "${ACCOUNT}" ]; then
     printf "Usage: ./13.subscriptions_id_DELETE_types.sh [ACCOUNT]\n"
     exit 2
