@@ -21,6 +21,7 @@ things. This is the ledger. Delete it when the open list is empty.
 | Admin bash and bat | About 58 read scripts that never looked at the HTTP status (a 401 printed nothing and exited 0), the `change_me` passwords of `18.AccountSetup`, `01.myself_POST` made the login its name says | `test_bash_admin_sweep_c.sh` |
 | Harness | One helper module for the lab checks (631 lines fewer), polling instead of fixed sleeps, a time limit per check, a private output folder per run, no temp folder left behind | `tests/integration/lib/harness.py`, `run_check.py` |
 | Features | A refused call stops the run in both; the trigger feature heals a stale home folder like the billable one; clean-ups exit 1 and keep their state file; paths are encoded; shared code in `Features/lib` (`home_folder`, `admin_calls`) | `test_feature_*.sh`, `test_feature_bat_twins.py` |
+| Docs | The 600 line per resource list of the gotchas is now one subsection per resource in the reference's order, with a link index, and the sweeps' findings in a group of their own (no word was lost: checked by comparing the text) | `.claude/skills/st-api-gotchas` |
 | Skills | The orientation index in folder order, the covered tags as a table | `.claude/skills` |
 | Repository | `.gitattributes` (CRLF for `.bat`) and the hygiene check that reads CRLF | `.gitattributes` |
 | Docs | The gotchas entries later findings contradicted; an index; README, Features README, CLAUDE.md, tests README (every check named, guarded by `check_docs_match_repo.py`) | |
@@ -35,7 +36,8 @@ things. This is the ledger. Delete it when the open list is empty.
    them, or say so plainly).
 3. **The bat twins have never run:** none of the bat changes could be run (no Windows here). A short run of the ones with
    PowerShell in them (`Features/lib/admin_calls.bat`, the acknowledgment scripts, `03.Connect/11`) would be worth it.
-4. **Docs:** the 550 line per resource list in the gotchas is still one list; incident and history entries belong in a changelog.
+4. **Docs:** the gotchas history and incident entries of Part 1 (a hardcoded account name, a graceful stop that kept running,
+   the PeSIT loop) belong in a changelog, not among the rules.
 5. **For the owner:** the password that was in `stBuildFullTestAccount.py` is still in git history (rotate it if it was ever
    real); `st_callback_host` in `tests/local/integration.conf` is stale, so checks 40 and 47 fail on it; the trainer kit needs
    the new arguments of the changed scripts and a new `python.tsv`; `stLinkSimpleRoute` replaces all of a route's steps with one

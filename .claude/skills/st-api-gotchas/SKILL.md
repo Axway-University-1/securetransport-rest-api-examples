@@ -544,688 +544,785 @@ resource of the EndUser API reference (`tests/integration/checks/33.enduser_api_
 Confirmed directly on 5.5-20260924, while adding examples resource by resource
 from the Admin API reference (`tests/integration/checks/34` onwards):
 
-- **The `metadata.links` the server builds are wrong for a name with a space.**
-  It encodes the space as `+` and then the `+` as `%2B`:
-  `/administrators?roleName=Master%2BAdministrator` and
-  `/accounts?businessUnit=example%2Bbu` find nothing. Build the search
-  yourself, with the name URL-encoded once (`curl -G --data-urlencode`).
-- **`/accessPolicies` answers a plain array**, and a rule's id is its line in
-  pg_hba.conf: the ids after a deleted rule move up. List again before each
-  delete, never delete several ids from one listing.
-- **`/accountSetup` is not all or nothing.** A body that fails part of the way
-  leaves what came before created. Every site and profile in it needs
-  `account`. An account that exists is skipped, not refused.
-- **`/addressBook/sources` has no POST or DELETE**; PUT and PATCH answer 204.
-- **`POST /administrators` needs `parent`**, the administrator it is created
-  under, though the reference does not mark it required: 400 "Please specify
-  parent administrator" without it.
-- **Administrator API keys** (`/administrators/{name}/api-keys`): the key is in
-  the POST answer only; at most 2 per administrator (409); `validityDays` or
-  `expiresAt`, not both (400). The `SECURETRANSPORT-API-KEY` header alone
-  authenticates. A method the key's permissions do not cover answers a
-  plain-text 403; a revoked key a plain-text 401, "Authentication required."
-- **A role's menus come back in no fixed order.** `add` to `/menus/-` adds
-  the menu, not necessarily at the end. `DELETE /administrativeRoles/{name}?targetRoleName=`
-  moves the role's administrators to that role.
-- **Accounts: the type filter is `type=`, and `accountType=` is ignored.**
-  Confirmed directly (5.5-20260924): `GET /accounts?accountType=user`,
-  `accountType=template` and `accountType=nonsense` all answer every account, while
-  `type=template` answers the templates only and `type=nonsense` is 400 "Unknown name
-  value [nonsense] for enum class". `stDeleteTestAccounts.py` listed with `accountType=user`,
-  so a template or service account whose name matched was in its list too (the lab had no
-  such accounts, so it could not do harm there). It now sends `type=user`, and also looks at
-  each account's `type` itself.
-- **`GET /servers?fields=isActive` still names the protocol**: each entry is
-  `{"protocol": ..., "isActive": ...}` (add `serverName` to `fields=` for the name), as an
-  account list always carries `type`. Confirmed directly, a read. `stGraceful.py` reads the protocol out
-  of it; there are two `http` servers on the lab, so one protocol can list several.
-- **`POST /daemons/operations` takes `daemon=<protocol>`**, as the reference says
-  and `23.connect_operations_scripts.py` uses (`operation=stop&daemon=as2`). `stGraceful.py`
-  used to send `serverName=`, a parameter of `/servers/operations`, which that endpoint does not
-  list, and the reference says a stop with no `daemon` is every daemon. **Not run on the lab**
-  (a stop cannot be taken back, see "A graceful stop with a timeout keeps running server-side"):
-  this is from the reference and from check 23, and the fake server of the offline tests
-  behaves as the reference says.
-- **Business units:** `baseFolder=` as a filter is ignored (every value gives
-  every unit). `parent` reads null even for a nested unit; the nesting shows in
-  `businessUnitHierarchy` and `metadata.links.parentBusinessUnit`, and
-  `parent=` as a filter works. A delete is refused, 400, while the unit has
-  nested units or accounts.
-- **Certificates:** `expirationTime.from` and `.to` are in milliseconds, not
-  the Unix seconds the reference implies; in seconds they find nothing. A
-  generate (JSON body) answers 201 as multipart/mixed, the JSON in the first
-  part, the id in `Location`; an import (multipart/mixed body) answers 200 with
-  plain JSON. PATCH works only on `accessLevel`, `additionalAttributes` and
-  the external store fields. `POST /certificates/{id}/operations?operation=export`
-  needs a multipart form body even for pem and crt (`-F exportPassword=`),
-  otherwise 400 "Entity is empty."; `includePath=true` on a GET answers an
-  array, the certificate then its chain. Deleting an account deletes its
-  certificates.
-- **Certificate signing requests:** the CSR itself is only in the POST
-  answer (multipart/mixed); a GET answers the JSON alone, and 406 to any other
-  Accept. Read back, `keySize` is 0 and `signAlgorithm` null. With a filter,
-  `totalCount` still counts every request. Completing (multipart form, `alias`
-  and `certificateFile`) answers 200, creates the certificate and removes the
-  request; a CA the server does not trust is accepted, "Not chained to a
-  trusted root".
-- **Configurations are options underneath.** Sentinel, external stores and S3
-  storage profiles are stored as Server Configuration Options
-  (`AxwaySentinel.*`, `TM.ExternalStores.<name>`,
-  `StorageProfiles.S3.Registry.<name>.*`), and the options endpoint can do what
-  the dedicated one refuses. Once a Sentinel `host` is set, `/configurations/sentinel`
-  refuses an empty one ("host must not be null or empty") and then any change:
-  turn reporting off, then clear `AxwaySentinel.RemoteHost.host` and
-  `AxwaySentinel.OverflowFile.path` and restore `.RemoteHost.port` and
-  `.Heartbeat.delay` through `PUT /configurations/options`. An option is cleared
-  with `[""]`; `[]` answers 400 "Invalid argument length.".
-- **External stores:** `GET /configurations/externalStores?name=` with a pattern
-  ending in `*` answers 404 "External Stores configuration is not valid" once it
-  matches a store - it also matches the store's companion option
-  `TM.ExternalStores.<name>.encryptedFields`. Use an exact name. `fields=` is
-  ignored. The `test` operation answers 200 whatever happens; read
-  `fetchStatus`, `connectionStatus`, `authenticationStatus`.
-- **S3 storage profiles** have no resource: add the name to
-  `StorageProfiles.S3.Registry` (one value each), set
-  `StorageProfiles.S3.Registry.<name>.Bucket`, `.Region`, `.CustomEndpointUrl`,
-  `.AccessKey`, `.SecretKey`. Saving them tests the connection (400 when the
-  bucket cannot be reached); `test` is a HEAD on the bucket.
-- **Other configuration endpoints:** a logging option's XML comes only with
-  `Accept: application/xml` (204 when none is set); a PUT on one that was never
-  set answers 400 "not eligible for propagation". Enabling Sentinel needs
-  `overflowFilePath`. The database `test` operation is a multipart form and
-  needs host, port, databaseName, username and password. Login settings are
-  validated whole on every change, so already inconsistent settings refuse even
-  a no-op. Some option groups the list returns answer 501 when read.
-  `allowedSTServers` answers 404 on a standalone server.
+### By resource, in the order of the reference
 
-- **Denied users** (`/deniedUsers`): only GET, POST and DELETE; GET or HEAD on one
-  name answers 405. POST answers 201 with the entry's address in `Location` and
-  no body. `ttl` is in hours and left out for a permanent block (`blockedUntil`
-  null). **POST accepts an empty `loginName`, and the entry can then not be
-  removed through the API** (DELETE with an empty name is 405, with a space or
-  a NUL it is "not found"); also 0, negative and absurd `ttl` values, which
-  give entries that have already expired. Check both before sending. A
-  duplicate is 400; DELETE of a name not in the list is 400, not 404. An
-  expired temporary entry stays listed until the server's blocked-users cleaner
-  removes it. The `loginName` filter ignores case but entries are case
-  sensitive: `example_denied` and `EXAMPLE_DENIED` coexist, and DELETE takes the
-  exact name. The date filters take yyyy-MM-dd, RFC 2822 or a millisecond
-  timestamp. A blocked name is refused at the EndUser login (`POST /myself`)
-  with 401 "Login failed. Re-submit your credentials." - the same text as a
-  wrong password, so test with a login that worked just before - and logs in
-  again as soon as the entry is removed; other accounts are unaffected.
+Jump to: [Access policies](#access-policies) · [Account setup](#account-setup) · [Accounts](#accounts) · [Address book](#address-book) · [Administrative roles](#administrative-roles) · [Administrators](#administrators) · [Business units](#business-units) · [Certificates](#certificates) · [Configurations](#configurations) · [Daemons](#daemons) · [Denied users](#denied-users) · [Events](#events) · [ICAP servers](#icap-servers) · [LDAP domains](#ldap-domains) · [Logs](#logs) · [Mail templates](#mail-templates) · [Routes](#routes) · [Route steps metadata](#route-steps-metadata) · [Route steps charsets](#route-steps-charsets) · [Servers](#servers) · [Sessions](#sessions) · [Sites](#sites) · [Site templates](#site-templates) · [Statistics summary](#statistics-summary) · [Subscriptions](#subscriptions) · [Transaction Manager](#transaction-manager) · [Transfer profiles](#transfer-profiles) · [User classes](#user-classes) · [Zones](#zones)
 
-- **Events** (`/events`) are the tasks being processed now, so the list is usually
-  empty. Confirmed directly: a file uploaded to an Advanced Routing subscription
-  first shows a short-lived `DEFAULT` event for the arrival, then an
-  `ADVANCED_ROUTING` one that is `ready` (queued) and becomes `active`. A send
-  step towards a partner that accepts the connection and never answers (a
-  TcpSink) keeps it active; to make events for a test, use that. An event can stay
-  `active` after its transfer has `Failed`; `POST /events/operations?operation=delete`
-  with `{"ids": [...]}` removes it, answering 200 with `deleted` or `not found` per
-  id. Any other `operation` answers 200 with `{}` and does nothing. `status` is
-  matched exactly (`active`, not `ACTIVE`); an unknown `processorType` finds
-  nothing rather than a 400; `arrivalTime`, `lastHeartbeatAfter` and
-  `lastHeartbeatBefore` are milliseconds, a date answers 400 "For input string".
-  An unknown id is 404. A file that already exists in the folder is not a new
-  arrival, and deleting an account leaves its home folder on disk: give a test
-  upload a name of its own and delete it afterwards.
+#### Access policies
 
-- **ICAP servers** (`/icapServers`) scan a transfer only for the **business units that
-  list them in `enabledIcapServers`**, and only while `serverEnabled` is true; an
-  enabled server that no unit lists scans nothing, so a test can scope the scan to a
-  throwaway unit and leave every other transfer alone. Confirmed directly: ST sends
-  `OPTIONS`, then each file as a `REQMOD` with a preview (`X-Authenticated-User` is
-  `Local://<account>` in base64); a block (ICAP 200 with an HTTP 403) leaves the
-  transfer `Failed` and removes the file, after the file has first been listed (the scan
-  is asynchronous, a few seconds); several files may be scanned in any order. With the
-  server unreachable, `denyOnConnectionError` true refuses the file and false lets it
-  through; disabled, nothing is scanned. A PUT whose body has another
-  `basicSettings.name`, or a PATCH of `/basicSettings/name`, **renames** the server.
-  The `basicSettings.name`, `.url` and the other filters are exact (no `*`, case
-  sensitive); the `url` is not checked (`http://x` is accepted); maxSize and
-  previewSize are required. Deleting a server a unit still lists succeeds and takes it
-  out of that unit's list. `businessUnits?icapServer=` filters nothing (every value
-  lists every unit): read `enabledIcapServers` and select yourself. In a business
-  unit an account's home folder must end with the account name, so a fresh folder per
-  test run has to come from the unit's `baseFolder`.
+**`/accessPolicies` answers a plain array**, and a rule's id is its line in
+pg_hba.conf: the ids after a deleted rule move up. List again before each
+delete, never delete several ids from one listing.
 
-- **LDAP domains** (`/ldapDomains`): `bindDn` and `bindDnPassword` are required, though
-  only `name` is marked. The server **resolves the host when it saves a domain**: a
-  name it cannot resolve answers 400 "Invalid server host", an address always works.
-  The bind password reads back encrypted (`{AES128}...`); sending that text back in a
-  PUT keeps the password, plain text is encrypted anew, and a body with no password is
-  400. The defaults are not the reference's: `referralsAllowed` and
-  `anonymousBindsAllowed` read true. The `Location` of a POST ends with the domain's
-  **id**, but the path takes the **name**. A PUT with another `name`, or a PATCH of
-  `/name`, renames it. `name=` and `bindDn=` are exact (no `*`, case sensitive);
-  `isDefault=` as a filter fails with "unable to comply" for true and false. A PATCH
-  can set `/isDefault` to true but cannot set it back (400 "You cannot set precedence
-  on non default domain"); an added server (`/ldapServers/-`) takes order 1. The
-  `testConnection` operation answers 200 whether or not it worked, reads the message
-  (`Successful Connection.` or `Connection failed.`), and only opens a TCP connection:
-  it sends nothing, so a TcpSink is enough to play the directory. A domain is used for
-  logins only when the server's login settings turn LDAP on, a server-wide change.
+#### Account setup
 
-- **Logs** (`/logs/audit`, `/logs/server`, `/logs/transfers`): the audit log is **newest first**,
-  the server log is **oldest first** (use `fromDate`, or the last `offset`, to see the recent
-  ones). `fromDate` and `endDate` are RFC 2822 dates only (`Wed, 07 Oct 2026 10:00:00 +0300`;
-  `2026-10-07` is 400); the audit log's `duration=` takes hours. Audit `objectName=` and
-  `objectType=` are exact, with case, no `*`; `userName=` is a case sensitive part of the name.
-  Server `component=` and `level=` must be in capitals and are repeated parameters
-  (`component=FTPD&component=HTTPD`); a comma list or lower case finds nothing, and a value that
-  does not exist is not an error. `message=` is a case sensitive part of the message, `*` is
-  not a wildcard. **`accountName=` is ignored on the server log** (any value answers every
-  entry; `account=` is the one the transfer log honours). Both lists answer `text/csv` when
-  asked, with a header row; XML is 406. The audit entry's **PUT answers 204 and changes
-  nothing**, for every kind of entry: the trail is immutable. The ids differ: audit is a plain
-  string, the server and transfer logs use the `urlrepresentation` of an id object (Base64);
-  a malformed one is 400, an unknown well formed one 404. A single transfer has other fields
-  than the list (`incoming` is only in the list). One pull leaves three transfer log entries, the
-  upload, the file served and the pull, and only the pull carries the `operationIndex`;
-  `pullSummary` counts the files found, answers zeros for an unknown index, and adds up two
-  pulls with one index. Transfer operations: `resubmit` works on a finished transfer (200);
-  `cancel` is allowed only when the server says so: a single read carries `isCancelable` (the list
-  calls it `isCancellable`). Finished transfers and running ones (a 10 MB FTP upload, EndUser API
-  upload, SSH pull, a route's send) are never cancelable: "not eligible for cancellation".
-  What is cancelable is a failed PeSIT pull waiting for a retry: cancel answers 200 and the
-  pull's summary moves it from "to retry" to "failed". `tests/integration/checks/48.cancel_transfer.py`
-  covers both. `GET /logs/transfers` has NO default order: pass `sortByStartTime=descending`
-  (newest first; `ascending` oldest first; any value sorts descending) or "latest" is a guess. `verify` needs an AS2 receipt; `ack` and
-  `nack` need a PeSIT transfer; any other operation is 403 with an unhelpful message. Logs are
-  never cleaned up by deleting the account: its entries stay. **What a login writes to the server log depends on the
-  protocol** (confirmed by check 47, 5.5-20260924): SFTP is component `sshd`, INFO "User NAME login success." and, for a
-  wrong password, INFO (not WARN) "User NAME login failed."; HTTP (EndUser API) is `httpd` INFO "User NAME login success.",
-  but a FAILED HTTP login names no account: `httpd` INFO "Denying access to unknown user from address IP" (said for a
-  known account with a wrong password too) and `tm` INFO "Authentication failed using local."; an unknown login name
-  there is also added to the Denied Users list (`tm` INFO "Login name X is added to the Denied Users list until ...").
-  `httpd` WARNs "virtual user NAME does not have email associated" on every successful HTTP login: not a failure. FTP is
-  `ftpd` INFO "virtual user NAME logged in from" and WARN "Failed login for user NAME from". `tm` INFO "User with login
-  name "NAME" ... successfully authenticated over SSH|HTTP|FTP" holds the name for all three. Three wrong passwords on
-  an account is its limit ("Maximum failed auth attempts=3").
+**`/accountSetup` is not all or nothing.** A body that fails part of the way
+leaves what came before created. Every site and profile in it needs
+`account`. An account that exists is skipped, not refused.
 
-- **Mail templates** (`/mailTemplates`): a template is an XHTML file stored under a name that
-  must end in `.xhtml`, and the server ships eight of its own (the notification e-mails are
-  built from them). POST and PUT are multipart forms (JSON is 415). The reference says the
-  uploaded file's name is ignored; **it is checked**: a file not named `*.xhtml` is 400 "only
-  .xhtml name extensions are supported", so send it with `;filename=<template name>`. The
-  content is not checked (an empty file or plain text is stored). **PUT on a name that does not
-  exist creates the template and answers 204**, not the 404 the reference lists, and a PUT with
-  no `description` sets it to null: look first, and send the description back. **POST accepts a
-  `/` (and `../`) in the name, and the entry can then not be addressed**: `%2F` in the path is
-  answered 400 by the web server, `%252F` looks for a name holding a literal `%2F`, and there is
-  no other delete, so it stays on the server (the list shows it, `?name=` finds it); the
-  examples refuse `/` and `\`. Names are case sensitive (`example.xhtml` and `EXAMPLE.xhtml`
-  coexist; HEAD and DELETE take the exact case); 300 characters is 400 "Database error creating
-  mail template"; a duplicate is 409. `name=` and `description=` are exact, case sensitive, no
-  `*`; `totalCount` ignores the filter; `limit=-1` is 400. The list is sorted by name, ignoring
-  case. GET one answers the file (`application/xhtml+xml`, whatever `accept` says), HEAD
-  answers 404 with an HTML body, DELETE of an unknown name is a JSON 404.
+#### Accounts
 
-- **Routes** (`/routes`; examples `09.CompositeRoutes` 08 to 10): contrary to "A route step has no
-  id" above, a step **has an `id`** (and a `precedingStep` link) on read, and a PUT that sends the
-  steps back with their ids keeps them. It is still not an address: a patch path
-  `/steps/<id>/status` is 400 "Can't reference field ... on array"; use the position
-  (`/steps/1/status`, past the end is 400 "Array index N is out of bounds"). Contrary to "PATCH cannot
-  insert into the middle of an array", `add` at `/steps/1` **did** insert in the middle and the
-  `precedingStep` links followed, `add` at `/steps/-` appends and `remove` at `/steps/N` deletes; PUT of
-  the whole route is still the safe way. Contrary to "replace needs the field to exist", `replace` of
-  a `description` that is null worked (204), as did `add` on one that was set. **A PUT with a body that
-  has no steps answers 204 and removes every step**, and a PUT with no `type` or `conditionType` is 400.
-  `type` and `id` are read only in a patch (400), and a composite route's `routeTemplate` cannot
-  change (400 "Cannot change the Template ..."; a route that is not a template is a different 400).
-  A PUT or PATCH of `name` renames, and **two simple routes may share a name** (the list's `name=`
-  takes a `*`, so look an id up by the exact name and refuse more than one). HEAD answers 200 for a
-  route of every type and 404 with no body otherwise; GET of an unknown id is a JSON 404, "Route with
-  id X not found or not accessible.". `metadata` in a PUT body is accepted and ignored. A simple
-  route that another route runs (an `ExecuteRoute` step) cannot be deleted, 400 "Route is in use.";
-  **deleting the template or composite route that runs it deletes the simple route too**.
-  `failureEmailNotification` true needs the template and recipients in the same patch (400 "Missing
-  failure e-mail recipients."). `referredByRoute=<simple route id>` lists the routes that run it.
+**Accounts: the type filter is `type=`, and `accountType=` is ignored.**
+Confirmed directly (5.5-20260924): `GET /accounts?accountType=user`,
+`accountType=template` and `accountType=nonsense` all answer every account, while
+`type=template` answers the templates only and `type=nonsense` is 400 "Unknown name
+value [nonsense] for enum class". `stDeleteTestAccounts.py` listed with `accountType=user`,
+so a template or service account whose name matched was in its list too (the lab had no
+such accounts, so it could not do harm there). It now sends `type=user`, and also looks at
+each account's `type` itself.
 
-- **Route steps metadata** (`/routeStepsMetadata`; example `30.RouteStepsMetadata`): read only, one GET
-  (HEAD 200; POST, PUT and DELETE 405; `/routeStepsMetadata/<type>` 404; XML 406). A **plain array** of
-  entries with 12 keys, not `{resultSet, result}`. The lab lists 17 types (13 Transformation, 4 Routing),
-  more than the reference's enum of 14: **PullFromPartner, SendToFusion and `setflowattributes` (lower
-  case)** are missing from it, so never validate a step type against the reference. `ExecuteRoute` is not
-  listed. `stepType=`, `limit=` and `offset=` are ignored; `fields=` keeps the keys named (an unknown one
-  gives `{}`). The `stepType` **is** the `type` of a route step: a step with another type is 400 "Route Step
-  type is undefined.". **The metadata does not say which fields a step needs; the server does**: a POST
-  /routes whose step lacks fields answers 400 with every missing one in `validationErrors`
-  (`steps[0].compressionType must not be null`) and creates nothing; add what it names and repeat. The
-  smallest step of **all 17 types** was found that way and created, read back and deleted. Every step
-  needs `type`, `status` (a missing one is 400 `steps[0].status must not be null`) and
-  `actionOnStepFailure` (FAIL or PROCEED; the message for a missing one is only "Valid steps.actionOnStepFailure
-  values are..."), plus its own fields; `conditionType` can be left out. **A file filter needs both
-  fileFilterExpression and fileFilterExpressionType (GLOB, REGEXP, TEXT_FILES)**: one without the other is
-  400 "File filter type cannot be empty." (PgpDecryption alone takes the expression alone, and reads the type
-  back null). ExternalScript, setflowattributes and PullFromPartner have no filter. **PgpEncryption's
-  `compressionType` is a number in a string**, "0" none, "-1" preferred, "1" ZIP, "2" ZLIB, "3" BZIP2 (ZIP is
-  400 "Invalid compression type"), unlike Compress's ZIP/JAR/TAR/GZIP. `setflowattributes` keeps
-  `actionOnStepFailure` inside `customProperties` when read back, and `linePaddingLength` reads back as a
-  string. **Creating a route does not look up what a step names**: an account, a transfer site
-  (`<site>#!#CVD#!#`), a PGP key alias, a Fusion integration or a script path that does not exist is 201, so
-  every type can be created on a bare lab with placeholders. The per-type table is in the Notes of
-  `30.RouteStepsMetadata/01` (`01 <type> minimal` prints the step), and
-  `tests/integration/checks/51.route_steps_metadata_scripts.py` creates, reads back and deletes each one
-  and shows that leaving out any field is 400.
+#### Address book
 
-- **Route steps charsets** (`/routeStepsCharsets`; example `31.RouteStepsCharsets`): read only, one GET (HEAD
-  200; POST, PUT, PATCH and DELETE 405; `/routeStepsCharsets/UTF-8` 404; XML and CSV 406). The answer is **one
-  object, `{"charsets": [...]}`**, neither a plain array (as `/routeStepsMetadata` is) nor `{resultSet, result}`:
-  396 unique names on the lab, sorted ignoring case. `name=`, `limit=`, `offset=` and `fields=` are ignored.
-  **The list is the canonical names, not everything a step accepts**: the six step types with a charset
-  (CharactersReplace, EncodingConversion, LineEnding, LineFolding, LinePadding, LineTruncating) refuse one Java
-  does not know (400 "The charset specified by inputCharset is not supported.", or outputCharset) and an empty one
-  (400 "The charset name specified by inputCharset is illegal."), but accept `utf-8`, `UTF8` and `ASCII`, which are
-  not in the list, and store them as written. A name in the list is always accepted; one outside it may be. Every
-  charset in the 17 minimal steps of `30.RouteStepsMetadata` (UTF-8, and UTF-16 as the output of
-  EncodingConversion) is in the list. `01 step FILE` checks a step, a list of steps or a route against it;
-  `tests/integration/checks/52.route_steps_charsets_scripts.py` covers it.
+**`/addressBook/sources` has no POST or DELETE**; PUT and PATCH answer 204.
 
-- **Sessions** (`/sessions`; examples `32.Sessions`): the list is not stable: a call right after clients connect, or even later, can lack sessions that are open (one protocol of several) or answer `[]`, and the next call has them again, so read it twice before acting and never conclude from one read that a session is gone (check 53 waits for a complete list); a session exists only while a client is connected, so on a quiet
-  server the list is `[]`. Plain arrays, not `{resultSet, result}`. Confirmed directly: an FTP, HTTP (an EndUser API
-  login) and SSH client each give one session, with an id `FTP:<hash>:<number>`, `HTTP:<hash>` or `SSH:<hash>`; the
-  administrator's own API login is not listed. The reference spells a field `currentTransferBandwith` (the server writes
-  `...Bandwidth`) and lists only FTP and HTTP. **`type=` is ignored** (type=SSH, type=XX, type=ftp all answer every
-  session), so filter the answer yourself; `limit=0` or a negative is 400, `limit=abc` a bare 404, `fields=` works,
-  `localDaemonReturn=` changes nothing. A session's `command` is IDLE or STOR for FTP and empty for HTTP and SSH.
-  `DELETE /sessions/{id}` answers 204 and disconnects the client at once (an idle FTP client gets EOF, an upload a
-  broken pipe, an SSH client exits, the EndUser API answers 401 on the next call); only that session goes, the user's
-  others stay, and the account is not locked. The colon may be sent as `%3A`. A session already gone is 404; a
-  malformed id is 400 for DELETE but **404 for GET**, "The format of the session is incorrect"; the protocol must be in
-  capitals. `/sessions/statistics/userClass` always lists VirtClass and RealClass (counts 0 when nothing is connected)
-  and follows the sessions as they open and close; `/sessions/statistics/bandwidth` stayed `[]` while an FTP client
-  uploaded 6 MB (no bandwidth limit on the lab), so its shape is the reference's, unseen.
+#### Administrative roles
 
-- **Statistics summary** (`/statisticsSummary`; examples `33.StatisticsSummary`, check 55): it is the **usage report** the server can send to the Amplify
-  Platform, not a live gauge of the server, and it has three operations. `generateReport` takes `startDate` and `endDate`, both required, as **dd/MM/yyyy
-  only** (`2026-10-01` and `01-10-2026` are 400; `1/10/2026` is accepted); the end day is **included**; a start after the end, an end after today and a day that
-  does not exist are 400. The answer is **one entry per day** (`granularity` 86400000), keyed by the start of the day in the server's time zone with its offset, in
-  a map (not an array), plus a `meta` with the product, version, plugins and `reportSummary` (totals). Confirmed directly that it is live, not cached (the new
-  counts were there within 5 seconds) and what it counts: `ST.TransfersIn` +1 for each file received, `ST.TransfersOut` +1 for each file sent (EndUser API or FTP
-  download), a file deleted through the API or FTP (logged as an outgoing transfer) counts in neither, and **`ST.Transfers` is the billable count, not In + Out**:
-  an upload then two downloads gave In +1, Out +2, Transfers +2 (the first outbound of a file is free, as in "Billing" above, over FTP as well as the EndUser API).
-  **`ST.ActiveUsers` and `ST.Volume` read 0 in every call** (also with `includeActiveUsersCount=true` and `includeIncomingFileVolume=true`, a 3 MB upload and many
-  logins; any value for a flag, even `abc`, is accepted): what makes them move was not seen, and the transfer log's `size` is null for these transfers.
-  `activeUsers` lists the **users who have ever logged in**, with `lastAccessTime` as text for people (`October 8, 2026, 8:43 AM`, to the minute, with a U+202F
-  before AM), `{resultSet, result}`; a user is listed from the first login over any protocol, a wrong password does not move the time, the administrator making
-  the call is not listed, and **a deleted account stays in the list for good**. `name=` is a **part of the name, case sensitive**, no `*`; `lastAccessTime.from`
-  and `.to` take yyyy-MM-dd, RFC 2822 or milliseconds (anything else 400); `limit=0` is the default page of 100 (see Paging), a negative one is 400, `fields=` works. `testConnection`
-  (`POST /statisticsSummary/operations?operation=testConnection`) **really connects**: it posts `grant_type=client_credentials` with the id and secret of the body
-  (or the saved `StatisticsSummaryReport.*` ones) to `Platform.Authentication`, then calls `Platform.API` with the token. **The platform's refusal comes back with
-  the platform's own status and body**: a 401 `{"error":"invalid_client",...}` is Axway's answer, not your administrator login failing, and a stand-in's 500 came back
-  as 500. A failure the server finds itself is **406** (not 400) "Test connection to the Amplify Platform failed...": a body with no `type` (even `{}`), a `type`
-  that is not exactly `testConnection`, or a non-empty `networkZone` (nothing is sent to the token address then); with a wrong or missing `type` and a `clientId`
-  it is 400 "Unsupported parameter - clientId". `operation=nope` and `operation=TestConnection` still run the test; none at all is 400. A success was **not seen**:
-  it needs real platform credentials, and the server calls a `Platform.API` that must be HTTPS, which no stand-in here is. The check points only the token address
-  at a `FakeToken` stand-in (and puts it back), so the real platform is never contacted.
+**A role's menus come back in no fixed order.** `add` to `/menus/-` adds
+the menu, not necessarily at the end. `DELETE /administrativeRoles/{name}?targetRoleName=`
+moves the role's administrators to that role.
 
-- **Transaction Manager** (`/transactionManager`; examples `34.TransactionManager`, check 57): one GET answers `{"status": "Running."}` (a free
-  text, with the full stop; `stGraceful.py` looks for the word `Running`). `fields=` is ignored (even an unknown one), HEAD is 200, PUT, PATCH
-  and DELETE are 405 on it and on `/transactionManager/operations`, GET on `/operations` is 405, XML and CSV are 406, a sub path is 404. What
-  a stopped or stopping Transaction Manager answers was **not seen**: the stop is server wide and cannot be undone (see "The Transaction
-  Manager has no start operation"), so it was **never sent to the lab**, not even with a wrong value. `02.transactionManager_operations_POST_stop.sh`
-  is written from the reference and `stGraceful.py` and tested only against a stub `curl`; it sends nothing unless the first argument is the word
-  `stop-the-transaction-manager` (exit 2 otherwise), and check 57 runs only its refusals, behind a fake `curl`. The reference's `graceful` is false when
-  left out, an immediate stop; the script sends it always and defaults to true.
+#### Administrators
 
-- **Transfer profiles** (`/transferProfiles`; examples `35.TransferProfiles`, check 58): a profile is **PeSIT only** and belongs to an
-  account that **already has a PeSIT transfer site** (400 "Account does not contain any PeSIT transfer sites."; an account that does
-  not exist is 404; a template account was not tried, its creation needs a `templateClass`). It is addressed by a generated **id**,
-  so every example looks it up by account and name. Name is unique per account but case sensitive (`p1` and `P1` coexist, the same
-  name on another account is fine, a duplicate is 400 "The transfer profile cannot have the same account and name."), while the
-  **`name=` filter ignores case and takes a `*`**: pick the exact name out of the answer yourself. `account=` is exact (no `*`, case
-  sensitive). `default=` takes true or false and **any other text means false**; `transferMode`, `recordFormat`, `recordLength`,
-  `multiSelect`, `fileLabelOption`, `sendMapping` and `additionalAttributes.key`/`.value` filter too, a value that is no
-  transfer mode finds nothing (no 400); `limit=-1` is 400, `fields=` keeps the keys named (unknown 400). Required, though the
-  reference marks less: `name`, `account`, `fileLabelOption`, and one of `sendMapping`/`receiveMapping` (the 400 also names the
-  receiving message directory); `receiveMapping` may not contain `*` or `?` and `sendMapping` is 250 characters at most;
-  `recordLength` 1 to 32767; a name of 300 characters is a 403 "unable to comply". **The server stores a `/` in front of both
-  mappings** and an unset `receiveMapping` reads back `""`. An account has **at most one default**: making a profile the default
-  (create, PUT or PATCH) turns the old one off. **PUT replaces the whole profile and needs the `id` in the body** (400 "id to
-  load is required for loading" without it); a fragment *with* the id answers 204 and resets everything left out (transfer mode,
-  record format and length, multiSelect, the acknowledgment and padding flags, the attributes, the receive mapping). `account`
-  in a PUT or PATCH is accepted and ignored, `name` renames, a name the account already has is **403, not 400**, an unknown id
-  404. PATCH: `replace`/`add` work on the scalars, an `add` to `/additionalAttributes/userVars.<name>` (the prefix is required,
-  the value may not be blank), an empty patch is 204, a path that does not exist is 400 `Missing field`, a patch that would
-  leave both mappings empty is 400, `replace` of `/id` is 400. GET of an unknown id (well formed or not) is a JSON 404, HEAD a
-  bodiless 404, DELETE a JSON 404 the second time. Deleting the account deletes its profiles. **What a profile does** (check
-  58, two real pulls over the lab's own PeSIT server): the PeSIT file name of a pull is the **name of the receiver's profile**
-  (the one the pull names in `transferProfile`, else the account's default); it shows as the `filename` of the transfer log entry
-  and `${pesit.fileName}` in a `receiveMapping` evaluates to it. The profile named decides what the received file is called
-  (`receiveMapping: "landed.txt"` gave `landed.txt`, `${pesit.fileName}` gave the profile's name), in the pull's
-  `destinationDirectory`; what is sent comes from the **sender's default profile** (`sendMapping`). A pull that names no profile uses
-  the receiver's default one. `advancedSettings`: see the next entry, which has what they do to a file.
-  **PATCH of a side's `type` is 400** ("Patch operation on read only or discriminator fields is not permitted."; PUT the whole
-  profile to change it, and the fields of the old type go); a PATCH or PUT of a field the type does not have (an
-  `outputRecordLength` of a binary sender, a `lineEndingFormat` of a binary receiver) is **204 and ignored**. `type` is case
-  sensitive (an unknown one, `Binary` too, is 400); `lineEndingFormat` is DEFAULT, WINDOWS or UNIX; the server fills in
-  `localDataCode`, `networkDataCode`, VARIABLE records of 2048, a `paddingCharacter` of the text `\u0020` (ascii) or `\u0040`
-  (ebcdic) and `lineEndingFormat` DEFAULT. `custom_table` (sender or receiver) names a server configuration option that holds the
-  table, and is 400 "does not exist or is empty" when there is none; `ascii_custom_table` and `ebcdic_custom_table` with an inline
-  `translationTable` (base64 of 256 bytes) and a `translationCustomTableFileName` are accepted and read back (201), creating no
-  option, but **a transfer through them fails**: "Failure in opening file" (check 59).
+**`POST /administrators` needs `parent`**, the administrator it is created
+under, though the reference does not mark it required: 400 "Please specify
+parent administrator" without it.
 
-- **What a transfer profile does to the bytes of a file** (check 59, 116 real PeSIT pulls, the wire read through a
-  `CapturingProxy` and `tests/integration/lib/pesit_wire.py`). In a pull the SENDER's default profile `callerTranscoding` ("sending")
-  decides what goes on the wire and the RECEIVER's `receiverTranscoding` what is stored; the sender announces the data coding in PI 16
-  (0 ASCII, 1 EBCDIC, 2 binary) and the receiver decides by it. The connection is `LEN2 + FPDU` (FPDU: length, phase, type, two
-  ids, parameters); the data is in DTF FPDUs (phase 0, type 0), as the file's bytes or as records, each a 2 byte length (not counting
-  itself) and its bytes. Sent and received are one link: only the stored file shows the receiver's conversion.
-  - **binary**: bytes untouched (stream, PI 16 = 2); a stream longer than the record length (2048) is cut into records of that
-    length and joined again by a binary receiver, still byte for byte. `outputRecordFormat`/`Length` of a binary sender are read only.
-    A binary receiver joins records with nothing between them (CRLF/LF of an ascii sender are gone), converts nothing.
-  - **ascii sender**: a record per LF (a CR right before it goes too; other CRs stay), the LF removed, none added for a final line
-    without one; one record only is sent as bare bytes with no length. No conversion of the characters (UTF-8, Latin-1 and EBCDIC bytes
-    pass), a record longer than `outputRecordLength` (2048, or what is set) **fails the transfer**: receiver "Record length too long"
-    (the receiver compares each record with the length the sender announced). FIXED pads a short record (paddingCharacter, a space by
-    default; the text `\u002E` is a dot) and, like VARIABLE, fails on a longer one; the cut-to-length seen earlier was an artifact (below).
-    An empty file sends nothing. `paddingCharacter` and `outputRecordLength` change nothing for VARIABLE records that fit.
-  - **ascii_predefined / ebcdic_predefined sender**: the same record cutting, then characters converted from `sourceEncodingScheme`
-    to `outputEncodingScheme` (UTF-8 to ISO-8859-1 turns a euro sign into `?`; IBM037 lacks it too, it becomes 0x3F), announced as
-    `networkDataCode`. IBM1047 differs from IBM037 in `[ ] ^` and in the line feed (0x15 against 0x25); 0x25 converted from IBM037 to
-    IBM1047 becomes 0x15 and is not a record end.
-  - **ebcdic sender**: no conversion, announced as EBCDIC, records end at 0x15 (not at LF 0x0A or 0x25), FIXED pads with byte 0x7C: the
-    default paddingCharacter `\u0040` is the character @, converted to EBCDIC (not the EBCDIC space 0x40).
-  - **ascii receiver**: puts LF (WINDOWS: CRLF, UNIX/DEFAULT: LF) after each record, adds a final one to a line that had none; a **stream**
-    (binary data, a single bare record) gets the line end added after it, so a file that already ends in LF ends in two; an empty file
-    stays empty. Converts only EBCDIC network data (PI 16 = 1) to ASCII, with a table that is IBM1047 except that 0x4F reads as the
-    letter E with a diaeresis and 0x6A as `|`. FIXED pads or cuts each record to the length, then the line end.
-  - **ebcdic receiver**: converts only network ASCII data (PI 16 = 0) to EBCDIC (IBM1047 except that `|` becomes 0x6A), ends records
-    with 0x15 (WINDOWS: 0x0D 0x15); network binary or EBCDIC data is not converted, only the end added. FIXED pads with 0x7C.
-  - **predefined receiver**: converts from `sourceEncodingScheme` to `outputEncodingScheme` whatever the network code says, and adds the
-    line end of the OUTPUT encoding (0x15 for IBM1047).
-  - **advancedSettings.enabled**: true and the advanced sides win over the plain `transferMode`; false and the plain fields are in force,
-    whatever the advanced settings hold.
-  - **plain fields**: `transferMode` ASCII = ascii sender and receiver; EBCDIC and EBCDIC_NATIVE sender = no conversion, announced as
-    EBCDIC, records end at 0x25 and 0x15 (and 0x0A), padded with 0x40; an EBCDIC receiver converts nothing; EBCDIC_NATIVE ends records
-    with 0x25. `recordFormat` Fixed with `recordLength` pads the sender's records, **also the last block of a BINARY file with NUL bytes**
-    (a 17 byte file with 10 becomes 20 bytes), and makes a receiver FAIL ("Incorrect record length") on records of another length;
-    `paddingStripEnabled` strips the padding from an ASCII receiver's fixed records (not a binary receiver's).
-  - **A PeSIT connection that is kept open between pulls carries the record format of the transfer before it**: with it reused, a
-    changed profile gave other answers (a FIXED sender that did not pad, a record longer than the length cut instead of refused, the
-    record length announced twice different). Check 59 cuts the connection after every pull; do the same (or wait for it to close)
-    before believing a test of a changed profile.
+**Administrator API keys** (`/administrators/{name}/api-keys`): the key is in
+the POST answer only; at most 2 per administrator (409); `validityDays` or
+`expiresAt`, not both (400). The `SECURETRANSPORT-API-KEY` header alone
+authenticates. A method the key's permissions do not cover answers a
+plain-text 403; a revoked key a plain-text 401, "Authentication required."
 
-- **User classes** (`/userClasses`; examples `36.UserClasses`, check 60): a class is the rule that decides which class an account
-  is in when it LOGS IN; the class of a login is the `userClass` of its session (`GET /sessions?fields=userName,userClass`), and it is the same over SFTP (SSH session), the EndUser API (HTTP session) and FTP: every behaviour below (match, disabled, expression, userName, userType, address, rename, order, delete with a session open) was repeated over all three in check 60 and none differed; and
-  the next login after any change is already in the new state (a session that is open keeps the class it had, even a deleted one's
-  name, and keeps working). The server tries the classes in `order` and the first ENABLED one that fits wins; fitting means
-  `userType` (`*`, `real` or `virtual`; a local account is virtual), `userName` (a pattern with `*`, case sensitive: `example_*`,
-  `*_ab12`), `group`, `address` (the client's address, exact or ending in `*`) and an `expression`. VirtClass and RealClass fit
-  every login of their type, so a class of your own only ever wins by being tried first, and **a new class is put FIRST** (a POST's
-  `order` is ignored), VirtClass and RealClass moving to 2 and 3 (they move back when it is deleted); an enabled class with a
-  `userName` of `*` would take every login on the server, so give a throwaway class the exact name of a throwaway account and
-  create it disabled. `order` of a PUT or PATCH moves a class and shifts the others (0 or 1 first; past the last, or negative, is
-  400 "Order is not valid."). **The list is not in the order of `order`**: sort it. Required in a POST: `className`, `userType`,
-  `userName`, `group`, `address` (the 400 lists each missing one); the reference's text says `host`, the field is `address` (`host`
-  is 400 "Unsupported parameter"); `enabled` defaults to false and `expression` to the empty text. Names are case sensitive (two
-  classes `x` and `X`), a space is 400, 33 characters are accepted (the reference says 32), a duplicate is 409. **The expression is
-  checked when saved**, 400 "expression X is not valid.", but it is the server's own dialect, not the `${...}` of a route: `==`, `&&`,
-  `||`, `!`, `gt` and a method on a string literal are refused; `true`, `false`, `and`, `or`, `>`, `isset("A") ? a : b`,
-  `memberof("CN=..",LDAP_DIR_memberOf$collection)` and any bare name or `user.name.startsWith("a")` are accepted (syntax only: an
-  unknown name is not an error). On a login `true`, `1 > 0` and `true or false` match; `false`, `2 > 3`, `not true`, a bare name and
-  every attribute test do not, because a local account has no directory attributes (its `additionalAttributes` are not seen). So
-  membership by an LDAP attribute was **never seen**: it needs a login through a directory. PUT replaces the whole class: the five
-  required fields alone answer 204 and reset `expression` to the empty text and `enabled` to false (`order` is kept); an `id` in the
-  body is ignored. PATCH: `replace` works on every field, `remove` of `/expression` gives the empty text, `remove` of any other is 400,
-  `replace` of `/id` is 204 and does nothing, a path that does not exist is 400 `Missing field`, an empty patch is 204. **An unknown id
-  is 404 for GET and HEAD and 400 for PUT, PATCH and DELETE** ("User Class with ID X does not exist."); the NAME is not an id. The
-  `className=` filter ignores case and takes `*` (pick the exact name yourself), the other filters are exact (`userName=nobody*`
-  finds only a class whose text IS `nobody*`), `enabled=` takes true or false and anything else means false, `userType=*` finds the
-  class typed `*` only, `limit=0` is the default page of 100 (see Paging), negative or text is 400. **A delete is never refused**: not for a class with a session
-  open in it, and not for one a template account names. **A template account's `templateClass` is not looked up**: a class that does
-  not exist is 201, a deleted class's name stays in the template, and it is only readable with `type=template`
-  (`GET /accounts/X?type=template&fields=templateClass`; without the type, 400 "Field templateClass does not exist."). A template
-  with no `templateClass` is 400. The session list keeps a just closed session for a moment, so to read the class of a login, take
-  the session whose id was not there before it (check 60 does).
-- **Zones** (`/zones`; examples `37.Zones`, check 61): a zone is a NETWORK (DMZ) zone: a name, a description, `publicURLPrefix`, `ssoSpEntityId`,
-  `isDnsResolutionEnabled`, `isDefault` and `edges` (an edge has a `title`, notes, addresses, protocols with a port, proxies). It is addressed by its
-  **name**, which is case sensitive (`example_a` and `EXAMPLE_A` coexist, `private` is a 404). The lab has one, **`Private`**, "the information for back
-  ends", with one edge `Host` carrying the lab's own FTP, SSH, HTTP, ADMIN, AS2 and PESIT ports: never change or delete it. A standalone lab can create
-  and delete zones freely, and a zone with edges changes nothing by itself (no listener, no routing): check 61 saved the whole list, ran, and compared it
-  at the end. The lists are plain `{resultSet, result}` and stable. Only `name` is required; a duplicate is **400** "The zone name is not unique." (not the
-  reference's 409); `/ \ ; '` in a name or an edge title and 256 characters are 400; an unknown field is 400 "Unsupported parameter"; an edge needs a
-  `title`; a protocol needs `streamingProtocol` (HTTP, FTP, AS2, SSH, PESIT, ADMIN: another is a bare 403 "unable to comply") and a `port` from 1024
-  (400); a protocol's `sslAlias` that is no certificate of the server is 400 "Error creating zone"; an edge's `deploymentSite` defaults to `Prod`; protocols
-  come back in the server's order; a proxy's `password` is never read back, `isUsePassword` is. **Filters are exact and case sensitive, `name=` too (no
-  `*`)**: `isDefault=` takes true or false, the `edges.*` ones work, an unknown filter is ignored, `edges.proxies.isUsePassword=` is a 403; `limit=0` is the default page of 100
-  (see Paging), a negative or text limit and a negative offset are 400. **PUT replaces**: it needs `name`, equal to the one in the path (another is 400, so no
-  rename by PUT or by PATCH of `/name`), and leaving a field out RESETS it (`publicURLPrefix`, `ssoSpEntityId`, `isDnsResolutionEnabled`, and **`isDefault`
-  goes off**), but **a body with no `edges` key keeps the edges**, `"edges": []` removes them and an edge sent with a title only loses everything else;
-  sent back as it was read the whole zone is kept, edge ids and a proxy's `isUsePassword` included. PATCH leaves the rest alone: `replace`, `add` and
-  `remove` of the scalars (also of a null one), `/edges/-` adds an edge, `remove /edges/1` removes it, a path that does not exist is 400 `Missing field`,
-  `/edges/0/edgeId` is 204 and ignored, an empty patch is 204; **a patch of an edge's `title` makes the edge a new one and its saved proxy password is
-  lost**, two edges with one title are a 500, a second protocol of the same kind on an edge is accepted. **There is only one default zone**: making one
-  the default (create, PUT or PATCH) turns the other off; `Private` is not the default on the lab. **Using a zone**: a business unit names one in `dmz`
-  (a name that does not exist is 400 "No such DMZ zone with name X"; the unit's `dmz=` filter answers 403, so read every unit's `dmz` and pick). On the
-  lab an account of a unit that names a zone with an edge logged in over SFTP, the EndUser API and FTP exactly as before: nothing is routed without a real
-  edge. What it does do: **the zone cannot be deleted while a unit names it, a 500** "Database error deleting DMZ zone: X" (not a 400 or 409; fine once
-  the unit is gone), and the default flag is **not** copied into a unit created while a zone was the default (`dmz` stays null). A delete of a zone
-  that is not there is 404, GET one a JSON 404, HEAD a bodiless 404. The effect behind a real edge (routing, `isAutoDiscoverable`, a proxy in use)
-  was **not seen**. The `networkZone` fields met elsewhere (`testConnection` of `/statisticsSummary`, and `s3NetworkZone` and the other storage
-  profile ones, "network zone name to use for proxying connections") name a zone the connection is to go through; that was not run through a real edge either.
-- **Older examples made safe to run bare** (`02.Introduction/04`, `03.Connect/03` to `05`,
-  `04.Applications`, `05.Accounts`, `13.Configurations/01` and `02`; checks 04, 05, 13, 14, 21, 23).
-  They used to change real or server wide things with no argument, ignore the HTTP status and exit 0;
-  they now default to `example_*` objects or require their input (exit 2, nothing sent), print `HTTP <code>`,
-  exit 1 on a refusal and print the old value and how to put it back. What was seen on the lab on the way:
-  **`PATCH /myself`** answers 204, and the old password stops working at once while the new one works at once;
-  the same password again is 204; a one letter password is accepted (no complexity rule on the admin) and an
-  empty one is 400 "password cannot be empty"; only `/passwordCredentials/password` and
-  `/preferredFileTrackingColumns` can be patched on it (400 "Patch operation is allowed only on fields ...");
-  a wrong current password is a plain 401. **`PUT /daemons/ssh`** is 204; `maxConnections` outside 1 to 100000 is 400
-  "should be in the range from 1 to 100000" (also for 0 and -10), text is 400 "Cannot parse 'abc' to int." and
-  the text "12" is accepted; `preferBouncyCastleProvider` text is 400; **a PUT with the `banner` left out or null is a
-  bare 403** "unable to comply" (not a 400), an empty one is fine; an unknown field is 400 "Unsupported parameter";
-  a changed configuration takes effect when the daemon restarts (the reference), which was not tried. PATCH
-  `replace` of each of the three fields is 204 and a path that does not exist is 400 `Missing field`.
-  **`PATCH /configurations/options/{name}`**: `replace` of `/values/0` and of `/values` are both 204, an unknown
-  option is 400 "Option with name ... does not exist." on the PATCH and 404 on the GET, the value is not checked
-  against what the option means (the text "abc" was accepted for the number of days), a value sent to an encrypted
-  option is stored encrypted and **differently each time**, while its own `{AES128}...` text sent back is kept as it is
-  (so a restore from the printed old value is exact). **Accounts**: a creation is 201 with `Location`, a duplicate is
-  409 "The account name is not unique."; a PUT of the object as read is 204 (also when read without a `type`);
-  a PATCH `replace` of `nonAddressBookCollaborationAllowed` takes the text "true" or the boolean; a business unit that does
-  not exist is 404 "Business unit with name X not found or not accessible."; a user account created through the API has the
-  LDAP and Local address book sources. **Applications**: a flow application is created with only `type`, `name` and `notes`
-  (201), a duplicate name is 400; a PUT of the object as read is 204; a `schedules` list is only there for maintenance types,
-  and `startDate` reads back as the **epoch in milliseconds, as text**; PATCH `replace` of `/schedules/0/startDate` with a date
-  in the past (the 2025 date the old example sent) is 400 "startDate occurs before the current moment."; the server derives the
-  schedule's `executionTimes` from the time of day of the start date in **its own time zone** (00:00:00Z on a +03:00 server read
-  back as `["03:00"]`), and sending the old date back, as the ISO date taken from the milliseconds, restores both exactly; on an
-  application with no schedules the path is 400 `Missing field "schedules"`.
+#### Business units
 
-- **Older examples that could not fail, now checked** (`03.Connect` 07 and 10 to 13, `06.TransferSites`,
-  `07.Subscriptions`, `08.RouteTemplates`, `09.CompositeRoutes`, `12.BusinessUnits/01`, `13.Configurations` 39 to 47,
-  `14.ExpressionLanguage`, `15.Transfers/01`, `17.AccessPolicies/02`, `18.AccountSetup`, `20.AdministrativeRoles`,
-  `21.Administrators`; checks 06, 07, 08, 19, 22, 31, 34, 35, 37, 38, 40, 56). Every one prints `HTTP <code>` taken from
-  `curl -w` (the head of a headers file is a `100 Continue` or a redirect now and then), exits 1 on a refusal and 2 on a bad
-  argument. Seen on the lab, 5.5-20260924: **Servers**: `POST /servers` of a minimal ssh server is 201 with no body and a
-  `Location` that is a search (`/servers?serverName=NAME`), not a path; the new server is inactive, `port` is null and
-  `isSftpEnabled` false; a duplicate name is 409 "Server with name X already exist."; a port another server uses is accepted
-  while it is inactive; an http server with no port or certificate alias is 400 "HTTPS is enabled, but the certificate alias is
-  mandatory.; Missing HTTPS port.". **A server that is not there answers differently by method**: GET is 404 with an HTML page,
-  **HEAD is a bodiless 400**, DELETE and PATCH are 400 "Server with name X does not exist.", PUT is 400 "Could not update server
-  with name X.". A PUT with only name, protocol and port is 204 but **resets** `clientPasswordAuth`, `ciphers` and
-  `keyExchangeAlgorithms` to empty text; a PUT of the whole object read back is 204. A PATCH whose body is an object, not an
-  array, is 400 "Incorrect JSON format" (PowerShell: `@($x) | ConvertTo-Json` unrolls a one element array to an object; use
-  `ConvertTo-Json -InputObject @($x)`). `replace`, `add` and `remove` on `/port` all work on a null port; 99999 is 400 "mPort must
-  be less than or equal to 65535", text 400 "Something went wrong while patching the entity"; `publicKeys` is one comma separated
-  string and `replace` takes an empty string or a non algorithm name unchecked; `GET /servers?fields=port` alone is 400 "Field
-  port does not exist." (it needs `protocol=ssh`); `limit=200` is accepted. **`POST /servers/operations`** answers 200 with
-  `serverStatuses[{serverName, message, isSuccessful}]` **even when it failed** (an unknown server is `isSuccessful` false "Server
-  with name X does not exist."): read `isSuccessful`, not the status; no `serverName` is 400 "Specify at least one server name to
-  start.", an `operation` other than start or stop 400 `must match "(?i)start|(?i)stop"`, a repeated `serverName` gives several
-  results (no start or stop of a real server was sent). **Sites, subscriptions, routes**: a site POST is 201 with the id at the
-  end of `Location`, a duplicate on one account 409 "Entry already exist."; the HTTP site 01 creates has a null password and an
-  SSH site's reads back as `{AES128}`; a second application of one name is 400 "An application with this name already exists.",
-  a second subscription on one folder 400 "...unique anchor..."; a DELETE of an unknown site, subscription or application is a JSON
-  404 ("... not found or not accessible.", for a route "Route is not found."); **two simple routes with one name are both created
-  (201)**, so a delete by name is ambiguous and the scripts delete by the id in `Location`; `name=` ignores case on routes,
-  policies and sites. The 163 route templates took about 53 seconds to create and 54 to delete. **Business units**: a name that
-  exists is 400 (not 409) "Business unit name already exists. Business unit base folder is already in use or it is not valid.",
-  a `baseFolder` that is not absolute 400 "Folder name is not absolute: home/x", an empty name 400 "name cannot be empty", a missing
-  `baseFolder` 400; a name with a space is accepted. **External stores and S3**: DELETE of an unknown store is 400 "Cannot delete
-  External Store with name: X. Cannot find External Store or External Store configuration is not accessible" (the GET and the
-  operations are 404), a PATCH of an unknown one 404 "External Stores configuration DB error"; `%2F` in a store name is a 400 with an
-  HTML page from the web server and a raw `/` a 404, so such a name cannot be addressed (the scripts refuse it); a storage profile
-  test of an unknown name is 404 "Storage profile 'X' not found."; **when the settings PUT of an S3 register is refused (400), the
-  name stays in `StorageProfiles.S3.Registry` with every option empty**, so "nothing is saved" is true of the settings only.
-  **Roles and administrators**: a role that exists is 409 "Administrative role with the same name already exist on the server.",
-  an unknown menu 400 "List contains unsupported menu." (POST and PATCH), an unknown role 404 "No such administrative role." on
-  PATCH, DELETE and DELETE with an unknown `targetRoleName`; a duplicate administrator is 409 "Entry already exist.", an unknown
-  role 400 "An admin role with the specified roleName not found.", an empty password 400 "The password cannot be empty.", a name with
-  a space 400 "Spaces are not allowed in an Administrator Name.", an unknown administrator 404 "Admin not found - X" (GET, PATCH,
-  DELETE); an administrator that deletes itself gets 400 "Administrator cannot be deleted.", and the delete script refuses the
-  logged in one before sending anything. **Access policies, pull, login restriction rules**: a bad `authMethod` is 400 "Valid auth
-  method values are: reject, trust, scram-sha-256, md5, password." and changes nothing; `POST /transfers/operations?operation=pull`
-  answers 202, an unknown account 404 "Cannot find account with name X or it is not accessible", an unknown site 400 "X site does not
-  exist"; a rule patched without `clientAddress`, or with a type other than ALLOW or DENY, is 400 with the reasons in
-  `validationErrors`; a duplicate login restriction policy is 409.
+`baseFolder=` as a filter is ignored (every value gives
+every unit). `parent` reads null even for a nested unit; the nesting shows in
+`businessUnitHierarchy` and `metadata.links.parentBusinessUnit`, and
+`parent=` as a filter works. A delete is refused, 400, while the unit has
+nested units or accounts.
 
-- **Read examples that never looked at the status, now checked** (about 58 scripts, `01.Authentication` to `37.Zones`; checks
-  01, 02, 09, 10, 12, 15, 24, 30, 57). Seen on the lab, 5.5-20260924: **refused credentials answer 401 `Authentication
-  required.` as `text/html`, not JSON**, for a GET list, `POST /myself` and a HEAD alike, so a script that pipes a list into jq
-  printed nothing and exited 0; a 500 is an HTML page. `POST /myself` answers 200 `{"message": "Logged in"}` (not the
-  account), `DELETE /myself` 200 `{"message": "Logged out"}`, and a `GET /myself` with the old jar afterwards is 401 (an
-  example may demand a 401 or 403 there). A HEAD of a missing server is a **bodiless 400**, a GET of it (with or without `fields=`) a
-  404 HTML page from Tomcat; `GET /daemons/nope` is 400 "Invalid value for parameter name, expected (ssh)"; a missing
-  administrative role is 404 "No such administrative role.". **`/certificates?usage=` is not validated the way it looks**: `ca`,
-  `signer` and `server` are 403 "Insufficient permissions to perform the operation" (which says nothing about usage), the accepted
-  values are `local`, `private`, `partner`, `login` and `trusted`, matched ignoring case, and `/certificates/requests?usage=nonsense`
-  returns all requests. `grep "os"` on the version answer matches `os` and `osDistribution`; lab bodies end with `}` and no newline.
-  Two wrong passwords on `admin` did not lock it. A bash script's exit code is that of its last command: an example that ends in a
-  `grep` exits 1 when the grep finds nothing, whatever the call did.
+#### Certificates
 
-- **Timings and traps seen while replacing the harness' fixed sleeps** (5.5-20260924). A subscription pull puts the file in the
-  folder about 2.5 s after it is asked for; the pull summary says done 0.3 to 1.3 s later; a file deleted at that moment was not
-  pulled again in 8 of 8 tries, and `ClearPullHistory` is effective at once (a pull right after it fetched the file 8 of 8). A
-  running transfer reports "not cancelable" at once and a cancel shows in the pull summary at once. The statistics report shows a
-  transfer within about 2 s. **An sftp `pwd` is answered by the client** and never notices a session the server ended; `ls` does
-  ("Received disconnect ... Manual termination by the server administrator"). `DELETE /files/<non-empty folder>` on the EndUser
-  API is 403, so remove folders bottom-up (an empty one is 204). **The active users report keeps every name that has ever logged
-  in** (314 on the lab), so a throwaway account that logs in adds a name for good, and `limit=0` returns the first 100 of them. A
-  background job started with `&` in a shell ignores SIGINT. The whole lab suite takes about 14 minutes for check 59 alone with a
-  callback address the lab can reach (and about an hour when it cannot, every transfer then waiting for its retry).
+`expirationTime.from` and `.to` are in milliseconds, not
+the Unix seconds the reference implies; in seconds they find nothing. A
+generate (JSON body) answers 201 as multipart/mixed, the JSON in the first
+part, the id in `Location`; an import (multipart/mixed body) answers 200 with
+plain JSON. PATCH works only on `accessLevel`, `additionalAttributes` and
+the external store fields. `POST /certificates/{id}/operations?operation=export`
+needs a multipart form body even for pem and crt (`-F exportPassword=`),
+otherwise 400 "Entity is empty."; `includePath=true` on a GET answers an
+array, the certificate then its chain. Deleting an account deletes its
+certificates.
 
-- **Features: what the failure handling run on the lab showed** (`audit-billable-transfers`, `trigger-route-after-completed-pull`,
-  `Features/lib`; 5.5-20260924). A `#` in an unencoded file path cuts the URL: `DELETE /files/dir/a#1.txt` asks for
-  `/dir/a` and answers 404 "Unable to delete file: /dir/a. (file not found)"; a space makes curl send nothing (code 000);
-  encoded segments work for GET and DELETE (204). A GET or DELETE of a folder that does not exist is a **404**, also inside a
-  stale home (not the 403 of a create there), so a clean-up can tell "not there" from "refused". `HEAD /accounts/<name>` is 200
-  or 404. Deleting an application that still has subscriptions is 400 "Application for ID: ... has active subscriptions". A
-  wrong password on the EndUser login is 401 "Login failed. Re-submit your credentials.". The stale home was reproduced on both
-  features (an account of uid 1001 deleted, then a new one of uid 41733): the probe got the 403, both runs moved to `<name>_2`
-  or `_3` and went on to the end. A clean-up that cannot tell whether something exists (the server unreachable) must not say
-  "nothing to delete", and one that cannot read the list of sites that log in as a partner must keep the partner.
+**Certificate signing requests:** the CSR itself is only in the POST
+answer (multipart/mixed); a GET answers the JSON alone, and 406 to any other
+Accept. Read back, `keySize` is 0 and `signAlgorithm` null. With a filter,
+`totalCount` still counts every request. Completing (multipart form, `alias`
+and `certificateFile`) answers 200, creates the certificate and removes the
+request; a CA the server does not trust is accepted, "Not chained to a
+trusted root".
 
-- **A home folder outlives its account and keeps its owner.** Deleting an account leaves `/home/<name>` on disk with
-  the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
-  An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST
-  is 403 "Error occurred while creating file: null", and so is a DELETE of a folder there, while a folder below an
-  existing one still works because the server creates missing parents itself, which hides the cause (the
-  audit-billable-transfers feature hit this when its example uid changed from 1001 to 41733). Changing the uid again
-  does not fix a home with mixed owners. Use another account name, so that it gets a new home folder; the features'
-  04 scripts print this hint, and `00.run_all.sh ANOTHER_NAME` takes the name. audit-billable-transfers'
-  `00.run_all` does it by itself when no name was chosen: after step 01 it POSTs and DELETEs a throwaway top-level
-  folder `bt_home_probe` as the test account, and on that 403 deletes only that account and moves to `<name>_2` ..
-  `_9` (confirmed on 5.5-20260924). Probe with a top-level folder: a nested one succeeds and hides the problem.
-- **Site templates** (`/siteTemplates`, not covered): the reference defines only two types, `cd` (Connect:Direct)
-  and `custom`, not per-protocol templates; a site names one in `siteTemplate`, on Connect:Direct sites only. On a
-  lab without Connect:Direct nothing can be created: a complete `cd` body is 400 "Site template protocol cd is not
-  valid. Connect:Direct protocol not available.", and `custom`, `s3`, `smb`, `ssh`, `ftp`, `http` and the rest are 400
-  "Protocol X is not supported." (so `custom` fails too, though the reference lists it). The list is `{resultSet, result}`
-  and empty; HEAD of an unknown id is a bodiless 404, GET and PATCH a JSON 404, DELETE a 400 whose only message is the
-  id. Create, read, replace, patch and delete of a real template were never seen working: do not copy behaviour from
-  the reference alone; probe it on a lab with Connect:Direct first.
-- **Sites** (`/sites`; examples `06.TransferSites` 05 to 11): a site is addressed by a generated **id**, so every
-  example looks it up by account and name. **The `name=` filter ignores case and takes a `*`**: `example_x` and
-  `EXAMPLE_X` are two sites (creation is case sensitive, a second `example_x` on the same account is 409 "Entry
-  already exist."), both come back for either, and `example_x*` also finds `example_x2`; the same name on two accounts
-  is fine. So pick the exact name out of the answer yourself, and refuse more than one. `account=` is exact, case
-  sensitive, no `*`. Unlike the reference, the type-specific filters (`port=`, `downloadFolder=`) work **without**
-  `type=`; `limit=0` is the default page of 100, `-1` is 400. HEAD is 200 or a bodiless 404; GET of an unknown id is a JSON 404
-  ("Site with id X not found or not accessible."); `fields=` keeps the named keys, an unknown one is 400; `type=` on a
-  GET of one is ignored (`type=http` on an SSH site answers it). The password reads back as `{AES128}...`.
-  **PUT replaces the whole site**: a fragment answers 204 and resets what it leaves out (folders, pattern, renaming,
-  connection limit); the read object with the encrypted password sent back keeps the password, no password at all is
-  400 "Specify password", plain text is encrypted anew; `account` in the body is accepted and ignored, `type` cannot
-  change (400), no `type` is 400, `name` renames. **PATCH**: `type` is read only (400), a path that does not exist
-  is 400 `Missing field`, `remove` sets null (the key stays), `replace` of `/id` and `/account` answer 204 and do
-  nothing, `replace` of `/name` renames, an empty patch is 204, `add` to `/additionalAttributes/userVars.<name>` works,
-  `add` to `/alternativeAddresses/-` is 404 "usage of Site Alternative Addresses is disabled". `customProperties` is
-  refused on an SSH or HTTP site (400 "Unsupported parameter") and is the whole of a custom site (S3, SMB...).
-  **`POST /sites/operations`** (`operation=testConnection` or `listRemoteFolder`; anything else, or none, is 400): the
-  test answers **200 whether or not it worked**, read `connectionStatus`, `authenticationStatus`, `errorDetails`
-  ("Connection refused", "Unknown site host: x", "Password authentication failed...", "530-Login failed...", "Failed
-  to negotiate transport component" for a partner that is not SSH). With the site's `id` in the body (and name,
-  host, port, protocol, as the reference requires) the server fills in the rest, the saved login included; what the
-  body does carry wins (a wrong password, host or port fails the test), except the protocol, which is the saved
-  site's. A site that is not saved needs `account` (400 "Account null does not exist" without it), `host`, `port`,
-  `protocol` and `username` (lower case) with `password` and `usePassword` "true". A partner that accepts the
-  connection and says nothing keeps the call waiting over 30 seconds; a stand-in that sends one junk line and closes
-  (`JunkServer`) fails at once. **A wrong password is a real failed login: one wrong SSH password counts as two
-  failures (password, then keyboard-interactive), and with `failedAuthMaximum` 3 a second wrong test locks the
-  account, which then refuses every login until unlocked**; a login that works resets the count. **`listRemoteFolder`
-  lists the UPLOAD folder when `folderToList` is left out** (the reference says download), so is
-  `includesFolderNamesInResult` false when left out (the reference says true), and any `folderToList` other than
-  `downloadFolder` means upload. SSH, FTP and HTTP sites list; a folder that is not there is 200 with an empty
-  result and `errorDetails` "No such file: Specified file path is invalid."; a site with no folder of that kind is
-  400 "Remote folder value cannot be empty for a non saved site." (the text says non saved though it is saved); a
-  `limit` that is not a number is a bare 404; `limit=-1` lists all; `orderByLastModified=ascending` reverses the
-  order. A custom S3 site's test needs HTTPS and a download key or upload destination: against the plain HTTP
-  `FakeS3` it fails with "https protocol is not supported", so it is not covered here.
-  A home folder on disk keeps the first account's owner: a new account with another uid on a used home cannot create
-  folders there (403 "Error occurred while creating file: null"), and a fresh home can refuse the first folder for a
-  moment.
+#### Configurations
 
-- **Subscriptions** (`/subscriptions`; examples `07.Subscriptions` 05 to 13, check 56): a subscription is addressed by a
-  generated **id**, and **account plus application is not unique**: one account has several subscriptions on one
-  application as long as their folders differ (a second one on the same folder is 400 "All subscriptions to an application
-  should have a unique anchor", and for StandardRouter the anchor includes the `subscriberID`). So the examples look an id
-  up by account, application **and folder**. Unlike sites, **`account=` and `application=` are exact, case sensitive, no `*`**
-  (capitals or a wildcard find nothing, no error); `folder=` takes a `*` (and `/inbox*` finds `/inbox2`); `type=` with a
-  value that is no type finds nothing; `limit=-1` is 400, `fields=` keeps the keys named plus `type`. The list is not
-  stable (read it again before concluding something is gone). **The `type` of a subscription is the type of its
-  application**: a body that says another is accepted (201) and the application's type wins. Created with only type,
-  account, application and folder: AdvancedRouting, Basic, HumanSystem (`rules`), MBFT, StandardRouter (needs `subscriberID`,
-  400 without it). SharedFolder and SiteMailbox need more of their application first (`sharedFolder`; `inboxFolder` and
-  `outboxFolder`), and a SiteMailbox subscription 400 "requires inbound transfer configuration". A POST of an application
-  that exists is **400 "An application with this name already exists.", not 409**; an application that still has a
-  subscription cannot be deleted (400 "has active subscriptions"); deleting the account deletes its subscriptions. **A
-  subscription's folder is not made by the POST**: it appears in the home folder at the account's next login (or at the
-  first pull); `DELETE ?purge=true` and the `Purge` operation remove the whole folder, a plain DELETE leaves it. HEAD is 200
-  or a bodiless 404; GET of an unknown id a JSON 404 ("Subscription with id X not found or not accessible."); `type=` on a
-  GET of one is ignored. **PUT replaces the whole subscription**: a body with only type, account, application and folder
-  answers 204 and drops the transfer configurations (the pull sites), the flow attributes and every other setting; the read
-  object sent back (nested `metadata` and all) changes nothing. A transfer configuration sent with no `id` gets a new one, and
-  one with an id that no longer exists is 400 "you are trying to update transfer configuration with id X that does not
-  exists" (read again before sending back). **PUT of an unknown id is 400 "Subscription for ID: X not found", not the 404 the
-  reference lists** (PATCH, GET, DELETE and the operations answer 404). No `type` is 400 "Invalid discriminator value."; another
-  `type` 400 with a misleading "Unsupported parameter - postClientDownloads"; `application` in the body is accepted and ignored;
-  `folder` moves it; an `account` that does not exist is 404, or a bare 403 "unable to comply" when the body carries a transfer
-  configuration. `fileRetentionPeriod` (0 to 36500) needs a pull site ("Cannot set file retention period without setting
-  transfer site."), a negative `maxParallelSitPulls` is 400. A flow attribute key must start with `userVars.`, hold only
-  letters, digits, `.` and `_`, and not repeat `userVars.`; the "10 characters" minimum of the reference is not enforced
-  (`userVars.a` works); the value is 1 to 4000 characters, blank is 400. **PATCH**: `add` of a flow attribute works whether or
-  not it exists (it overwrites), `replace` of one that is not there is 400 `Missing field`, contrary to the usual rule `replace`
-  of a **null** field works (`maxParallelSitPulls`), `remove` of it sets null; `type` is read only (400); `replace` of `/id` and
-  `/application` answer 204 and do nothing; `/folder` moves it; an unknown path is 400 `Missing field`; an empty patch is 204.
-  **Operations** (`POST /subscriptions/{id}/operations?operation=`, the name is case sensitive: `pull` and `Nope` are a bare
-  404 "HTTP 404 Not Found"): `Pull` needs the body `{"type":"pull","site":...}` (none is a 403 "unable to comply"; a site that
-  does not exist is 406 "Site 'X' was not found."; a subscription with no transfer configuration 400 "No transfer
-  configuration found for this subscription."; a wrong `type` 400 with a misleading "Unsupported parameter - site"), answers 202
-  with `message` and a `link` holding the `operationIndex`, and the file arrives in the subscription's folder within seconds and
-  stays on the partner; `createFilesListEnabled` and `createFilesListFilename` in the body write a listing of the pulled files
-  into the folder. With a **pull history** (the subscription's `fileRetentionPeriod` more than 0; the reference says SFTP sites only, an SSH site was the only one tried) a file already
-  pulled is not pulled again, even if it was deleted from the folder, until `ClearPullHistory` (202, message; an optional body
-  `{"type":"clearPullHistory","fileRetentionPeriod":N}` is accepted, 0 to 36500 else 400, and what it changes was not seen).
-  A second pull started at once, as soon as the file had arrived, fetched it again; with 5 seconds in between it did not (the
-  history seems to be written a moment after the file arrives). `Purge` is
-  204 and removes the whole folder, not only its files; the subscription stays and a later pull makes the folder again.
-  `tests/integration/checks/56.subscriptions_scripts.py` covers all of it.
+**Configurations are options underneath.** Sentinel, external stores and S3
+storage profiles are stored as Server Configuration Options
+(`AxwaySentinel.*`, `TM.ExternalStores.<name>`,
+`StorageProfiles.S3.Registry.<name>.*`), and the options endpoint can do what
+the dedicated one refuses. Once a Sentinel `host` is set, `/configurations/sentinel`
+refuses an empty one ("host must not be null or empty") and then any change:
+turn reporting off, then clear `AxwaySentinel.RemoteHost.host` and
+`AxwaySentinel.OverflowFile.path` and restore `.RemoteHost.port` and
+`.Heartbeat.delay` through `PUT /configurations/options`. An option is cleared
+with `[""]`; `[]` answers 400 "Invalid argument length.".
+
+**External stores:** `GET /configurations/externalStores?name=` with a pattern
+ending in `*` answers 404 "External Stores configuration is not valid" once it
+matches a store - it also matches the store's companion option
+`TM.ExternalStores.<name>.encryptedFields`. Use an exact name. `fields=` is
+ignored. The `test` operation answers 200 whatever happens; read
+`fetchStatus`, `connectionStatus`, `authenticationStatus`.
+
+**S3 storage profiles** have no resource: add the name to
+`StorageProfiles.S3.Registry` (one value each), set
+`StorageProfiles.S3.Registry.<name>.Bucket`, `.Region`, `.CustomEndpointUrl`,
+`.AccessKey`, `.SecretKey`. Saving them tests the connection (400 when the
+bucket cannot be reached); `test` is a HEAD on the bucket.
+
+**Other configuration endpoints:** a logging option's XML comes only with
+`Accept: application/xml` (204 when none is set); a PUT on one that was never
+set answers 400 "not eligible for propagation". Enabling Sentinel needs
+`overflowFilePath`. The database `test` operation is a multipart form and
+needs host, port, databaseName, username and password. Login settings are
+validated whole on every change, so already inconsistent settings refuse even
+a no-op. Some option groups the list returns answer 501 when read.
+`allowedSTServers` answers 404 on a standalone server.
+
+#### Daemons
+
+**`POST /daemons/operations` takes `daemon=<protocol>`**, as the reference says
+and `23.connect_operations_scripts.py` uses (`operation=stop&daemon=as2`). `stGraceful.py`
+used to send `serverName=`, a parameter of `/servers/operations`, which that endpoint does not
+list, and the reference says a stop with no `daemon` is every daemon. **Not run on the lab**
+(a stop cannot be taken back, see "A graceful stop with a timeout keeps running server-side"):
+this is from the reference and from check 23, and the fake server of the offline tests
+behaves as the reference says.
+
+#### Denied users
+
+(`/deniedUsers`): only GET, POST and DELETE; GET or HEAD on one
+name answers 405. POST answers 201 with the entry's address in `Location` and
+no body. `ttl` is in hours and left out for a permanent block (`blockedUntil`
+null). **POST accepts an empty `loginName`, and the entry can then not be
+removed through the API** (DELETE with an empty name is 405, with a space or
+a NUL it is "not found"); also 0, negative and absurd `ttl` values, which
+give entries that have already expired. Check both before sending. A
+duplicate is 400; DELETE of a name not in the list is 400, not 404. An
+expired temporary entry stays listed until the server's blocked-users cleaner
+removes it. The `loginName` filter ignores case but entries are case
+sensitive: `example_denied` and `EXAMPLE_DENIED` coexist, and DELETE takes the
+exact name. The date filters take yyyy-MM-dd, RFC 2822 or a millisecond
+timestamp. A blocked name is refused at the EndUser login (`POST /myself`)
+with 401 "Login failed. Re-submit your credentials." - the same text as a
+wrong password, so test with a login that worked just before - and logs in
+again as soon as the entry is removed; other accounts are unaffected.
+
+#### Events
+
+(`/events`) are the tasks being processed now, so the list is usually
+empty. Confirmed directly: a file uploaded to an Advanced Routing subscription
+first shows a short-lived `DEFAULT` event for the arrival, then an
+`ADVANCED_ROUTING` one that is `ready` (queued) and becomes `active`. A send
+step towards a partner that accepts the connection and never answers (a
+TcpSink) keeps it active; to make events for a test, use that. An event can stay
+`active` after its transfer has `Failed`; `POST /events/operations?operation=delete`
+with `{"ids": [...]}` removes it, answering 200 with `deleted` or `not found` per
+id. Any other `operation` answers 200 with `{}` and does nothing. `status` is
+matched exactly (`active`, not `ACTIVE`); an unknown `processorType` finds
+nothing rather than a 400; `arrivalTime`, `lastHeartbeatAfter` and
+`lastHeartbeatBefore` are milliseconds, a date answers 400 "For input string".
+An unknown id is 404. A file that already exists in the folder is not a new
+arrival, and deleting an account leaves its home folder on disk: give a test
+upload a name of its own and delete it afterwards.
+
+#### ICAP servers
+
+(`/icapServers`) scan a transfer only for the **business units that
+list them in `enabledIcapServers`**, and only while `serverEnabled` is true; an
+enabled server that no unit lists scans nothing, so a test can scope the scan to a
+throwaway unit and leave every other transfer alone. Confirmed directly: ST sends
+`OPTIONS`, then each file as a `REQMOD` with a preview (`X-Authenticated-User` is
+`Local://<account>` in base64); a block (ICAP 200 with an HTTP 403) leaves the
+transfer `Failed` and removes the file, after the file has first been listed (the scan
+is asynchronous, a few seconds); several files may be scanned in any order. With the
+server unreachable, `denyOnConnectionError` true refuses the file and false lets it
+through; disabled, nothing is scanned. A PUT whose body has another
+`basicSettings.name`, or a PATCH of `/basicSettings/name`, **renames** the server.
+The `basicSettings.name`, `.url` and the other filters are exact (no `*`, case
+sensitive); the `url` is not checked (`http://x` is accepted); maxSize and
+previewSize are required. Deleting a server a unit still lists succeeds and takes it
+out of that unit's list. `businessUnits?icapServer=` filters nothing (every value
+lists every unit): read `enabledIcapServers` and select yourself. In a business
+unit an account's home folder must end with the account name, so a fresh folder per
+test run has to come from the unit's `baseFolder`.
+
+#### LDAP domains
+
+(`/ldapDomains`): `bindDn` and `bindDnPassword` are required, though
+only `name` is marked. The server **resolves the host when it saves a domain**: a
+name it cannot resolve answers 400 "Invalid server host", an address always works.
+The bind password reads back encrypted (`{AES128}...`); sending that text back in a
+PUT keeps the password, plain text is encrypted anew, and a body with no password is
+400. The defaults are not the reference's: `referralsAllowed` and
+`anonymousBindsAllowed` read true. The `Location` of a POST ends with the domain's
+**id**, but the path takes the **name**. A PUT with another `name`, or a PATCH of
+`/name`, renames it. `name=` and `bindDn=` are exact (no `*`, case sensitive);
+`isDefault=` as a filter fails with "unable to comply" for true and false. A PATCH
+can set `/isDefault` to true but cannot set it back (400 "You cannot set precedence
+on non default domain"); an added server (`/ldapServers/-`) takes order 1. The
+`testConnection` operation answers 200 whether or not it worked, reads the message
+(`Successful Connection.` or `Connection failed.`), and only opens a TCP connection:
+it sends nothing, so a TcpSink is enough to play the directory. A domain is used for
+logins only when the server's login settings turn LDAP on, a server-wide change.
+
+#### Logs
+
+(`/logs/audit`, `/logs/server`, `/logs/transfers`): the audit log is **newest first**,
+the server log is **oldest first** (use `fromDate`, or the last `offset`, to see the recent
+ones). `fromDate` and `endDate` are RFC 2822 dates only (`Wed, 07 Oct 2026 10:00:00 +0300`;
+`2026-10-07` is 400); the audit log's `duration=` takes hours. Audit `objectName=` and
+`objectType=` are exact, with case, no `*`; `userName=` is a case sensitive part of the name.
+Server `component=` and `level=` must be in capitals and are repeated parameters
+(`component=FTPD&component=HTTPD`); a comma list or lower case finds nothing, and a value that
+does not exist is not an error. `message=` is a case sensitive part of the message, `*` is
+not a wildcard. **`accountName=` is ignored on the server log** (any value answers every
+entry; `account=` is the one the transfer log honours). Both lists answer `text/csv` when
+asked, with a header row; XML is 406. The audit entry's **PUT answers 204 and changes
+nothing**, for every kind of entry: the trail is immutable. The ids differ: audit is a plain
+string, the server and transfer logs use the `urlrepresentation` of an id object (Base64);
+a malformed one is 400, an unknown well formed one 404. A single transfer has other fields
+than the list (`incoming` is only in the list). One pull leaves three transfer log entries, the
+upload, the file served and the pull, and only the pull carries the `operationIndex`;
+`pullSummary` counts the files found, answers zeros for an unknown index, and adds up two
+pulls with one index. Transfer operations: `resubmit` works on a finished transfer (200);
+`cancel` is allowed only when the server says so: a single read carries `isCancelable` (the list
+calls it `isCancellable`). Finished transfers and running ones (a 10 MB FTP upload, EndUser API
+upload, SSH pull, a route's send) are never cancelable: "not eligible for cancellation".
+What is cancelable is a failed PeSIT pull waiting for a retry: cancel answers 200 and the
+pull's summary moves it from "to retry" to "failed". `tests/integration/checks/48.cancel_transfer.py`
+covers both. `GET /logs/transfers` has NO default order: pass `sortByStartTime=descending`
+(newest first; `ascending` oldest first; any value sorts descending) or "latest" is a guess. `verify` needs an AS2 receipt; `ack` and
+`nack` need a PeSIT transfer; any other operation is 403 with an unhelpful message. Logs are
+never cleaned up by deleting the account: its entries stay. **What a login writes to the server log depends on the
+protocol** (confirmed by check 47, 5.5-20260924): SFTP is component `sshd`, INFO "User NAME login success." and, for a
+wrong password, INFO (not WARN) "User NAME login failed."; HTTP (EndUser API) is `httpd` INFO "User NAME login success.",
+but a FAILED HTTP login names no account: `httpd` INFO "Denying access to unknown user from address IP" (said for a
+known account with a wrong password too) and `tm` INFO "Authentication failed using local."; an unknown login name
+there is also added to the Denied Users list (`tm` INFO "Login name X is added to the Denied Users list until ...").
+`httpd` WARNs "virtual user NAME does not have email associated" on every successful HTTP login: not a failure. FTP is
+`ftpd` INFO "virtual user NAME logged in from" and WARN "Failed login for user NAME from". `tm` INFO "User with login
+name "NAME" ... successfully authenticated over SSH|HTTP|FTP" holds the name for all three. Three wrong passwords on
+an account is its limit ("Maximum failed auth attempts=3").
+
+#### Mail templates
+
+(`/mailTemplates`): a template is an XHTML file stored under a name that
+must end in `.xhtml`, and the server ships eight of its own (the notification e-mails are
+built from them). POST and PUT are multipart forms (JSON is 415). The reference says the
+uploaded file's name is ignored; **it is checked**: a file not named `*.xhtml` is 400 "only
+.xhtml name extensions are supported", so send it with `;filename=<template name>`. The
+content is not checked (an empty file or plain text is stored). **PUT on a name that does not
+exist creates the template and answers 204**, not the 404 the reference lists, and a PUT with
+no `description` sets it to null: look first, and send the description back. **POST accepts a
+`/` (and `../`) in the name, and the entry can then not be addressed**: `%2F` in the path is
+answered 400 by the web server, `%252F` looks for a name holding a literal `%2F`, and there is
+no other delete, so it stays on the server (the list shows it, `?name=` finds it); the
+examples refuse `/` and `\`. Names are case sensitive (`example.xhtml` and `EXAMPLE.xhtml`
+coexist; HEAD and DELETE take the exact case); 300 characters is 400 "Database error creating
+mail template"; a duplicate is 409. `name=` and `description=` are exact, case sensitive, no
+`*`; `totalCount` ignores the filter; `limit=-1` is 400. The list is sorted by name, ignoring
+case. GET one answers the file (`application/xhtml+xml`, whatever `accept` says), HEAD
+answers 404 with an HTML body, DELETE of an unknown name is a JSON 404.
+
+#### Routes
+
+(`/routes`; examples `09.CompositeRoutes` 08 to 10): contrary to "A route step has no
+id" above, a step **has an `id`** (and a `precedingStep` link) on read, and a PUT that sends the
+steps back with their ids keeps them. It is still not an address: a patch path
+`/steps/<id>/status` is 400 "Can't reference field ... on array"; use the position
+(`/steps/1/status`, past the end is 400 "Array index N is out of bounds"). Contrary to "PATCH cannot
+insert into the middle of an array", `add` at `/steps/1` **did** insert in the middle and the
+`precedingStep` links followed, `add` at `/steps/-` appends and `remove` at `/steps/N` deletes; PUT of
+the whole route is still the safe way. Contrary to "replace needs the field to exist", `replace` of
+a `description` that is null worked (204), as did `add` on one that was set. **A PUT with a body that
+has no steps answers 204 and removes every step**, and a PUT with no `type` or `conditionType` is 400.
+`type` and `id` are read only in a patch (400), and a composite route's `routeTemplate` cannot
+change (400 "Cannot change the Template ..."; a route that is not a template is a different 400).
+A PUT or PATCH of `name` renames, and **two simple routes may share a name** (the list's `name=`
+takes a `*`, so look an id up by the exact name and refuse more than one). HEAD answers 200 for a
+route of every type and 404 with no body otherwise; GET of an unknown id is a JSON 404, "Route with
+id X not found or not accessible.". `metadata` in a PUT body is accepted and ignored. A simple
+route that another route runs (an `ExecuteRoute` step) cannot be deleted, 400 "Route is in use.";
+**deleting the template or composite route that runs it deletes the simple route too**.
+`failureEmailNotification` true needs the template and recipients in the same patch (400 "Missing
+failure e-mail recipients."). `referredByRoute=<simple route id>` lists the routes that run it.
+
+#### Route steps metadata
+
+(`/routeStepsMetadata`; example `30.RouteStepsMetadata`): read only, one GET
+(HEAD 200; POST, PUT and DELETE 405; `/routeStepsMetadata/<type>` 404; XML 406). A **plain array** of
+entries with 12 keys, not `{resultSet, result}`. The lab lists 17 types (13 Transformation, 4 Routing),
+more than the reference's enum of 14: **PullFromPartner, SendToFusion and `setflowattributes` (lower
+case)** are missing from it, so never validate a step type against the reference. `ExecuteRoute` is not
+listed. `stepType=`, `limit=` and `offset=` are ignored; `fields=` keeps the keys named (an unknown one
+gives `{}`). The `stepType` **is** the `type` of a route step: a step with another type is 400 "Route Step
+type is undefined.". **The metadata does not say which fields a step needs; the server does**: a POST
+/routes whose step lacks fields answers 400 with every missing one in `validationErrors`
+(`steps[0].compressionType must not be null`) and creates nothing; add what it names and repeat. The
+smallest step of **all 17 types** was found that way and created, read back and deleted. Every step
+needs `type`, `status` (a missing one is 400 `steps[0].status must not be null`) and
+`actionOnStepFailure` (FAIL or PROCEED; the message for a missing one is only "Valid steps.actionOnStepFailure
+values are..."), plus its own fields; `conditionType` can be left out. **A file filter needs both
+fileFilterExpression and fileFilterExpressionType (GLOB, REGEXP, TEXT_FILES)**: one without the other is
+400 "File filter type cannot be empty." (PgpDecryption alone takes the expression alone, and reads the type
+back null). ExternalScript, setflowattributes and PullFromPartner have no filter. **PgpEncryption's
+`compressionType` is a number in a string**, "0" none, "-1" preferred, "1" ZIP, "2" ZLIB, "3" BZIP2 (ZIP is
+400 "Invalid compression type"), unlike Compress's ZIP/JAR/TAR/GZIP. `setflowattributes` keeps
+`actionOnStepFailure` inside `customProperties` when read back, and `linePaddingLength` reads back as a
+string. **Creating a route does not look up what a step names**: an account, a transfer site
+(`<site>#!#CVD#!#`), a PGP key alias, a Fusion integration or a script path that does not exist is 201, so
+every type can be created on a bare lab with placeholders. The per-type table is in the Notes of
+`30.RouteStepsMetadata/01` (`01 <type> minimal` prints the step), and
+`tests/integration/checks/51.route_steps_metadata_scripts.py` creates, reads back and deletes each one
+and shows that leaving out any field is 400.
+
+#### Route steps charsets
+
+(`/routeStepsCharsets`; example `31.RouteStepsCharsets`): read only, one GET (HEAD
+200; POST, PUT, PATCH and DELETE 405; `/routeStepsCharsets/UTF-8` 404; XML and CSV 406). The answer is **one
+object, `{"charsets": [...]}`**, neither a plain array (as `/routeStepsMetadata` is) nor `{resultSet, result}`:
+396 unique names on the lab, sorted ignoring case. `name=`, `limit=`, `offset=` and `fields=` are ignored.
+**The list is the canonical names, not everything a step accepts**: the six step types with a charset
+(CharactersReplace, EncodingConversion, LineEnding, LineFolding, LinePadding, LineTruncating) refuse one Java
+does not know (400 "The charset specified by inputCharset is not supported.", or outputCharset) and an empty one
+(400 "The charset name specified by inputCharset is illegal."), but accept `utf-8`, `UTF8` and `ASCII`, which are
+not in the list, and store them as written. A name in the list is always accepted; one outside it may be. Every
+charset in the 17 minimal steps of `30.RouteStepsMetadata` (UTF-8, and UTF-16 as the output of
+EncodingConversion) is in the list. `01 step FILE` checks a step, a list of steps or a route against it;
+`tests/integration/checks/52.route_steps_charsets_scripts.py` covers it.
+
+#### Servers
+
+**`GET /servers?fields=isActive` still names the protocol**: each entry is
+`{"protocol": ..., "isActive": ...}` (add `serverName` to `fields=` for the name), as an
+account list always carries `type`. Confirmed directly, a read. `stGraceful.py` reads the protocol out
+of it; there are two `http` servers on the lab, so one protocol can list several.
+
+#### Sessions
+
+(`/sessions`; examples `32.Sessions`): the list is not stable: a call right after clients connect, or even later, can lack sessions that are open (one protocol of several) or answer `[]`, and the next call has them again, so read it twice before acting and never conclude from one read that a session is gone (check 53 waits for a complete list); a session exists only while a client is connected, so on a quiet
+server the list is `[]`. Plain arrays, not `{resultSet, result}`. Confirmed directly: an FTP, HTTP (an EndUser API
+login) and SSH client each give one session, with an id `FTP:<hash>:<number>`, `HTTP:<hash>` or `SSH:<hash>`; the
+administrator's own API login is not listed. The reference spells a field `currentTransferBandwith` (the server writes
+`...Bandwidth`) and lists only FTP and HTTP. **`type=` is ignored** (type=SSH, type=XX, type=ftp all answer every
+session), so filter the answer yourself; `limit=0` or a negative is 400, `limit=abc` a bare 404, `fields=` works,
+`localDaemonReturn=` changes nothing. A session's `command` is IDLE or STOR for FTP and empty for HTTP and SSH.
+`DELETE /sessions/{id}` answers 204 and disconnects the client at once (an idle FTP client gets EOF, an upload a
+broken pipe, an SSH client exits, the EndUser API answers 401 on the next call); only that session goes, the user's
+others stay, and the account is not locked. The colon may be sent as `%3A`. A session already gone is 404; a
+malformed id is 400 for DELETE but **404 for GET**, "The format of the session is incorrect"; the protocol must be in
+capitals. `/sessions/statistics/userClass` always lists VirtClass and RealClass (counts 0 when nothing is connected)
+and follows the sessions as they open and close; `/sessions/statistics/bandwidth` stayed `[]` while an FTP client
+uploaded 6 MB (no bandwidth limit on the lab), so its shape is the reference's, unseen.
+
+#### Sites
+
+(`/sites`; examples `06.TransferSites` 05 to 11): a site is addressed by a generated **id**, so every
+example looks it up by account and name. **The `name=` filter ignores case and takes a `*`**: `example_x` and
+`EXAMPLE_X` are two sites (creation is case sensitive, a second `example_x` on the same account is 409 "Entry
+already exist."), both come back for either, and `example_x*` also finds `example_x2`; the same name on two accounts
+is fine. So pick the exact name out of the answer yourself, and refuse more than one. `account=` is exact, case
+sensitive, no `*`. Unlike the reference, the type-specific filters (`port=`, `downloadFolder=`) work **without**
+`type=`; `limit=0` is the default page of 100, `-1` is 400. HEAD is 200 or a bodiless 404; GET of an unknown id is a JSON 404
+("Site with id X not found or not accessible."); `fields=` keeps the named keys, an unknown one is 400; `type=` on a
+GET of one is ignored (`type=http` on an SSH site answers it). The password reads back as `{AES128}...`.
+**PUT replaces the whole site**: a fragment answers 204 and resets what it leaves out (folders, pattern, renaming,
+connection limit); the read object with the encrypted password sent back keeps the password, no password at all is
+400 "Specify password", plain text is encrypted anew; `account` in the body is accepted and ignored, `type` cannot
+change (400), no `type` is 400, `name` renames. **PATCH**: `type` is read only (400), a path that does not exist
+is 400 `Missing field`, `remove` sets null (the key stays), `replace` of `/id` and `/account` answer 204 and do
+nothing, `replace` of `/name` renames, an empty patch is 204, `add` to `/additionalAttributes/userVars.<name>` works,
+`add` to `/alternativeAddresses/-` is 404 "usage of Site Alternative Addresses is disabled". `customProperties` is
+refused on an SSH or HTTP site (400 "Unsupported parameter") and is the whole of a custom site (S3, SMB...).
+**`POST /sites/operations`** (`operation=testConnection` or `listRemoteFolder`; anything else, or none, is 400): the
+test answers **200 whether or not it worked**, read `connectionStatus`, `authenticationStatus`, `errorDetails`
+("Connection refused", "Unknown site host: x", "Password authentication failed...", "530-Login failed...", "Failed
+to negotiate transport component" for a partner that is not SSH). With the site's `id` in the body (and name,
+host, port, protocol, as the reference requires) the server fills in the rest, the saved login included; what the
+body does carry wins (a wrong password, host or port fails the test), except the protocol, which is the saved
+site's. A site that is not saved needs `account` (400 "Account null does not exist" without it), `host`, `port`,
+`protocol` and `username` (lower case) with `password` and `usePassword` "true". A partner that accepts the
+connection and says nothing keeps the call waiting over 30 seconds; a stand-in that sends one junk line and closes
+(`JunkServer`) fails at once. **A wrong password is a real failed login: one wrong SSH password counts as two
+failures (password, then keyboard-interactive), and with `failedAuthMaximum` 3 a second wrong test locks the
+account, which then refuses every login until unlocked**; a login that works resets the count. **`listRemoteFolder`
+lists the UPLOAD folder when `folderToList` is left out** (the reference says download), so is
+`includesFolderNamesInResult` false when left out (the reference says true), and any `folderToList` other than
+`downloadFolder` means upload. SSH, FTP and HTTP sites list; a folder that is not there is 200 with an empty
+result and `errorDetails` "No such file: Specified file path is invalid."; a site with no folder of that kind is
+400 "Remote folder value cannot be empty for a non saved site." (the text says non saved though it is saved); a
+`limit` that is not a number is a bare 404; `limit=-1` lists all; `orderByLastModified=ascending` reverses the
+order. A custom S3 site's test needs HTTPS and a download key or upload destination: against the plain HTTP
+`FakeS3` it fails with "https protocol is not supported", so it is not covered here.
+A home folder on disk keeps the first account's owner: a new account with another uid on a used home cannot create
+folders there (403 "Error occurred while creating file: null"), and a fresh home can refuse the first folder for a
+moment.
+
+#### Site templates
+
+(`/siteTemplates`, not covered): the reference defines only two types, `cd` (Connect:Direct)
+and `custom`, not per-protocol templates; a site names one in `siteTemplate`, on Connect:Direct sites only. On a
+lab without Connect:Direct nothing can be created: a complete `cd` body is 400 "Site template protocol cd is not
+valid. Connect:Direct protocol not available.", and `custom`, `s3`, `smb`, `ssh`, `ftp`, `http` and the rest are 400
+"Protocol X is not supported." (so `custom` fails too, though the reference lists it). The list is `{resultSet, result}`
+and empty; HEAD of an unknown id is a bodiless 404, GET and PATCH a JSON 404, DELETE a 400 whose only message is the
+id. Create, read, replace, patch and delete of a real template were never seen working: do not copy behaviour from
+the reference alone; probe it on a lab with Connect:Direct first.
+
+#### Statistics summary
+
+(`/statisticsSummary`; examples `33.StatisticsSummary`, check 55): it is the **usage report** the server can send to the Amplify
+Platform, not a live gauge of the server, and it has three operations. `generateReport` takes `startDate` and `endDate`, both required, as **dd/MM/yyyy
+only** (`2026-10-01` and `01-10-2026` are 400; `1/10/2026` is accepted); the end day is **included**; a start after the end, an end after today and a day that
+does not exist are 400. The answer is **one entry per day** (`granularity` 86400000), keyed by the start of the day in the server's time zone with its offset, in
+a map (not an array), plus a `meta` with the product, version, plugins and `reportSummary` (totals). Confirmed directly that it is live, not cached (the new
+counts were there within 5 seconds) and what it counts: `ST.TransfersIn` +1 for each file received, `ST.TransfersOut` +1 for each file sent (EndUser API or FTP
+download), a file deleted through the API or FTP (logged as an outgoing transfer) counts in neither, and **`ST.Transfers` is the billable count, not In + Out**:
+an upload then two downloads gave In +1, Out +2, Transfers +2 (the first outbound of a file is free, as in "Billing" above, over FTP as well as the EndUser API).
+**`ST.ActiveUsers` and `ST.Volume` read 0 in every call** (also with `includeActiveUsersCount=true` and `includeIncomingFileVolume=true`, a 3 MB upload and many
+logins; any value for a flag, even `abc`, is accepted): what makes them move was not seen, and the transfer log's `size` is null for these transfers.
+`activeUsers` lists the **users who have ever logged in**, with `lastAccessTime` as text for people (`October 8, 2026, 8:43 AM`, to the minute, with a U+202F
+before AM), `{resultSet, result}`; a user is listed from the first login over any protocol, a wrong password does not move the time, the administrator making
+the call is not listed, and **a deleted account stays in the list for good**. `name=` is a **part of the name, case sensitive**, no `*`; `lastAccessTime.from`
+and `.to` take yyyy-MM-dd, RFC 2822 or milliseconds (anything else 400); `limit=0` is the default page of 100 (see Paging), a negative one is 400, `fields=` works. `testConnection`
+(`POST /statisticsSummary/operations?operation=testConnection`) **really connects**: it posts `grant_type=client_credentials` with the id and secret of the body
+(or the saved `StatisticsSummaryReport.*` ones) to `Platform.Authentication`, then calls `Platform.API` with the token. **The platform's refusal comes back with
+the platform's own status and body**: a 401 `{"error":"invalid_client",...}` is Axway's answer, not your administrator login failing, and a stand-in's 500 came back
+as 500. A failure the server finds itself is **406** (not 400) "Test connection to the Amplify Platform failed...": a body with no `type` (even `{}`), a `type`
+that is not exactly `testConnection`, or a non-empty `networkZone` (nothing is sent to the token address then); with a wrong or missing `type` and a `clientId`
+it is 400 "Unsupported parameter - clientId". `operation=nope` and `operation=TestConnection` still run the test; none at all is 400. A success was **not seen**:
+it needs real platform credentials, and the server calls a `Platform.API` that must be HTTPS, which no stand-in here is. The check points only the token address
+at a `FakeToken` stand-in (and puts it back), so the real platform is never contacted.
+
+#### Subscriptions
+
+(`/subscriptions`; examples `07.Subscriptions` 05 to 13, check 56): a subscription is addressed by a
+generated **id**, and **account plus application is not unique**: one account has several subscriptions on one
+application as long as their folders differ (a second one on the same folder is 400 "All subscriptions to an application
+should have a unique anchor", and for StandardRouter the anchor includes the `subscriberID`). So the examples look an id
+up by account, application **and folder**. Unlike sites, **`account=` and `application=` are exact, case sensitive, no `*`**
+(capitals or a wildcard find nothing, no error); `folder=` takes a `*` (and `/inbox*` finds `/inbox2`); `type=` with a
+value that is no type finds nothing; `limit=-1` is 400, `fields=` keeps the keys named plus `type`. The list is not
+stable (read it again before concluding something is gone). **The `type` of a subscription is the type of its
+application**: a body that says another is accepted (201) and the application's type wins. Created with only type,
+account, application and folder: AdvancedRouting, Basic, HumanSystem (`rules`), MBFT, StandardRouter (needs `subscriberID`,
+400 without it). SharedFolder and SiteMailbox need more of their application first (`sharedFolder`; `inboxFolder` and
+`outboxFolder`), and a SiteMailbox subscription 400 "requires inbound transfer configuration". A POST of an application
+that exists is **400 "An application with this name already exists.", not 409**; an application that still has a
+subscription cannot be deleted (400 "has active subscriptions"); deleting the account deletes its subscriptions. **A
+subscription's folder is not made by the POST**: it appears in the home folder at the account's next login (or at the
+first pull); `DELETE ?purge=true` and the `Purge` operation remove the whole folder, a plain DELETE leaves it. HEAD is 200
+or a bodiless 404; GET of an unknown id a JSON 404 ("Subscription with id X not found or not accessible."); `type=` on a
+GET of one is ignored. **PUT replaces the whole subscription**: a body with only type, account, application and folder
+answers 204 and drops the transfer configurations (the pull sites), the flow attributes and every other setting; the read
+object sent back (nested `metadata` and all) changes nothing. A transfer configuration sent with no `id` gets a new one, and
+one with an id that no longer exists is 400 "you are trying to update transfer configuration with id X that does not
+exists" (read again before sending back). **PUT of an unknown id is 400 "Subscription for ID: X not found", not the 404 the
+reference lists** (PATCH, GET, DELETE and the operations answer 404). No `type` is 400 "Invalid discriminator value."; another
+`type` 400 with a misleading "Unsupported parameter - postClientDownloads"; `application` in the body is accepted and ignored;
+`folder` moves it; an `account` that does not exist is 404, or a bare 403 "unable to comply" when the body carries a transfer
+configuration. `fileRetentionPeriod` (0 to 36500) needs a pull site ("Cannot set file retention period without setting
+transfer site."), a negative `maxParallelSitPulls` is 400. A flow attribute key must start with `userVars.`, hold only
+letters, digits, `.` and `_`, and not repeat `userVars.`; the "10 characters" minimum of the reference is not enforced
+(`userVars.a` works); the value is 1 to 4000 characters, blank is 400. **PATCH**: `add` of a flow attribute works whether or
+not it exists (it overwrites), `replace` of one that is not there is 400 `Missing field`, contrary to the usual rule `replace`
+of a **null** field works (`maxParallelSitPulls`), `remove` of it sets null; `type` is read only (400); `replace` of `/id` and
+`/application` answer 204 and do nothing; `/folder` moves it; an unknown path is 400 `Missing field`; an empty patch is 204.
+**Operations** (`POST /subscriptions/{id}/operations?operation=`, the name is case sensitive: `pull` and `Nope` are a bare
+404 "HTTP 404 Not Found"): `Pull` needs the body `{"type":"pull","site":...}` (none is a 403 "unable to comply"; a site that
+does not exist is 406 "Site 'X' was not found."; a subscription with no transfer configuration 400 "No transfer
+configuration found for this subscription."; a wrong `type` 400 with a misleading "Unsupported parameter - site"), answers 202
+with `message` and a `link` holding the `operationIndex`, and the file arrives in the subscription's folder within seconds and
+stays on the partner; `createFilesListEnabled` and `createFilesListFilename` in the body write a listing of the pulled files
+into the folder. With a **pull history** (the subscription's `fileRetentionPeriod` more than 0; the reference says SFTP sites only, an SSH site was the only one tried) a file already
+pulled is not pulled again, even if it was deleted from the folder, until `ClearPullHistory` (202, message; an optional body
+`{"type":"clearPullHistory","fileRetentionPeriod":N}` is accepted, 0 to 36500 else 400, and what it changes was not seen).
+A second pull started at once, as soon as the file had arrived, fetched it again; with 5 seconds in between it did not (the
+history seems to be written a moment after the file arrives). `Purge` is
+204 and removes the whole folder, not only its files; the subscription stays and a later pull makes the folder again.
+`tests/integration/checks/56.subscriptions_scripts.py` covers all of it.
+
+#### Transaction Manager
+
+(`/transactionManager`; examples `34.TransactionManager`, check 57): one GET answers `{"status": "Running."}` (a free
+text, with the full stop; `stGraceful.py` looks for the word `Running`). `fields=` is ignored (even an unknown one), HEAD is 200, PUT, PATCH
+and DELETE are 405 on it and on `/transactionManager/operations`, GET on `/operations` is 405, XML and CSV are 406, a sub path is 404. What
+a stopped or stopping Transaction Manager answers was **not seen**: the stop is server wide and cannot be undone (see "The Transaction
+Manager has no start operation"), so it was **never sent to the lab**, not even with a wrong value. `02.transactionManager_operations_POST_stop.sh`
+is written from the reference and `stGraceful.py` and tested only against a stub `curl`; it sends nothing unless the first argument is the word
+`stop-the-transaction-manager` (exit 2 otherwise), and check 57 runs only its refusals, behind a fake `curl`. The reference's `graceful` is false when
+left out, an immediate stop; the script sends it always and defaults to true.
+
+#### Transfer profiles
+
+(`/transferProfiles`; examples `35.TransferProfiles`, check 58): a profile is **PeSIT only** and belongs to an
+account that **already has a PeSIT transfer site** (400 "Account does not contain any PeSIT transfer sites."; an account that does
+not exist is 404; a template account was not tried, its creation needs a `templateClass`). It is addressed by a generated **id**,
+so every example looks it up by account and name. Name is unique per account but case sensitive (`p1` and `P1` coexist, the same
+name on another account is fine, a duplicate is 400 "The transfer profile cannot have the same account and name."), while the
+**`name=` filter ignores case and takes a `*`**: pick the exact name out of the answer yourself. `account=` is exact (no `*`, case
+sensitive). `default=` takes true or false and **any other text means false**; `transferMode`, `recordFormat`, `recordLength`,
+`multiSelect`, `fileLabelOption`, `sendMapping` and `additionalAttributes.key`/`.value` filter too, a value that is no
+transfer mode finds nothing (no 400); `limit=-1` is 400, `fields=` keeps the keys named (unknown 400). Required, though the
+reference marks less: `name`, `account`, `fileLabelOption`, and one of `sendMapping`/`receiveMapping` (the 400 also names the
+receiving message directory); `receiveMapping` may not contain `*` or `?` and `sendMapping` is 250 characters at most;
+`recordLength` 1 to 32767; a name of 300 characters is a 403 "unable to comply". **The server stores a `/` in front of both
+mappings** and an unset `receiveMapping` reads back `""`. An account has **at most one default**: making a profile the default
+(create, PUT or PATCH) turns the old one off. **PUT replaces the whole profile and needs the `id` in the body** (400 "id to
+load is required for loading" without it); a fragment *with* the id answers 204 and resets everything left out (transfer mode,
+record format and length, multiSelect, the acknowledgment and padding flags, the attributes, the receive mapping). `account`
+in a PUT or PATCH is accepted and ignored, `name` renames, a name the account already has is **403, not 400**, an unknown id
+404. PATCH: `replace`/`add` work on the scalars, an `add` to `/additionalAttributes/userVars.<name>` (the prefix is required,
+the value may not be blank), an empty patch is 204, a path that does not exist is 400 `Missing field`, a patch that would
+leave both mappings empty is 400, `replace` of `/id` is 400. GET of an unknown id (well formed or not) is a JSON 404, HEAD a
+bodiless 404, DELETE a JSON 404 the second time. Deleting the account deletes its profiles. **What a profile does** (check
+58, two real pulls over the lab's own PeSIT server): the PeSIT file name of a pull is the **name of the receiver's profile**
+(the one the pull names in `transferProfile`, else the account's default); it shows as the `filename` of the transfer log entry
+and `${pesit.fileName}` in a `receiveMapping` evaluates to it. The profile named decides what the received file is called
+(`receiveMapping: "landed.txt"` gave `landed.txt`, `${pesit.fileName}` gave the profile's name), in the pull's
+`destinationDirectory`; what is sent comes from the **sender's default profile** (`sendMapping`). A pull that names no profile uses
+the receiver's default one. `advancedSettings`: see the next entry, which has what they do to a file.
+**PATCH of a side's `type` is 400** ("Patch operation on read only or discriminator fields is not permitted."; PUT the whole
+profile to change it, and the fields of the old type go); a PATCH or PUT of a field the type does not have (an
+`outputRecordLength` of a binary sender, a `lineEndingFormat` of a binary receiver) is **204 and ignored**. `type` is case
+sensitive (an unknown one, `Binary` too, is 400); `lineEndingFormat` is DEFAULT, WINDOWS or UNIX; the server fills in
+`localDataCode`, `networkDataCode`, VARIABLE records of 2048, a `paddingCharacter` of the text `\u0020` (ascii) or `\u0040`
+(ebcdic) and `lineEndingFormat` DEFAULT. `custom_table` (sender or receiver) names a server configuration option that holds the
+table, and is 400 "does not exist or is empty" when there is none; `ascii_custom_table` and `ebcdic_custom_table` with an inline
+`translationTable` (base64 of 256 bytes) and a `translationCustomTableFileName` are accepted and read back (201), creating no
+option, but **a transfer through them fails**: "Failure in opening file" (check 59).
+
+**What a transfer profile does to the bytes of a file** (check 59, 116 real PeSIT pulls, the wire read through a
+`CapturingProxy` and `tests/integration/lib/pesit_wire.py`). In a pull the SENDER's default profile `callerTranscoding` ("sending")
+decides what goes on the wire and the RECEIVER's `receiverTranscoding` what is stored; the sender announces the data coding in PI 16
+(0 ASCII, 1 EBCDIC, 2 binary) and the receiver decides by it. The connection is `LEN2 + FPDU` (FPDU: length, phase, type, two
+ids, parameters); the data is in DTF FPDUs (phase 0, type 0), as the file's bytes or as records, each a 2 byte length (not counting
+itself) and its bytes. Sent and received are one link: only the stored file shows the receiver's conversion.
+- **binary**: bytes untouched (stream, PI 16 = 2); a stream longer than the record length (2048) is cut into records of that
+  length and joined again by a binary receiver, still byte for byte. `outputRecordFormat`/`Length` of a binary sender are read only.
+  A binary receiver joins records with nothing between them (CRLF/LF of an ascii sender are gone), converts nothing.
+- **ascii sender**: a record per LF (a CR right before it goes too; other CRs stay), the LF removed, none added for a final line
+  without one; one record only is sent as bare bytes with no length. No conversion of the characters (UTF-8, Latin-1 and EBCDIC bytes
+  pass), a record longer than `outputRecordLength` (2048, or what is set) **fails the transfer**: receiver "Record length too long"
+  (the receiver compares each record with the length the sender announced). FIXED pads a short record (paddingCharacter, a space by
+  default; the text `\u002E` is a dot) and, like VARIABLE, fails on a longer one; the cut-to-length seen earlier was an artifact (below).
+  An empty file sends nothing. `paddingCharacter` and `outputRecordLength` change nothing for VARIABLE records that fit.
+- **ascii_predefined / ebcdic_predefined sender**: the same record cutting, then characters converted from `sourceEncodingScheme`
+  to `outputEncodingScheme` (UTF-8 to ISO-8859-1 turns a euro sign into `?`; IBM037 lacks it too, it becomes 0x3F), announced as
+  `networkDataCode`. IBM1047 differs from IBM037 in `[ ] ^` and in the line feed (0x15 against 0x25); 0x25 converted from IBM037 to
+  IBM1047 becomes 0x15 and is not a record end.
+- **ebcdic sender**: no conversion, announced as EBCDIC, records end at 0x15 (not at LF 0x0A or 0x25), FIXED pads with byte 0x7C: the
+  default paddingCharacter `\u0040` is the character @, converted to EBCDIC (not the EBCDIC space 0x40).
+- **ascii receiver**: puts LF (WINDOWS: CRLF, UNIX/DEFAULT: LF) after each record, adds a final one to a line that had none; a **stream**
+  (binary data, a single bare record) gets the line end added after it, so a file that already ends in LF ends in two; an empty file
+  stays empty. Converts only EBCDIC network data (PI 16 = 1) to ASCII, with a table that is IBM1047 except that 0x4F reads as the
+  letter E with a diaeresis and 0x6A as `|`. FIXED pads or cuts each record to the length, then the line end.
+- **ebcdic receiver**: converts only network ASCII data (PI 16 = 0) to EBCDIC (IBM1047 except that `|` becomes 0x6A), ends records
+  with 0x15 (WINDOWS: 0x0D 0x15); network binary or EBCDIC data is not converted, only the end added. FIXED pads with 0x7C.
+- **predefined receiver**: converts from `sourceEncodingScheme` to `outputEncodingScheme` whatever the network code says, and adds the
+  line end of the OUTPUT encoding (0x15 for IBM1047).
+- **advancedSettings.enabled**: true and the advanced sides win over the plain `transferMode`; false and the plain fields are in force,
+  whatever the advanced settings hold.
+- **plain fields**: `transferMode` ASCII = ascii sender and receiver; EBCDIC and EBCDIC_NATIVE sender = no conversion, announced as
+  EBCDIC, records end at 0x25 and 0x15 (and 0x0A), padded with 0x40; an EBCDIC receiver converts nothing; EBCDIC_NATIVE ends records
+  with 0x25. `recordFormat` Fixed with `recordLength` pads the sender's records, **also the last block of a BINARY file with NUL bytes**
+  (a 17 byte file with 10 becomes 20 bytes), and makes a receiver FAIL ("Incorrect record length") on records of another length;
+  `paddingStripEnabled` strips the padding from an ASCII receiver's fixed records (not a binary receiver's).
+- **A PeSIT connection that is kept open between pulls carries the record format of the transfer before it**: with it reused, a
+  changed profile gave other answers (a FIXED sender that did not pad, a record longer than the length cut instead of refused, the
+  record length announced twice different). Check 59 cuts the connection after every pull; do the same (or wait for it to close)
+  before believing a test of a changed profile.
+
+#### User classes
+
+(`/userClasses`; examples `36.UserClasses`, check 60): a class is the rule that decides which class an account
+is in when it LOGS IN; the class of a login is the `userClass` of its session (`GET /sessions?fields=userName,userClass`), and it is the same over SFTP (SSH session), the EndUser API (HTTP session) and FTP: every behaviour below (match, disabled, expression, userName, userType, address, rename, order, delete with a session open) was repeated over all three in check 60 and none differed; and
+the next login after any change is already in the new state (a session that is open keeps the class it had, even a deleted one's
+name, and keeps working). The server tries the classes in `order` and the first ENABLED one that fits wins; fitting means
+`userType` (`*`, `real` or `virtual`; a local account is virtual), `userName` (a pattern with `*`, case sensitive: `example_*`,
+`*_ab12`), `group`, `address` (the client's address, exact or ending in `*`) and an `expression`. VirtClass and RealClass fit
+every login of their type, so a class of your own only ever wins by being tried first, and **a new class is put FIRST** (a POST's
+`order` is ignored), VirtClass and RealClass moving to 2 and 3 (they move back when it is deleted); an enabled class with a
+`userName` of `*` would take every login on the server, so give a throwaway class the exact name of a throwaway account and
+create it disabled. `order` of a PUT or PATCH moves a class and shifts the others (0 or 1 first; past the last, or negative, is
+400 "Order is not valid."). **The list is not in the order of `order`**: sort it. Required in a POST: `className`, `userType`,
+`userName`, `group`, `address` (the 400 lists each missing one); the reference's text says `host`, the field is `address` (`host`
+is 400 "Unsupported parameter"); `enabled` defaults to false and `expression` to the empty text. Names are case sensitive (two
+classes `x` and `X`), a space is 400, 33 characters are accepted (the reference says 32), a duplicate is 409. **The expression is
+checked when saved**, 400 "expression X is not valid.", but it is the server's own dialect, not the `${...}` of a route: `==`, `&&`,
+`||`, `!`, `gt` and a method on a string literal are refused; `true`, `false`, `and`, `or`, `>`, `isset("A") ? a : b`,
+`memberof("CN=..",LDAP_DIR_memberOf$collection)` and any bare name or `user.name.startsWith("a")` are accepted (syntax only: an
+unknown name is not an error). On a login `true`, `1 > 0` and `true or false` match; `false`, `2 > 3`, `not true`, a bare name and
+every attribute test do not, because a local account has no directory attributes (its `additionalAttributes` are not seen). So
+membership by an LDAP attribute was **never seen**: it needs a login through a directory. PUT replaces the whole class: the five
+required fields alone answer 204 and reset `expression` to the empty text and `enabled` to false (`order` is kept); an `id` in the
+body is ignored. PATCH: `replace` works on every field, `remove` of `/expression` gives the empty text, `remove` of any other is 400,
+`replace` of `/id` is 204 and does nothing, a path that does not exist is 400 `Missing field`, an empty patch is 204. **An unknown id
+is 404 for GET and HEAD and 400 for PUT, PATCH and DELETE** ("User Class with ID X does not exist."); the NAME is not an id. The
+`className=` filter ignores case and takes `*` (pick the exact name yourself), the other filters are exact (`userName=nobody*`
+finds only a class whose text IS `nobody*`), `enabled=` takes true or false and anything else means false, `userType=*` finds the
+class typed `*` only, `limit=0` is the default page of 100 (see Paging), negative or text is 400. **A delete is never refused**: not for a class with a session
+open in it, and not for one a template account names. **A template account's `templateClass` is not looked up**: a class that does
+not exist is 201, a deleted class's name stays in the template, and it is only readable with `type=template`
+(`GET /accounts/X?type=template&fields=templateClass`; without the type, 400 "Field templateClass does not exist."). A template
+with no `templateClass` is 400. The session list keeps a just closed session for a moment, so to read the class of a login, take
+the session whose id was not there before it (check 60 does).
+
+#### Zones
+
+(`/zones`; examples `37.Zones`, check 61): a zone is a NETWORK (DMZ) zone: a name, a description, `publicURLPrefix`, `ssoSpEntityId`,
+`isDnsResolutionEnabled`, `isDefault` and `edges` (an edge has a `title`, notes, addresses, protocols with a port, proxies). It is addressed by its
+**name**, which is case sensitive (`example_a` and `EXAMPLE_A` coexist, `private` is a 404). The lab has one, **`Private`**, "the information for back
+ends", with one edge `Host` carrying the lab's own FTP, SSH, HTTP, ADMIN, AS2 and PESIT ports: never change or delete it. A standalone lab can create
+and delete zones freely, and a zone with edges changes nothing by itself (no listener, no routing): check 61 saved the whole list, ran, and compared it
+at the end. The lists are plain `{resultSet, result}` and stable. Only `name` is required; a duplicate is **400** "The zone name is not unique." (not the
+reference's 409); `/ \ ; '` in a name or an edge title and 256 characters are 400; an unknown field is 400 "Unsupported parameter"; an edge needs a
+`title`; a protocol needs `streamingProtocol` (HTTP, FTP, AS2, SSH, PESIT, ADMIN: another is a bare 403 "unable to comply") and a `port` from 1024
+(400); a protocol's `sslAlias` that is no certificate of the server is 400 "Error creating zone"; an edge's `deploymentSite` defaults to `Prod`; protocols
+come back in the server's order; a proxy's `password` is never read back, `isUsePassword` is. **Filters are exact and case sensitive, `name=` too (no
+`*`)**: `isDefault=` takes true or false, the `edges.*` ones work, an unknown filter is ignored, `edges.proxies.isUsePassword=` is a 403; `limit=0` is the default page of 100
+(see Paging), a negative or text limit and a negative offset are 400. **PUT replaces**: it needs `name`, equal to the one in the path (another is 400, so no
+rename by PUT or by PATCH of `/name`), and leaving a field out RESETS it (`publicURLPrefix`, `ssoSpEntityId`, `isDnsResolutionEnabled`, and **`isDefault`
+goes off**), but **a body with no `edges` key keeps the edges**, `"edges": []` removes them and an edge sent with a title only loses everything else;
+sent back as it was read the whole zone is kept, edge ids and a proxy's `isUsePassword` included. PATCH leaves the rest alone: `replace`, `add` and
+`remove` of the scalars (also of a null one), `/edges/-` adds an edge, `remove /edges/1` removes it, a path that does not exist is 400 `Missing field`,
+`/edges/0/edgeId` is 204 and ignored, an empty patch is 204; **a patch of an edge's `title` makes the edge a new one and its saved proxy password is
+lost**, two edges with one title are a 500, a second protocol of the same kind on an edge is accepted. **There is only one default zone**: making one
+the default (create, PUT or PATCH) turns the other off; `Private` is not the default on the lab. **Using a zone**: a business unit names one in `dmz`
+(a name that does not exist is 400 "No such DMZ zone with name X"; the unit's `dmz=` filter answers 403, so read every unit's `dmz` and pick). On the
+lab an account of a unit that names a zone with an edge logged in over SFTP, the EndUser API and FTP exactly as before: nothing is routed without a real
+edge. What it does do: **the zone cannot be deleted while a unit names it, a 500** "Database error deleting DMZ zone: X" (not a 400 or 409; fine once
+the unit is gone), and the default flag is **not** copied into a unit created while a zone was the default (`dmz` stays null). A delete of a zone
+that is not there is 404, GET one a JSON 404, HEAD a bodiless 404. The effect behind a real edge (routing, `isAutoDiscoverable`, a proxy in use)
+was **not seen**. The `networkZone` fields met elsewhere (`testConnection` of `/statisticsSummary`, and `s3NetworkZone` and the other storage
+profile ones, "network zone name to use for proxying connections") name a zone the connection is to go through; that was not run through a real edge either.
+
+### Findings that cut across resources, and what the sweeps of the older examples showed
+
+#### The `metadata.links` the server builds are wrong for a name with a space
+
+It encodes the space as `+` and then the `+` as `%2B`:
+`/administrators?roleName=Master%2BAdministrator` and
+`/accounts?businessUnit=example%2Bbu` find nothing. Build the search
+yourself, with the name URL-encoded once (`curl -G --data-urlencode`).
+
+#### Older examples made safe to run bare
+
+(`02.Introduction/04`, `03.Connect/03` to `05`,
+`04.Applications`, `05.Accounts`, `13.Configurations/01` and `02`; checks 04, 05, 13, 14, 21, 23).
+They used to change real or server wide things with no argument, ignore the HTTP status and exit 0;
+they now default to `example_*` objects or require their input (exit 2, nothing sent), print `HTTP <code>`,
+exit 1 on a refusal and print the old value and how to put it back. What was seen on the lab on the way:
+**`PATCH /myself`** answers 204, and the old password stops working at once while the new one works at once;
+the same password again is 204; a one letter password is accepted (no complexity rule on the admin) and an
+empty one is 400 "password cannot be empty"; only `/passwordCredentials/password` and
+`/preferredFileTrackingColumns` can be patched on it (400 "Patch operation is allowed only on fields ...");
+a wrong current password is a plain 401. **`PUT /daemons/ssh`** is 204; `maxConnections` outside 1 to 100000 is 400
+"should be in the range from 1 to 100000" (also for 0 and -10), text is 400 "Cannot parse 'abc' to int." and
+the text "12" is accepted; `preferBouncyCastleProvider` text is 400; **a PUT with the `banner` left out or null is a
+bare 403** "unable to comply" (not a 400), an empty one is fine; an unknown field is 400 "Unsupported parameter";
+a changed configuration takes effect when the daemon restarts (the reference), which was not tried. PATCH
+`replace` of each of the three fields is 204 and a path that does not exist is 400 `Missing field`.
+**`PATCH /configurations/options/{name}`**: `replace` of `/values/0` and of `/values` are both 204, an unknown
+option is 400 "Option with name ... does not exist." on the PATCH and 404 on the GET, the value is not checked
+against what the option means (the text "abc" was accepted for the number of days), a value sent to an encrypted
+option is stored encrypted and **differently each time**, while its own `{AES128}...` text sent back is kept as it is
+(so a restore from the printed old value is exact). **Accounts**: a creation is 201 with `Location`, a duplicate is
+409 "The account name is not unique."; a PUT of the object as read is 204 (also when read without a `type`);
+a PATCH `replace` of `nonAddressBookCollaborationAllowed` takes the text "true" or the boolean; a business unit that does
+not exist is 404 "Business unit with name X not found or not accessible."; a user account created through the API has the
+LDAP and Local address book sources. **Applications**: a flow application is created with only `type`, `name` and `notes`
+(201), a duplicate name is 400; a PUT of the object as read is 204; a `schedules` list is only there for maintenance types,
+and `startDate` reads back as the **epoch in milliseconds, as text**; PATCH `replace` of `/schedules/0/startDate` with a date
+in the past (the 2025 date the old example sent) is 400 "startDate occurs before the current moment."; the server derives the
+schedule's `executionTimes` from the time of day of the start date in **its own time zone** (00:00:00Z on a +03:00 server read
+back as `["03:00"]`), and sending the old date back, as the ISO date taken from the milliseconds, restores both exactly; on an
+application with no schedules the path is 400 `Missing field "schedules"`.
+
+#### Older examples that could not fail, now checked
+
+(`03.Connect` 07 and 10 to 13, `06.TransferSites`,
+`07.Subscriptions`, `08.RouteTemplates`, `09.CompositeRoutes`, `12.BusinessUnits/01`, `13.Configurations` 39 to 47,
+`14.ExpressionLanguage`, `15.Transfers/01`, `17.AccessPolicies/02`, `18.AccountSetup`, `20.AdministrativeRoles`,
+`21.Administrators`; checks 06, 07, 08, 19, 22, 31, 34, 35, 37, 38, 40, 56). Every one prints `HTTP <code>` taken from
+`curl -w` (the head of a headers file is a `100 Continue` or a redirect now and then), exits 1 on a refusal and 2 on a bad
+argument. Seen on the lab, 5.5-20260924: **Servers**: `POST /servers` of a minimal ssh server is 201 with no body and a
+`Location` that is a search (`/servers?serverName=NAME`), not a path; the new server is inactive, `port` is null and
+`isSftpEnabled` false; a duplicate name is 409 "Server with name X already exist."; a port another server uses is accepted
+while it is inactive; an http server with no port or certificate alias is 400 "HTTPS is enabled, but the certificate alias is
+mandatory.; Missing HTTPS port.". **A server that is not there answers differently by method**: GET is 404 with an HTML page,
+**HEAD is a bodiless 400**, DELETE and PATCH are 400 "Server with name X does not exist.", PUT is 400 "Could not update server
+with name X.". A PUT with only name, protocol and port is 204 but **resets** `clientPasswordAuth`, `ciphers` and
+`keyExchangeAlgorithms` to empty text; a PUT of the whole object read back is 204. A PATCH whose body is an object, not an
+array, is 400 "Incorrect JSON format" (PowerShell: `@($x) | ConvertTo-Json` unrolls a one element array to an object; use
+`ConvertTo-Json -InputObject @($x)`). `replace`, `add` and `remove` on `/port` all work on a null port; 99999 is 400 "mPort must
+be less than or equal to 65535", text 400 "Something went wrong while patching the entity"; `publicKeys` is one comma separated
+string and `replace` takes an empty string or a non algorithm name unchecked; `GET /servers?fields=port` alone is 400 "Field
+port does not exist." (it needs `protocol=ssh`); `limit=200` is accepted. **`POST /servers/operations`** answers 200 with
+`serverStatuses[{serverName, message, isSuccessful}]` **even when it failed** (an unknown server is `isSuccessful` false "Server
+with name X does not exist."): read `isSuccessful`, not the status; no `serverName` is 400 "Specify at least one server name to
+start.", an `operation` other than start or stop 400 `must match "(?i)start|(?i)stop"`, a repeated `serverName` gives several
+results (no start or stop of a real server was sent). **Sites, subscriptions, routes**: a site POST is 201 with the id at the
+end of `Location`, a duplicate on one account 409 "Entry already exist."; the HTTP site 01 creates has a null password and an
+SSH site's reads back as `{AES128}`; a second application of one name is 400 "An application with this name already exists.",
+a second subscription on one folder 400 "...unique anchor..."; a DELETE of an unknown site, subscription or application is a JSON
+404 ("... not found or not accessible.", for a route "Route is not found."); **two simple routes with one name are both created
+(201)**, so a delete by name is ambiguous and the scripts delete by the id in `Location`; `name=` ignores case on routes,
+policies and sites. The 163 route templates took about 53 seconds to create and 54 to delete. **Business units**: a name that
+exists is 400 (not 409) "Business unit name already exists. Business unit base folder is already in use or it is not valid.",
+a `baseFolder` that is not absolute 400 "Folder name is not absolute: home/x", an empty name 400 "name cannot be empty", a missing
+`baseFolder` 400; a name with a space is accepted. **External stores and S3**: DELETE of an unknown store is 400 "Cannot delete
+External Store with name: X. Cannot find External Store or External Store configuration is not accessible" (the GET and the
+operations are 404), a PATCH of an unknown one 404 "External Stores configuration DB error"; `%2F` in a store name is a 400 with an
+HTML page from the web server and a raw `/` a 404, so such a name cannot be addressed (the scripts refuse it); a storage profile
+test of an unknown name is 404 "Storage profile 'X' not found."; **when the settings PUT of an S3 register is refused (400), the
+name stays in `StorageProfiles.S3.Registry` with every option empty**, so "nothing is saved" is true of the settings only.
+**Roles and administrators**: a role that exists is 409 "Administrative role with the same name already exist on the server.",
+an unknown menu 400 "List contains unsupported menu." (POST and PATCH), an unknown role 404 "No such administrative role." on
+PATCH, DELETE and DELETE with an unknown `targetRoleName`; a duplicate administrator is 409 "Entry already exist.", an unknown
+role 400 "An admin role with the specified roleName not found.", an empty password 400 "The password cannot be empty.", a name with
+a space 400 "Spaces are not allowed in an Administrator Name.", an unknown administrator 404 "Admin not found - X" (GET, PATCH,
+DELETE); an administrator that deletes itself gets 400 "Administrator cannot be deleted.", and the delete script refuses the
+logged in one before sending anything. **Access policies, pull, login restriction rules**: a bad `authMethod` is 400 "Valid auth
+method values are: reject, trust, scram-sha-256, md5, password." and changes nothing; `POST /transfers/operations?operation=pull`
+answers 202, an unknown account 404 "Cannot find account with name X or it is not accessible", an unknown site 400 "X site does not
+exist"; a rule patched without `clientAddress`, or with a type other than ALLOW or DENY, is 400 with the reasons in
+`validationErrors`; a duplicate login restriction policy is 409.
+
+#### Read examples that never looked at the status, now checked
+
+(about 58 scripts, `01.Authentication` to `37.Zones`; checks
+01, 02, 09, 10, 12, 15, 24, 30, 57). Seen on the lab, 5.5-20260924: **refused credentials answer 401 `Authentication
+required.` as `text/html`, not JSON**, for a GET list, `POST /myself` and a HEAD alike, so a script that pipes a list into jq
+printed nothing and exited 0; a 500 is an HTML page. `POST /myself` answers 200 `{"message": "Logged in"}` (not the
+account), `DELETE /myself` 200 `{"message": "Logged out"}`, and a `GET /myself` with the old jar afterwards is 401 (an
+example may demand a 401 or 403 there). A HEAD of a missing server is a **bodiless 400**, a GET of it (with or without `fields=`) a
+404 HTML page from Tomcat; `GET /daemons/nope` is 400 "Invalid value for parameter name, expected (ssh)"; a missing
+administrative role is 404 "No such administrative role.". **`/certificates?usage=` is not validated the way it looks**: `ca`,
+`signer` and `server` are 403 "Insufficient permissions to perform the operation" (which says nothing about usage), the accepted
+values are `local`, `private`, `partner`, `login` and `trusted`, matched ignoring case, and `/certificates/requests?usage=nonsense`
+returns all requests. `grep "os"` on the version answer matches `os` and `osDistribution`; lab bodies end with `}` and no newline.
+Two wrong passwords on `admin` did not lock it. A bash script's exit code is that of its last command: an example that ends in a
+`grep` exits 1 when the grep finds nothing, whatever the call did.
+
+#### Timings and traps seen while replacing the harness' fixed sleeps
+
+(5.5-20260924). A subscription pull puts the file in the
+folder about 2.5 s after it is asked for; the pull summary says done 0.3 to 1.3 s later; a file deleted at that moment was not
+pulled again in 8 of 8 tries, and `ClearPullHistory` is effective at once (a pull right after it fetched the file 8 of 8). A
+running transfer reports "not cancelable" at once and a cancel shows in the pull summary at once. The statistics report shows a
+transfer within about 2 s. **An sftp `pwd` is answered by the client** and never notices a session the server ended; `ls` does
+("Received disconnect ... Manual termination by the server administrator"). `DELETE /files/<non-empty folder>` on the EndUser
+API is 403, so remove folders bottom-up (an empty one is 204). **The active users report keeps every name that has ever logged
+in** (314 on the lab), so a throwaway account that logs in adds a name for good, and `limit=0` returns the first 100 of them. A
+background job started with `&` in a shell ignores SIGINT. The whole lab suite takes about 14 minutes for check 59 alone with a
+callback address the lab can reach (and about an hour when it cannot, every transfer then waiting for its retry).
+
+#### Features: what the failure handling run on the lab showed
+
+(`audit-billable-transfers`, `trigger-route-after-completed-pull`,
+`Features/lib`; 5.5-20260924). A `#` in an unencoded file path cuts the URL: `DELETE /files/dir/a#1.txt` asks for
+`/dir/a` and answers 404 "Unable to delete file: /dir/a. (file not found)"; a space makes curl send nothing (code 000);
+encoded segments work for GET and DELETE (204). A GET or DELETE of a folder that does not exist is a **404**, also inside a
+stale home (not the 403 of a create there), so a clean-up can tell "not there" from "refused". `HEAD /accounts/<name>` is 200
+or 404. Deleting an application that still has subscriptions is 400 "Application for ID: ... has active subscriptions". A
+wrong password on the EndUser login is 401 "Login failed. Re-submit your credentials.". The stale home was reproduced on both
+features (an account of uid 1001 deleted, then a new one of uid 41733): the probe got the 403, both runs moved to `<name>_2`
+or `_3` and went on to the end. A clean-up that cannot tell whether something exists (the server unreachable) must not say
+"nothing to delete", and one that cannot read the list of sites that log in as a partner must keep the partner.
+
+#### A home folder outlives its account and keeps its owner
+
+Deleting an account leaves `/home/<name>` on disk with
+the uid it was created with (see `GET /files/?metadata=true` on the EndUser API: `owner`, `group`, `permissions`).
+An account created later under the same name with ANOTHER uid cannot create a folder directly in it: every such POST
+is 403 "Error occurred while creating file: null", and so is a DELETE of a folder there, while a folder below an
+existing one still works because the server creates missing parents itself, which hides the cause (the
+audit-billable-transfers feature hit this when its example uid changed from 1001 to 41733). Changing the uid again
+does not fix a home with mixed owners. Use another account name, so that it gets a new home folder; the features'
+04 scripts print this hint, and `00.run_all.sh ANOTHER_NAME` takes the name. audit-billable-transfers'
+`00.run_all` does it by itself when no name was chosen: after step 01 it POSTs and DELETEs a throwaway top-level
+folder `bt_home_probe` as the test account, and on that 403 deletes only that account and moves to `<name>_2` ..
+`_9` (confirmed on 5.5-20260924). Probe with a top-level folder: a nested one succeeds and hides the problem.
 
 ## The EndUser port does not reliably follow the admin-port-minus-one convention
 
