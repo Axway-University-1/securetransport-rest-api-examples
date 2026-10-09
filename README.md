@@ -414,16 +414,15 @@ unzip -j export_configuration.zip systemConfiguration.xml -d /home/axway/api
 
 ### Not yet covered
 
-These areas of the API do not have examples yet. Contributions are welcome, and
-the list doubles as a rough roadmap.
+Every resource of the Admin API reference has examples, except these, which need
+something this project's lab does not have. Contributions are welcome, and the
+list doubles as a rough roadmap.
 
-- Site Templates (the lab has no Connect:Direct, so every create is refused)
-- Cluster Services (not planned: the examples are written against a standalone server)
+- **Site Templates** (`/siteTemplates`): they need Connect:Direct; on the lab every create is refused.
+- **Cluster Services** (`/clusterServices`) and the cluster-only configuration operations: the examples are written against a standalone server.
+- Parts of **Configurations**, left out on purpose because they change the whole server and cannot be undone through the API: the Oracle-only `database/{componentType}`, changing the database connection, and the replication operations.
 
-Only the following remain uncovered:
-- **siteTemplates:** requires Connect:Direct protocol, not available on this lab
-- **clusterServices** and cluster-only configuration operations: standalone lab
-- Parts of **configurations:** Oracle-only `database/{componentType}`, database connection, replication
+Bulk changes across every route or subscription exist as python programs (`stUpdateAll*.py`), not as bash or bat examples.
 
 
 ## Features by Release
