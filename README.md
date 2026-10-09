@@ -288,6 +288,7 @@ already exists.
 | 11. Certificates | `/certificates`, generate, import, export, signing requests | 14 | 14 |
 | 12. Business Units | `/businessUnits`, units, their nesting, and why a delete is refused | 7 | 7 |
 | 13. Configurations | `/configurations`: options, logging, database, Sentinel, login, archiving, external stores, S3 storage profiles | 47 | 47 |
+| 14. Expression Language | Expression Language in a route condition, a file filter, a rename pattern, a login restriction rule and a site (also as python): which fields carry it and how it is escaped | 8 | 0 |
 | 15. Transfers | `/transfers/operations`, a pull on demand | 1 | 1 |
 | 16. Transfer Logs | `/logs/transfers`, by account and status, billable transfers per day | 5 | 5 |
 | 17. Access Policies | `/accessPolicies`, the embedded database's pg_hba.conf rules | 6 | 6 |
@@ -314,8 +315,11 @@ already exists.
 | 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same
-path through the material. Where the bash examples use `jq`, the bat examples
-use PowerShell to do the same job.
+path through the material, with one exception: `14. Expression Language` has
+bash (and python) only. Where the bash examples use `jq`, the bat examples use
+PowerShell to do the same job. Many bat twins were brought up to date together
+with their bash twins and were checked by reading them and by text tests, not by
+running them on Windows: if one misbehaves, please report it.
 
 ### EndUser API
 
@@ -328,7 +332,7 @@ use PowerShell to do the same job.
 | 05. Transfers | `/transfers`, `/transfers/operations`, `/transfers/pullSummary`: the user's transfer log, pull, push, folder monitor, pull summary, AS2 receipt check | 7 |
 | 06. Server Time | `/serverTime` | 1 |
 
-Every resource of the EndUser API 2.0 reference has an example. All of them
+The EndUser examples are bash only, with no bat twins. Every resource of the EndUser API 2.0 reference has an example. All of them
 were run against a real server except three, which say so in their own header:
 the password reset pair (`03.Myself/04` and `05`), which need a real reset
 email, and `05.Transfers/07`, which needs an AS2 transfer.
