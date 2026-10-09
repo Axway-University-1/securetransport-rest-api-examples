@@ -31,7 +31,7 @@ REM - Confirmed directly: the answer is `{resultSet, result}`, and the list is N
 REM   yourself, as this script does. `className=` ignores case and takes a `*` (`EXAMPLE_F*` finds `example_f1`). The other filters
 REM   are exact and take no wildcard: `userType=` (real, virtual or the `*` type; another text finds nothing), `userName=nobody*`
 REM   finds nothing when no class has that very text, `group=`, `address=`, `expression=`, `order=`. `enabled=` takes true or false
-REM   and any other text means false. `limit=0` lists all, a negative `limit` is 400 "The limit should be a positive number or 0.",
+REM   and any other text means false. `limit=0` is the default page of 100, not all (the reference: it means Webservices.EntriesPerPage), so this script asks for `limit=1000`, a negative `limit` is 400 "The limit should be a positive number or 0.",
 REM   `limit=abc` and a negative `offset` are 400. `fields=` keeps the keys named, an unknown one is 400 "Field nope does not exist.".
 REM - A class has an `id`; the other examples in this folder look it up by name.
 REM - PowerShell is used to print one line per class, in place of jq.
@@ -73,7 +73,7 @@ FOR /F %%N IN ('powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_
 echo.
 echo The classes matching %PATTERN%, in the order they are tried: order, name, type, user, group, address, state, expression:
 SET "URL=%MAIN_URL%"
-SET CURL_OPTS=-G %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=0"
+SET CURL_OPTS=-G %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=1000"
 CALL :st_get
 IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($c in @($r.result | Sort-Object { [int]$_.order })) { if ($c) { $s = if ($c.enabled) { 'enabled' } else { 'disabled' }; $e = if ($c.expression) { $c.expression } else { '-' }; '  {0}  {1}  {2}  user {3}  group {4}  address {5}  {6}  expression {7}' -f $c.order, $c.className, $c.userType, $c.userName, $c.group, $c.address, $s, $e } }"
@@ -81,7 +81,7 @@ powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | Conve
 echo.
 echo Only the enabled ones:
 SET "URL=%MAIN_URL%"
-SET CURL_OPTS=-G %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=0" --data-urlencode "enabled=true"
+SET CURL_OPTS=-G %TYPE_ARGS% --data-urlencode "className=%PATTERN%" --data-urlencode "limit=1000" --data-urlencode "enabled=true"
 CALL :st_get
 IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; foreach ($c in @($r.result | Sort-Object { [int]$_.order })) { if ($c) { $s = if ($c.enabled) { 'enabled' } else { 'disabled' }; $e = if ($c.expression) { $c.expression } else { '-' }; '  {0}  {1}  {2}  user {3}  group {4}  address {5}  {6}  expression {7}' -f $c.order, $c.className, $c.userType, $c.userName, $c.group, $c.address, $s, $e } }"

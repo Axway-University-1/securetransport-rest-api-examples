@@ -30,7 +30,7 @@
 #   nothing), and this script also keeps only the zone whose name is exactly NAME. `isDefault=` takes true or false (another text lists every
 #   zone). `description=`, `publicURLPrefix=`, `isDnsResolutionEnabled=` and the `edges.*` filters (`edges.title`, `edges.protocols.port`,
 #   `edges.protocols.streamingProtocol`, `edges.ipAddresses.ipAddress`, `edges.proxies.username`, `edges.enabledProxy`) work, exactly; an unknown
-#   filter is ignored (200), but `edges.proxies.isUsePassword=` answers 403 "unable to comply". `limit=0` lists all, a negative one is 400 "The limit
+#   filter is ignored (200), but `edges.proxies.isUsePassword=` answers 403 "unable to comply". `limit=0` is the default page of 100, not all (the reference: it means Webservices.EntriesPerPage), so this script asks for `limit=1000`, a negative one is 400 "The limit
 #   should be a positive number or 0.", `limit=abc` and a negative `offset` are 400; `limit=1&offset=N` walked three zones once each. `fields=` keeps
 #   the keys named; an unknown one is 400 "Field bogus does not exist.".
 # - Requires `jq`, which prints one line per zone.
@@ -76,9 +76,9 @@ NAME_FILTER=()
 [ -n "${NAME}" ] && NAME_FILTER=(--data-urlencode "name=${NAME}")
 
 printf "\nThe zones named %s: name, default, edges, description:\n" "${NAME:-(any)}"
-st_get -G "${MAIN_URL}" "${NAME_FILTER[@]}" --data-urlencode "limit=0"
+st_get -G "${MAIN_URL}" "${NAME_FILTER[@]}" --data-urlencode "limit=1000"
 printf '%s\n' "${RESPONSE}" | jq -r --arg name "${NAME}" "(.result // [])[] | select(\$name == \"\" or .name == \$name) | ${LINE}"
 
 printf "\nThe default zone:\n"
-st_get -G "${MAIN_URL}" --data-urlencode "isDefault=true" --data-urlencode "limit=0"
+st_get -G "${MAIN_URL}" --data-urlencode "isDefault=true" --data-urlencode "limit=1000"
 printf '%s\n' "${RESPONSE}" | jq -r "(.result // [])[] | select(.isDefault) | ${LINE}"

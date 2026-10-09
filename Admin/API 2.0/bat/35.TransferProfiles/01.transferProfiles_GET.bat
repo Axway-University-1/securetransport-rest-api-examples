@@ -24,7 +24,7 @@ REM Notes:
 REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Transfer profiles are a PeSIT thing. Confirmed directly: a profile for an account that has no PeSIT transfer site
 REM   is refused, 400 "Account does not contain any PeSIT transfer sites."; an account that does not exist is 404.
-REM - Confirmed directly: the answer is `{resultSet, result}`; `limit=0` lists all, a negative `limit` is 400. `account=` is
+REM - Confirmed directly: the answer is `{resultSet, result}`; `limit=0` is the default page of 100, not all (the reference: it means Webservices.EntriesPerPage), a negative `limit` is 400. `account=` is
 REM   exact (case sensitive, no wildcard, an account that does not exist just finds nothing). `name=` ignores case and takes a
 REM   `*`, so `P*` finds `p1` and `P1`. A name is unique per account but case sensitive: `p1` and `P1` can both exist.
 REM   `default=` takes true or false, and any other text means false (`default=abc` lists the profiles that are not the default).

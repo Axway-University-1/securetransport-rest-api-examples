@@ -38,7 +38,7 @@
 #   out of the answer. `FROM` and `TO` take the
 #   three date formats the reference names, and anything else is 400 "Invalid date format. Format must be *EEE, dd MMM yyyy
 #   HH:mm:ss Z*, *yyyy-MM-dd* or a timestamp.". `lastAdhocAccessTime.from` and `.to` are not offered here.
-# - Confirmed directly: `limit=0` lists everything, a negative limit is 400 "The limit should be a positive number or 0.",
+# - Confirmed directly: `limit=0` is the default page of 100, not everything (the reference: it means Webservices.EntriesPerPage; the lab has 314 active users and `limit=0` returned 100), a negative limit is 400 "The limit should be a positive number or 0.",
 #   `offset` skips that many, `fields=name` keeps the named keys (an unknown one is 400 "Field <name> does not exist.") and
 #   `totalCount` counts all the users that match, not the page. The default page, with no `limit`, held all 46 users of the lab,
 #   so this script asks for a page of 100 and goes on while the page is full.

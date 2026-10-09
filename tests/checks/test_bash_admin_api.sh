@@ -3177,17 +3177,17 @@ CLASS_LIST='{"resultSet":{"returnCount":3,"totalCount":3},"result":[{"id":"r1","
 
 GET_BODY=$(body uc_list "${CLASS_LIST}")
 run "${F}/01.userClasses_GET.sh"
-expect "01 GET: the count, the classes, then only the enabled ones (limit=0 lists all)" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=id
-GET ${U}?className=*&limit=0
-GET ${U}?className=*&limit=0&enabled=true"
+expect "01 GET: the count, the classes, then only the enabled ones (limit=1000 lists all)" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=id
+GET ${U}?className=*&limit=1000
+GET ${U}?className=*&limit=1000&enabled=true"
 has "01 GET: the first line is the class with order 1 though the server listed it last" "  1  example_userclass  *  user example_nobody  group *  address *  disabled  expression true"
 has "01 GET: then order 2" "  2  VirtClass  virtual  user *  group *  address *  enabled  expression -"
 expect "01 GET: the lines come in the order of order, not the server's order" "$(printf '%s\n' "${OUT}" | grep '^  [0-9]  ' | head -3 | awk '{print $2}' | tr '\n' ' ')" "example_userclass VirtClass RealClass "
 run "${F}/01.userClasses_GET.sh" "example*" real
-expect "01 GET: a type and a pattern go into the query" "$(calls | tail -2)" "GET ${U}?userType=real&className=example*&limit=0
-GET ${U}?userType=real&className=example*&limit=0&enabled=true"
+expect "01 GET: a type and a pattern go into the query" "$(calls | tail -2)" "GET ${U}?userType=real&className=example*&limit=1000
+GET ${U}?userType=real&className=example*&limit=1000&enabled=true"
 run "${F}/01.userClasses_GET.sh" "*" '*'
-expect "01 GET: the * type is sent as the type (it is not a wildcard)" "$(calls | sed -n 2p)" "GET ${U}?userType=*&className=*&limit=0"
+expect "01 GET: the * type is sent as the type (it is not a wildcard)" "$(calls | sed -n 2p)" "GET ${U}?userType=*&className=*&limit=1000"
 expect "01 GET: sends the Referer" "$(has_header 'Referer: THIS_IS_A_RANDOM_TEXT' | head -1)" "3"
 run "${F}/01.userClasses_GET.sh" "*" bogus
 expect "01 GET: a bad type, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
@@ -3383,13 +3383,13 @@ ZONE_JSON='{"name":"example zone","description":"old","publicURLPrefix":"https:/
 
 GET_BODY=$(body zones_list "${ZONE_LIST}")
 run "${F}/01.zones_GET.sh"
-expect "01 GET: the count, every zone (limit=0), then the default zone" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=name
-GET ${U}?limit=0
-GET ${U}?isDefault=true&limit=0"
+expect "01 GET: the count, every zone (limit=1000), then the default zone" "${RC}:$(calls)" "0:GET ${U}?limit=1&fields=name
+GET ${U}?limit=1000
+GET ${U}?isDefault=true&limit=1000"
 has "01 GET: a line per zone: default, edges, description" "  example_zone  default false  edges 0  -"
 has "01 GET: the description is shown" "  Private  default false  edges 1  This network zone holds the information for back ends."
 run "${F}/01.zones_GET.sh" example_zone
-expect "01 GET: a name goes into the query, urlencoded by curl" "$(calls | sed -n 2p)" "GET ${U}?name=example_zone&limit=0"
+expect "01 GET: a name goes into the query, urlencoded by curl" "$(calls | sed -n 2p)" "GET ${U}?name=example_zone&limit=1000"
 expect "01 GET: the filter is not wildcard, case sensitive: only the exact name is listed (EXAMPLE_ZONE is not)" \
   "$(printf '%s\n' "${OUT}" | sed -n '/^The zones named/,/^The default/p' | grep -c '^  ')" "1"
 expect "01 GET: the default section lists only a zone that is really the default" \

@@ -80,7 +80,7 @@ script = harness.bind_script(c, FOLDER, timeout=120, tail=400, retry_text="Found
 
 
 def classes():
-    response = admin.get("userClasses", params={"limit": 0})
+    response = admin.get("userClasses", params={"limit": 1000})
     return (response.json() or {}).get("result", []) if response.status == 200 else []
 
 

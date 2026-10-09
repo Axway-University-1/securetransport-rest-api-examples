@@ -1112,8 +1112,8 @@ echo "=== 36.UserClasses ==="
 
 expect_calls <<'EOF'
 GET @@BASE@@/userClasses?limit=1&fields=id
-GET @@BASE@@/userClasses?userType=virtual&className=VirtClass&limit=0
-GET @@BASE@@/userClasses?userType=virtual&className=VirtClass&limit=0&enabled=true
+GET @@BASE@@/userClasses?userType=virtual&className=VirtClass&limit=1000
+GET @@BASE@@/userClasses?userType=virtual&className=VirtClass&limit=1000&enabled=true
 EOF
 expect_out <<'EOF'
 User classes on the server: 7
@@ -1151,8 +1151,8 @@ echo "=== 37.Zones ==="
 
 expect_calls <<'EOF'
 GET @@BASE@@/zones?limit=1&fields=name
-GET @@BASE@@/zones?name=My zone&limit=0
-GET @@BASE@@/zones?isDefault=true&limit=0
+GET @@BASE@@/zones?name=My zone&limit=1000
+GET @@BASE@@/zones?isDefault=true&limit=1000
 EOF
 expect_out <<'EOF'
 Zones on the server: 7

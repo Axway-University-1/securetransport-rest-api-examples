@@ -224,8 +224,9 @@ try:
         out = script("02.statisticsSummary_activeUsers_GET.sh")
         c.check("02 with no filter prints all %d users the API counts" % total, "Users who have logged in: %d" % total in out
                 and out.count("\n  ") == total, out[:120])
-        c.check("a negative limit is 400, limit=0 lists everything", admin.get("statisticsSummary/activeUsers", params={"limit": -1}).status == 400
-                and len(admin.get("statisticsSummary/activeUsers", params={"limit": 0}).json()["result"]) == total)
+        # The reference: limit=0 means Webservices.EntriesPerPage (100 by default), not "all"
+        c.check("a negative limit is 400, limit=0 is the default page of 100 (not everything)", admin.get("statisticsSummary/activeUsers", params={"limit": -1}).status == 400
+                and len(admin.get("statisticsSummary/activeUsers", params={"limit": 0}).json()["result"]) == min(total, 100))
 
         # 01, against the numbers
         # the login did not move the counts

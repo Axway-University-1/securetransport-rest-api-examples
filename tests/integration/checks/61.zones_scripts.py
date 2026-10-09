@@ -64,7 +64,7 @@ script = harness.bind_script(c, FOLDER, timeout=120, tail=400, arg_width=30)
 
 
 def all_zones():
-    response = admin.get("zones", params={"limit": 0})
+    response = admin.get("zones", params={"limit": 1000})
     return sorted((response.json() or {}).get("result", []), key=lambda z: z["name"]) if response.status == 200 else None
 
 

@@ -30,7 +30,7 @@ REM - Confirmed directly: the answer is `{resultSet, result}`. `name=` is EXACT 
 REM   nothing), and this script also keeps only the zone whose name is exactly NAME. `isDefault=` takes true or false (another text lists every
 REM   zone). `description=`, `publicURLPrefix=`, `isDnsResolutionEnabled=` and the `edges.*` filters (`edges.title`, `edges.protocols.port`,
 REM   `edges.protocols.streamingProtocol`, `edges.ipAddresses.ipAddress`, `edges.proxies.username`, `edges.enabledProxy`) work, exactly; an unknown
-REM   filter is ignored (200), but `edges.proxies.isUsePassword=` answers 403 "unable to comply". `limit=0` lists all, a negative one is 400 "The limit
+REM   filter is ignored (200), but `edges.proxies.isUsePassword=` answers 403 "unable to comply". `limit=0` is the default page of 100, not all (the reference: it means Webservices.EntriesPerPage), so this script asks for `limit=1000`, a negative one is 400 "The limit
 REM   should be a positive number or 0.", `limit=abc` and a negative `offset` are 400; `limit=1&offset=N` walked three zones once each. `fields=` keeps
 REM   the keys named; an unknown one is 400 "Field bogus does not exist.".
 REM - PowerShell is used to print one line per zone, in place of jq.
@@ -67,7 +67,7 @@ FOR /F %%N IN ('powershell -NoProfile -Command "(Get-Content -Raw $env:RESPONSE_
 echo.
 echo The zones named %SHOWN%: name, default, edges, description:
 SET "URL=%MAIN_URL%"
-SET CURL_OPTS=-G %NAME_FILTER% --data-urlencode "limit=0"
+SET CURL_OPTS=-G %NAME_FILTER% --data-urlencode "limit=1000"
 CALL :st_get
 IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "foreach ($z in @((Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).result)) { if ($z -and ($env:NAME -eq '' -or $z.name -ceq $env:NAME)) { '  {0}  default {1}  edges {2}  {3}' -f $z.name, ([string]$z.isDefault).ToLower(), ($z.edges | Measure-Object).Count, $(if ($z.description) { $z.description } else { '-' }) } }"
@@ -75,7 +75,7 @@ powershell -NoProfile -Command "foreach ($z in @((Get-Content -Raw $env:RESPONSE
 echo.
 echo The default zone:
 SET "URL=%MAIN_URL%"
-SET CURL_OPTS=-G --data-urlencode "isDefault=true" --data-urlencode "limit=0"
+SET CURL_OPTS=-G --data-urlencode "isDefault=true" --data-urlencode "limit=1000"
 CALL :st_get
 IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "foreach ($z in @((Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json).result)) { if ($z -and $z.isDefault) { '  {0}  default {1}  edges {2}  {3}' -f $z.name, ([string]$z.isDefault).ToLower(), ($z.edges | Measure-Object).Count, $(if ($z.description) { $z.description } else { '-' }) } }"

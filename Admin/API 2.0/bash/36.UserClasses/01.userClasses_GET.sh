@@ -31,7 +31,7 @@
 #   yourself, as this script does. `className=` ignores case and takes a `*` (`EXAMPLE_F*` finds `example_f1`). The other filters
 #   are exact and take no wildcard: `userType=` (real, virtual or the `*` type; another text finds nothing), `userName=nobody*`
 #   finds nothing when no class has that very text, `group=`, `address=`, `expression=`, `order=`. `enabled=` takes true or false
-#   and any other text means false. `limit=0` lists all, a negative `limit` is 400 "The limit should be a positive number or 0.",
+#   and any other text means false. `limit=0` is the default page of 100, not all (the reference: it means Webservices.EntriesPerPage), so this script asks for `limit=1000`, a negative `limit` is 400 "The limit should be a positive number or 0.",
 #   `limit=abc` and a negative `offset` are 400. `fields=` keeps the keys named, an unknown one is 400 "Field nope does not exist.".
 # - A class has an `id`; the other examples in this folder look it up by name.
 # - Requires `jq`, which prints one line per class.
@@ -83,9 +83,9 @@ st_get "${MAIN_URL}?limit=1&fields=id"
 printf '%s\n' "${RESPONSE}" | jq -r '.resultSet.totalCount'
 
 printf "\nThe classes matching %s, in the order they are tried: order, name, type, user, group, address, state, expression:\n" "${PATTERN}"
-st_get -G "${MAIN_URL}" "${TYPE_FILTER[@]}" --data-urlencode "className=${PATTERN}" --data-urlencode "limit=0"
+st_get -G "${MAIN_URL}" "${TYPE_FILTER[@]}" --data-urlencode "className=${PATTERN}" --data-urlencode "limit=1000"
 printf '%s\n' "${RESPONSE}" | jq -r "(.result // []) | sort_by(.order)[] | ${LINE}"
 
 printf "\nOnly the enabled ones:\n"
-st_get -G "${MAIN_URL}" "${TYPE_FILTER[@]}" --data-urlencode "className=${PATTERN}" --data-urlencode "limit=0" --data-urlencode "enabled=true"
+st_get -G "${MAIN_URL}" "${TYPE_FILTER[@]}" --data-urlencode "className=${PATTERN}" --data-urlencode "limit=1000" --data-urlencode "enabled=true"
 printf '%s\n' "${RESPONSE}" | jq -r "(.result // []) | sort_by(.order)[] | ${LINE}"

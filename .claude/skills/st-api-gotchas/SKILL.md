@@ -185,9 +185,12 @@ server refuses (exit 1).
 A list answers at most `Webservices.EntriesPerPage` objects, 100 by default, in no
 fixed order unless you ask for one. Confirmed on `/logs/transfers` (5.5-20260924): the
 default is 100 of 12604, `limit=1000` returns 1000 (the page size is not capped at 100),
-`offset` works, and **`limit=0` is still 100, not "all"**. On other resources `limit=0`
-does list everything (zones, user classes, sites), and on some it is a 400 (sessions), so
-never rely on it.
+`offset` works, and **`limit=0` is still 100, not "all"**: the reference says so ("if the limit
+parameter is set to 0 or it is null then its value will be the value of ... Webservices.EntriesPerPage",
+100 by default), and the active users report returned 100 of 314 names for it. A short list can look as if
+`limit=0` lists everything, only because it has fewer than 100 entries (zones, user classes, sites on the lab).
+On some resources it is a 400 (sessions). Never rely on it: ask for the limit you want (`limit=1000` was honored)
+and page by offset.
 
 ```
 GET /collection?offset=0&limit=100&sortBy...=ascending
@@ -848,7 +851,7 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   `activeUsers` lists the **users who have ever logged in**, with `lastAccessTime` as text for people (`October 8, 2026, 8:43 AM`, to the minute, with a U+202F
   before AM), `{resultSet, result}`; a user is listed from the first login over any protocol, a wrong password does not move the time, the administrator making
   the call is not listed, and **a deleted account stays in the list for good**. `name=` is a **part of the name, case sensitive**, no `*`; `lastAccessTime.from`
-  and `.to` take yyyy-MM-dd, RFC 2822 or milliseconds (anything else 400); `limit=0` lists all, a negative one is 400, `fields=` works. `testConnection`
+  and `.to` take yyyy-MM-dd, RFC 2822 or milliseconds (anything else 400); `limit=0` is the default page of 100 (see Paging), a negative one is 400, `fields=` works. `testConnection`
   (`POST /statisticsSummary/operations?operation=testConnection`) **really connects**: it posts `grant_type=client_credentials` with the id and secret of the body
   (or the saved `StatisticsSummaryReport.*` ones) to `Platform.Authentication`, then calls `Platform.API` with the token. **The platform's refusal comes back with
   the platform's own status and body**: a 401 `{"error":"invalid_client",...}` is Axway's answer, not your administrator login failing, and a stand-in's 500 came back
@@ -971,7 +974,7 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   is 404 for GET and HEAD and 400 for PUT, PATCH and DELETE** ("User Class with ID X does not exist."); the NAME is not an id. The
   `className=` filter ignores case and takes `*` (pick the exact name yourself), the other filters are exact (`userName=nobody*`
   finds only a class whose text IS `nobody*`), `enabled=` takes true or false and anything else means false, `userType=*` finds the
-  class typed `*` only, `limit=0` lists all, negative or text is 400. **A delete is never refused**: not for a class with a session
+  class typed `*` only, `limit=0` is the default page of 100 (see Paging), negative or text is 400. **A delete is never refused**: not for a class with a session
   open in it, and not for one a template account names. **A template account's `templateClass` is not looked up**: a class that does
   not exist is 201, a deleted class's name stays in the template, and it is only readable with `type=template`
   (`GET /accounts/X?type=template&fields=templateClass`; without the type, 400 "Field templateClass does not exist."). A template
@@ -987,8 +990,8 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   `title`; a protocol needs `streamingProtocol` (HTTP, FTP, AS2, SSH, PESIT, ADMIN: another is a bare 403 "unable to comply") and a `port` from 1024
   (400); a protocol's `sslAlias` that is no certificate of the server is 400 "Error creating zone"; an edge's `deploymentSite` defaults to `Prod`; protocols
   come back in the server's order; a proxy's `password` is never read back, `isUsePassword` is. **Filters are exact and case sensitive, `name=` too (no
-  `*`)**: `isDefault=` takes true or false, the `edges.*` ones work, an unknown filter is ignored, `edges.proxies.isUsePassword=` is a 403; `limit=0` lists
-  all, a negative or text limit and a negative offset are 400. **PUT replaces**: it needs `name`, equal to the one in the path (another is 400, so no
+  `*`)**: `isDefault=` takes true or false, the `edges.*` ones work, an unknown filter is ignored, `edges.proxies.isUsePassword=` is a 403; `limit=0` is the default page of 100
+  (see Paging), a negative or text limit and a negative offset are 400. **PUT replaces**: it needs `name`, equal to the one in the path (another is 400, so no
   rename by PUT or by PATCH of `/name`), and leaving a field out RESETS it (`publicURLPrefix`, `ssoSpEntityId`, `isDnsResolutionEnabled`, and **`isDefault`
   goes off**), but **a body with no `edges` key keeps the edges**, `"edges": []` removes them and an edge sent with a title only loses everything else;
   sent back as it was read the whole zone is kept, edge ids and a proxy's `isUsePassword` included. PATCH leaves the rest alone: `replace`, `add` and
@@ -1132,7 +1135,7 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   already exist."), both come back for either, and `example_x*` also finds `example_x2`; the same name on two accounts
   is fine. So pick the exact name out of the answer yourself, and refuse more than one. `account=` is exact, case
   sensitive, no `*`. Unlike the reference, the type-specific filters (`port=`, `downloadFolder=`) work **without**
-  `type=`; `limit=0` lists everything, `-1` is 400. HEAD is 200 or a bodiless 404; GET of an unknown id is a JSON 404
+  `type=`; `limit=0` is the default page of 100, `-1` is 400. HEAD is 200 or a bodiless 404; GET of an unknown id is a JSON 404
   ("Site with id X not found or not accessible."); `fields=` keeps the named keys, an unknown one is 400; `type=` on a
   GET of one is ignored (`type=http` on an SSH site answers it). The password reads back as `{AES128}...`.
   **PUT replaces the whole site**: a fragment answers 204 and resets what it leaves out (folders, pattern, renaming,
