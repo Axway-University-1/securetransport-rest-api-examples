@@ -36,24 +36,19 @@ Needs --write and st_allow_writes="yes". Refuses to start when a profile whose
 name starts with example_ exists. Removes the profiles, sites and accounts in a
 finally block (the received and sent files first) and checks nothing is left.
 """
-import base64
+import contextlib
 import os
 import random
 import sys
-import time
 import urllib.parse
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the transfer profiles examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the transfer profiles examples for real")
 
 c = st_client.Checker("Transfer profiles, run for real from Admin/API 2.0/bash/35.TransferProfiles")
 
@@ -70,12 +65,10 @@ FOLDER = os.path.join(BASH, "35.TransferProfiles")
 
 N = random.randint(1000, 9999)
 SENDER, RECEIVER, PLAIN = "TPS%d" % N, "TPR%d" % N, "TPN%d" % N
-UID = str(40000 + N)
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 HOST = config["st_server"]
 PESIT_HOST = config.get("st_pesit_host") or config["st_server"]
-PESIT_PORT = config.get("st_pesit_port") or "17617"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ENDUSER_PORT = harness.ports(config).enduser
 EXAMPLE, UPPER, SACRIFICE = "example_profile", "EXAMPLE_PROFILE", "example_sacrifice"
 SEND_PROFILE, FIXED_PROFILE, DEFAULT_PROFILE, BASIC_PROFILE = "PRFS", "PRFB", "PRFD", "PRFX"
 ASCII_NAME, BASIC_NAME = "example_ascii", "example_basic"
@@ -89,33 +82,9 @@ PESIT_SITE_DEFAULTS = {"dmz": "none", "pesitId": "", "ptcpConnections": 1, "sock
                        "usePreconnectionPartnerPasswordExpr": False}
 
 
-def wait_until(predicate, seconds=30, interval=1):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        try:
-            if predicate():
-                return True
-        except st_client.STError:
-            pass
-        time.sleep(interval)
-    try:
-        return bool(predicate())
-    except st_client.STError:
-        return False
-
-
-def script(name, args=None, expect_rc=0, retry=True):
-    """Run an example. The list of profiles is not always complete: when the lookup found none for a
-    profile that is known to exist (retry=True), run it again, up to five times."""
-    for _ in range(5):
-        result = runner.run(os.path.join(FOLDER, name), args, timeout=120)
-        out = result.stdout + result.stderr
-        if retry and "Found 0 transfer profiles named" in out:
-            time.sleep(2)
-            continue
-        break
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-400:])
-    return out
+# The list of profiles is not always complete: when the lookup found none for a profile that is known to exist
+# (retry=True), the example is run again, up to five times
+script = harness.bind_script(c, FOLDER, timeout=120, tail=400, retry_text="Found 0 transfer profiles named")
 
 
 def profiles(account):
@@ -130,24 +99,11 @@ def find(account, name):
 
 def settled(account, name, condition, seconds=30):
     """Read the profile until condition(profile) is true, and return it (or the last one read)."""
-    last = [None]
-
-    def look():
-        last[0] = find(account, name)
-        return last[0] is not None and condition(last[0])
-    wait_until(look, seconds)
-    return last[0] or {}
+    return harness.settled(lambda: find(account, name), condition, seconds) or {}
 
 
 def without(profile, *keys):
     return {k: v for k, v in profile.items() if k not in keys}
-
-
-def create_account(name):
-    response = admin.post("accounts", {"name": name, "type": "user", "uid": UID, "gid": UID, "homeFolder": "/home/" + name,
-                                       "transfersWebServiceAllowed": True,
-                                       "user": {"name": name, "passwordCredentials": {"password": PASSWORD}}})
-    c.check("set up: the account " + name, response.status == 201, response.text[:200])
 
 
 def pesit_site(owner, partner):
@@ -170,28 +126,27 @@ def pull(profile=None):
         rows = admin.get("logs/transfers", params={"account": RECEIVER, "sortByStartTime": "descending", "limit": 20}).json().get("result", [])
         mine = [r for r in rows if str(r.get("operationIndex")) == index]
         return bool(mine) and mine[0]["status"] in ("Processed", "Failed")
-    wait_until(done, 60, 2)
+    harness.wait_until(done, 60, 2)
     rows = admin.get("logs/transfers", params={"account": RECEIVER, "sortByStartTime": "descending", "limit": 20}).json().get("result", [])
     return index, [r for r in rows if str(r.get("operationIndex")) == index]
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /transferProfiles, PeSIT or /logs/transfers")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /transferProfiles, PeSIT or /logs/transfers")
 if (admin.get("transferProfiles", params={"name": "example_*"}).json() or {}).get("result"):
     c.check("no transfer profile named example_* exists yet", False, "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
 
+PESIT_PORT = harness.ports(config, admin).pesit
 before = (admin.get("transferProfiles", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount")
 accounts = []
+user_accounts = contextlib.ExitStack()
 eu_sender = eu_receiver = None
 landed = []
 try:
     for name in (SENDER, RECEIVER, PLAIN):
-        create_account(name)
+        user_accounts.enter_context(harness.throwaway_account(admin, c, config, name=name, password=PASSWORD,
+                                                             extra={"transfersWebServiceAllowed": True}))
         accounts.append(name)
     pesit_site(RECEIVER, SENDER)
     pesit_site(SENDER, RECEIVER)
@@ -441,18 +396,18 @@ try:
         index, rows = pull(FIXED_PROFILE)
         c.check(core("pull naming %s (advancedSettings, binary): Processed" % FIXED_PROFILE), bool(rows) and rows[0]["status"] == "Processed", [(r["status"], r.get("filename")) for r in rows])
         c.check("   its transfer log entry carries the profile's name as the PeSIT file name", bool(rows) and rows[0].get("filename") == FIXED_PROFILE, rows and rows[0].get("filename"))
-        names = wait_until(lambda: FIXED_NAME in (eu_receiver.list_folder("/landing") or []), 30) and eu_receiver.list_folder("/landing")
+        names = harness.wait_until(lambda: FIXED_NAME in (eu_receiver.list_folder("/landing") or []), 30) and eu_receiver.list_folder("/landing")
         c.check("   the file landed in /landing under the receive mapping of the profile named", bool(names) and FIXED_NAME in names, names)
         landed.append(FIXED_NAME)
 
         index, rows = pull()
         c.check("pull naming no profile: Processed", bool(rows) and rows[0]["status"] == "Processed", [(r["status"], r.get("filename")) for r in rows])
-        names = wait_until(lambda: DEFAULT_PROFILE in (eu_receiver.list_folder("/landing") or []), 30) and eu_receiver.list_folder("/landing")
+        names = harness.wait_until(lambda: DEFAULT_PROFILE in (eu_receiver.list_folder("/landing") or []), 30) and eu_receiver.list_folder("/landing")
         c.check("   it used the account's default profile: the file is called %s, the profile's name" % DEFAULT_PROFILE, bool(names) and DEFAULT_PROFILE in names, names)
         landed.append(DEFAULT_PROFILE)
         index, rows = pull(BASIC_PROFILE)
         c.check(extra("pull naming %s (a profile with the plain fields only): Processed" % BASIC_PROFILE), bool(rows) and rows[0]["status"] == "Processed", [(r["status"], r.get("filename")) for r in rows])
-        names = wait_until(lambda: BASIC_LANDED in (eu_receiver.list_folder("/landing") or []), 30) and eu_receiver.list_folder("/landing")
+        names = harness.wait_until(lambda: BASIC_LANDED in (eu_receiver.list_folder("/landing") or []), 30) and eu_receiver.list_folder("/landing")
         c.check(extra("   the file landed under that basic profile's receive mapping"), bool(names) and BASIC_LANDED in names, names)
         landed.append(BASIC_LANDED)
         c.check("   the sender's file is still there (the site keeps it: PRESERVE)", SENT_FILE in (eu_sender.list_folder("/") or []))
@@ -460,7 +415,7 @@ try:
         # -- 07: DELETE -------------------------------------------------------------------
         c.info("--- 07 deletes the one profile it names")
         out = script("07.transferProfiles_id_DELETE.sh", [RECEIVER, EXAMPLE])
-        gone = wait_until(lambda: find(RECEIVER, EXAMPLE) is None)
+        gone = harness.wait_until(lambda: find(RECEIVER, EXAMPLE) is None)
         c.check("07 deleted example_profile (204) and no other: the one in capitals is still there",
                 gone and "HTTP 204" in out and find(RECEIVER, UPPER) is not None, out[-300:])
         script("07.transferProfiles_id_DELETE.sh", [RECEIVER, EXAMPLE], expect_rc=1, retry=False)
@@ -473,7 +428,7 @@ try:
         for extra_name in (ASCII_NAME, "example_ebcdic", BASIC_NAME, BASIC_PROFILE):
             script("07.transferProfiles_id_DELETE.sh", [RECEIVER, extra_name])
         c.check("only the receiver's default profile is left",
-                wait_until(lambda: [p["name"] for p in profiles(RECEIVER)] == [DEFAULT_PROFILE]), [p["name"] for p in profiles(RECEIVER)])
+                harness.wait_until(lambda: [p["name"] for p in profiles(RECEIVER)] == [DEFAULT_PROFILE]), [p["name"] for p in profiles(RECEIVER)])
 finally:
     # the files first: the home folders stay on disk when the accounts go
     for client, folder_files in ((eu_receiver, ["landing/" + n for n in landed] + ["landing"]), (eu_sender, [SENT_FILE])):
@@ -486,12 +441,12 @@ finally:
             admin.delete("transferProfiles/" + p["id"])
         for s in (admin.get("sites", params={"account": account, "fields": "id"}).json() or {}).get("result", []):
             admin.delete("sites/" + s["id"])
-        admin.delete("accounts/" + account)
+    user_accounts.close()
     c.check("nothing is left behind: no profile of ours, no account",
-            wait_until(lambda: not (admin.get("transferProfiles", params={"name": "example_*"}).json() or {}).get("result")
+            harness.wait_until(lambda: not (admin.get("transferProfiles", params={"name": "example_*"}).json() or {}).get("result")
                        and not any(profiles(a) for a in accounts) and not any(admin.exists("accounts/" + a) for a in accounts)))
     c.check("the profile count is as before",
-            wait_until(lambda: (admin.get("transferProfiles", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount") == before),
+            harness.wait_until(lambda: (admin.get("transferProfiles", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount") == before),
             (admin.get("transferProfiles", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount"))
     admin.logout()
 

@@ -17,19 +17,14 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the certificate examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the certificate examples for real")
 if not config.get("st_ca_password"):
     st_client.skip("st_ca_password is not set in integration.conf: generating a certificate needs it")
 
@@ -41,12 +36,7 @@ SUBJECT = "CN=example_csr,O=Example"
 WRITTEN = ("example_cert.pem", "example_cert.crt", "example_cert.p12", "example_csr.req")
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=90)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc,
-            out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=90)
 
 
 def certs(name):
@@ -59,18 +49,14 @@ def requests():
     return (admin.get("certificates/requests", params={"subject": SUBJECT}).json() or {}).get("result", [])
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /certificates")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /certificates")
 if any(certs(n) for n in NAMES) or requests() or admin.exists("accounts/" + ACCOUNT):
     c.check("the example certificates, requests and %s do not exist yet" % ACCOUNT, False,
             "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
 
-work = tempfile.mkdtemp(prefix="st_certs_")
+work = harness.scratch("st_certs_")
 os.environ["CA_PASSWORD"] = config["st_ca_password"]
 os.environ["EXPORT_PASSWORD"] = "Example-Export-1"
 try:
@@ -162,7 +148,6 @@ finally:
     for name in WRITTEN:
         if os.path.exists(os.path.join(FOLDER, name)):
             os.remove(os.path.join(FOLDER, name))
-    shutil.rmtree(work, ignore_errors=True)
     c.check("nothing is left behind", not any(certs(n) for n in NAMES) and requests() == []
             and not admin.exists("accounts/" + ACCOUNT)
             and not any(os.path.exists(os.path.join(FOLDER, n)) for n in WRITTEN))

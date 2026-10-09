@@ -23,23 +23,19 @@ removed in a finally block, events first, and it never deletes an event of
 another account.
 """
 import base64
+import contextlib
 import os
 import sys
 import tempfile
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 import dummy_servers  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the events examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the events examples for real")
 if not config.get("st_callback_host"):
     st_client.skip("st_callback_host is not set in integration.conf: the event needs a silent partner on this machine")
 
@@ -47,21 +43,17 @@ c = st_client.Checker("Events, run for real from Admin/API 2.0/bash/23.Events")
 ADMIN_TREE = runner.path("Admin", "API 2.0", "bash")
 ENDUSER_TREE = runner.path("EndUser", "API 2.0", "bash")
 FOLDER = os.path.join(ADMIN_TREE, "23.Events")
-ACCOUNT, APPLICATION, SITE = "example_events_user", "example_events_app", "example_events_site"
+ACCOUNT, APPLICATION, SITE = "example_events_user_" + harness.suffix(), "example_events_app", "example_events_site"
 TEMPLATE, SIMPLE, COMPOSITE = "example_events_template", "example_events_simple", "example_events_composite"
 SUBSCRIPTION_FOLDER = "example_events"
 # A name of its own each run: deleting an account leaves its home folder on disk, and a file
 # that is already there is not a new arrival
 UPLOAD_NAME = "example_events_%s.txt" % base64.b32encode(os.urandom(5)).decode().rstrip("=").lower()
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+PASSWORD = harness.new_password()
+ENDUSER_PORT = harness.ports(config).enduser
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=90)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=90)
 
 
 def my_events(routing_only=False):
@@ -88,23 +80,18 @@ def location_id(response):
     return response.headers.get("Location", "").rsplit("/", 1)[-1]
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /events or the flow it needs")
-    admin.logout()
-    sys.exit(c.done())
-if (admin.exists("accounts/" + ACCOUNT) or admin.exists("applications/" + APPLICATION) or by_name("sites", SITE)
+admin = harness.connect(config, c, mock="the bundled mock does not implement /events or the flow it needs")
+if (admin.exists("applications/" + APPLICATION) or by_name("sites", SITE)
         or any(by_name("routes", n) for n in (TEMPLATE, SIMPLE, COMPOSITE))):
     c.check("none of the example_events_* objects exist yet", False, "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
 
 ids = {}
+accounts = contextlib.ExitStack()
 try:
     with dummy_servers.TcpSink() as sink:
-        made = admin.post("accounts", {"name": ACCOUNT, "type": "user", "uid": "1071", "gid": "1071", "homeFolder": "/home/" + ACCOUNT,
-                                       "user": {"name": ACCOUNT, "passwordCredentials": {"password": PASSWORD}}})
-        c.check("set up: the account", made.status == 201, made.text[:200])
+        accounts.enter_context(harness.throwaway_account(admin, c, config, name=ACCOUNT, password=PASSWORD, label="set up: the account"))
         c.check("set up: the Advanced Routing application",
                 admin.post("applications", {"type": "AdvancedRouting", "name": APPLICATION, "notes": "events check"}).status == 201)
         r = admin.post("subscriptions", {"type": "AdvancedRouting", "account": ACCOUNT, "application": APPLICATION,
@@ -155,13 +142,14 @@ try:
 
         # A new event is "ready" while it waits to be taken, then "active" while it runs
         events, seen = [], []
-        for _ in range(45):
+
+        def event_is_active():
+            global events
             events = my_events(routing_only=True)
             if events and events[0]["status"] not in seen:
                 seen.append(events[0]["status"])
-            if events and events[0]["status"] == "active":
-                break
-            time.sleep(2)
+            return bool(events) and events[0]["status"] == "active"
+        harness.wait_until(event_is_active, 90, 2)
         c.check("the server starts an event for the file, and it stays", len(events) == 1, events)
         c.check("a new event is ready, or already active, and becomes active", events and events[0]["status"] == "active", seen)
         if len(events) != 1 or events[0]["status"] != "active":
@@ -171,10 +159,7 @@ try:
         c.check("it is an active Advanced Routing event for the uploaded file",
                 (event["status"], event["processorType"], event["fullTarget"]) == ("active", "ADVANCED_ROUTING", target),
                 (event["status"], event["processorType"], event["fullTarget"]))
-        for _ in range(15):
-            if sink.connections:
-                break
-            time.sleep(1)
+        harness.wait_until(lambda: bool(sink.connections), 15, 1)
         c.check("the server has connected to the silent partner, which is what keeps the event", len(sink.connections) >= 1,
                 len(sink.connections))
 
@@ -210,23 +195,18 @@ try:
             out = script("03.events_operations_POST_delete.sh", [event["id"]])
             c.check("03 deleting it again says not found, and still exits 0", "  %s: not found" % event["id"] in out, out[-200:])
 finally:
-    time.sleep(3)
-    try:
-        if admin.exists("accounts/" + ACCOUNT):
-            cleaner = st_client.EndUserClient(config["st_server"], ENDUSER_PORT, ACCOUNT, PASSWORD)
-            cleaner.login()
-            for leftover in cleaner.list_folder(SUBSCRIPTION_FOLDER) or []:
-                cleaner.delete_file("%s/%s" % (SUBSCRIPTION_FOLDER, leftover))
-            cleaner.logout()
-    except st_client.STError:
-        pass
-    stuck = [e["id"] for e in my_events()]
-    if stuck:
-        admin.post("events/operations", {"ids": stuck}, params={"operation": "delete"})
+    # an event still running when the check ends outlives what it belongs to: delete it, until a read finds none
+    def no_event_left():
+        stuck = [e["id"] for e in my_events()]
+        if stuck:
+            admin.post("events/operations", {"ids": stuck}, params={"operation": "delete"})
+        return not stuck
+    harness.wait_until(no_event_left, 10, 2)
     for path in ("routes/" + ids.get("composite", ""), "routes/" + ids.get("template", ""), "subscriptions/" + ids.get("subscription", ""),
-                 "sites/" + ids.get("site", ""), "applications/" + APPLICATION, "accounts/" + ACCOUNT):
+                 "sites/" + ids.get("site", ""), "applications/" + APPLICATION):
         if not path.endswith("/"):
             admin.delete(path)
+    accounts.close()   # the files in its home folder, then the account
     c.check("nothing is left behind: no event, account, application, site or route", not my_events()
             and not admin.exists("accounts/" + ACCOUNT) and not admin.exists("applications/" + APPLICATION)
             and not by_name("sites", SITE) and not any(by_name("routes", n) for n in (TEMPLATE, SIMPLE, COMPOSITE)))

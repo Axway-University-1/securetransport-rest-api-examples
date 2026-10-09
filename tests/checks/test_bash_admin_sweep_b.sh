@@ -24,7 +24,7 @@ REPO="$(cd .. && pwd)"
 ADMIN_TREE="${REPO}/Admin/API 2.0/bash"
 BAT_TREE="${REPO}/Admin/API 2.0/bat"
 
-WORK="${TESTS_DIR}/output/bash_admin_sweep_b"
+WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/bash_admin_sweep_b"
 rm -rf "${WORK}"
 mkdir -p "${WORK}/bin" "${WORK}/admin"
 

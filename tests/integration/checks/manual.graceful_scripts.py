@@ -97,17 +97,11 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the graceful script for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the graceful script for real")
 
 if "--i-understand-this-can-disrupt-live-service" not in sys.argv:
     st_client.skip("this check needs --i-understand-this-can-disrupt-live-service too - "
@@ -146,13 +140,7 @@ def tm_status(client):
     return (client.get("transactionManager").json() or {}).get("status")
 
 
-def wait_until(predicate, timeout=90, interval=3):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if predicate():
-            return True
-        time.sleep(interval)
-    return predicate()
+wait_until = lambda predicate, timeout=90, interval=3: harness.wait_until(predicate, timeout, interval)  # noqa: E731
 
 
 def restore_everything(client, original_daemons, original_servers, original_cluster):
@@ -171,22 +159,19 @@ def restore_everything(client, original_daemons, original_servers, original_clus
     for name, was_active in original_servers.items():
         if not was_active:
             continue
-        for _ in range(5):
+
+        def started(name=name):
             if server_states(client).get(name):
-                break
+                return True
             client._request("POST", "servers/operations?serverName=%s&operation=start"
                             % name.replace(" ", "%20"))
-            time.sleep(3)
+            return False
+        harness.wait_until(started, 15, 3)
 
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /clusterServices, /daemons "
+client = harness.connect(config, c, mock=("the bundled mock does not implement /clusterServices, /daemons "
            "operations, /servers operations or /transactionManager; run this "
-           "against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+           "against a real server to exercise it"))
 
 original_daemons = daemon_statuses(client)
 original_servers = server_states(client)

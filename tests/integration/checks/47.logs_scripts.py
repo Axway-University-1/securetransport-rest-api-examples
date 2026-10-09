@@ -39,57 +39,38 @@ nobody else uses. The objects themselves are removed in finally blocks.
 Needs --write and st_allow_writes="yes".
 """
 import base64
+import contextlib
 import csv
-import io
 import os
-import random
 import re
 import shutil
 import sys
-import tempfile
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 import protocol_logins  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the log examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the log examples for real")
 
 c = st_client.Checker("Logs, run for real from Admin/API 2.0/bash 16, 27 and 28")
 ADMIN_TREE = runner.path("Admin", "API 2.0", "bash")
 ENDUSER_TREE = runner.path("EndUser", "API 2.0", "bash")
 RUN = base64.b32encode(os.urandom(4)).decode().rstrip("=").lower()
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+PASSWORD = harness.new_password()
+ENDUSER_PORT = harness.ports(config).enduser
 SSH_HOST = config.get("st_ssh_host") or config["st_server"]
-SSH_PORT = config.get("st_ssh_port") or "8022"
-WORK = tempfile.mkdtemp(prefix="st_logs_")
+WORK = harness.scratch("st_logs_")
 
 
 def script(folder, name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(ADMIN_TREE, folder, name), args, timeout=120)
-    out = result.stdout + result.stderr
-    c.check("%s/%s %s exits %s" % (folder, name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+    return harness.run_script(c, ADMIN_TREE, folder + "/" + name, args, expect_rc, timeout=120)
 
 
-def account_body(name, uid):
-    return {"name": name, "type": "user", "uid": uid, "gid": uid, "homeFolder": "/home/" + name, "transfersWebServiceAllowed": True,
-            "user": {"name": name, "passwordCredentials": {"password": PASSWORD}}}
-
-
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement the logs")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement the logs")
 
 # ---------------------------------------------------------------- 1. the audit trail
 UNIT = "example_log_%s" % RUN
@@ -98,8 +79,9 @@ try:
         c.check("an audit entry is made for a business unit created ...", admin.post("businessUnits", {"name": UNIT, "baseFolder": "/home/" + UNIT}).status == 201)
         c.check("... changed ...", admin.patch("businessUnits/" + UNIT, [{"op": "replace", "path": "/homeFolderModifyingAllowed", "value": True}]).status == 204)
         c.check("... and deleted", admin.delete("businessUnits/" + UNIT).status == 204)
-        time.sleep(2)
-        rows = admin.get("logs/audit", params={"objectName": UNIT, "limit": 20}).json().get("result", [])
+        # the audit log is written a moment after the call: wait for the three entries, not a fixed time
+        rows = harness.settled(lambda: admin.get("logs/audit", params={"objectName": UNIT, "limit": 20}).json().get("result", []),
+                               lambda found: len(found) >= 3, 20, 1) or []
         by_operation = {r["operationType"]: r for r in rows}
         c.check("the audit log holds exactly one CREATE, one UPDATE and one DELETE for it", sorted(by_operation) == ["CREATE", "DELETE", "UPDATE"] and len(rows) == 3, [r["operationType"] for r in rows])
         c.check("each says who: the administrator the examples log in as, and the address the server saw",
@@ -159,16 +141,9 @@ finally:
 #         user from address <ip>" (said even for a known account with a wrong password) and tm INFO "Authentication failed using
 #         local."; httpd also WARNs "virtual user <name> does not have email associated" on every login, which is no failure.
 #   FTP   component ftpd: INFO "virtual user <name> logged in from", WARN "Failed login for user <name> from"
-SERVERS = admin.get("servers").json()
-SERVERS = SERVERS if isinstance(SERVERS, list) else SERVERS.get("result", [])
+PORTS = harness.ports(config, admin)
+SSH_PORT = PORTS.ssh
 DAEMONS = admin.get("daemons").json()
-
-
-def server_port(protocol, daemon):
-    ports = [s["port"] for s in SERVERS if s.get("protocol") == protocol and s.get("port")]
-    return ports[0] if ports and DAEMONS.get(daemon) == "Running" else None
-
-
 PROTOCOLS = {
     "SFTP": {"component": "SSHD", "token": "sshd", "ok": "User %s login success", "ok_re": r"INFO  sshd  .*User %s login success",
              "fail": "User %s login failed", "fail_re": r"INFO  sshd  .*User %s login failed", "fail_level": "INFO", "fail_names_account": True},
@@ -178,7 +153,8 @@ PROTOCOLS = {
     "FTP": {"component": "FTPD", "token": "ftpd", "ok": "virtual user %s logged in", "ok_re": r"INFO  ftpd  .*virtual user %s logged in from",
             "fail": "Failed login for user %s", "fail_re": r"WARN  ftpd  .*Failed login for user %s from", "fail_level": "WARN", "fail_names_account": True},
 }
-ssh_port, ftp_port = server_port("ssh", "sshStatus"), server_port("ftp", "ftpStatus")
+ssh_port = PORTS.ssh if DAEMONS.get("sshStatus") == "Running" else None
+ftp_port = PORTS.ftp if DAEMONS.get("ftpStatus") == "Running" else None
 logins = protocol_logins.Logins(config["st_server"], ssh_port, ENDUSER_PORT, ftp_port, PASSWORD)
 usable = ["SFTP", "HTTP"] + (["FTP"] if ftp_port else [])
 if not ssh_port or not shutil.which("sftp"):
@@ -187,27 +163,31 @@ if not ssh_port or not shutil.which("sftp"):
 if not ftp_port:
     c.info("the FTP daemon is not running: the legacy FTP part of part 2 is left out")
 created = []
+accounts = contextlib.ExitStack()
 try:
     for number, proto in enumerate(usable):
         spec = PROTOCOLS[proto]
         label = proto + (" (legacy)" if proto == "FTP" else "") + ": "
         account = "example_log_%s_%s" % (proto.lower(), RUN)
-        uid = str(random.randint(50000, 58000))
         comp = spec["component"]
         if proto == "FTP":
             c.info("--- FTP: the legacy protocol, as an additional part")
-        made = admin.post("accounts", account_body(account, uid))
         created.append(account)
-        c.check(label + "set up: an account to log in as (fresh name and uid)", made.status == 201, made.text[:200])
+        accounts.enter_context(harness.throwaway_account(admin, c, config, name=account, password=PASSWORD, extra={"transfersWebServiceAllowed": True},
+                                                         label=label + "set up: an account to log in as (fresh name and uid)"))
         since_before = time.strftime("%a, %d %b %Y %H:%M:%S GMT", time.gmtime(time.time() - 600))
         failures_before = admin.get("logs/server", params={"fromDate": since_before, "component": comp, "message": spec["fail"] % account if spec["fail_names_account"] else spec["fail"], "limit": 1}).json()["resultSet"]["totalCount"]
         got = logins.try_login(proto, account)
         c.check(label + "the account logs in", got == "ok", got)
         got = logins.try_login(proto, account, "not-the-password")
         c.check(label + "and a wrong password is refused", got.startswith("refused"), got)
-        time.sleep(3)
         fail_msg = spec["fail"] % account if spec["fail_names_account"] else spec["fail"]
         ok_msg = spec["ok"] % account
+
+        def logged(message):
+            return admin.get("logs/server", params={"fromDate": since_before, "component": comp, "message": message, "limit": 1}).json()["resultSet"]["totalCount"]
+        # the server log is written a moment after the login: wait until both entries can be found, not a fixed time
+        harness.wait_until(lambda: logged(ok_msg) >= 1 and logged(fail_msg) > failures_before, 20, 1)
         with runner.real_credentials(ADMIN_TREE, config):
             out = script("28.ServerLogs", "01.logs_server_GET.sh", ["10", account, comp])
             c.check(label + "28/01 finds the login in the server log, by message, component and date",
@@ -272,18 +252,19 @@ try:
                 script("28.ServerLogs", "03.logs_server_GET_csv.sh", [target, "0"], expect_rc=2)
 finally:
     logins.cleanup()
-    for account in created:
-        admin.delete("accounts/" + account)
+    accounts.close()
 
 # ---------------------------------------------------------------- 3. the transfer log
-ACCOUNT, SITE = "example_log_tl", "example_log_site"
+ACCOUNT, SITE = "example_log_tl_" + RUN, "example_log_site"
 FILE_NAME = "pull_me_%s.txt" % RUN
 if admin.exists("accounts/" + ACCOUNT) or (admin.get("sites", params={"name": SITE}).json().get("result")):
     c.check("no %s account or %s site exists yet" % (ACCOUNT, SITE), False, "remove them first; this check will not touch them")
 else:
     site_id = None
+    accounts3 = contextlib.ExitStack()
     try:
-        c.check("set up: the account", admin.post("accounts", account_body(ACCOUNT, "1132")).status == 201)
+        accounts3.enter_context(harness.throwaway_account(admin, c, config, name=ACCOUNT, password=PASSWORD, extra={"transfersWebServiceAllowed": True},
+                                                          label="set up: the account"))
         local = os.path.join(WORK, FILE_NAME)
         with open(local, "w") as f:
             f.write("a file for the partner to serve\n")
@@ -300,12 +281,8 @@ else:
         match = re.search(r"operationIndex=([0-9a-f-]+)", pulled.text)
         c.check("the pull is accepted (202), and its link carries the operation index", pulled.status == 202 and match is not None, pulled.text[:200])
         index = match.group(1) if match else "none"
-        summary = {}
-        for _ in range(20):
-            summary = admin.get("logs/transfers/pullSummary/" + index).json()
-            if summary.get("successful") or summary.get("failed"):
-                break
-            time.sleep(2)
+        summary = harness.settled(lambda: admin.get("logs/transfers/pullSummary/" + index).json(),
+                                  lambda s: s.get("successful") or s.get("failed"), 40, 2) or {}
         c.check("the file is pulled", summary.get("successful") == 1, summary)
 
         with runner.real_credentials(ADMIN_TREE, config):
@@ -315,12 +292,10 @@ else:
             c.check("16/05 an index nobody used is not an error: all counts are 0", "  0 file(s): 0 pulled, 0 failed, 0 to retry, 0 in progress, 0 on hold" in out, out[-300:])
             script("16.TransferLogs", "05.logs_transfers_pullSummary_GET.sh", expect_rc=2)
 
-            entries = []
-            for _ in range(15):   # the transfer log is written a little after the transfer ends: wait for the three entries
-                entries = [x for x in admin.get("logs/transfers", params={"account": ACCOUNT, "limit": 50, "sortByStartTime": "descending"}).json()["result"] if x["filename"] == FILE_NAME]
-                if len(entries) >= 3:
-                    break
-                time.sleep(2)
+            # the transfer log is written a little after the transfer ends: wait for the three entries
+            entries = harness.settled(
+                lambda: [x for x in admin.get("logs/transfers", params={"account": ACCOUNT, "limit": 50, "sortByStartTime": "descending"}).json()["result"]
+                         if x["filename"] == FILE_NAME], lambda found: len(found) >= 3, 30, 2) or []
             pull = next((x for x in entries if x.get("serverInitiated")), None)
             upload_entry = next((x for x in entries if x["protocol"] == "http"), None)
             c.check("the log holds the upload, the file served over SSH, and the pull; only the pull carries the operation index",
@@ -348,19 +323,10 @@ else:
             else:
                 c.check("the upload and the pull can be found in the log", False, [(x["protocol"], x["incoming"]) for x in entries])
     finally:
-        try:
-            cleaner = st_client.EndUserClient(config["st_server"], ENDUSER_PORT, ACCOUNT, PASSWORD)
-            cleaner.login()
-            for folder in ("outbound-drop", "incoming"):
-                for leftover in cleaner.list_folder(folder) or []:
-                    cleaner.delete_file("%s/%s" % (folder, leftover))
-            cleaner.logout()
-        except st_client.STError:
-            pass
         found = admin.get("sites", params={"name": SITE, "fields": "id"}).json().get("result") or []
         if found:
             admin.delete("sites/" + found[0]["id"])
-        admin.delete("accounts/" + ACCOUNT)
+        accounts3.close()   # the files in its home folder, then the account
 
 c.check("nothing is left behind but log entries: no business unit, account or site",
         not admin.exists("businessUnits/" + UNIT) and not any(admin.exists("accounts/" + a) for a in created) and not admin.exists("accounts/" + ACCOUNT)

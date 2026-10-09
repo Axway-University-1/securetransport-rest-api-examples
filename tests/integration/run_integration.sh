@@ -14,9 +14,14 @@
 #   2. The config must say st_confirm_lab="yes". That is a deliberate statement
 #      that the server is not production.
 #   3. Anything that writes needs BOTH --write on the command line AND
-#      st_allow_writes="yes" in the config.
+#      st_allow_writes="yes" in the config. Without the second, --write is not
+#      even passed on to the checks (each check also repeats the gate itself).
 #   4. Objects that get created carry st_object_prefix, default ZZTEST_, and are
 #      deleted again even when a check fails.
+#
+# Each check gets ST_CHECK_TIMEOUT seconds (1800 when not set; 0 turns the limit
+# off). A check that hangs is stopped, with SIGTERM so that it cleans up first
+# (ST_CHECK_GRACE seconds, 120), and counted as FAILED. See lib/run_check.py.
 #
 # The config lives in tests/local, which git ignores, so credentials and the
 # server address never reach the repository.
@@ -32,7 +37,7 @@ for arg in "$@"; do
     case "${arg}" in
         --write) WRITE="--write" ;;
         --mock)  MOCK="yes" ;;
-        -h|--help) sed -n '2,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,28p' "${HERE}/$(basename "$0")" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*) echo "unknown option: ${arg}"; exit 2 ;;
         *) FILTERS+=("${arg}") ;;
     esac
@@ -122,16 +127,23 @@ if [ "${CONFIRM}" != "yes" ]; then
 fi
 
 SERVER=$(grep -E '^st_server=' "${CONF}" | head -1 | cut -d'"' -f2)
-ALLOW=$(grep -E '^st_allow_writes=' "${CONF}" | head -1 | cut -d'"' -f2)
+ALLOW=$(grep -E '^st_allow_writes=' "${CONF}" | head -1 | cut -d'"' -f2 | tr '[:upper:]' '[:lower:]')
 PREFIX=$(grep -E '^st_object_prefix=' "${CONF}" | head -1 | cut -d'"' -f2)
+
+# --write reaches a check only when the config allows writing too (the checks accept yes, true or 1, so does this)
+case "${ALLOW}" in
+    yes|true|1) ALLOWED="yes" ;;
+    *)          ALLOWED="" ;;
+esac
 
 echo "######################################################################"
 echo "# Integration tests"
 echo "#   server : ${SERVER}"
-if [ -n "${WRITE}" ] && [ "${ALLOW}" = "yes" ]; then
+if [ -n "${WRITE}" ] && [ -n "${ALLOWED}" ]; then
 echo "#   mode   : READ AND WRITE, objects prefixed ${PREFIX:-ZZTEST_}"
 elif [ -n "${WRITE}" ]; then
 echo "#   mode   : read only, because st_allow_writes is not yes"
+WRITE=""
 else
 echo "#   mode   : read only"
 fi
@@ -159,7 +171,7 @@ for check in $(find checks -maxdepth 1 -name '[0-9]*.py' -type f | sort -t. -k1,
     echo "----------------------------------------------------------------------"
     check_start=${SECONDS}
     # Shown as it happens, so a check of several minutes is not silent, and kept to be read
-    python3 "${check}" ${WRITE} 2>&1 | tee "${OUTPUT_FILE}"
+    python3 "${HERE}/lib/run_check.py" "${check}" ${WRITE} 2>&1 | tee "${OUTPUT_FILE}"
     status=${PIPESTATUS[0]}
     echo "  (${name}: $((SECONDS - check_start)) s)"
     # A failure counts whatever else was printed. Otherwise it is a pass only if

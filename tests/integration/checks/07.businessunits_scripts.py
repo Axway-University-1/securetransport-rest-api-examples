@@ -29,17 +29,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the business units script for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the business units script for real")
 
 c = st_client.Checker("Business Units, run for real from Admin/API 2.0/bash/12.BusinessUnits")
 
@@ -47,13 +41,8 @@ BASH_TREE = runner.path("Admin", "API 2.0", "bash")
 BU_DIR = os.path.join(BASH_TREE, "12.BusinessUnits")
 NAME = "Finance"
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /businessUnits; run this "
-           "against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /businessUnits; run this "
+                                          "against a real server to exercise it"))
 
 created = False
 target = NAME

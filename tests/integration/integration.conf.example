@@ -44,22 +44,24 @@ st_timeout="30"
 # default, matching curl -k in the examples. Set to yes if yours is trusted.
 st_verify_tls="no"
 
-# The EndUser API port, for 11.enduser_scripts.py. This project documents
+# The EndUser API port, for every check that logs in as an end user. This project documents
 # 8444/8443 for a non root install and 444/443 for a root one, but that pairing
 # is not guaranteed - confirmed on one real server that mixed the two (444
 # admin, 8443 end user). Leave blank to try the admin port minus one; set this
 # if that guess does not connect.
 #st_enduser_port=""
 
-# 31.subscriptions_routes_transfers_scripts.py creates SSH sites whose partner
-# is this same SecureTransport, so it can pull from and push to itself. The
-# host and SSH port the server reaches itself on. Leave blank for st_server and
-# 8022.
+# Checks such as 31 create SSH sites whose partner is this same SecureTransport,
+# so it can pull from and push to itself, and others log in over SFTP. The host
+# and SSH port the server reaches itself on. Leave the host blank for st_server.
+# Leave the port blank for the port of the running SSH server that the Admin API
+# lists (GET /servers), and 8022 when it lists none.
 #st_ssh_host=""
 #st_ssh_port=""
 
-# 32.pesit_acknowledgment_loop_scripts.py makes a PeSIT loop through this
-# server's own PeSIT listener. Leave blank for st_server and 17617.
+# 32.pesit_acknowledgment_loop_scripts.py, 48 and 58 make PeSIT transfers through
+# this server's own PeSIT listener. Leave the host blank for st_server and the
+# port blank for the PeSIT port the Admin API lists, and 17617 when it lists none.
 #st_pesit_host=""
 #st_pesit_port=""
 

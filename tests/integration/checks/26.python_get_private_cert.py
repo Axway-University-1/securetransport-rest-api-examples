@@ -45,6 +45,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 
@@ -68,14 +69,7 @@ def json_body(response):
     return None
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run stGetPrivateCert.py for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run stGetPrivateCert.py for real")
 
 ca_password = config.get("st_ca_password", "")
 if not ca_password:
@@ -97,13 +91,8 @@ PKEY_FILE = os.path.join(PY_DIR, "exportedPrivateKey.p12")
 EXPORT_PASSWORD = "ZzTest_export_pw_1"
 LOG_FILE = os.path.join(PY_DIR, "my.log")
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /certificates certificate "
-           "generation or export; run this against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /certificates certificate "
+                                          "generation or export; run this against a real server to exercise it"))
 
 if client.exists("accounts/" + ACCOUNT):
     c.info('an account named "%s" already exists on this server; skipping '

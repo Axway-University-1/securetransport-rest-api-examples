@@ -42,17 +42,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run stBuildFullTestAccount.py for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run stBuildFullTestAccount.py for real")
 
 ca_password = config.get("st_ca_password", "")
 if not ca_password:
@@ -79,14 +73,9 @@ APP_NAME = "ZZTEST_advrouting"
 KEY_FILE = os.path.join(PY_DIR, "testsshkey")
 KEY_PASSPHRASE = "change_me"  # matches the script's own "password" field for the key
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /certificates, /sites, "
+client = harness.connect(config, c, mock=("the bundled mock does not implement /certificates, /sites, "
            "/subscriptions import/creation; run this against a real server "
-           "to exercise it")
-    client.logout()
-    sys.exit(c.done())
+           "to exercise it"))
 
 if client.exists("accounts/" + ACC_NAME):
     c.info('an account named "%s" already exists on this server; skipping '

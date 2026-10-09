@@ -41,64 +41,33 @@ user id on every run, because a home folder outlives its account and keeps its
 owner (see st-api-gotchas). Removes the subscriptions, applications, site and
 account in a finally block, and checks that nothing is left.
 """
+import contextlib
 import os
-import random
-import string
+import re
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the subscriptions examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the subscriptions examples for real")
 
 c = st_client.Checker("Subscriptions, run for real from Admin/API 2.0/bash/07.Subscriptions (05 to 13)")
 BASH = runner.path("Admin", "API 2.0", "bash")
 FOLDER = os.path.join(BASH, "07.Subscriptions")
-SUFFIX = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(6))
-ACCOUNT = "example_subs_" + SUFFIX
-UID = str(random.randint(53000, 59999))
-PASSWORD = "Ax" + "".join(random.choice(string.ascii_letters + string.digits) for _ in range(12)) + "1!"
+ACCOUNT = "example_subs_" + harness.suffix()
+PASSWORD = harness.new_password()
 APP, APP_B, SITE = "example_subs_ar", "example_subs_basic", "example_subs_site"
 TYPE_APPS = {t: "Example%sApplication" % t for t in ("Basic", "HumanSystem", "MBFT", "StandardRouter")}
 HOST = config["st_server"]
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ENDUSER_PORT = harness.ports(config).enduser
 
 
-def wait_until(predicate, seconds=30):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        try:
-            if predicate():
-                return True
-        except st_client.STError:
-            pass
-        time.sleep(1)
-    try:
-        return bool(predicate())
-    except st_client.STError:
-        return False
-
-
-def script(name, args=None, expect_rc=0, retry=True):
-    """Run an example. When its lookup found no subscription (retry=True: it exists, but the list is not
-    always complete), run it again, up to five times."""
-    for attempt in range(5):
-        result = runner.run(os.path.join(FOLDER, name), args, timeout=120)
-        out = result.stdout + result.stderr
-        if retry and "Found 0 subscriptions" in out:
-            time.sleep(2)
-            continue
-        break
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-400:])
-    return out
+# When a lookup found no subscription that is known to exist (retry=True: the list is not always complete), the
+# example is run again, up to five times
+script = harness.bind_script(c, FOLDER, timeout=120, tail=400, retry_text="Found 0 subscriptions")
 
 
 def subs_of(account=ACCOUNT, **params):
@@ -128,16 +97,27 @@ def make_sub(label, body):
     return response.headers.get("Location", "").rsplit("/", 1)[-1]
 
 
+def pull_ended(out):
+    """
+    Wait until the server is done with the pull whose `operationIndex` the example printed in `out`: the pull summary of the
+    transfer log counts the file pulled (or failed). Measured on the lab: the file is in the folder 2.5 s after the pull is
+    asked for, and the summary says so 0.3 to 1.3 s later; the pull history was written by then (a file deleted at that moment
+    was never pulled again, 8 times of 8). Returns the last summary read.
+    """
+    found = re.search(r"operationIndex: (\S+)", out)
+    if not found:
+        return {}
+    index = found.group(1)
+    return harness.settled(lambda: admin.get("logs/transfers/pullSummary/" + index).json() or {},
+                           lambda s: s.get("successful") or s.get("failed"), 40, 0.5) or {}
+
+
 def folder_names(client):
     listing = client.list_files()
     return [f.get("fileName") for f in (listing.json() or {}).get("files", [])] if listing.status == 200 else None
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /subscriptions or the protocol servers")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /subscriptions or the protocol servers")
 busy = [a for a in (APP, APP_B) + tuple(TYPE_APPS.values()) if admin.exists("applications/" + a)]
 if busy or admin.get("accounts", params={"name": "example_subs_*"}).json().get("result") \
         or admin.get("sites", params={"name": "example_subs_*"}).json().get("result"):
@@ -146,24 +126,20 @@ if busy or admin.get("accounts", params={"name": "example_subs_*"}).json().get("
     admin.logout()
     sys.exit(c.done())
 
-servers = admin.get("servers").json()
-servers = servers if isinstance(servers, list) else servers.get("result", [])
-ssh_ports = [s["port"] for s in servers if s.get("protocol") == "ssh" and s.get("port")]
 daemons = admin.get("daemons").json()
-if not ssh_ports or daemons.get("sshStatus") != "Running":
+if daemons.get("sshStatus") != "Running":
     c.info("the SSH daemon must be running: the pull logs in to it")
     admin.logout()
     sys.exit(c.done())
-ssh_port = ssh_ports[0]
+ssh_port = harness.ports(config, admin).ssh
 
 subs_before = (admin.get("subscriptions", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount")
 ids = {}
 eu = None
 left = None
+accounts = contextlib.ExitStack()
 try:
-    response = admin.post("accounts", {"name": ACCOUNT, "type": "user", "uid": UID, "gid": UID, "homeFolder": "/home/" + ACCOUNT,
-                                       "user": {"name": ACCOUNT, "passwordCredentials": {"password": PASSWORD}}})
-    c.check("set up: the account " + ACCOUNT, response.status == 201, response.text[:200])
+    accounts.enter_context(harness.throwaway_account(admin, c, config, name=ACCOUNT, password=PASSWORD))
     for name, kind in ((APP, "AdvancedRouting"), (APP_B, "Basic")):
         response = admin.post("applications", {"type": kind, "name": name})
         c.check("set up: the %s application %s" % (kind, name), response.status == 201, response.text[:200])
@@ -179,7 +155,7 @@ try:
     def create_in():
         made[0] = eu.create_folder("in")
         return made[0].status == 201
-    c.check("set up: the folder /in", wait_until(create_in, 20), (made[0].status, made[0].text[:200]))
+    c.check("set up: the folder /in", harness.wait_until(create_in, 20), (made[0].status, made[0].text[:200]))
 
     def upload(name, content=b"pulled by a subscription"):
         boundary = "----example_subs"
@@ -198,7 +174,7 @@ try:
             duplicate.status == 400 and "unique anchor" in duplicate.text, duplicate.text[:200])
     expected = {"/inbox", "/inbox2", "/basic", "/bare"}
     c.check("the list of the account shows all four subscriptions",
-            wait_until(lambda: {s["folder"] for s in subs_of()} == expected), sorted(s["folder"] for s in subs_of()))
+            harness.wait_until(lambda: {s["folder"] for s in subs_of()} == expected), sorted(s["folder"] for s in subs_of()))
     # the filters on the list: exact account and application, a * only in the folder
     c.check("account= is exact: capitals and a wildcard find nothing",
             not subs_of(ACCOUNT.upper()) and not subs_of(ACCOUNT[:-2] + "*"))
@@ -359,19 +335,20 @@ try:
         c.check("the folder of a subscription is not made by the POST: /inbox is not in the home folder yet", inbox() is None, inbox())
         eu.logout()
         eu.login()
-        c.check("the account's next login makes it, empty", wait_until(lambda: inbox() == []), inbox())
+        c.check("the account's next login makes it, empty", harness.wait_until(lambda: inbox() == []), inbox())
         out = script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/inbox"])
         c.check("09 the pull is accepted (HTTP 202), and the operationIndex is printed",
                 "HTTP 202" in out and "operationIndex: " in out, out[-300:])
-        c.check("09 the file arrives in the subscription folder", wait_until(lambda: inbox() == ["a.txt"]), inbox())
-        time.sleep(3)
-        c.check("09 and stays on the partner (a pull copies)", eu.list_folder("in") == ["a.txt"], eu.list_folder("in"))
+        c.check("09 the file arrives in the subscription folder", harness.wait_until(lambda: inbox() == ["a.txt"]), inbox())
+        ended = pull_ended(out)
+        c.check("09 and stays on the partner (a pull copies)", eu.list_folder("in") == ["a.txt"], (eu.list_folder("in"), ended))
         out = script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/inbox", "example_subs_nosite"], expect_rc=1)
         c.check("09 a site that does not exist is refused (406), the answer shown", "HTTP 406" in out and "was not found" in out, out[-300:])
         out = script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/bare"], expect_rc=1)
         c.check("09 a subscription with no pull site says so, and sends nothing", "has no pull site" in out and "HTTP" not in out, out[-300:])
         out = script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/bare", SITE])
         c.check("09 the site can be given: a subscription with no pull site of its own pulls with it", "HTTP 202" in out, out[-300:])
+        bare_pull = out
         raw = admin.post("subscriptions/%s/operations" % ids["ar"], None, params={"operation": "Pull"})
         c.check("a Pull with no body is refused (403)", raw.status == 403, (raw.status, raw.text[:200]))
         raw = admin.post("subscriptions/%s/operations" % ids["bare"], {"type": "pull"}, params={"operation": "Pull"})
@@ -383,31 +360,34 @@ try:
         raw = admin.post("subscriptions/nosuchid/operations", {"type": "pull", "site": SITE}, params={"operation": "Pull"})
         c.check("an unknown subscription id is 404", raw.status == 404, (raw.status, raw.text[:200]))
 
-        # the pull history
-        time.sleep(3)
+        # the pull history: first the pull of /bare, which is still running, is let end
+        pull_ended(bare_pull)
         eu.delete_file("inbox/a.txt")
         for leftover in (eu.list_folder("inbox") or []):
             eu.delete_file("inbox/" + leftover)
-        c.check("set up: the folder /inbox is empty again", wait_until(lambda: inbox() == []), inbox())
+        c.check("set up: the folder /inbox is empty again", harness.wait_until(lambda: inbox() == []), inbox())
         whole = {k: v for k, v in read(ids["ar"]).items() if k != "metadata"}
         r = admin.put("subscriptions/" + ids["ar"], dict(whole, fileRetentionPeriod=5))
         c.check("set up: the subscription keeps its pull history for 5 days (the pull site is SSH)",
                 r.status == 204 and read(ids["ar"]).get("fileRetentionPeriod") == 5, (r.status, r.text[:200]))
-        script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/inbox"])
-        c.check("09 with a history, the first pull fetches the file", wait_until(lambda: inbox() == ["a.txt"]), inbox())
-        time.sleep(5)  # the history is written after the file has arrived
+        out = script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/inbox"])
+        c.check("09 with a history, the first pull fetches the file", harness.wait_until(lambda: inbox() == ["a.txt"]), inbox())
+        pull_ended(out)   # the history is written when the pull is over
         eu.delete_file("inbox/a.txt")
-        c.check("set up: the pulled file is deleted from the folder", wait_until(lambda: inbox() == []), inbox())
+        c.check("set up: the pulled file is deleted from the folder", harness.wait_until(lambda: inbox() == []), inbox())
         script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/inbox"])
-        time.sleep(10)
-        c.check("09 with a history, a file already pulled is not pulled again, though it is gone from the folder", inbox() == [], inbox())
+        # That something does NOT happen cannot be seen to end: a pull that fetches nothing leaves its summary at zero. So the
+        # folder is watched for a bounded time, which is the time the file needed the first time (2.5 s measured, at most 3.8 s
+        # for the summary to say so) more than doubled. A file that comes back ends the watch at once.
+        pulled_again = harness.wait_until(lambda: bool(inbox()), 6, 0.5)
+        c.check("09 with a history, a file already pulled is not pulled again, though it is gone from the folder", not pulled_again and inbox() == [], inbox())
 
         # ---- 10 ClearPullHistory
         out = script("10.subscriptions_id_operations_POST_clearPullHistory.sh", [ACCOUNT, APP, "/inbox"])
         c.check("10 the clearing is accepted (HTTP 202) and says so", "HTTP 202" in out and "Clear pull history" in out and ids["ar"] in out, out[-300:])
-        time.sleep(3)
+        # no wait: a pull asked for at once after the clearing fetched the file in 8 tries of 8 on the lab
         script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/inbox"])
-        c.check("10 after the history is cleared, the next pull fetches the file again", wait_until(lambda: inbox() == ["a.txt"]), inbox())
+        c.check("10 after the history is cleared, the next pull fetches the file again", harness.wait_until(lambda: inbox() == ["a.txt"]), inbox())
         out = script("10.subscriptions_id_operations_POST_clearPullHistory.sh", [ACCOUNT, APP_B, "/basic"])
         c.check("10 on a subscription with no history it is accepted as well", "HTTP 202" in out, out[-300:])
         script("10.subscriptions_id_operations_POST_clearPullHistory.sh", [ACCOUNT, APP, "/nope"], expect_rc=1, retry=False)
@@ -426,7 +406,7 @@ try:
         out = script("11.subscriptions_id_operations_POST_purge.sh", [ACCOUNT, APP, "/inbox"])
         c.check("11 the purge answers 204", "HTTP 204" in out, out[-200:])
         c.check("11 the whole folder is gone from the home folder, not only the file",
-                wait_until(lambda: "inbox" not in (folder_names(eu) or ["inbox"])), folder_names(eu))
+                harness.wait_until(lambda: "inbox" not in (folder_names(eu) or ["inbox"])), folder_names(eu))
         c.check("11 the other folder of the application is not touched", "inbox2" in (folder_names(eu) or []), folder_names(eu))
         c.check("11 the subscription stays, unchanged", admin.head("subscriptions/" + ids["ar"]).status == 200 and read(ids["ar"]) == before)
         script("11.subscriptions_id_operations_POST_purge.sh", [ACCOUNT, APP, "/nope"], expect_rc=1, retry=False)
@@ -434,9 +414,8 @@ try:
         raw = admin.post("subscriptions/%s/operations" % ids["ar"], None, params={"operation": "purge"})
         c.check("the operation name is case sensitive: purge is 404", raw.status == 404, (raw.status, raw.text[:200]))
         script("10.subscriptions_id_operations_POST_clearPullHistory.sh", [ACCOUNT, APP, "/inbox"])
-        time.sleep(3)
         script("09.subscriptions_id_operations_POST_pull.sh", [ACCOUNT, APP, "/inbox"])
-        c.check("after a purge the next pull makes the folder again and fills it", wait_until(lambda: inbox() == ["a.txt"], 40), inbox())
+        c.check("after a purge the next pull makes the folder again and fills it", harness.wait_until(lambda: inbox() == ["a.txt"], 40), inbox())
 
         # ---- 12 POST types
         out = script("12.subscriptions_POST_types.sh", [ACCOUNT])
@@ -449,7 +428,7 @@ try:
                 global sub
                 sub = find(TYPE_APPS[kind], folder)
                 return sub is not None
-            c.check("12 the %s subscription is there, of that type" % kind, wait_until(got), sorted(s["folder"] for s in subs_of()))
+            c.check("12 the %s subscription is there, of that type" % kind, harness.wait_until(got), sorted(s["folder"] for s in subs_of()))
             if sub:
                 full = read(sub["id"])
                 c.check("12 %s: type, account and application" % kind,
@@ -466,7 +445,7 @@ try:
         eu.logout()
         eu.login()
         c.check("12 ... they are made at the account's next login",
-                wait_until(lambda: all(f.strip("/") in (folder_names(eu) or []) for f in expected_types.values())), folder_names(eu))
+                harness.wait_until(lambda: all(f.strip("/") in (folder_names(eu) or []) for f in expected_types.values())), folder_names(eu))
         out = script("12.subscriptions_POST_types.sh", [ACCOUNT], expect_rc=1)
         c.check("12 run again: every application is refused (it exists) and every subscription too (unique anchor)",
                 out.count("unique anchor") == 4 and out.count("application with this name already exists") == 4, out[-800:])
@@ -479,10 +458,10 @@ try:
         # ---- 13 DELETE types
         out = script("13.subscriptions_id_DELETE_types.sh", [ACCOUNT])
         c.check("13 prints HTTP 204 for each subscription and each application", out.count("HTTP 204") == 8, out[-600:])
-        c.check("13 the four subscriptions are gone", wait_until(lambda: not [s for s in subs_of() if s["folder"].startswith("/example_")]),
+        c.check("13 the four subscriptions are gone", harness.wait_until(lambda: not [s for s in subs_of() if s["folder"].startswith("/example_")]),
                 sorted(s["folder"] for s in subs_of()))
         c.check("13 purge=true took their folders out of the home folder",
-                wait_until(lambda: not [n for n in (folder_names(eu) or []) if n.startswith("example_")]), folder_names(eu))
+                harness.wait_until(lambda: not [n for n in (folder_names(eu) or []) if n.startswith("example_")]), folder_names(eu))
         c.check("13 the four applications are gone", not [a for a in TYPE_APPS.values() if admin.exists("applications/" + a)])
         c.check("13 the other subscriptions of the account are untouched", {s["folder"] for s in subs_of()} == expected)
         out = script("13.subscriptions_id_DELETE_types.sh", [ACCOUNT])
@@ -492,14 +471,11 @@ try:
     plain = make_sub("a subscription on /plain, to delete without purge", dict(sub_body(APP_B, "/plain"), type="Basic"))
     eu.logout()
     eu.login()
-    c.check("the folder /plain is made at the next login", wait_until(lambda: "plain" in (folder_names(eu) or [])), folder_names(eu))
+    c.check("the folder /plain is made at the next login", harness.wait_until(lambda: "plain" in (folder_names(eu) or [])), folder_names(eu))
     c.check("DELETE without purge answers 204", admin.delete("subscriptions/" + plain).status == 204)
     c.check("and leaves the folder in the home folder", "plain" in (folder_names(eu) or []), folder_names(eu))
 finally:
     if eu:
-        for name in ("in", "inbox", "inbox2", "bare", "basic", "plain"):
-            for leftover in (eu.list_folder(name) or []):
-                eu.delete_file("%s/%s" % (name, leftover))
         left = folder_names(eu)
         eu.logout()
     for s in subs_of():
@@ -508,12 +484,12 @@ finally:
         admin.delete("applications/" + a)
     for s in (admin.get("sites", params={"account": ACCOUNT}).json() or {}).get("result", []):
         admin.delete("sites/" + s["id"])
-    admin.delete("accounts/" + ACCOUNT)
+    accounts.close()   # the files in the home folder, then the account
     c.check("nothing is left behind: no subscription, application, site or account",
-            wait_until(lambda: not subs_of()) and not [a for a in (APP, APP_B) + tuple(TYPE_APPS.values()) if admin.exists("applications/" + a)]
+            harness.wait_until(lambda: not subs_of()) and not [a for a in (APP, APP_B) + tuple(TYPE_APPS.values()) if admin.exists("applications/" + a)]
             and not admin.get("sites", params={"name": "example_subs_*"}).json().get("result") and not admin.exists("accounts/" + ACCOUNT))
     c.check("the subscription count is as before",
-            wait_until(lambda: (admin.get("subscriptions", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount") == subs_before),
+            harness.wait_until(lambda: (admin.get("subscriptions", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount") == subs_before),
             (admin.get("subscriptions", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount"))
     if left is not None:
         c.info("the home folder %s stays on the lab's disk, with its folders (an account's home folder is not deleted with it): %s" % (ACCOUNT, left))

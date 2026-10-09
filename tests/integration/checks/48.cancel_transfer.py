@@ -30,47 +30,43 @@ example_cx_* objects, or the PeSIT accounts EXCANS and EXCANR, exist, and remove
 everything in a finally block, events included. The log entries stay.
 """
 import base64
+import contextlib
 import ftplib
 import io
 import json
 import os
-import re
+import random
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import urllib.parse
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 import dummy_servers  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the cancel check for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the cancel check for real")
 
 c = st_client.Checker("Cancelling a running transfer, with 16.TransferLogs/04.logs_transfers_id_operations_POST.sh")
 ADMIN_TREE = runner.path("Admin", "API 2.0", "bash")
 ENDUSER_TREE = runner.path("EndUser", "API 2.0", "bash")
-ACCOUNT, SITE = "example_cx_user", "example_cx_site"
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+RUN = harness.suffix()
+ACCOUNT, SITE = "example_cx_user_" + RUN, "example_cx_site"
+PASSWORD = harness.new_password()
+ENDUSER_PORT = harness.ports(config).enduser
 SSH_HOST = config.get("st_ssh_host") or config["st_server"]
-SSH_PORT = int(config.get("st_ssh_port") or 8022)
 CALLBACK = config.get("st_callback_host", "")
 SIZE = 10 * 1024 * 1024
 RATE = 250 * 1024
-WORK = tempfile.mkdtemp(prefix="st_cancel_")
+WORK = harness.scratch("st_cancel_")
 # Part B: a PeSIT pair. The names are also PeSIT partner identifiers: short and alphanumeric
-SENDER, RECEIVER, PROFILE = "EXCANS", "EXCANR", "EXCANTP"
+NUMBER = random.randint(1000, 9999)
+SENDER, RECEIVER, PROFILE = "EXCS%d" % NUMBER, "EXCR%d" % NUMBER, "EXCTP%d" % NUMBER
 PESIT_HOST = config.get("st_pesit_host") or config["st_server"]
-PESIT_PORT = config.get("st_pesit_port") or "17617"
 # A PeSIT site made through the API leaves these empty, and then never connects
 PESIT_SITE_DEFAULTS = {"dmz": "none", "pesitId": "", "ptcpConnections": 1, "socketSendReceiveBuffersize": 65536, "receiveMessage": "", "sendMessage": "",
                        "useServerPasswordExpr": False, "usePartnerPasswordExpr": False, "usePreconnectionServerPasswordExpr": False,
@@ -213,28 +209,34 @@ def running_transfer_is_not_cancelable(label, transfer):
         c.check("%s: the transfer starts" % label, False, repr(e))
         transfer.abort()
         return
-    row = None
-    for _ in range(30):
-        time.sleep(1)
-        row = entry(transfer.name, transfer.server_initiated)
-        if row:
-            break
+    seen_after = time.time()
+    row = harness.wait_until(lambda: entry(transfer.name, transfer.server_initiated), 30, 1)
+    c.info("%s: the log showed it after %.0f s" % (label, time.time() - seen_after))
     c.check("%s: the transfer log shows the 10 MB file In Progress" % label, bool(row) and row["status"] == "In Progress", row and row["status"])
     if not row:
         transfer.abort()
         return
-    time.sleep(4)
     ident = row["id"]["urlrepresentation"]
     with runner.real_credentials(ADMIN_TREE, config):
-        read = admin_script("03.logs_transfers_id_GET.sh", [ident])
+        # the server says it is not cancelable once the transfer is running: ask (with the example's own read) until it does,
+        # and cancel only then
+        said_after = time.time()
+        read = harness.settled(lambda: admin_script("03.logs_transfers_id_GET.sh", [ident]), lambda r: "  cancelable: no, resubmittable: no" in r.stdout, 20, 1)
+        c.info("%s: it said so after %.0f s" % (label, time.time() - said_after))
         c.check("%s: the transfer says it is not cancelable" % label, "  cancelable: no, resubmittable: no" in read.stdout, read.stdout[-300:])
         result = admin_script("04.logs_transfers_id_operations_POST.sh", [ident, "cancel"])
     out = result.stdout + result.stderr
     c.check("%s: the cancel is refused: not eligible for cancellation" % label, result.returncode == 1 and "is not eligible for cancellation" in out, out.strip()[-260:])
-    time.sleep(3)
+    # That the transfer carries on cannot be seen to end, so it is watched for a bounded time after the refusal. An accepted cancel
+    # shows at once (0 s after it was accepted in part B, measured with a 1 s poll), so 2 s is the poll twice. Any sign of an end
+    # (a status other than In Progress, a client that stopped sending) ends the watch and fails the check.
+    def has_ended():
+        latest = entry(transfer.name, transfer.server_initiated)
+        return not (latest and latest["status"] == "In Progress" and transfer.running())
+    ended = harness.wait_until(has_ended, 2, 0.5)
     now = entry(transfer.name, transfer.server_initiated)
     c.check("%s: and the transfer carries on, still In Progress and still sending" % label,
-            bool(now) and now["status"] == "In Progress" and transfer.running(), now and now["status"])
+            not ended and bool(now) and now["status"] == "In Progress" and transfer.running(), now and now["status"])
     transfer.abort()
 
 
@@ -245,9 +247,7 @@ def admin_script(name, args):
 def cancel_a_transfer_waiting_for_a_retry():
     c.info("--- a PeSIT pull that failed and is waiting to be retried")
     for name in (SENDER, RECEIVER):
-        made = admin.post("accounts", {"name": name, "type": "user", "uid": "1151", "gid": "1151", "homeFolder": "/home/" + name, "transfersWebServiceAllowed": True,
-                                       "user": {"name": name, "passwordCredentials": {"password": PASSWORD}}})
-        c.check("set up: the account %s" % name, made.status == 201, made.text[:200])
+        accounts.enter_context(harness.throwaway_account(admin, c, config, name=name, password=PASSWORD, extra={"transfersWebServiceAllowed": True}))
     for owner, partner in ((RECEIVER, SENDER), (SENDER, RECEIVER)):
         made = admin.post("sites", {"type": "pesit", "protocol": "pesit", "name": partner, "account": owner, "host": PESIT_HOST, "port": PESIT_PORT,
                                     "transferType": "unspecified", "storeAndForwardMode": "PRESERVE", **PESIT_SITE_DEFAULTS})
@@ -263,17 +263,17 @@ def cancel_a_transfer_waiting_for_a_retry():
     index = urllib.parse.parse_qs(urllib.parse.urlparse((pulled.json() or {}).get("link", "")).query).get("operationIndex", [""])[0]
 
     row, one = None, {}
-    for _ in range(25):
-        time.sleep(2)
-        try:
-            rows = admin.get("logs/transfers", params={"account": RECEIVER, "sortByStartTime": "descending", "limit": 20}).json().get("result", [])
-            row = next((x for x in rows if x.get("serverInitiated") and x["protocol"] == "pesit" and str(x.get("operationIndex")) == index), None)
-            if row:
-                one = admin.get("logs/transfers/" + row["id"]["urlrepresentation"]).json()
-                if one.get("isCancelable"):
-                    break
-        except st_client.STError:
-            continue  # the lab is reached over a VPN that drops now and then
+
+    def failed_and_cancelable():
+        nonlocal row, one
+        rows = admin.get("logs/transfers", params={"account": RECEIVER, "sortByStartTime": "descending", "limit": 20}).json().get("result", [])
+        row = next((x for x in rows if x.get("serverInitiated") and x["protocol"] == "pesit" and str(x.get("operationIndex")) == index), None)
+        if row:
+            one = admin.get("logs/transfers/" + row["id"]["urlrepresentation"]).json()
+            return bool(one.get("isCancelable"))
+        return False
+    # an unanswered call (the lab is reached over a VPN that drops now and then) is one more try
+    harness.wait_until(failed_and_cancelable, 50, 2)
     c.check("the receiving transfer failed, and the server says it is cancelable", bool(row) and row["status"] == "Failed" and one.get("isCancelable") is True,
             (row and row["status"], one.get("isCancelable"), one.get("errorMessage")))
     if not row:
@@ -286,16 +286,19 @@ def cancel_a_transfer_waiting_for_a_retry():
         c.check("05 counts it as waiting to be retried: 1 to retry, none failed", "  1 file(s): 0 pulled, 0 failed, 1 to retry, 0 in progress, 0 on hold" in summary.stdout, summary.stdout[-300:])
 
         cancelled = admin_script("04.logs_transfers_id_operations_POST.sh", [ident, "cancel"])
+        cancel_accepted = time.time()
         out = cancelled.stdout + cancelled.stderr
         c.check("THE CANCEL WORKS: the example exits 0, with HTTP 200, \"was successfully cancelled\"",
                 cancelled.returncode == 0 and "HTTP 200" in out and "was successfully cancelled" in out, out.strip()[-260:])
 
         after = ""
-        for _ in range(10):
+
+        def no_retry_left():
+            nonlocal after
             after = admin_script("05.logs_transfers_pullSummary_GET.sh", [index]).stdout
-            if "0 to retry" in after:
-                break
-            time.sleep(2)
+            return "0 to retry" in after
+        harness.wait_until(no_retry_left, 20, 1)
+        c.info("the cancel was seen in the pull summary %.0f s after it was accepted" % (time.time() - cancel_accepted))
         c.check("05 now counts it as failed: no more retries", "  1 file(s): 0 pulled, 1 failed, 0 to retry, 0 in progress, 0 on hold" in after, after[-300:])
         read = admin_script("03.logs_transfers_id_GET.sh", [ident])
         c.check("03 says it is no longer cancelable", "  cancelable: no," in read.stdout, read.stdout[-300:])
@@ -303,24 +306,21 @@ def cancel_a_transfer_waiting_for_a_retry():
         c.check("a second cancel is refused: not eligible", again.returncode == 1 and "is not eligible for cancellation" in again.stdout + again.stderr, (again.stdout + again.stderr)[-260:])
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement the transfer log")
-    admin.logout()
-    sys.exit(c.done())
-servers = admin.get("servers").json()
-ftp_servers = [s for s in (servers if isinstance(servers, list) else servers.get("result", [])) if s.get("protocol") == "ftp" and s.get("port")]
-ftp_port = ftp_servers[0]["port"] if ftp_servers and admin.get("daemons").json().get("ftpStatus") == "Running" else None
-pesit_running = admin.get("daemons").json().get("pesitStatus") == "Running"
-if any(admin.exists("accounts/" + n) for n in (ACCOUNT, SENDER, RECEIVER)) or (admin.get("sites", params={"name": SITE}).json().get("result")):
-    c.check("no %s, %s or %s account, nor %s site, exists yet" % (ACCOUNT, SENDER, RECEIVER, SITE), False, "remove them first; this check will not touch them")
+admin = harness.connect(config, c, mock="the bundled mock does not implement the transfer log")
+PORTS = harness.ports(config, admin)
+SSH_PORT, PESIT_PORT = int(PORTS.ssh), PORTS.pesit
+daemons = admin.get("daemons").json()
+ftp_port = int(PORTS.ftp) if PORTS.ftp and daemons.get("ftpStatus") == "Running" else None
+pesit_running = daemons.get("pesitStatus") == "Running"
+if admin.get("sites", params={"name": SITE}).json().get("result"):
+    c.check("no %s site exists yet" % SITE, False, "remove it first; this check will not touch it")
     admin.logout()
     sys.exit(c.done())
 
+accounts = contextlib.ExitStack()
 try:
-    made = admin.post("accounts", {"name": ACCOUNT, "type": "user", "uid": "1141", "gid": "1141", "homeFolder": "/home/" + ACCOUNT, "transfersWebServiceAllowed": True,
-                                   "user": {"name": ACCOUNT, "passwordCredentials": {"password": PASSWORD}}})
-    c.check("set up: a throwaway account", made.status == 201, made.text[:200])
+    accounts.enter_context(harness.throwaway_account(admin, c, config, name=ACCOUNT, password=PASSWORD, extra={"transfersWebServiceAllowed": True},
+                                                     label="set up: a throwaway account"))
     if ftp_port:
         running_transfer_is_not_cancelable("FTP upload", FtpUpload(unique("cancel_ftp")))
     else:
@@ -335,23 +335,16 @@ try:
     else:
         c.info("the PeSIT daemon is not running: the transfer waiting for a retry is not tried")
 finally:
-    time.sleep(2)
-    try:
-        cleaner = st_client.EndUserClient(config["st_server"], ENDUSER_PORT, ACCOUNT, PASSWORD)
-        cleaner.login()
-        for folder in ("", "outbound-drop", "incoming"):
-            for leftover in cleaner.list_folder(folder) or []:
-                cleaner.delete_file((folder + "/" if folder else "") + leftover)
-        cleaner.logout()
-    except st_client.STError:
-        pass
-    # A pull is retried: its event would outlive the sites and the accounts
-    for _ in range(2):
+    # A pull is retried: its event would outlive the sites and the accounts. Delete them until a read finds none.
+    def no_event_left():
+        left = False
         for name in (ACCOUNT, SENDER, RECEIVER):
             stuck = [e["id"] for e in admin.get("events", params={"accountName": name, "limit": 100}).json().get("result", [])]
             if stuck:
+                left = True
                 admin.post("events/operations", {"ids": stuck}, params={"operation": "delete"})
-        time.sleep(2)
+        return not left
+    harness.wait_until(no_event_left, 10, 2)
     for name in (SENDER, RECEIVER):
         for profile in admin.get("transferProfiles", params={"account": name, "fields": "id"}).json().get("result", []):
             admin.delete("transferProfiles/" + profile["id"])
@@ -360,8 +353,7 @@ finally:
     found = admin.get("sites", params={"name": SITE, "fields": "id"}).json().get("result") or []
     if found:
         admin.delete("sites/" + found[0]["id"])
-    for name in (ACCOUNT, SENDER, RECEIVER):
-        admin.delete("accounts/" + name)
+    accounts.close()   # the files of the throwaway account, then the accounts
     c.check("nothing is left behind but log entries: no event, account, site or profile",
             not any(admin.get("events", params={"accountName": n}).json().get("result") for n in (ACCOUNT, SENDER, RECEIVER))
             and not any(admin.exists("accounts/" + n) for n in (ACCOUNT, SENDER, RECEIVER))

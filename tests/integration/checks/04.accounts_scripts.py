@@ -56,17 +56,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the accounts scripts for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the accounts scripts for real")
 
 c = st_client.Checker("Accounts, run for real from Admin/API 2.0/bash/05.Accounts")
 
@@ -75,10 +69,6 @@ ACCOUNTS_DIR = os.path.join(BASH_TREE, "05.Accounts")
 BODY_DIR = os.path.join(ACCOUNTS_DIR, "06.patch_body")
 USER, SERVICE, TEMPLATE = "example_user", "example_service", "example_template"
 NAMES = [USER, SERVICE, TEMPLATE]
-
-
-def script(name):
-    return os.path.join(ACCOUNTS_DIR, name)
 
 
 @contextlib.contextmanager
@@ -101,10 +91,7 @@ def environment(**values):
 
 def run(name, args=None, expect_rc=0, timeout=60):
     """Run a script, check its exit code, and give back its output."""
-    result = runner.run(script(name), args, timeout=timeout)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+    return harness.run_script(c, ACCOUNTS_DIR, name, args, expect_rc, timeout=timeout)
 
 
 client = st_client.connect(config, c)

@@ -60,30 +60,21 @@ st_pesit_host and st_pesit_port (this server's PeSIT listener, default
 st_server and 17617), st_ssh_host, st_ssh_port, st_enduser_port and
 st_chain_wait_seconds, as for 31.
 """
-import base64
 import datetime
 import email.utils
 import os
 import re
 import subprocess
 import sys
-import tempfile
-import time
 import urllib.parse
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run a PeSIT loop and the acknowledgment scripts for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run a PeSIT loop and the acknowledgment scripts for real")
 
 c = st_client.Checker("PeSIT loop between two throwaway accounts, and the scripts in "
                       "Admin/API 2.0/bash/90.EndToEndAcknowledgment, run for real")
@@ -94,7 +85,7 @@ PREFIX = config.get("st_object_prefix") or "ZZTEST_"
 PESIT_PREFIX = re.sub(r"[^A-Za-z0-9]", "", PREFIX)[:6]
 SENDER = PESIT_PREFIX + "PS"
 RECEIVER = PESIT_PREFIX + "PR"
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 PROFILE = PESIT_PREFIX + "TP"   # also the PeSIT file name, so alphanumeric too
 APPLICATION = PREFIX + "PesitApplication"
 TEMPLATE = PREFIX + "PesitTemplate"
@@ -105,22 +96,19 @@ SENT_FILE = "pesit_loop.txt"
 SENT_CONTENT = b"A file sent over PeSIT between two throwaway accounts.\n"
 
 PESIT_HOST = config.get("st_pesit_host") or config["st_server"]
-PESIT_PORT = config.get("st_pesit_port") or "17617"
 SSH_HOST = config.get("st_ssh_host") or config["st_server"]
-SSH_PORT = config.get("st_ssh_port") or "8022"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ENDUSER_PORT = harness.ports(config).enduser
 WAIT = int(config.get("st_chain_wait_seconds") or "90")
+
+wait_until = lambda predicate, timeout=WAIT, interval=3: harness.wait_until(predicate, timeout, interval)  # noqa: E731
 
 BASH_TREE = runner.path("Admin", "API 2.0", "bash")
 ACK_DIR = os.path.join(BASH_TREE, "90.EndToEndAcknowledgment")
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement PeSIT, /transfers or /logs/transfers; "
-           "run this against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement PeSIT, /transfers or /logs/transfers; "
+                                          "run this against a real server to exercise it"))
+PORTS = harness.ports(config, client)
+PESIT_PORT, SSH_PORT = PORTS.pesit, PORTS.ssh
 
 
 # Set explicitly: a PeSIT site created through the API, unlike one created in
@@ -135,16 +123,6 @@ PESIT_SITE_DEFAULTS = {
 
 def results(path, params=None):
     return (client.get(path, params=params).json() or {}).get("result", [])
-
-
-def wait_until(predicate, timeout=WAIT, interval=3):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        found = predicate()
-        if found:
-            return found
-        time.sleep(interval)
-    return predicate()
 
 
 def created(label, response):
@@ -223,7 +201,7 @@ if taken:
     sys.exit(c.done())
 
 made_accounts = []
-logs = tempfile.mkdtemp(prefix="zztest_pesit_")
+logs = harness.scratch("zztest_pesit_")
 mine = []
 
 try:
@@ -330,10 +308,9 @@ try:
             c.info("IteratePesitInbounds.sh is not run: %d unacknowledged PeSIT transfer(s) in the last hour "
                    "are not this check's, and it would acknowledge them too" % len(others))
         else:
-            elsewhere = tempfile.mkdtemp(prefix="zztest_elsewhere_")
+            elsewhere = harness.scratch("zztest_elsewhere_")
             result = subprocess.run(["bash", os.path.join(ACK_DIR, "IteratePesitInbounds.sh"), "1", "0", "", logs],
                                     cwd=elsewhere, capture_output=True, text=True, timeout=300)
-            os.rmdir(elsewhere)
             c.check("IteratePesitInbounds.sh, run from another folder, runs without an error",
                     result.returncode == 0, (result.stdout + result.stderr).strip()[-300:])
             c.check("it ACKs the transfer that was pushed on",

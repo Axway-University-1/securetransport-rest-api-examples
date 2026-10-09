@@ -19,15 +19,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the administrator examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the administrator examples for real")
 
 c = st_client.Checker("Roles and administrators, run for real from Admin/API 2.0/bash/20 and 21")
 BASH = runner.path("Admin", "API 2.0", "bash")
@@ -35,10 +31,7 @@ ROLE, ADMIN = "example_role", "example_admin"
 
 
 def script(folder, name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(BASH, folder, name), args, timeout=60)
-    out = result.stdout + result.stderr
-    c.check("%s exits %s" % (name, expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+    return harness.run_script(c, os.path.join(BASH, folder), name, args, expect_rc, label="{name} exits {rc}")
 
 
 def roles(name, args=None, expect_rc=0):
@@ -49,11 +42,7 @@ def admins(name, args=None, expect_rc=0):
     return script("21.Administrators", name, args, expect_rc)
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /administrativeRoles or /administrators")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /administrativeRoles or /administrators")
 if admin.exists("administrativeRoles/" + ROLE) or admin.exists("administrators/" + ADMIN):
     c.check("%s and %s do not exist yet" % (ROLE, ADMIN), False, "remove them first; this check will not touch them")
     admin.logout()

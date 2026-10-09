@@ -186,8 +186,54 @@ try:
         os.environ["PATH"] = old_path
         shutil.rmtree(stubs, ignore_errors=True)
     check("SFTP is core, FTP is the legacy one, listed last", protocol_logins.PROTOCOLS == ("SFTP", "HTTP", "FTP"))
+    # The ports come from harness.ports() as text, because a config holds text
+    as_text = protocol_logins.Logins("127.0.0.1", str(free_port), str(free_port), str(free_port), "x")
+    try:
+        for proto in protocol_logins.PROTOCOLS:
+            got = as_text.try_login(proto, "nobody")
+            check("%s with the ports as text is an error or a refusal, not an exception" % proto, got.split(" ")[0] in ("error", "refused"), got)
+        try:
+            as_text.open_login("FTP", "nobody")
+            raised = "no error"
+        except OSError:
+            raised = "OSError"
+        except Exception as e:  # noqa: BLE001
+            raised = type(e).__name__
+        check("an FTP login kept open to a closed port, the port as text, fails as a connection error", raised == "OSError", raised)
+    finally:
+        as_text.cleanup()
 finally:
     tried.cleanup()
+
+import time  # noqa: E402
+print("=== an open SFTP login says it is dead when the server ended the session, not only when the client exited ===")
+stubs = tempfile.mkdtemp(prefix="sftp_stub_")
+old_path = os.environ["PATH"]
+try:
+    marker = os.path.join(stubs, "session_ended")
+    # a stand-in sftp: it reads commands from standard input and, once the "server" has ended the session (the marker file),
+    # exits when it is sent the next one - which is what the real client does, and why a client that nobody types to looks alive
+    with open(os.path.join(stubs, "sftp"), "w") as f:
+        f.write('#!/bin/sh\nwhile read line; do\n  if [ -e "%s" ]; then echo "Connection closed" >&2; exit 1; fi\ndone\n' % marker)
+    os.chmod(os.path.join(stubs, "sftp"), 0o755)
+    os.environ["PATH"] = stubs + os.pathsep + old_path
+    kept = protocol_logins.Logins("127.0.0.1", 1, 1, 1, "x")
+    try:
+        holder = kept.open_login("SFTP", "someone")
+        check("an open SFTP login is alive while the session is", holder.alive() is True)
+        check("... and stays so when asked again", holder.alive() is True)
+        open(marker, "w").close()
+        started = time.time()
+        gone = holder.alive()
+        check("once the server has ended the session it is dead at the next look, though the client was never closed", gone is False, gone)
+        check("... and it is quick to say so", time.time() - started < 5)
+        check("a client that already exited is dead too", holder.alive() is False)
+        holder.close()
+    finally:
+        kept.cleanup()
+finally:
+    os.environ["PATH"] = old_path
+    shutil.rmtree(stubs, ignore_errors=True)
 
 print("=== the harness never writes over your own configuration ===")
 import shutil as _shutil  # noqa: E402
@@ -368,6 +414,8 @@ try:
     integration = os.path.join(work, "integration")
     os.makedirs(os.path.join(integration, "checks"))
     _shutil.copy(os.path.join(REPO, "tests", "integration", "run_integration.sh"), integration)
+    os.makedirs(os.path.join(integration, "lib"))
+    _shutil.copy(os.path.join(REPO, "tests", "integration", "lib", "run_check.py"), os.path.join(integration, "lib"))
     fake = {"01.ok.py": 'print("  3 passed, 0 failed")',
             "02.zero.py": 'print("  0 passed, 0 failed")',
             "03.skip.py": 'print("  SKIP  no server")',
@@ -398,8 +446,99 @@ try:
           result.stdout[-200:])
     result = run_runner("--no-such-option")
     check("an unknown option is refused", result.returncode == 2, result.returncode)
+    result = run_runner("-h")
+    check("-h prints the header of the runner, from any folder", result.returncode == 0 and "Run the integration checks" in result.stdout
+          and "ST_CHECK_TIMEOUT" in result.stdout, (result.returncode, result.stdout[-200:], result.stderr[-200:]))
 finally:
     _shutil.rmtree(work, ignore_errors=True)
+
+print("=== --write reaches a check only when the config allows writing, and a check that hangs is stopped ===")
+import time as _time  # noqa: E402
+work = _tempfile.mkdtemp(prefix="runner_test_")
+try:
+    integration = os.path.join(work, "integration")
+    os.makedirs(os.path.join(integration, "checks"))
+    os.makedirs(os.path.join(integration, "lib"))
+    _shutil.copy(os.path.join(REPO, "tests", "integration", "run_integration.sh"), integration)
+    _shutil.copy(os.path.join(REPO, "tests", "integration", "lib", "run_check.py"), os.path.join(integration, "lib"))
+    fake = {
+        "01.argv.py": 'import sys\nprint("ARGV " + " ".join(sys.argv[1:]))\nprint("  1 passed, 0 failed")',
+        "02.hang.py": 'import signal, sys, time\n'
+                      'def term(signum, frame):\n    print("  ..    cleanup ran after SIGTERM", flush=True)\n    sys.exit(143)\n'
+                      'signal.signal(signal.SIGTERM, term)\nprint("  ..    started", flush=True)\ntime.sleep(120)',
+        "03.deaf.py": 'import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\nprint("  ..    deaf", flush=True)\ntime.sleep(120)',
+        "04.quick.py": 'print("  2 passed, 0 failed")',
+    }
+    for name, code in fake.items():
+        with open(os.path.join(integration, "checks", name), "w") as f:
+            f.write(code + "\n")
+
+    def conf_with(allow):
+        path = os.path.join(work, "integration_%s.conf" % (allow or "unset"))
+        with open(path, "w") as f:
+            f.write('st_server="127.0.0.1"\nst_port="1"\nst_user="u"\nst_password="p"\nst_confirm_lab="yes"\n'
+                    + ('st_allow_writes="%s"\n' % allow if allow else ""))
+        return path
+
+    def run_with(conf, *args, **more_env):
+        env = dict(os.environ, ST_INTEGRATION_CONF=conf, **more_env)
+        return _subprocess.run(["bash", os.path.join(integration, "run_integration.sh")] + list(args),
+                               capture_output=True, text=True, env=env, timeout=120)
+    for allow, want_write in ((None, False), ("no", False), ("yes", True), ("YES", True), ("true", True)):
+        result = run_with(conf_with(allow), "--write", "argv")
+        got = re.search(r"^ARGV(.*)$", result.stdout, re.M)
+        check("--write with st_allow_writes %s: the check %s it" % (allow or "not in the config", "gets" if want_write else "does not get"),
+              got is not None and ("--write" in got.group(1)) is want_write, result.stdout[-300:])
+        check("... and the banner says so: %s" % ("read and write" if want_write else "read only, because st_allow_writes is not yes"),
+              (("READ AND WRITE" in result.stdout) if want_write else ("read only, because st_allow_writes is not yes" in result.stdout)), result.stdout[:400])
+    result = run_with(conf_with("yes"), "argv")
+    check("without --write on the command line the check does not get it either, whatever the config says",
+          "ARGV" in result.stdout and "--write" not in re.search(r"^ARGV(.*)$", result.stdout, re.M).group(1) and "mode   : read only" in result.stdout)
+
+    started = _time.time()
+    result = run_with(conf_with("yes"), "hang", ST_CHECK_TIMEOUT="2", ST_CHECK_GRACE="10")
+    took = _time.time() - started
+    check("a check that hangs is stopped after ST_CHECK_TIMEOUT seconds, not left to hang the run", took < 30, took)
+    check("it counts as FAILED, with a clear message that names the check and the limit",
+          result.returncode == 1 and "1 INTEGRATION CHECK(S) FAILED" in result.stdout and "02.hang.py" in result.stdout.split("INTEGRATION CHECK(S) FAILED")[-1]
+          and "02.hang.py did not finish within 2 seconds (ST_CHECK_TIMEOUT)" in result.stdout, result.stdout[-500:])
+    check("it was asked to stop with SIGTERM first, so that its cleanup runs", "cleanup ran after SIGTERM" in result.stdout, result.stdout[-500:])
+    started = _time.time()
+    result = run_with(conf_with("yes"), "deaf", ST_CHECK_TIMEOUT="1", ST_CHECK_GRACE="2")
+    check("a check that ignores SIGTERM is killed when its grace period is over, and says so",
+          "was killed (SIGKILL)" in result.stdout and result.returncode == 1 and _time.time() - started < 30, result.stdout[-400:])
+    result = run_with(conf_with("yes"), "quick", ST_CHECK_TIMEOUT="30")
+    check("a check that finishes in time is not touched by the limit", result.returncode == 0 and "did not finish" not in result.stdout, result.stdout[-300:])
+    result = run_with(conf_with("yes"), "quick")
+    check("with no ST_CHECK_TIMEOUT there is a limit (1800 seconds) and a quick check still passes", result.returncode == 0, result.stdout[-300:])
+finally:
+    _shutil.rmtree(work, ignore_errors=True)
+
+sys.path.insert(0, os.path.join(REPO, "tests", "integration", "lib"))
+import run_check  # noqa: E402
+for value, want in (("", 1800.0), ("600", 600.0), ("0", None), ("none", None), ("-5", None), ("abc", 1800.0), (" 45 ", 45.0)):
+    os.environ["ST_CHECK_TIMEOUT"] = value
+    got = run_check.seconds("ST_CHECK_TIMEOUT", run_check.DEFAULT_TIMEOUT)
+    check("ST_CHECK_TIMEOUT=%r means %r" % (value, want), got == want, got)
+os.environ.pop("ST_CHECK_TIMEOUT", None)
+check("the default limit is half an hour and the grace period two minutes", run_check.DEFAULT_TIMEOUT == 1800 and run_check.DEFAULT_GRACE == 120)
+
+# A Ctrl-C reaches the wrapper, not the check, which is in a group of its own: the wrapper has to pass it on
+import signal as _signal  # noqa: E402
+import subprocess as _sp  # noqa: E402
+import tempfile as _tf  # noqa: E402
+with _tf.TemporaryDirectory() as _work:
+    child = os.path.join(_work, "child.py")
+    with open(child, "w") as f:
+        f.write('import signal, sys, time\n'
+                'def handle(signum, frame):\n    print("child got signal %d" % signum, flush=True)\n    sys.exit(130)\n'
+                'signal.signal(signal.SIGINT, handle)\nprint("child started", flush=True)\ntime.sleep(60)\n')
+    wrapper = _sp.Popen([sys.executable, os.path.join(REPO, "tests", "integration", "lib", "run_check.py"), child], stdout=_sp.PIPE, text=True)
+    first = wrapper.stdout.readline()
+    wrapper.send_signal(_signal.SIGINT)
+    rest = wrapper.communicate(timeout=30)[0]
+    check("a SIGINT sent to the wrapper reaches the check it runs, and the check's own exit status comes back",
+          "child started" in first and "child got signal 2" in rest and wrapper.returncode == 130, (first, rest, wrapper.returncode))
 
 print("=== the mock leaves nothing behind ===")
 import glob as _glob  # noqa: E402

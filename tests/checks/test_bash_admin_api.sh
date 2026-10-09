@@ -15,7 +15,7 @@ TESTS_DIR="$(pwd)"
 REPO="$(cd .. && pwd)"
 ADMIN_TREE="${REPO}/Admin/API 2.0/bash"
 
-WORK="${TESTS_DIR}/output/bash_admin_api"
+WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/bash_admin_api"
 rm -rf "${WORK}"
 mkdir -p "${WORK}/bin" "${WORK}/admin" "${WORK}/files"
 

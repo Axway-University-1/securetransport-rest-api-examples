@@ -14,7 +14,7 @@ cd "$(dirname "$0")/.." || exit 1
 TESTS_DIR="$(pwd)"
 REPO="$(cd .. && pwd)"
 
-WORK="${TESTS_DIR}/output/feature_version_check"
+WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/feature_version_check"
 rm -rf "${WORK}"
 mkdir -p "${WORK}/bin"
 

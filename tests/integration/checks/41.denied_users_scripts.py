@@ -14,39 +14,36 @@ once 03.deniedUsers_name_DELETE.sh unblocks the first, it logs in again.
 Needs --write and st_allow_writes="yes". Refuses to start when any login name
 starting with "example" is already denied, and removes what it adds in a
 finally block. It never touches an entry it did not add, and ends by comparing
-the whole list with the one it started with.
+the entries that stay (blockedUntil null) with those it started with: a temporary
+block belongs to somebody else's lockout as much as to this check, and the server
+adds and ends those by itself. That a blank name or a 0 or negative number of hours
+sent nothing is shown by looking for the names it could have made, not by counting
+the list. The two accounts get a new name and user id on every run.
 """
-import base64
+import contextlib
 import os
 import sys
 from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the denied users examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the denied users examples for real")
 
 c = st_client.Checker("Denied users, run for real from Admin/API 2.0/bash/22.DeniedUsers")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "22.DeniedUsers")
 PERMANENT, TEMPORARY, UPPER = "example_denied", "example denied space", "EXAMPLE_DENIED"
 OURS = (PERMANENT, TEMPORARY, UPPER)
-BLOCKED_ACCOUNT, OTHER_ACCOUNT = "example_blocked_user", "example_allowed_user"
-ACCOUNT_PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+SUFFIX = harness.suffix()
+BLOCKED_ACCOUNT, OTHER_ACCOUNT = "example_blocked_" + SUFFIX, "example_allowed_" + SUFFIX
+ACCOUNT_PASSWORD = harness.new_password()
+ENDUSER_PORT = harness.ports(config).enduser
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=60)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=60)
 
 
 def listing(pattern="*"):
@@ -56,7 +53,7 @@ def listing(pattern="*"):
 def end_user_login(account):
     """The HTTP status of an EndUser login as this account, logging out again after a success."""
     client = st_client.EndUserClient(config["st_server"], ENDUSER_PORT, account, ACCOUNT_PASSWORD)
-    response = client._request("POST", "myself", headers={"Authorization": "Basic " + client._auth})
+    response = client.login_response()
     if response.status == 200:
         client.logout()
     return response
@@ -66,23 +63,21 @@ def entry(name):
     return [e for e in listing(name) if e["loginName"] == name]
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /deniedUsers or the EndUser login")
-    admin.logout()
-    sys.exit(c.done())
+def lasting(entries):
+    """The names of the entries that stay until somebody removes them. A temporary block (blockedUntil) ends by itself,
+    and the server adds one of its own whenever somebody else is locked out, so it says nothing about what this check did."""
+    return sorted(e["loginName"] for e in entries if e["blockedUntil"] is None)
+
+
+admin = harness.connect(config, c, mock="the bundled mock does not implement /deniedUsers or the EndUser login")
 if any(e["loginName"].lower().startswith("example") for e in listing()):
     c.check("no denied login name starts with example yet", False, "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
 
-if admin.exists("accounts/" + BLOCKED_ACCOUNT) or admin.exists("accounts/" + OTHER_ACCOUNT):
-    c.check("the accounts %s and %s do not exist yet" % (BLOCKED_ACCOUNT, OTHER_ACCOUNT), False,
-            "remove them first; this check will not touch them")
-    admin.logout()
-    sys.exit(c.done())
-
-before = sorted(e["loginName"] for e in listing())
+before_entries = listing()
+before = sorted(e["loginName"] for e in before_entries)
+accounts = contextlib.ExitStack()
 try:
     with runner.real_credentials(runner.path("Admin", "API 2.0", "bash"), config):
         out = script("02.deniedUsers_POST.sh")
@@ -97,12 +92,14 @@ try:
 
         script("02.deniedUsers_POST.sh", expect_rc=1)
         c.check("02 a name already blocked is refused, and still listed once", len(entry(PERMANENT)) == 1)
-        total = len(listing())
         script("02.deniedUsers_POST.sh", [" "], expect_rc=2)
         script("02.deniedUsers_POST.sh", ["example_zero", "0"], expect_rc=2)
         script("02.deniedUsers_POST.sh", ["example_neg", "-1"], expect_rc=2)
-        c.check("02 a blank name and a 0 or negative number of hours sent nothing",
-                len(listing()) == total and not entry("example_zero") and not entry("example_neg"))
+        # Not the length of the whole list, which another user's lockout changes: only a name this check could have sent
+        # (a blank one, or one of the two it made up) that was not in the list at the start counts
+        strays = [n for n in (e["loginName"] for e in listing()) if n not in before and n not in OURS
+                  and (not n.strip() or n in ("example_zero", "example_neg"))]
+        c.check("02 a blank name and a 0 or negative number of hours sent nothing", not strays, strays)
 
         out = script("01.deniedUsers_GET.sh", ["example*", "2000-01-01"])
         sections = {part.split(":\n", 1)[0]: part.split(":\n", 1)[1] if ":\n" in part else "" for part in out.split("\n\n")}
@@ -134,11 +131,9 @@ try:
         script("03.deniedUsers_name_DELETE.sh", [" "], expect_rc=2)
 
         # --- what a block is for: one account blocked, one not, both logging in
-        for uid, account in (("1061", BLOCKED_ACCOUNT), ("1062", OTHER_ACCOUNT)):
-            made = admin.post("accounts", {"name": account, "type": "user", "uid": uid, "gid": uid,
-                                           "homeFolder": "/home/" + account,
-                                           "user": {"name": account, "passwordCredentials": {"password": ACCOUNT_PASSWORD}}})
-            c.check("created the account %s" % account, made.status == 201, made.text[:200])
+        for account in (BLOCKED_ACCOUNT, OTHER_ACCOUNT):
+            accounts.enter_context(harness.throwaway_account(admin, c, config, name=account, password=ACCOUNT_PASSWORD,
+                                                             label="created the account %s" % account))
         c.check("before any block, the first account logs in", end_user_login(BLOCKED_ACCOUNT).status == 200)
         c.check("before any block, the second account logs in", end_user_login(OTHER_ACCOUNT).status == 200)
 
@@ -155,11 +150,11 @@ finally:
     for name in OURS + (BLOCKED_ACCOUNT,):
         if entry(name):
             admin.delete("deniedUsers/" + quote(name, safe=""))
-    for account in (BLOCKED_ACCOUNT, OTHER_ACCOUNT):
-        if admin.exists("accounts/" + account):
-            admin.delete("accounts/" + account)
-    c.check("the list is exactly as it was before", sorted(e["loginName"] for e in listing()) == before,
-            sorted(set(e["loginName"] for e in listing()) ^ set(before)))
+    accounts.close()
+    after_entries = listing()
+    c.check("the list is exactly as it was before (a temporary block of somebody else's, which comes and goes, left out)",
+            lasting(after_entries) == lasting(before_entries) and not [n for n in OURS + (BLOCKED_ACCOUNT,) if entry(n)],
+            sorted(set(lasting(after_entries)) ^ set(lasting(before_entries))))
     c.check("both accounts are gone", not admin.exists("accounts/" + BLOCKED_ACCOUNT)
             and not admin.exists("accounts/" + OTHER_ACCOUNT))
     admin.logout()

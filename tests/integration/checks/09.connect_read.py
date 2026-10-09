@@ -18,6 +18,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
@@ -29,13 +30,8 @@ c = st_client.Checker("Connect, read only, from Admin/API 2.0/bash/03.Connect")
 BASH_TREE = runner.path("Admin", "API 2.0", "bash")
 CONNECT_DIR = os.path.join(BASH_TREE, "03.Connect")
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /daemons or /servers; run "
-           "this against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /daemons or /servers; run "
+                                          "this against a real server to exercise it"))
 
 with runner.real_credentials(BASH_TREE, config):
     result = runner.run(os.path.join(CONNECT_DIR, "01.daemons_GET.sh"))

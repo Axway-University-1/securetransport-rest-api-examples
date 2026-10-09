@@ -26,21 +26,16 @@ domains exist, and removes everything in a finally block.
 import os
 import socket
 import sys
-import time
 from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 import dummy_servers  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the LDAP domain examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the LDAP domain examples for real")
 
 c = st_client.Checker("LDAP domains, run for real from Admin/API 2.0/bash/25.LdapDomains")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "25.LdapDomains")
@@ -50,23 +45,21 @@ CALLBACK = config.get("st_callback_host", "")
 
 
 def script(name, args=None, expect_rc=0):
-    saved = os.environ.get("LDAP_BIND_PASSWORD")
-    os.environ["LDAP_BIND_PASSWORD"] = BIND_PASSWORD
-    try:
-        result = runner.run(os.path.join(FOLDER, name), args, timeout=90)
-    finally:
-        if saved is None:
-            os.environ.pop("LDAP_BIND_PASSWORD", None)
-        else:
-            os.environ["LDAP_BIND_PASSWORD"] = saved
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+    return harness.run_script(c, FOLDER, name, args, expect_rc, timeout=90, env={"LDAP_BIND_PASSWORD": BIND_PASSWORD})
 
 
 def domain(name):
     response = admin.get("ldapDomains/" + quote(name, safe=""))
     return response.json() if response.status == 200 else None
+
+
+def listening(port):
+    """True when something on this machine accepts a connection on `port`."""
+    try:
+        socket.create_connection(("127.0.0.1", port), timeout=1).close()
+        return True
+    except OSError:
+        return False
 
 
 def free_port():
@@ -75,11 +68,7 @@ def free_port():
         return s.getsockname()[1]
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /ldapDomains")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /ldapDomains")
 if any(domain(n) for n in (NAME, SPACED, CONNECTION)):
     c.check("no example_ldap* domain exists yet", False, "remove them first; this check will not touch them")
     admin.logout()
@@ -159,10 +148,7 @@ try:
             seen = len(sink.connections)
             out = script("08.ldapDomains_name_operations_POST_testConnection.sh", [CONNECTION, str(number[sink_port])])
             c.check("08 the server with the sink behind it: Successful Connection.", "Successful Connection." in out, out[-200:])
-            for _ in range(20):
-                if len(sink.connections) > seen:
-                    break
-                time.sleep(0.25)
+            harness.wait_until(lambda: len(sink.connections) > seen, 5, 0.25)
             c.check("08 and the sink saw ST connect, and nothing was sent",
                     len(sink.connections) > seen and all(x["data"] == b"" for x in sink.connections[seen:]),
                     [(x["client"], x["data"]) for x in sink.connections[seen:]])
@@ -170,7 +156,8 @@ try:
             c.check("08 the server with nothing listening: Connection failed., exit 1", "Connection failed." in out, out[-200:])
             sink.__exit__(None, None, None)
             sink = None
-            time.sleep(1)
+            c.check("set up: nothing listens on the sink's port any more",
+                    harness.wait_until(lambda: not listening(sink_port), 5, 0.25), sink_port)
             out = script("08.ldapDomains_name_operations_POST_testConnection.sh", [CONNECTION, str(number[sink_port])], expect_rc=1)
             c.check("08 once the sink is gone, the first server fails too", "Connection failed." in out, out[-200:])
 finally:

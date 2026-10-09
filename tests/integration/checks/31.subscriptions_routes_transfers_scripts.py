@@ -49,33 +49,24 @@ Needs --write and st_allow_writes="yes". Optional settings in
 integration.conf: st_enduser_port, st_ssh_host, st_ssh_port and
 st_chain_wait_seconds, see integration.conf.example.
 """
-import base64
 import os
 import re
 import sys
-import tempfile
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the subscription, route and transfer scripts for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the subscription, route and transfer scripts for real")
 
 c = st_client.Checker("Sites, subscriptions, routes, a pull and the transfer log, run for real "
                       "as one flow")
 
 PREFIX = config.get("st_object_prefix") or "ZZTEST_"
 ACCOUNT = PREFIX + "chain"
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 TEMPLATE = PREFIX + "RouteTemplate"
 APPLICATION = PREFIX + "ARApplication"
 SIMPLE_COMPRESS = PREFIX + "SimpleRoute_Compress"
@@ -86,17 +77,14 @@ FOLDERS = ["outbound-drop", "delivered", "inbox", "inbox-trigger"]
 UPLOAD_NAME = "zztest_upload.txt"
 UPLOAD_CONTENT = "A file for the integration check, pulled, compressed and pushed.\n"
 
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ENDUSER_PORT = harness.ports(config).enduser
 SSH_HOST = config.get("st_ssh_host") or config["st_server"]
-SSH_PORT = config.get("st_ssh_port") or "8022"
 WAIT = int(config.get("st_chain_wait_seconds") or "90")
 NEW_RELEASE = "5.5-20260924"
 
 BASH_TREE = runner.path("Admin", "API 2.0", "bash")
 ENDUSER_TREE = runner.path("EndUser", "API 2.0", "bash")
 FILES_DIR = os.path.join(ENDUSER_TREE, "02.Files")
-
-SUBS = runner.chain_substitutions(PREFIX, SSH_HOST, SSH_PORT)
 
 # The scripts this check runs as name-substituted copies, in order. The offline
 # suite checks that every name in SUBS is substituted out of each of them.
@@ -168,13 +156,11 @@ def total(params):
             .get("resultSet", {}).get("totalCount"))
 
 
-client = st_client.connect(config, c)
+client = harness.connect(config, c, mock=("the bundled mock does not implement /sites, /subscriptions, /routes, "
+                                          "/transfers or the EndUser API; run this against a real server to exercise it"))
 
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /sites, /subscriptions, /routes, "
-           "/transfers or the EndUser API; run this against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+SSH_PORT = harness.ports(config, client).ssh
+SUBS = runner.chain_substitutions(PREFIX, SSH_HOST, SSH_PORT)
 
 new_release = st_client.server_release_at_least(client, NEW_RELEASE)
 if not new_release:
@@ -191,7 +177,7 @@ if taken:
     sys.exit(c.done())
 
 created_account = False
-work = tempfile.mkdtemp(prefix="zztest_chain_")
+work = harness.scratch("zztest_chain_")
 upload_path = os.path.join(work, UPLOAD_NAME)
 with open(upload_path, "w") as f:
     f.write(UPLOAD_CONTENT)
@@ -317,14 +303,9 @@ try:
         c.check("the pull is accepted (HTTP 202)", re.search(r"^HTTP 202$", result.stdout, re.M) is not None,
                 result.stdout[-200:])
 
-        delivered = []
-        deadline = time.time() + WAIT
         with st_client.EndUserClient(config["st_server"], ENDUSER_PORT, ACCOUNT, PASSWORD) as eu:
-            while time.time() < deadline:
-                delivered = [n for n in (eu.list_folder("delivered") or []) if n.startswith("compressed_files.zip")]
-                if delivered:
-                    break
-                time.sleep(3)
+            delivered = harness.settled(lambda: [n for n in (eu.list_folder("delivered") or []) if n.startswith("compressed_files.zip")],
+                                        bool, WAIT, 3) or []
             inbox_files = eu.list_folder("inbox")
         c.check("within %ds, the file came back pulled, compressed and pushed to /delivered" % WAIT,
                 delivered == ["compressed_files.zip_PUSHED"], delivered or ("inbox holds", inbox_files))
@@ -395,9 +376,6 @@ finally:
     leftovers += [ACCOUNT] if client.exists("accounts/" + ACCOUNT) else []
     c.check("everything this check created was removed", not leftovers, leftovers)
     os.environ.pop("PARTNER_PASSWORD", None)
-    if os.path.exists(upload_path):
-        os.remove(upload_path)
-    os.rmdir(work)
     client.logout()
 
 c.info("%d API calls issued by the verification client (not counting the scripts' own calls)"

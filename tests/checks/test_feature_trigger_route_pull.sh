@@ -14,7 +14,7 @@ TESTS_DIR="$(pwd)"
 REPO="$(cd .. && pwd)"
 FEATURE="Features/trigger-route-after-completed-pull"
 
-WORK="${TESTS_DIR}/output/feature_trigger_route_pull"
+WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/feature_trigger_route_pull"
 rm -rf "${WORK}"
 mkdir -p "${WORK}/bin" "${WORK}/Features" "${WORK}/Admin/API 2.0/bash"
 

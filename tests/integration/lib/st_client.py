@@ -407,11 +407,18 @@ class EndUserClient:
             raise STError("no answer from %s: %s" % (url, e)) from e
 
     def login(self):
-        response = self._request("POST", "myself",
-                                 headers={"Authorization": "Basic " + self._auth})
+        response = self.login_response()
         if response.status != 200:
             raise STError("EndUser login failed", response.status, response.text)
         return response
+
+    def login_response(self):
+        """
+        The login, as the answer the server gave: the Response of POST /myself, whatever its status
+        (login() raises on anything but 200). For a check that must tell a refusal (401) from a login,
+        or that tries several accounts and wants no exception. A session is open after a 200.
+        """
+        return self._request("POST", "myself", headers={"Authorization": "Basic " + self._auth})
 
     def logout(self):
         return self._request("DELETE", "myself")

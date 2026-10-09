@@ -50,26 +50,18 @@ Two more things confirmed while building this:
     test.txt mid-run so the later steps that depend on it are unaffected.
 Both are recorded in .claude/skills/st-api-gotchas/SKILL.md.
 """
-import base64
 import os
 import shutil
 import subprocess
 import sys
-import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the EndUser scripts for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the EndUser scripts for real")
 
 c = st_client.Checker("EndUser, run for real from EndUser/API 2.0/bash")
 
@@ -79,16 +71,11 @@ AUTH_DIR = os.path.join(ENDUSER_TREE, "01.Authenticate")
 FILES_DIR = os.path.join(ENDUSER_TREE, "02.Files")
 
 ACCOUNT = config.get("st_enduser_test_account", "ZZTEST_enduser")
-ACCOUNT_PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ACCOUNT_PASSWORD = harness.new_password()
+ENDUSER_PORT = harness.ports(config).enduser
 
-admin = st_client.connect(config, c)
-
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /files or a second port; "
-           "run this against a real server to exercise it")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock=("the bundled mock does not implement /files or a second port; "
+                                         "run this against a real server to exercise it"))
 
 created_account = False
 test_txt_backup = None
@@ -275,7 +262,7 @@ try:
             # keep in their own cookie jar, so it needs its own logout.
             euclient.logout()
 
-        stored_session = tempfile.mkdtemp(prefix="st_enduser_jar_")
+        stored_session = harness.scratch("st_enduser_jar_")
         stored_jar = os.path.join(stored_session, "jar")
 
         def stored_session_status():
@@ -296,7 +283,6 @@ try:
         c.check("after 02.myself_DELETE.sh, the session that was in the jar is refused (it really ended)",
                 stored_session_status() == "401", stored_session_status())
         c.check("02 removed the cookie jar", not os.path.exists(COOKIE_JAR))
-        shutil.rmtree(stored_session, ignore_errors=True)
         result = runner.run(os.path.join(AUTH_DIR, "02.myself_DELETE.sh"))
         c.check("02 exits 1 when there is no session to end", result.returncode == 1, result.returncode)
 

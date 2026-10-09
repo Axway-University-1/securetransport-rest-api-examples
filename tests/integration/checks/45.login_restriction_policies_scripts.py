@@ -22,26 +22,18 @@ from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the login restriction policy examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the login restriction policy examples for real")
 
 c = st_client.Checker("Login restriction policies, run for real from Admin/API 2.0/bash/26.LoginRestrictionPolicies")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "26.LoginRestrictionPolicies")
 NAME, SPACED, UNIT = "example_lrp", "example lrp space", "example_lrp_bu"
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=90)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=90)
 
 
 def policy(name):
@@ -53,11 +45,7 @@ def rule(name_, rule_name):
     return next((r for r in (policy(name_) or {}).get("rules", []) if r["name"] == rule_name), None)
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /loginRestrictionPolicies")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /loginRestrictionPolicies")
 if policy(NAME) or policy(SPACED) or admin.exists("businessUnits/" + UNIT):
     c.check("no example_lrp* policy or business unit exists yet", False, "remove them first; this check will not touch them")
     admin.logout()

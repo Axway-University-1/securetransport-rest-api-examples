@@ -32,6 +32,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
@@ -51,13 +52,8 @@ def script(name):
     return os.path.join(PY_DIR, name)
 
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement enough of the admin API for "
-           "these scripts; run this against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement enough of the admin API for "
+                                          "these scripts; run this against a real server to exercise it"))
 
 with runner.real_credentials_python(PY_TREE, config):
 

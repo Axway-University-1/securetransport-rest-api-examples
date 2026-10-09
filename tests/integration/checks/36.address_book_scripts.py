@@ -18,32 +18,20 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the address book examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the address book examples for real")
 
 c = st_client.Checker("Address book sources, run for real from Admin/API 2.0/bash/19.AddressBook")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "19.AddressBook")
 
 
-def script(name, args=None):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=60)
-    out = result.stdout + result.stderr
-    c.check("%s runs" % name, result.returncode == 0, out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=60, label="{name} runs")
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /addressBook")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /addressBook")
 
 ldap = [s for s in (admin.get("addressBook/sources", params={"name": "LDAP"}).json() or {}).get("result", [])]
 if not ldap:

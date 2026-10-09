@@ -31,6 +31,7 @@ import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
@@ -43,11 +44,7 @@ FOLDER = os.path.join(BASH, "34.TransactionManager")
 STOP = "02.transactionManager_operations_POST_stop.sh"
 WORD = "stop-the-transaction-manager"
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /transactionManager")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /transactionManager")
 
 
 def refusal(args):

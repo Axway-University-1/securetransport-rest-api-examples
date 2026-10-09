@@ -16,7 +16,7 @@ TESTS_DIR="$(pwd)"
 REPO="$(cd .. && pwd)"
 EU_TREE="${REPO}/EndUser/API 2.0/bash"
 
-WORK="${TESTS_DIR}/output/bash_enduser_api"
+WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/bash_enduser_api"
 rm -rf "${WORK}"
 mkdir -p "${WORK}/bin" "${WORK}/eu" "${WORK}/files"
 

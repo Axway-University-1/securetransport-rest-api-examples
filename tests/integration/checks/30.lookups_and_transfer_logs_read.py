@@ -48,6 +48,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
@@ -61,13 +62,8 @@ LOGS_DIR = os.path.join(BASH_TREE, "16.TransferLogs")
 PY_TREE = runner.path("Admin", "API 2.0", "python")
 BILLABLE_RELEASE = "5.5-20260924"
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /sites, /subscriptions, /routes "
-           "or /logs/transfers; run this against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /sites, /subscriptions, /routes "
+                                          "or /logs/transfers; run this against a real server to exercise it"))
 
 
 def results(path, params):

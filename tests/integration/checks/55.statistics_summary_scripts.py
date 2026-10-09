@@ -24,8 +24,13 @@ Runs the real, unmodified 33.StatisticsSummary examples, against what they repor
 
 The server's transfer log keeps the account's four entries (the upload, two downloads, the delete), and the active users list
 keeps the account's name: neither can be removed. Needs --write and st_allow_writes="yes".
-Refuses to start when example_stat_user exists. Counts of other transfers on the server
-are read as they are, so a busy lab can make the exact-count checks fail: run it again.
+Refuses to start when example_stat_user exists. The report counts the WHOLE server, and nothing
+in the API narrows it to one account, so a transfer of another account landing during a step
+moves the numbers this check expects exactly: it cannot count only its own. What it does is read
+the transfer log's count of OTHER accounts' transfers before and after each step, and say in the
+failure that it gained some ("run it again"), and say after each step how long the report took
+to show it. The account has a fixed name on purpose: the server keeps every name that ever logged
+in for its active users report, and a new name each run would add one for ever.
 
 It takes the date of the machine it runs on as the date of the server, so the two must be in
 the same time zone; and it waits out midnight (st_client.avoid_midnight) so the day does not
@@ -40,22 +45,18 @@ import time
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import dummy_servers  # noqa: E402
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the statistics summary examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the statistics summary examples for real")
 
 c = st_client.Checker("Statistics summary, run for real from Admin/API 2.0/bash/33.StatisticsSummary")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "33.StatisticsSummary")
 USER = "example_stat_user"
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 HOST = config["st_server"]
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ENDUSER_PORT = harness.ports(config).enduser
 CALLBACK = config.get("st_callback_host", "")
 AUTH_OPTION = "StatisticsSummaryReport.Platform.Authentication"
 CLIENT_OPTION = "StatisticsSummaryReport.ClientId"
@@ -63,29 +64,7 @@ FILE = "example_stat_%s.txt" % base64.b32encode(os.urandom(4)).decode().rstrip("
 KEYS = ("ST.TransfersIn", "ST.TransfersOut", "ST.Transfers")
 
 
-def script(name, args=None, expect_rc=0, env=None):
-    saved = {k: os.environ.get(k) for k in (env or {})}
-    os.environ.update(env or {})
-    try:
-        result = runner.run(os.path.join(FOLDER, name), args, timeout=120)
-    finally:
-        for k, v in saved.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
-
-
-def wait_for(predicate, seconds=30, every=2):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        if predicate():
-            return True
-        time.sleep(every)
-    return predicate()
+script = harness.bind_script(c, FOLDER, timeout=120)
 
 
 def report(start, end=None, **flags):
@@ -113,7 +92,7 @@ def settled():
         ok = now == last[0] and now
         last[0] = now
         return ok
-    wait_for(same, 40, 3)
+    harness.wait_until(same, 40, 3)
     return last[0]
 
 
@@ -125,29 +104,47 @@ def delta(before, after):
     return {k: after[k] - before[k] for k in KEYS}
 
 
+def transfers_logged(**params):
+    response = admin.get("logs/transfers", params=dict(params, limit=1))
+    return ((response.json() or {}).get("resultSet") or {}).get("totalCount") if response.status == 200 else None
+
+
+def others_logged():
+    """How many transfers of OTHER accounts the transfer log holds. The report's counts are the whole server's: another
+    account's transfer landing while a step runs moves them too, which is not a fault of the example."""
+    total, own = transfers_logged(), transfers_logged(account=USER)
+    return None if total is None or own is None else total - own
+
+
 def after_step(before, expected, label):
     """Wait for today's counts to differ from `before` by exactly `expected`."""
     got = [None]
+    started = time.time()
 
     def matches():
         got[0] = delta(before, counts(usage_today()))
         return got[0] == expected
-    ok = wait_for(matches, 40, 3)
-    c.check(label, ok, "expected %s, the server moved %s" % (expected, got[0]))
+    ok = harness.wait_until(matches, 40, 1)
+    took = time.time() - started
+    busy = others_logged()
+    note = ""
+    if busy != others_before[0]:
+        note = " (the transfer log gained %s transfer(s) of other accounts since the check began: the counts are the whole server's, run it again)" % (
+            (busy or 0) - (others_before[0] or 0))
+        others_before[0] = busy
+    c.info("the report showed this step after %.0f s" % took)
+    c.check(label, ok, "expected %s, the server moved %s%s" % (expected, got[0], note))
     return counts(settled())
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /statisticsSummary")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /statisticsSummary")
 if admin.exists("accounts/" + USER):
     c.check("the account %s does not exist yet" % USER, False, "remove it first; this check will not touch it")
     admin.logout()
     sys.exit(c.done())
 
 st_client.avoid_midnight()
+others_before = [others_logged()]
 saved_auth = admin.get("configurations/options/" + AUTH_OPTION).json()
 enduser = None
 try:
@@ -206,12 +203,11 @@ try:
         base = counts(settled())
         c.check("set up: today's counts have settled: %s" % base, bool(base))
         enduser = st_client.EndUserClient(HOST, ENDUSER_PORT, USER, PASSWORD)
-        c.check("the account logs in to the EndUser API", enduser._request("POST", "myself", headers={
-            "Authorization": "Basic " + enduser._auth}).status == 200)
+        c.check("the account logs in to the EndUser API", enduser.login_response().status == 200)
 
         # 02, after the login
         c.check("02 lists the account once it has logged in (waits: the list is read again)",
-                wait_for(lambda: listed([USER, str(start_ms)])[0], 30))
+                harness.wait_until(lambda: listed([USER, str(start_ms)])[0], 30))
         api = admin.get("statisticsSummary/activeUsers", params={"name": USER, "lastAccessTime.from": str(start_ms)}).json()
         c.check("the API lists it once, with a login time as text and no ad hoc access", api["resultSet"]["totalCount"] == 1
                 and api["result"][0]["name"] == USER and api["result"][0]["lastAccessTime"] and api["result"][0]["lastAdhocAccessTime"] == "", api)
@@ -248,8 +244,10 @@ try:
         c.check("a second download is 200", enduser.download(FILE).status == 200)
         base = after_step(base, {"ST.TransfersIn": 0, "ST.TransfersOut": 1, "ST.Transfers": 1}, "the second download moves Out by 1 and Transfers by 1")
         c.check("the file is deleted: 204", enduser.delete_file(FILE).status == 204)
-        time.sleep(10)
-        c.check("a delete moves nothing (it is logged as outgoing, and not counted)", counts(settled()) == base, (base, counts(settled())))
+        # That a delete moves nothing cannot be seen to end, so the report is watched for a bounded time: the other steps showed
+        # in it 2 s after they were done (measured, 6 runs of 3 steps), so 6 s is three times that. A count that moves ends the watch.
+        moved = harness.wait_until(lambda: counts(usage_today()) != base, 6, 1)
+        c.check("a delete moves nothing (it is logged as outgoing, and not counted)", not moved and counts(settled()) == base, (base, counts(settled())))
         r = report(today_string(), today_string(), includeActiveUsersCount="true", includeIncomingFileVolume="true")
         c.check("the flags are accepted", r.status == 200, r.status)
         c.info("ST.ActiveUsers and ST.Volume on the lab: %s" % {k: v for k, v in usage_today().items() if k in ("ST.ActiveUsers", "ST.Volume")})
@@ -271,7 +269,7 @@ try:
                                                                        "client_secret": "example_secret"}, token.requests and token.requests[-1]["body"])
                 script("03.statisticsSummary_operations_POST_testConnection.sh", expect_rc=1)
                 c.check("with no argument the saved client id is used", len(token.requests) == 2 and token.form()["client_id"] == saved_client[0],
-                        (saved_client, token.requests[-1]["body"]))
+                        (saved_client, token.requests and token.requests[-1]["body"]))
                 token.status, token.answer = 500, {"error": "boom", "error_description": "broken"}
                 out = script("03.statisticsSummary_operations_POST_testConnection.sh", ["example_client"], expect_rc=1)
                 c.check("a 500 from the platform is a 500 from the server, with the platform's body", "HTTP 500" in out

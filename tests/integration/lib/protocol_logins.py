@@ -11,6 +11,7 @@ thing for each: SFTP and HTTP (the EndUser API) are the CORE protocols, FTP is t
 `Logins(host, ssh_port, enduser_port, ftp_port, password)` has:
   try_login(proto, account, password=None) -> "ok" or "refused (...)" or "error (...)"; the login is closed at once
   open_login(proto, account)               -> a Holder whose alive() / close() work on a login kept open
+                                              (and status() on an HTTP one: the status of a call made with its session)
   cleanup()                                -> ends every sftp process this object started, removes its temp folder
 """
 import ftplib
@@ -27,10 +28,12 @@ SESSION_PROTOCOL = {"SFTP": "SSH", "HTTP": "HTTP", "FTP": "FTP"}
 
 
 class Holder:
-    """One open login: alive() says whether the client is still connected, close() ends it."""
+    """One open login: alive() says whether the client is still connected, close() ends it. An HTTP login also has
+    status(), the HTTP status of a call made with its session (200 while it is open, 401 once the server ended it)."""
 
-    def __init__(self, alive, close):
+    def __init__(self, alive, close, status=None):
         self.alive, self.close = alive, close
+        self.status = status or (lambda: None)
 
 
 class Logins:
@@ -65,7 +68,7 @@ class Logins:
         password = password or self.password
         if proto == "FTP":
             client = ftplib.FTP()
-            client.connect(self.host, self.ftp_port, timeout=30)
+            client.connect(self.host, int(self.ftp_port), timeout=30)
             client.login(account, password)
 
             def alive():
@@ -77,10 +80,11 @@ class Logins:
             return Holder(alive, client.close)
         if proto == "HTTP":
             client = st_client.EndUserClient(self.host, self.enduser_port, account, password)
-            login = client._request("POST", "myself", headers={"Authorization": "Basic " + client._auth})
+            login = client.login_response()
             if login.status != 200:
                 raise st_client.STError("EndUser login of %s answered %s" % (account, login.status))
-            return Holder(lambda: client._request("GET", "myself").status == 200, lambda: client.logout())
+            return Holder(lambda: client._request("GET", "myself").status == 200, lambda: client.logout(),
+                          status=lambda: client._request("GET", "myself").status)
         proc = self._sftp(account, password)
 
         def close():
@@ -92,7 +96,24 @@ class Logins:
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 proc.terminate()
-        return Holder(lambda: proc.poll() is None, close)
+
+        def alive():
+            """sftp reads its commands from the pipe and notices that the server ended the session only when it sends one:
+            asked while nothing is typed, a dead session looks alive. So give it a command that needs the server (`ls`: `pwd` is
+            answered from what the client remembers, and does not end it) and see whether it ends."""
+            if proc.poll() is not None:
+                return False
+            try:
+                proc.stdin.write(b"ls\n")
+                proc.stdin.flush()
+            except (OSError, ValueError):
+                return False
+            try:
+                proc.wait(timeout=1.5)
+                return False
+            except subprocess.TimeoutExpired:
+                return True
+        return Holder(alive, close)
 
     def try_login(self, proto, account, password=None):
         """'ok' when the login was accepted, 'refused (...)' when it was not, 'error (...)' when it could not be tried.
@@ -101,13 +122,13 @@ class Logins:
         try:
             if proto == "FTP":
                 client = ftplib.FTP()
-                client.connect(self.host, self.ftp_port, timeout=15)
+                client.connect(self.host, int(self.ftp_port), timeout=15)
                 client.login(account, password)
                 client.quit()
                 return "ok"
             if proto == "HTTP":
                 client = st_client.EndUserClient(self.host, self.enduser_port, account, password)
-                response = client._request("POST", "myself", headers={"Authorization": "Basic " + client._auth})
+                response = client.login_response()
                 if response.status == 200:
                     client.logout()
                     return "ok"

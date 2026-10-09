@@ -25,34 +25,26 @@ It shows what the example teaches and the reference does not say:
 import json
 import os
 import sys
-import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the charsets check (it creates and deletes throwaway routes)")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the charsets check (it creates and deletes throwaway routes)")
 
 c = st_client.Checker("Route steps charsets, run for real from Admin/API 2.0/bash/31.RouteStepsCharsets (01)")
 BASH = runner.path("Admin", "API 2.0", "bash")
 SCRIPT = os.path.join(BASH, "31.RouteStepsCharsets", "01.routeStepsCharsets_GET.sh")
 METADATA = os.path.join(BASH, "30.RouteStepsMetadata", "01.routeStepsMetadata_GET.sh")
 PREFIX = "example_charset_"
-SCRATCH = tempfile.mkdtemp(prefix="example_charset_")
+SCRATCH = harness.scratch("example_charset_")
 
 
 def script(args=None, expect_rc=0):
-    result = runner.run(SCRIPT, args, timeout=60)
-    out = result.stdout + result.stderr
-    c.check("01 %s exits %s" % (" ".join(args or []) or "with no arguments", expect_rc), result.returncode == expect_rc,
-            out.strip()[-300:])
-    return out
+    return harness.run_script(c, os.path.dirname(SCRIPT), os.path.basename(SCRIPT), args, expect_rc,
+                              label=lambda name, shown, rc: "01 %s exits %s" % (shown or "with no arguments", rc))
 
 
 def write_json(name, value):
@@ -75,11 +67,7 @@ def errors_of(response):
     return " ".join((response.json() or {}).get("validationErrors") or [])
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /routeStepsCharsets")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /routeStepsCharsets")
 if left_over():
     c.check("no route named %s* exists yet" % PREFIX, False, "remove them first; this check will not touch them")
     admin.logout()
@@ -185,9 +173,6 @@ finally:
     for route in left_over():
         admin.delete("routes/" + route["id"])
     c.check("nothing is left behind: no route named %s*" % PREFIX, not left_over())
-    for name in os.listdir(SCRATCH):
-        os.remove(os.path.join(SCRATCH, name))
-    os.rmdir(SCRATCH)
     admin.logout()
 
 sys.exit(c.done())

@@ -44,7 +44,7 @@ start when its example_lre* objects exist, and removes everything in a finally b
 whatever the assertions found: no policy, unit or account is left. No policy is ever made
 the default.
 """
-import base64
+import contextlib
 import os
 import shutil
 import sys
@@ -52,64 +52,49 @@ import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 import protocol_logins  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the login restriction enforcement check for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the login restriction enforcement check for real")
 
 c = st_client.Checker("Login restriction policy enforcement, run for real with 26.LoginRestrictionPolicies")
 ADMIN_TREE = runner.path("Admin", "API 2.0", "bash")
 FOLDER = os.path.join(ADMIN_TREE, "26.LoginRestrictionPolicies")
 POLICY, UNIT = "example_lre", "example_lre_bu"
 IN_UNIT, OUTSIDE = "example_lre_user", "example_lre_other"
-RUN = base64.b32encode(os.urandom(4)).decode().rstrip("=").lower()
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+RUN = harness.suffix(8)
+IN_UNIT, OUTSIDE = IN_UNIT + "_" + RUN, OUTSIDE + "_" + RUN
+PASSWORD = harness.new_password()
+ENDUSER_PORT = harness.ports(config).enduser
 HOST = config["st_server"]
 WAIT_SECONDS = 20
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=90)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=90)
 
 
 def login_until(account, proto, wanted, seconds=WAIT_SECONDS):
     """(the outcome, the tries made, the seconds spent): the login is tried again every 2 seconds until its outcome
     starts with `wanted` ('ok' or 'refused') or `seconds` have passed (the cap per protocol)."""
     start = time.time()
-    tries = 0
-    while True:
-        outcome = logins.try_login(proto, account)
-        tries += 1
-        if outcome.startswith(wanted) or time.time() - start >= seconds:
-            return outcome, tries, int(time.time() - start)
-        time.sleep(2)
+    tries, last = [0], [None]
+
+    def attempt():
+        last[0] = logins.try_login(proto, account)
+        tries[0] += 1
+        return last[0].startswith(wanted)
+    harness.wait_until(attempt, seconds, 2)
+    return last[0], tries[0], int(time.time() - start)
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /loginRestrictionPolicies or the protocol servers")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /loginRestrictionPolicies or the protocol servers")
 
-servers = admin.get("servers").json()
-servers = servers if isinstance(servers, list) else servers.get("result", [])
+ports = harness.ports(config, admin)
 daemons = admin.get("daemons").json()
-ports = {}
-for protocol in ("ftp", "ssh"):
-    found_ports = [x["port"] for x in servers if x.get("protocol") == protocol and x.get("port")]
-    ports[protocol] = found_ports[0] if found_ports else None
-ftp_port = ports["ftp"] if daemons.get("ftpStatus") == "Running" else None
-ssh_port = ports["ssh"] if daemons.get("sshStatus") == "Running" else None
+ftp_port = ports.ftp if daemons.get("ftpStatus") == "Running" else None
+ssh_port = ports.ssh if daemons.get("sshStatus") == "Running" else None
 if not ssh_port or not shutil.which("sftp"):
     c.check("SFTP, a core protocol, can be exercised", False, "the SSH daemon is not running, or there is no sftp client on this machine")
     admin.logout()
@@ -121,22 +106,20 @@ if not ftp_port:
     c.info("the FTP daemon is not running or has no port: the legacy FTP part is left out")
 
 exists = admin.get("loginRestrictionPolicies", params={"name": POLICY}).json().get("result")
-if exists or admin.exists("businessUnits/" + UNIT) or admin.exists("accounts/" + IN_UNIT) or admin.exists("accounts/" + OUTSIDE):
-    c.check("no example_lre* policy, business unit or account exists yet", False, "remove them first; this check will not touch them")
+if exists or admin.exists("businessUnits/" + UNIT):
+    c.check("no example_lre* policy or business unit exists yet", False, "remove them first; this check will not touch them")
     logins.cleanup()
     admin.logout()
     sys.exit(c.done())
 
+accounts = contextlib.ExitStack()
 try:
     base = "/home/%s_%s" % (UNIT, RUN)
     c.check("set up: a business unit", admin.post("businessUnits", {"name": UNIT, "baseFolder": base}).status == 201)
-    for uid, account, home, unit in (("1101", IN_UNIT, "%s/%s" % (base, IN_UNIT), UNIT), ("1102", OUTSIDE, "/home/%s" % OUTSIDE, None)):
-        body = {"name": account, "type": "user", "uid": uid, "gid": uid, "homeFolder": home,
-                "user": {"name": account, "passwordCredentials": {"password": PASSWORD}}}
-        if unit:
-            body["businessUnit"] = unit
-        made = admin.post("accounts", body)
-        c.check("set up: the account %s%s" % (account, " in the business unit" if unit else ", in no unit"), made.status == 201, made.text[:200])
+    for account, home, unit in ((IN_UNIT, "%s/%s" % (base, IN_UNIT), UNIT), (OUTSIDE, "/home/%s" % OUTSIDE, None)):
+        accounts.enter_context(harness.throwaway_account(
+            admin, c, config, name=account, password=PASSWORD, home=home, extra={"businessUnit": unit} if unit else None,
+            label="set up: the account %s%s" % (account, " in the business unit" if unit else ", in no unit")))
 
     for proto in protocols:
         label = LABELS[proto]
@@ -170,8 +153,7 @@ try:
 finally:
     logins.cleanup()
     admin.delete("loginRestrictionPolicies/" + POLICY)
-    for account in (IN_UNIT, OUTSIDE):
-        admin.delete("accounts/" + account)
+    accounts.close()
     admin.delete("businessUnits/" + UNIT)
     c.check("nothing is left behind: no policy, business unit or account",
             not admin.get("loginRestrictionPolicies", params={"name": POLICY}).json().get("result")

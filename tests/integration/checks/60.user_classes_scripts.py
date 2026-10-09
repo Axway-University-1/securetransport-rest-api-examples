@@ -34,25 +34,20 @@ Refuses to start when a class named example_* (in any capitals) exists. Removes 
 it made in a finally block and ends by comparing the whole list of classes (with
 VirtClass and RealClass, and their order) with the one saved before.
 """
-import base64
+import contextlib
 import os
 import random
 import shutil
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 import protocol_logins  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the user classes examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the user classes examples for real")
 
 c = st_client.Checker("User classes, run for real from Admin/API 2.0/bash/36.UserClasses")
 _check = c.check
@@ -71,8 +66,7 @@ MATCH, OTHER, TEMPLATE_BASE = "example_ucm_" + SUFFIX, "example_uco_" + SUFFIX, 
 TEMPLATE = TEMPLATE_BASE
 TEMPLATE_NO_CLASS_BASE = "example_ucn_" + SUFFIX
 TEMPLATE_NO_CLASS = TEMPLATE_NO_CLASS_BASE
-BASE_UID = random.randint(50000, 58000)
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 HOST = config["st_server"]
 FIRST, SECOND, RENAMED = "example_userclass", "example_second", "example_renamed"
 UPPER = "EXAMPLE_USERCLASS"
@@ -80,33 +74,9 @@ BUILTIN = ("VirtClass", "RealClass")
 tracked = set()
 
 
-def wait_until(predicate, seconds=30, interval=1):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        try:
-            if predicate():
-                return True
-        except st_client.STError:
-            pass
-        time.sleep(interval)
-    try:
-        return bool(predicate())
-    except st_client.STError:
-        return False
-
-
-def script(name, args=None, expect_rc=0, retry=True):
-    """Run an example. A list of classes can lack one that exists, so a lookup that found none for a class that is
-    known to exist (retry=True) is run again, up to five times."""
-    for _ in range(5):
-        result = runner.run(os.path.join(FOLDER, name), args, timeout=120)
-        out = result.stdout + result.stderr
-        if retry and "Found 0 user classes named" in out:
-            time.sleep(2)
-            continue
-        break
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-400:])
-    return out
+# A list of classes can lack one that exists, so a lookup that found none for a class that is known to exist
+# (retry=True) is run again, up to five times
+script = harness.bind_script(c, FOLDER, timeout=120, tail=400, retry_text="Found 0 user classes named")
 
 
 def classes():
@@ -120,13 +90,7 @@ def find(name):
 
 
 def settled(name, condition, seconds=20):
-    last = [None]
-
-    def look():
-        last[0] = find(name)
-        return last[0] is not None and condition(last[0])
-    wait_until(look, seconds)
-    return last[0] or {}
+    return harness.settled(lambda: find(name), condition, seconds) or {}
 
 
 def names_by_order():
@@ -157,7 +121,7 @@ def login(account, hold=False, proto=None):
         found[:] = [s for s in sessions() if s["userName"] == account and s["id"] not in before
                     and s["protocol"] == SESSION_PROTOCOL[proto]]
         return bool(found)
-    wait_until(seen, 20)
+    harness.wait_until(seen, 20)
     if hold:
         return (found[0] if found else None), holder
     holder.close()
@@ -178,13 +142,7 @@ def lands_in(account, want, seconds=30):
     def look():
         last[0] = login_class(account)
         return last[0] == want
-    return wait_until(look, seconds, 1), last[0]
-
-
-def create_account(name, uid):
-    response = admin.post("accounts", {"name": name, "type": "user", "uid": str(uid), "gid": str(uid), "homeFolder": "/home/" + name,
-                                       "user": {"name": name, "passwordCredentials": {"password": PASSWORD}}})
-    c.check("set up: the account " + name, response.status == 201, response.text[:200])
+    return harness.wait_until(look, seconds, 1), last[0]
 
 
 def line(k):
@@ -193,24 +151,14 @@ def line(k):
         "enabled" if k["enabled"] else "disabled", k["expression"] or "-")
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /userClasses, /sessions or the protocol servers")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /userClasses, /sessions or the protocol servers")
 if any(k["className"].lower().startswith("example_") for k in classes()):
     c.check("no user class named example_* exists yet", False, "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
-servers = admin.get("servers").json()
-servers = servers if isinstance(servers, list) else servers.get("result", [])
-ports = {}
-for protocol in ("ftp", "ssh"):
-    found_ports = [x["port"] for x in servers if x.get("protocol") == protocol and x.get("port")]
-    ports[protocol] = found_ports[0] if found_ports else None
+ports = harness.ports(config, admin)
 daemons = admin.get("daemons").json()
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
-FTP_PORT, SSH_PORT = ports["ftp"], ports["ssh"]
+ENDUSER_PORT, FTP_PORT, SSH_PORT = ports.enduser, ports.ftp, ports.ssh
 missing = []
 if not FTP_PORT or daemons.get("ftpStatus") != "Running":
     missing.append("the FTP daemon is not running")
@@ -228,11 +176,11 @@ saved = {k["id"]: k for k in classes()}
 c.check("set up: the server has VirtClass and RealClass, and they are saved to compare with at the end",
         all(any(k["className"] == b for k in saved.values()) for b in BUILTIN), sorted(k["className"] for k in saved.values()))
 open_clients = []
-accounts = []
+accounts = []          # the template accounts, which are made through the API as they are needed
+users = contextlib.ExitStack()
 try:
-    for offset, account in enumerate((MATCH, OTHER)):
-        create_account(account, BASE_UID + offset)
-        accounts.append(account)
+    for account in (MATCH, OTHER):
+        users.enter_context(harness.throwaway_account(admin, c, config, name=account, password=PASSWORD))
     in_class, _ = lands_in(MATCH, "VirtClass")
     c.check("with no class of ours both accounts log in to VirtClass", in_class and login_class(OTHER) == "VirtClass")
 
@@ -260,7 +208,7 @@ try:
                 (first.get("userType"), first.get("userName"), first.get("group"), first.get("address"), first.get("enabled"), first.get("expression"))
                 == ("*", MATCH, "*", "*", False, ""), first)
         c.check("02 it is FIRST (order 1) and VirtClass and RealClass moved down, in the same order",
-                wait_until(lambda: names_by_order() == [FIRST, "VirtClass", "RealClass"]), names_by_order())
+                harness.wait_until(lambda: names_by_order() == [FIRST, "VirtClass", "RealClass"]), names_by_order())
         c.check("the effect: the class is disabled, so the MATCH account still logs in to VirtClass", login_class(MATCH) == "VirtClass")
         before_count = len(classes())
         script("02.userClasses_POST.sh", [FIRST, MATCH], expect_rc=1)
@@ -274,7 +222,7 @@ try:
         tracked.add(UPPER)
         c.check("02 a name in other capitals is another class (names are case sensitive)", find(UPPER) is not None and find(FIRST) is not None, out[-200:])
         script("07.userClasses_id_DELETE.sh", [UPPER])
-        c.check("07 deleted that one only: example_userclass is still there", wait_until(lambda: find(UPPER) is None) and find(FIRST) is not None)
+        c.check("07 deleted that one only: example_userclass is still there", harness.wait_until(lambda: find(UPPER) is None) and find(FIRST) is not None)
 
         # -- 03, 04 ---------------------------------------------------------------------------
         c.info("--- 03 and 04 check and read it")
@@ -302,7 +250,7 @@ try:
                 c.info("--- FTP: the legacy protocol, as an additional part; the same behaviours as above")
             TEMPLATE = TEMPLATE_BASE + "_" + PROTO.lower()
             TEMPLATE_NO_CLASS = TEMPLATE_NO_CLASS_BASE + "_" + PROTO.lower()
-            UID_T = BASE_UID + 2 + 2 * number
+            UID_T, UID_T2 = harness.fresh_uid(), harness.fresh_uid()
             if number:
                 # the first protocol deleted the classes it used: a new disabled one, as 02 makes it
                 script("02.userClasses_POST.sh", [FIRST, MATCH])
@@ -418,12 +366,12 @@ try:
             out = script("02.userClasses_POST.sh", [SECOND, MATCH, "true", "true"])
             tracked.add(SECOND)
             c.check("02 a second enabled class for the MATCH account is FIRST, the older one second",
-                    wait_until(lambda: names_by_order() == [SECOND, FIRST, "VirtClass", "RealClass"]), names_by_order())
+                    harness.wait_until(lambda: names_by_order() == [SECOND, FIRST, "VirtClass", "RealClass"]), names_by_order())
             ok, got = lands_in(MATCH, SECOND)
             c.check("the effect: the newer class (order 1) wins", ok, got)
             out = script("06.userClasses_id_PATCH.sh", [SECOND, "order", "2"])
             c.check("06 order 2 moves it behind the other one: the order of the others shifts",
-                    wait_until(lambda: names_by_order() == [FIRST, SECOND, "VirtClass", "RealClass"]) and "is now '1'." in out, (names_by_order(), out[-200:]))
+                    harness.wait_until(lambda: names_by_order() == [FIRST, SECOND, "VirtClass", "RealClass"]) and "is now '1'." in out, (names_by_order(), out[-200:]))
             ok, got = lands_in(MATCH, FIRST)
             c.check("the effect: the older class (now order 1) wins", ok, got)
 
@@ -437,7 +385,7 @@ try:
             c.check("set up: a template account that names %s" % FIRST, template.status == 201, template.text[:200])
             accounts.append(TEMPLATE)
             nameless = admin.post("accounts", {"name": TEMPLATE_NO_CLASS, "type": "template", "homeFolder": "/home/" + TEMPLATE_NO_CLASS,
-                                               "uid": str(UID_T + 1), "gid": str(UID_T + 1), "templateClass": "example_no_such_class"})
+                                               "uid": str(UID_T2), "gid": str(UID_T2), "templateClass": "example_no_such_class"})
             c.check("a template account naming a class that does not exist is accepted too (201): the server never looks", nameless.status == 201, nameless.text[:200])
             accounts.append(TEMPLATE_NO_CLASS)
 
@@ -445,17 +393,17 @@ try:
             c.info("--- 07 deletes one class, never VirtClass or RealClass")
             for builtin in BUILTIN:
                 out = script("07.userClasses_id_DELETE.sh", [builtin], expect_rc=2)
-            c.check("07 VirtClass and RealClass are refused and still there", wait_until(lambda: all(find(b) is not None for b in BUILTIN)), names_by_order())
+            c.check("07 VirtClass and RealClass are refused and still there", harness.wait_until(lambda: all(find(b) is not None for b in BUILTIN)), names_by_order())
             script("07.userClasses_id_DELETE.sh", [], expect_rc=2)
             out = script("07.userClasses_id_DELETE.sh", [FIRST])
             c.check("07 deletes the class the MATCH account was in (even with a session in it and a template naming it): 204",
-                    "HTTP 204" in out and wait_until(lambda: find(FIRST) is None), out[-300:])
+                    "HTTP 204" in out and harness.wait_until(lambda: find(FIRST) is None), out[-300:])
             c.check("the classes after it moved up: the older class is gone, the newer one is first",
-                    wait_until(lambda: names_by_order() == [SECOND, "VirtClass", "RealClass"]), names_by_order())
+                    harness.wait_until(lambda: names_by_order() == [SECOND, "VirtClass", "RealClass"]), names_by_order())
             ok, got = lands_in(MATCH, SECOND)
             c.check("the effect: the next login of the MATCH account is in the other class that fits", ok, got)
             c.check("the session that was open keeps its class's name in the list",
-                    wait_until(lambda: any(s["id"] == session_id and s["userClass"] == FIRST for s in sessions())),
+                    harness.wait_until(lambda: any(s["id"] == session_id and s["userClass"] == FIRST for s in sessions())),
                     [s["userClass"] for s in sessions() if s["id"] == session_id])
             c.check("and the connection is still open (the client is still connected)", held.alive())
             held.close()
@@ -466,7 +414,7 @@ try:
             script("07.userClasses_id_DELETE.sh", [FIRST], expect_rc=1, retry=False)
             script("07.userClasses_id_DELETE.sh", [SECOND])
             c.check("both of ours are deleted: the list is VirtClass and RealClass, in that order",
-                    wait_until(lambda: names_by_order() == ["VirtClass", "RealClass"]), names_by_order())
+                    harness.wait_until(lambda: names_by_order() == ["VirtClass", "RealClass"]), names_by_order())
             ok, got = lands_in(MATCH, "VirtClass")
             c.check("the effect: with no class of ours the MATCH account is in VirtClass", ok, got)
 
@@ -499,9 +447,9 @@ try:
             c.check("POST with %s is 400 (%s)" % (label, want), refused.status == 400 and want in refused.text, (refused.status, refused.text[:200]))
         asked = admin.post("userClasses", dict(body, order=7))
         tracked.add("example_expr")
-        c.check("`order` in a POST is ignored: the new class is first", asked.status == 201 and wait_until(lambda: names_by_order()[0] == "example_expr"), names_by_order())
+        c.check("`order` in a POST is ignored: the new class is first", asked.status == 201 and harness.wait_until(lambda: names_by_order()[0] == "example_expr"), names_by_order())
         admin.delete("userClasses/" + find("example_expr")["id"])
-        c.check("deleting it puts the order of VirtClass and RealClass back", wait_until(lambda: names_by_order() == ["VirtClass", "RealClass"]), names_by_order())
+        c.check("deleting it puts the order of VirtClass and RealClass back", harness.wait_until(lambda: names_by_order() == ["VirtClass", "RealClass"]), names_by_order())
 finally:
     for client in open_clients:
         try:
@@ -514,12 +462,13 @@ finally:
             admin.delete("userClasses/" + k["id"])
     for account in accounts:
         admin.delete("accounts/" + account)
+    users.close()
     c.check("nothing is left behind: no class of ours, no account of ours",
-            wait_until(lambda: not any(k["className"].lower().startswith("example_") for k in classes())
-                       and not any(admin.exists("accounts/" + a) for a in accounts)))
+            harness.wait_until(lambda: not any(k["className"].lower().startswith("example_") for k in classes())
+                       and not any(admin.exists("accounts/" + a) for a in accounts + [MATCH, OTHER])))
     after = {k["id"]: k for k in classes()}
     c.check("the whole list of classes is as it was before: VirtClass and RealClass, their ids and their order",
-            wait_until(lambda: {k["id"]: k for k in classes()} == saved), (sorted((k["order"], k["className"]) for k in after.values()),
+            harness.wait_until(lambda: {k["id"]: k for k in classes()} == saved), (sorted((k["order"], k["className"]) for k in after.values()),
                                                                             sorted((k["order"], k["className"]) for k in saved.values())))
     admin.logout()
 

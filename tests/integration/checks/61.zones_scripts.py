@@ -25,30 +25,22 @@ zone named example* (in any capitals) exists, and ends by comparing the whole li
 zones with the one saved first. The accounts get a new name and user id on every run (a
 home folder outlives its account). Needs --write and st_allow_writes="yes".
 """
-import base64
-import ftplib
+import contextlib
 import json
 import os
 import random
 import shutil
-import stat
-import subprocess
 import sys
-import tempfile
-import time
 from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
+import protocol_logins  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the zones examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the zones examples for real")
 
 c = st_client.Checker("Zones, run for real from Admin/API 2.0/bash/37.Zones")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "37.Zones")
@@ -60,37 +52,15 @@ FULL = "example_zfull_" + SUFFIX
 BU = "example_zbu_" + SUFFIX
 BU2 = "example_zbu2_" + SUFFIX
 ACCOUNT = "example_zacct_" + SUFFIX
-BASE_UID = random.randint(59000, 59900)
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 HOST = config["st_server"]
-WORK = tempfile.mkdtemp(prefix="zones_check_")
-open_procs = []
 
 
 def zp(name):
     return "zones/" + quote(name, safe="")
 
 
-def wait_until(predicate, seconds=30, interval=1):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        try:
-            if predicate():
-                return True
-        except st_client.STError:
-            pass
-        time.sleep(interval)
-    try:
-        return bool(predicate())
-    except st_client.STError:
-        return False
-
-
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=120)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(a[:30] for a in (args or [])), expect_rc), result.returncode == expect_rc, out.strip()[-400:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=120, tail=400, arg_width=30)
 
 
 def all_zones():
@@ -109,75 +79,27 @@ def names():
 
 
 def settled(name, condition, seconds=15):
-    last = [None]
-
-    def look():
-        last[0] = zone(name)
-        return last[0] is not None and condition(last[0])
-    wait_until(look, seconds)
-    return last[0] or {}
+    return harness.settled(lambda: zone(name), condition, seconds) or {}
 
 
 def without_description(z):
     return {k: v for k, v in (z or {}).items() if k != "description"}
 
 
-# ---- logins: SFTP and HTTP are the core, FTP the legacy, additional part --------------------------------
-def sftp_login(account):
-    askpass = os.path.join(WORK, "askpass.sh")
-    if not os.path.exists(askpass):
-        with open(askpass, "w") as f:
-            f.write("#!/bin/sh\necho '%s'\n" % PASSWORD)
-        os.chmod(askpass, stat.S_IRWXU)
-    proc = subprocess.Popen(["sftp", "-P", str(SSH_PORT), "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
-                             "-o", "PreferredAuthentications=password", "-o", "NumberOfPasswordPrompts=1", "%s@%s" % (account, HOST)],
-                            env=dict(os.environ, SSH_ASKPASS=askpass, SSH_ASKPASS_REQUIRE="force", DISPLAY="x"),
-                            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, start_new_session=True, text=True)
-    open_procs.append(proc)
-    try:
-        out, _ = proc.communicate("pwd\nbye\n", timeout=30)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        return False
-    return proc.returncode == 0 and "Remote working directory" in out
+# ---- logins: SFTP and HTTP are the core, FTP the legacy, additional part (the shared protocol_logins) ----
+def logs_in(protocol, account):
+    return logins.try_login(protocol, account) == "ok"
 
 
-def http_login(account):
-    client = st_client.EndUserClient(HOST, ENDUSER_PORT, account, PASSWORD)
-    return client._request("POST", "myself", headers={"Authorization": "Basic " + client._auth}).status == 200
-
-
-def ftp_login(account):
-    client = ftplib.FTP()
-    try:
-        client.connect(HOST, FTP_PORT, timeout=30)
-        client.login(account, PASSWORD)
-        client.voidcmd("NOOP")
-        client.close()
-        return True
-    except (OSError, EOFError, ftplib.Error):
-        return False
-
-
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /zones or the protocol servers")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /zones or the protocol servers")
 saved = all_zones()
 if saved is None or any(z["name"].lower().startswith("example") for z in saved):
     c.check("no zone named example* exists yet", False, "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
-servers = admin.get("servers").json()
-servers = servers if isinstance(servers, list) else servers.get("result", [])
-ports = {}
-for protocol in ("ftp", "ssh"):
-    found_ports = [x["port"] for x in servers if x.get("protocol") == protocol and x.get("port")]
-    ports[protocol] = found_ports[0] if found_ports else None
+ports = harness.ports(config, admin)
 daemons = admin.get("daemons").json()
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
-FTP_PORT, SSH_PORT = ports["ftp"], ports["ssh"]
+ENDUSER_PORT, FTP_PORT, SSH_PORT = ports.enduser, ports.ftp, ports.ssh
 missing = []
 if not SSH_PORT or daemons.get("sshStatus") != "Running":
     missing.append("the SSH daemon is not running (SFTP)")
@@ -189,7 +111,9 @@ if missing:
     sys.exit(c.done())
 private = [z for z in saved if z["name"] == "Private"]
 c.check("set up: the server has the zone Private, saved with the rest to compare with at the end", len(private) == 1, [z["name"] for z in saved])
-accounts, units = [], []
+units = []
+logins = protocol_logins.Logins(HOST, SSH_PORT, ENDUSER_PORT, FTP_PORT, PASSWORD)
+account_stack = contextlib.ExitStack()
 
 try:
     with runner.real_credentials(runner.path("Admin", "API 2.0", "bash"), config):
@@ -201,7 +125,7 @@ try:
             global out
             out = script("01.zones_GET.sh")
             return "Zones on the server: %d" % len(saved) in out
-        c.check("01 counts the zones the API counts", wait_until(listed, 20), out[:200])
+        c.check("01 counts the zones the API counts", harness.wait_until(listed, 20), out[:200])
         p = private[0]
         c.check("01 prints a line per zone: name, default, edges, description",
                 "  Private  default %s  edges %d  %s" % (str(p["isDefault"]).lower(), len(p["edges"]), p["description"] or "-") in out, out[-400:])
@@ -225,7 +149,7 @@ try:
         script("02.zones_POST.sh", [UPPER])
         c.check("02 names are case sensitive: %s is another zone" % UPPER, settled(UPPER, lambda z: True).get("name") == UPPER and zone(ZONE) is not None)
         script("07.zones_name_DELETE.sh", [UPPER])
-        c.check("07 deleted that one only: %s is still there" % ZONE, wait_until(lambda: zone(UPPER) is None) and zone(ZONE) is not None)
+        c.check("07 deleted that one only: %s is still there" % ZONE, harness.wait_until(lambda: zone(UPPER) is None) and zone(ZONE) is not None)
         out = script("02.zones_POST.sh", [SPACED, "d with a \"quote\"", "e1", "edge.example.invalid", "8022"])
         c.check("02 a name with a space: the Location holds it URL-encoded", "HTTP 201" in out and "/zones/" + quote(SPACED, safe="") in out, out[-300:])
         z = settled(SPACED, lambda z: True)
@@ -344,10 +268,10 @@ try:
         c.check("01 lists the default zone in its last section", "The default zone:\n  %s  default true" % FULL in out, out[-400:])
         put = admin.put(zp(ZONE), {"name": ZONE, "isDefault": True})
         c.check("raw PUT of another zone with isDefault true makes THAT the only default",
-                put.status == 204 and wait_until(lambda: [z["name"] for z in (all_zones() or []) if z["isDefault"]] == [ZONE]), [z["name"] for z in (all_zones() or []) if z["isDefault"]])
+                put.status == 204 and harness.wait_until(lambda: [z["name"] for z in (all_zones() or []) if z["isDefault"]] == [ZONE]), [z["name"] for z in (all_zones() or []) if z["isDefault"]])
         put = admin.put(zp(ZONE), {"name": ZONE})
         c.check("raw PUT with no isDefault turns it off: there is no default again",
-                put.status == 204 and wait_until(lambda: [z["name"] for z in (all_zones() or []) if z["isDefault"]] == []))
+                put.status == 204 and harness.wait_until(lambda: [z["name"] for z in (all_zones() or []) if z["isDefault"]] == []))
         raw = admin.patch(zp(FULL), [{"op": "replace", "path": "/isDefault", "value": True}])
         made = admin.post("businessUnits", {"name": BU2, "baseFolder": "/" + BU2})
         if made.status == 201:
@@ -358,7 +282,7 @@ try:
         admin.delete("businessUnits/" + quote(BU2, safe=""))
         units.remove(BU2) if BU2 in units else None
         admin.patch(zp(FULL), [{"op": "replace", "path": "/isDefault", "value": False}])
-        c.check("the default is off again", wait_until(lambda: [z["name"] for z in (all_zones() or []) if z["isDefault"]] == []))
+        c.check("the default is off again", harness.wait_until(lambda: [z["name"] for z in (all_zones() or []) if z["isDefault"]] == []))
 
         # -- the effect: a business unit names a zone ------------------------------------------
         c.info("--- what naming a zone changes: a business unit whose dmz is a zone with an edge")
@@ -366,62 +290,56 @@ try:
         c.check("a business unit that names a zone that does not exist is 400 'No such DMZ zone'", raw.status == 400 and "No such DMZ zone" in raw.text, raw.text[:200])
         c.check("set up: a business unit naming the zone %s" % SPACED, admin.post("businessUnits", {"name": BU, "baseFolder": "/" + BU, "dmz": SPACED}).status == 201)
         units.append(BU)
-        created = admin.post("accounts", {"name": ACCOUNT, "type": "user", "uid": str(BASE_UID), "gid": str(BASE_UID), "homeFolder": "/%s/%s" % (BU, ACCOUNT),
-                                          "businessUnit": BU, "user": {"name": ACCOUNT, "passwordCredentials": {"password": PASSWORD}}})
-        c.check("set up: an account in that unit", created.status == 201, created.text[:200])
-        accounts.append(ACCOUNT)
+        account_stack.enter_context(harness.throwaway_account(
+            admin, c, config, name=ACCOUNT, password=PASSWORD, home="/%s/%s" % (BU, ACCOUNT), extra={"businessUnit": BU},
+            label="set up: an account in that unit"))
         out = ""
 
         def names_it():
             global out
             out = script("04.zones_name_GET.sh", [SPACED])
             return "  business units that name it: %s" % BU in out
-        c.check("04 lists the unit that names the zone", wait_until(names_it, 20), out[-300:])
+        c.check("04 lists the unit that names the zone", harness.wait_until(names_it, 20), out[-300:])
         out = script("04.zones_name_GET.sh", [FULL])
         c.check("04 and no unit for a zone that none names", "  business units that name it: none" in out, out[-200:])
         c.check("the unit reads back its zone in dmz", admin.get("businessUnits/" + quote(BU, safe="")).json().get("dmz") == SPACED)
         c.check("CORE: an SFTP login of the account in that unit works, exactly as before (the edge changes nothing on a standalone server)",
-                wait_until(lambda: sftp_login(ACCOUNT), 30))
-        c.check("CORE: an HTTP (EndUser API) login works too", wait_until(lambda: http_login(ACCOUNT), 30))
+                harness.wait_until(lambda: logs_in("SFTP", ACCOUNT), 30))
+        c.check("CORE: an HTTP (EndUser API) login works too", harness.wait_until(lambda: logs_in("HTTP", ACCOUNT), 30))
         if FTP_PORT and daemons.get("ftpStatus") == "Running":
             c.info("--- FTP: the legacy protocol, as an additional part")
-            c.check("additional, legacy: an FTP login works too", wait_until(lambda: ftp_login(ACCOUNT), 30))
+            c.check("additional, legacy: an FTP login works too", harness.wait_until(lambda: logs_in("FTP", ACCOUNT), 30))
         out = script("07.zones_name_DELETE.sh", [SPACED], expect_rc=1)
         c.check("07 a zone that a unit names is refused (the server answers 500) and says why", "HTTP 500" in out and "Database error deleting DMZ zone" in out, out[-300:])
         c.check("07 the zone is still there, and so is the unit's dmz", zone(SPACED) is not None and admin.get("businessUnits/" + quote(BU, safe="")).json().get("dmz") == SPACED)
-        c.check("the unit's login still works after the refusal", sftp_login(ACCOUNT) and http_login(ACCOUNT))
-        admin.delete("accounts/" + ACCOUNT)
-        accounts.remove(ACCOUNT)
+        c.check("the unit's login still works after the refusal", logs_in("SFTP", ACCOUNT) and logs_in("HTTP", ACCOUNT))
+        account_stack.close()   # the unit's account is deleted first: the unit and then the zone cannot go while it is there
         admin.delete("businessUnits/" + quote(BU, safe=""))
         units.remove(BU)
         out = script("07.zones_name_DELETE.sh", [SPACED])
-        c.check("07 once the unit is gone the zone is deleted: HTTP 204", "HTTP 204" in out and wait_until(lambda: zone(SPACED) is None), out[-300:])
+        c.check("07 once the unit is gone the zone is deleted: HTTP 204", "HTTP 204" in out and harness.wait_until(lambda: zone(SPACED) is None), out[-300:])
 
         # -- 07 ---------------------------------------------------------------------------
         c.info("--- 07 deletes")
         out = script("07.zones_name_DELETE.sh", [ZONE])
-        c.check("07 deletes a zone: HTTP 204", "HTTP 204" in out and wait_until(lambda: zone(ZONE) is None), out[-200:])
+        c.check("07 deletes a zone: HTTP 204", "HTTP 204" in out and harness.wait_until(lambda: zone(ZONE) is None), out[-200:])
         out = script("07.zones_name_DELETE.sh", [ZONE], expect_rc=1)
         c.check("07 a second delete is 404 'not found'", "HTTP 404" in out and "not found" in out, out[-200:])
         out = script("07.zones_name_DELETE.sh", [FULL])
-        c.check("07 deletes the zone with an edge and a proxy", "HTTP 204" in out and wait_until(lambda: zone(FULL) is None), out[-200:])
+        c.check("07 deletes the zone with an edge and a proxy", "HTTP 204" in out and harness.wait_until(lambda: zone(FULL) is None), out[-200:])
         script("07.zones_name_DELETE.sh", [], expect_rc=2)
         c.check("the refusals and the 404s deleted nothing else: Private is still there", zone("Private") is not None)
 finally:
-    for proc in open_procs:
-        if proc.poll() is None:
-            proc.kill()
-    for account in accounts:
-        admin.delete("accounts/" + account)
+    logins.cleanup()
+    account_stack.close()
     for unit in units:
         admin.delete("businessUnits/" + quote(unit, safe=""))
     for name in (ZONE, UPPER, SPACED, FULL, ZONE + "x", ZONE + "y", FULL + "_other", FULL + "_x"):
         if zone(name) is not None:
             admin.delete(zp(name))
-    shutil.rmtree(WORK, ignore_errors=True)
     after = all_zones()
     c.check("nothing is left behind and the whole list of zones, Private included, is exactly what it was",
-            wait_until(lambda: all_zones() == saved), json.dumps([z["name"] for z in (after or [])]))
+            harness.wait_until(lambda: all_zones() == saved), json.dumps([z["name"] for z in (after or [])]))
     admin.logout()
 
 sys.exit(c.done())

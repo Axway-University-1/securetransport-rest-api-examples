@@ -66,27 +66,22 @@ import urllib.parse
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import dummy_servers  # noqa: E402
 import pesit_wire  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the transfer profile content check for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the transfer profile content check for real")
 
 c = st_client.Checker("Transfer profiles at work: the content of a file, sent, received and stored")
 
 N = random.randint(1000, 9999)
 WORKERS = 3
 UID = str(40000 + N)
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 HOST = config["st_server"]
 PESIT_HOST = config.get("st_pesit_host") or HOST
-PESIT_PORT = int(config.get("st_pesit_port") or 17617)
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ENDUSER_PORT = harness.ports(config).enduser
 CALLBACK = config.get("st_callback_host", "")
 PESIT_SITE_DEFAULTS = {"dmz": "none", "pesitId": "", "ptcpConnections": 1, "socketSendReceiveBuffersize": 65536,
                        "receiveMessage": "", "sendMessage": "", "useServerPasswordExpr": False,
@@ -473,18 +468,6 @@ print("  ..    %d cases, one PeSIT pull each" % len(CASES))
 # --------------------------------------------------------------------------------------------
 # running a case
 # --------------------------------------------------------------------------------------------
-def wait_until(predicate, seconds=30, interval=1):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        try:
-            if predicate():
-                return True
-        except (st_client.STError, KeyError, IndexError, ValueError):
-            pass
-        time.sleep(interval)
-    return False
-
-
 class Worker:
     def __init__(self, index):
         self.index = index
@@ -542,7 +525,7 @@ class Worker:
             rows = admin.get("logs/transfers", params={"account": self.receiver, "sortByStartTime": "descending", "limit": 20}).json().get("result", [])
             found[:] = [r for r in rows if str(r.get("operationIndex")) == index]
             return bool(found) and found[0]["status"] in ("Processed", "Failed")
-        wait_until(done, 90, 1)
+        harness.wait_until(lambda: stopping.is_set() or done(), 90, 1)   # a check that is being stopped does not wait for a pull
         if not found:
             return None, ""
         row, error = found[0], ""
@@ -556,6 +539,8 @@ class Worker:
         outcome = {}
         tried = []
         for attempt in range(3):
+            if attempt and stopping.is_set():   # being stopped (Ctrl-C, or the runner's time limit): no more tries
+                break
             self.counter += 1
             tag = "%d%d" % (self.index, self.counter)
             send_file, land = "src%s.dat" % tag, "dst%s.dat" % tag
@@ -567,10 +552,10 @@ class Worker:
                 put = self.eu_sender.upload("/" + send_file, data, send_file)
                 outcome["upload_status"] = put.status
                 got = []
-                wait_until(lambda: got.append(self.eu_sender.download(send_file).body) or got[-1] == data, 20)
+                harness.wait_until(lambda: got.append(self.eu_sender.download(send_file).body) or got[-1] == data, 20)
                 outcome["generated"] = got[-1] if got else None
                 profile = self.profiles(case.sender, case.receiver, send_file, land, tag)
-                time.sleep(0.5)
+                time.sleep(0.5)   # a short pause between saving the profiles and the pull, kept as it was: not the proof of any result
                 status, error = self.pull(profile)
                 outcome["status"], outcome["error"] = status, error
                 if self.proxy:
@@ -583,7 +568,7 @@ class Worker:
                     outcome["net"] = pesit_wire.network_data_code(capture)
                 if status == "Processed":
                     stored = []
-                    wait_until(lambda: land in (self.eu_receiver.list_folder("/landing") or []), 20)
+                    harness.wait_until(lambda: land in (self.eu_receiver.list_folder("/landing") or []), 20)
                     stored.append(self.eu_receiver.download("landing/" + land))
                     outcome["stored"] = stored[0].body if stored[0].status == 200 else None
                     self.eu_receiver.delete_file("landing/" + land)
@@ -622,11 +607,8 @@ class Worker:
             self.proxy.close()
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement PeSIT or /logs/transfers")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement PeSIT or /logs/transfers")
+PESIT_PORT = int(harness.ports(config, admin).pesit)
 if any(admin.exists("accounts/CS%d%d" % (N, i)) for i in range(WORKERS)):
     c.check("no account of this run exists yet", False, "run again")
     admin.logout()
@@ -654,12 +636,14 @@ try:
         w.setup()
     if not CALLBACK:
         c.info("st_callback_host is not set: the receiver's site points straight at the server, so the sent stage is not checked")
-    try:
-        with concurrent.futures.ThreadPoolExecutor(WORKERS) as pool:
+    with concurrent.futures.ThreadPoolExecutor(WORKERS) as pool:
+        try:
             list(pool.map(work, workers))
-    except KeyboardInterrupt:
-        stopping.set()   # the workers finish the pull they are in; then everything is removed
-        raise
+        except (KeyboardInterrupt, SystemExit):   # Ctrl-C, or the SIGTERM of the runner's time limit
+            # Said INSIDE the block: leaving it waits for the workers, and they only stop when they are told, so they used to
+            # carry on through every case still queued (an hour, when the pulls fail) before anything was cleaned up
+            stopping.set()   # the workers finish the case they are in, then everything is removed
+            raise
     # custom_table (a table kept in a server configuration option): no such option, so no such profile
     probe = workers[0]
     for side, key in (("callerTranscoding", "callerTranscoding"), ("receiverTranscoding", "receiverTranscoding")):
@@ -693,7 +677,7 @@ finally:
         except Exception as e:  # keep cleaning
             print("  ..    teardown of %s: %r" % (w.sender, e))
     c.check("nothing is left behind: no account, no profile of this run",
-            wait_until(lambda: not any(admin.exists("accounts/" + a) for w in workers for a in (w.sender, w.receiver))))
+            harness.wait_until(lambda: not any(admin.exists("accounts/" + a) for w in workers for a in (w.sender, w.receiver))))
     admin.logout()
 
 sys.exit(c.done())

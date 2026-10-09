@@ -27,42 +27,34 @@ Needs --write and st_allow_writes="yes". Refuses to start when its example_icap*
 objects exist, and removes everything in a finally block.
 """
 import base64
+import contextlib
 import os
 import sys
 import tempfile
-import time
 from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 import dummy_servers  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the ICAP server examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the ICAP server examples for real")
 
 c = st_client.Checker("ICAP servers, run for real from Admin/API 2.0/bash/24.IcapServers")
 ADMIN_TREE = runner.path("Admin", "API 2.0", "bash")
 ENDUSER_TREE = runner.path("EndUser", "API 2.0", "bash")
 FOLDER = os.path.join(ADMIN_TREE, "24.IcapServers")
 NAME, SPACED, BEHAVIOUR = "example_icap", "example icap space", "example_icap_scan"
-BU, ACCOUNT = "example_icap_bu", "example_icap_user"
-RUN = base64.b32encode(os.urandom(4)).decode().rstrip("=").lower()
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+RUN = harness.suffix(8)
+BU, ACCOUNT = "example_icap_bu", "example_icap_user_" + RUN
+PASSWORD = harness.new_password()
+ENDUSER_PORT = harness.ports(config).enduser
 CALLBACK = config.get("st_callback_host", "")
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=90)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=90)
 
 
 def server(name):
@@ -79,32 +71,36 @@ def upload(local_name, content):
             return runner.run(os.path.join(ENDUSER_TREE, "02.Files", "08.fileOperations_POST_upload.sh"), [path], timeout=90)
 
 
-def verdict(filename, wait_for_gone=0):
-    """(is the file still in the home folder, the newest transfer status for it); waits up to wait_for_gone seconds for it to go."""
-    deadline = time.time() + wait_for_gone
-    while True:
-        client = st_client.EndUserClient(config["st_server"], ENDUSER_PORT, ACCOUNT, PASSWORD)
-        client.login()
-        present = filename in (client.list_folder("") or [])
-        client.logout()
-        logged = admin.get("logs/transfers", params={"account": ACCOUNT, "limit": 50}).json().get("result", [])
-        status = next((x["status"] for x in logged if x["filename"] == filename), None)
-        if not present or time.time() >= deadline:
-            return present, status
-        time.sleep(2)
+def look(filename):
+    """One reading: (is the file still in the home folder, the newest transfer status for it)."""
+    client = st_client.EndUserClient(config["st_server"], ENDUSER_PORT, ACCOUNT, PASSWORD)
+    client.login()
+    present = filename in (client.list_folder("") or [])
+    client.logout()
+    logged = admin.get("logs/transfers", params={"account": ACCOUNT, "limit": 50}).json().get("result", [])
+    status = next((x["status"] for x in logged if x["filename"] == filename), None)
+    return present, status
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /icapServers")
-    admin.logout()
-    sys.exit(c.done())
+def verdict(filename, until, timeout=45):
+    """The reading (is the file still in the home folder, its newest transfer status) once `until(reading)` holds, or
+    the last reading after `timeout` seconds. The scan and the transfer log take a moment: the state is waited for,
+    not a fixed time."""
+    return harness.settled(lambda: look(filename), until, timeout, 2)
+
+
+GONE = lambda reading: not reading[0]  # noqa: E731
+PASSED = lambda reading: reading == (True, "Processed")  # noqa: E731
+
+
+admin = harness.connect(config, c, mock="the bundled mock does not implement /icapServers")
 if any(server(n) for n in (NAME, SPACED, BEHAVIOUR)) or admin.exists("businessUnits/" + BU) or admin.exists("accounts/" + ACCOUNT):
     c.check("no example_icap* server, unit or account exists yet", False, "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
 
 icap = None
+accounts = contextlib.ExitStack()
 try:
     with runner.real_credentials(ADMIN_TREE, config):
         # ---- part 1: the examples
@@ -176,14 +172,14 @@ try:
                     (server(BEHAVIOUR) or {}).get("serverEnabled") is True and not server(BEHAVIOUR)["basicSettings"]["denyOnConnectionError"])
             c.check("set up: a business unit that lists it",
                     admin.post("businessUnits", {"name": BU, "baseFolder": "/home/%s_%s" % (BU, RUN), "enabledIcapServers": [BEHAVIOUR]}).status == 201)
-            made = admin.post("accounts", {"name": ACCOUNT, "type": "user", "uid": "1081", "gid": "1081", "homeFolder": "/home/%s_%s/%s" % (BU, RUN, ACCOUNT),
-                                           "businessUnit": BU, "user": {"name": ACCOUNT, "passwordCredentials": {"password": PASSWORD}}})
-            c.check("set up: an end user account in that unit", made.status == 201, made.text[:200])
+            accounts.enter_context(harness.throwaway_account(
+                admin, c, config, name=ACCOUNT, password=PASSWORD, home="/home/%s_%s/%s" % (BU, RUN, ACCOUNT),
+                extra={"businessUnit": BU}, label="set up: an end user account in that unit"))
 
             c.check("a clean file is uploaded", upload("a_clean.txt", b"nothing wrong in here\n").returncode == 0)
             c.check("a file with the marker text is uploaded", upload("a_marked.txt", b"this holds EICAR-ICAP-TEST, so block it\n").returncode == 0)
-            marked = verdict("a_marked.txt", wait_for_gone=45)
-            clean = verdict("a_clean.txt")
+            marked = verdict("a_marked.txt", GONE)
+            clean = verdict("a_clean.txt", PASSED)
             c.check("the ICAP server was sent both files, one of them blocked (they may arrive in either order)",
                     sorted((r["method"], r["blocked"]) for r in icap.requests) == [("REQMOD", False), ("REQMOD", True)],
                     [(r["method"], r["blocked"]) for r in icap.requests])
@@ -197,30 +193,21 @@ try:
             icap.__exit__(None, None, None)
             icap = None
             upload("b_down_allowed.txt", b"the scanner is down\n")
-            time.sleep(10)
-            c.check("with the ICAP server gone and deny off, the file goes through", verdict("b_down_allowed.txt") == (True, "Processed"), verdict("b_down_allowed.txt"))
+            allowed = verdict("b_down_allowed.txt", PASSED)
+            c.check("with the ICAP server gone and deny off, the file goes through", allowed == (True, "Processed"), allowed)
             script("06.icapServers_name_PATCH.sh", [BEHAVIOUR, "true", "true"])
             upload("c_down_denied.txt", b"the scanner is down\n")
-            denied = verdict("c_down_denied.txt", wait_for_gone=45)
+            denied = verdict("c_down_denied.txt", GONE)
             c.check("with the ICAP server gone and deny on, the file is refused: removed, Failed", denied == (False, "Failed"), denied)
             script("06.icapServers_name_PATCH.sh", [BEHAVIOUR, "false"])
             upload("d_disabled.txt", b"nothing scans this\n")
-            time.sleep(10)
-            c.check("with the server disabled, the file goes through though deny is on", verdict("d_disabled.txt") == (True, "Processed"), verdict("d_disabled.txt"))
+            disabled = verdict("d_disabled.txt", PASSED)
+            c.check("with the server disabled, the file goes through though deny is on", disabled == (True, "Processed"), disabled)
 finally:
     if icap is not None:
         icap.__exit__(None, None, None)
-    try:
-        if admin.exists("accounts/" + ACCOUNT):
-            cleaner = st_client.EndUserClient(config["st_server"], ENDUSER_PORT, ACCOUNT, PASSWORD)
-            cleaner.login()
-            for leftover in cleaner.list_folder("") or []:
-                cleaner.delete_file(leftover)
-            cleaner.logout()
-    except st_client.STError:
-        pass
-    for path in ("accounts/" + ACCOUNT, "businessUnits/" + BU):
-        admin.delete(path)
+    accounts.close()   # its files, then the account
+    admin.delete("businessUnits/" + BU)
     for name in (NAME, SPACED, BEHAVIOUR):
         admin.delete("icapServers/" + quote(name, safe=""))
     c.check("nothing is left behind: no server, business unit or account",

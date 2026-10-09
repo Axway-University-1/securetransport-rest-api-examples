@@ -113,6 +113,18 @@ for path in files:
     bare = [i + 1 for i, line in enumerate(source.split("\n")) if re.search(r"writeLog\((ec|eh|et|ee|e)\s*,", line)]
     check("%s: writeLog is given text, not an exception object" % rel, not bare, bare)
 
+print("=== the integration checks and their library ===")
+# They only run against a server, so a name that is wrong on a path the lab does not take (a failure message, a clean-up)
+# is found here or not at all, and a refactor of the shared helpers touches all of them
+harness_files = sorted(glob.glob(os.path.join(REPO, "tests", "integration", "checks", "*.py"))
+                       + glob.glob(os.path.join(REPO, "tests", "integration", "lib", "*.py")))
+check("there are integration checks to read", len(harness_files) > 60, len(harness_files))
+for path in harness_files:
+    rel = os.path.relpath(path, REPO)
+    source = open(path).read()
+    check("%s: every name is defined" % rel, not undefined_names(source, rel), undefined_names(source, rel))
+    check("%s: every except body uses its own name" % rel, not mixed_up_exception_names(source), mixed_up_exception_names(source))
+
 print()
 if failed:
     print("test_python_names: FAIL (%d)" % failed)

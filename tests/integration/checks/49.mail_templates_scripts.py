@@ -22,40 +22,30 @@ st_allow_writes="yes".
 """
 import os
 import sys
-import tempfile
 import urllib.error
 import urllib.request
 from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the mail template examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the mail template examples for real")
 
 c = st_client.Checker("Mail templates, run for real from Admin/API 2.0/bash/29.MailTemplates (01 to 06)")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "29.MailTemplates")
 LOWER, UPPER, SPACED = "example_mail.xhtml", "EXAMPLE_MAIL.xhtml", "example other.xhtml"
 NAMES = (LOWER, UPPER, SPACED)
-WORK = tempfile.mkdtemp(prefix="st_mail_")
+WORK = harness.scratch("st_mail_")
 
 
 def mail_path(name):
     return "mailTemplates/" + quote(name, safe="")
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=60)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc,
-            out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=60)
 
 
 def listed(name):
@@ -93,11 +83,7 @@ def raw_put(name, text, description):
         return e.code
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /mailTemplates")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /mailTemplates")
 if any(listed(name) for name in NAMES):
     c.check("%s do not exist yet" % ", ".join(NAMES), False, "remove them first; this check will not touch them")
     admin.logout()

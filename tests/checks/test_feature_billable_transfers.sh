@@ -10,7 +10,7 @@ TESTS_DIR="$(pwd)"
 REPO="$(cd .. && pwd)"
 FEATURE="Features/audit-billable-transfers"
 
-WORK="${TESTS_DIR}/output/feature_billable_transfers"
+WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/feature_billable_transfers"
 rm -rf "${WORK}"
 mkdir -p "${WORK}/bin" "${WORK}/Features" "${WORK}/Admin/API 2.0/bash"
 

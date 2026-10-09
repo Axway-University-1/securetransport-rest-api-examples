@@ -7,6 +7,12 @@
 #
 #   ./tests/run_all.sh            run everything
 #   ./tests/run_all.sh hygiene    run only checks whose name contains 'hygiene'
+#
+# The checks write their scratch files under ST_TEST_OUTPUT. This script makes a
+# folder of its own for it (tests/output/run.XXXXXX), so that two runs at once, or
+# a run and a single check, do not delete each other's files. It is removed when
+# everything passed and kept, with its path printed, when something failed. A check
+# started by hand, with no ST_TEST_OUTPUT, uses tests/output/<its name>.
 # ==============================================================================
 cd "$(dirname "$0")" || exit 1
 
@@ -16,6 +22,8 @@ FAILED=0
 FAILED_NAMES=()
 
 mkdir -p output
+RUN_OUTPUT="$(mktemp -d "$(pwd)/output/run.XXXXXX")" || exit 1
+export ST_TEST_OUTPUT="${RUN_OUTPUT}"
 
 for check in $(find checks -type f \( -name 'check_*' -o -name 'test_*' \) | sort); do
 
@@ -44,6 +52,7 @@ done
 
 echo "######################################################################"
 if [ "${FAILED}" -eq 0 ]; then
+    rm -rf "${RUN_OUTPUT}"
     echo "# ALL CHECKS PASSED  (${PASSED})"
     echo "#"
     echo "# These all run offline. To check the examples against a real server:"
@@ -57,5 +66,7 @@ echo "# ${FAILED} CHECK(S) FAILED, ${PASSED} passed"
 for n in "${FAILED_NAMES[@]}"; do
     echo "#   ${n}"
 done
+echo "#"
+echo "# The files of this run are kept in ${RUN_OUTPUT}"
 echo "######################################################################"
 exit 1

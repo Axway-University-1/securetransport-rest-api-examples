@@ -73,10 +73,24 @@ def real_credentials(tree_dir, config):
             pass
 
 
-def run(script_path, args=None, timeout=60):
+def _environment(env):
+    """os.environ with `env` on top (a value of None removes the variable), or None for the plain environment."""
+    if not env:
+        return None
+    merged = dict(os.environ)
+    for key, value in env.items():
+        if value is None:
+            merged.pop(key, None)
+        else:
+            merged[key] = str(value)
+    return merged
+
+
+def run(script_path, args=None, timeout=60, env=None):
     """
     Run a shipped script from its own directory, the way its own header says
-    to ("./02.accounts_POST.sh"), and return the CompletedProcess.
+    to ("./02.accounts_POST.sh"), and return the CompletedProcess. `env` adds
+    variables to the script's environment only: this process's own is not changed.
 
     Never raises on a non-zero exit. Most examples now read the status with
     curl -w and exit 1 when the server refuses and 2 on a bad argument, but a
@@ -88,7 +102,7 @@ def run(script_path, args=None, timeout=60):
     script_name = os.path.basename(script_path)
     cmd = ["bash", script_name] + list(args or [])
     return subprocess.run(cmd, cwd=script_dir, capture_output=True, text=True,
-                          timeout=timeout)
+                          timeout=timeout, env=_environment(env))
 
 
 PY_INTERPRETER = path("tests", "local", "pyvenv", "bin", "python3")
@@ -184,7 +198,7 @@ def real_credentials_python(tree_dir, config):
                 f.write(outer)
 
 
-def run_python(script_path, args=None, timeout=60):
+def run_python(script_path, args=None, timeout=60, env=None):
     """
     Run a shipped python3 script from its own directory, the way run() runs
     a bash script - using the venv at tests/local/pyvenv (see
@@ -200,7 +214,7 @@ def run_python(script_path, args=None, timeout=60):
     script_name = os.path.basename(script_path)
     cmd = [PY_INTERPRETER, script_name] + list(args or [])
     return subprocess.run(cmd, cwd=script_dir, capture_output=True, text=True,
-                          timeout=timeout)
+                          timeout=timeout, env=_environment(env))
 
 
 def chain_substitutions(prefix, ssh_host, ssh_port):

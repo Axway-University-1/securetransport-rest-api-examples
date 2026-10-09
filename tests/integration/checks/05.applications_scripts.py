@@ -39,17 +39,11 @@ import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the applications scripts for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the applications scripts for real")
 
 c = st_client.Checker("Applications, run for real from Admin/API 2.0/bash/04.Applications")
 
@@ -63,25 +57,13 @@ def app_path(name):
     return "applications/" + name.replace(" ", "%20")
 
 
-def script(name):
-    return os.path.join(APPS_DIR, name)
-
-
 def run(name, args=None, expect_rc=0, timeout=60):
     """Run a script, check its exit code, and give back its output."""
-    result = runner.run(script(name), args, timeout=timeout)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+    return harness.run_script(c, APPS_DIR, name, args, expect_rc, timeout=timeout)
 
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /applications; run this "
-           "against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /applications; run this "
+                                          "against a real server to exercise it"))
 
 baseline = None
 try:

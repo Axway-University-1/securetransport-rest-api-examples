@@ -50,21 +50,14 @@ Needs --write and st_allow_writes="yes", same as 04.accounts_scripts.py.
 """
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the Connect operations scripts for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the Connect operations scripts for real")
 
 c = st_client.Checker("Connect operations, run for real from Admin/API 2.0/bash/03.Connect")
 
@@ -78,41 +71,18 @@ def daemon_statuses(client):
     return {p: daemons.get(p + "Status") for p in DAEMON_PROTOCOLS}
 
 
+# Stopping and starting daemons and servers can make the admin API itself unreachable for a moment: harness.wait_until
+# counts that as not yet. These waits are long ones.
+wait_until = lambda predicate, timeout=90, interval=3: harness.wait_until(predicate, timeout, interval)  # noqa: E731
+
+
 def server_states(client):
     return {s["serverName"]: s["isActive"]
             for s in client.page("servers", params={"fields": "serverName,isActive"})}
 
 
-def wait_until(predicate, timeout=90, interval=3):
-    """
-    Confirmed directly, a real (if transient) failure mode: stopping and
-    restarting daemons/servers can make the admin API itself briefly
-    unreachable, and a bare connection error from one predicate call used to
-    propagate straight out of this loop and crash the whole check, even
-    though every attempt afterward would have succeeded. Treat a transient
-    STError the same as a predicate that simply is not true yet.
-    """
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            if predicate():
-                return True
-        except st_client.STError:
-            pass
-        time.sleep(interval)
-    try:
-        return predicate()
-    except st_client.STError:
-        return False
-
-
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /daemons or /servers operations; "
-           "run this against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /daemons or /servers operations; "
+                                          "run this against a real server to exercise it"))
 
 original_daemons = daemon_statuses(client)
 original_servers = server_states(client)

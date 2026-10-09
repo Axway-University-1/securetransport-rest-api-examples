@@ -32,15 +32,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the step types check (it creates and deletes throwaway routes)")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the step types check (it creates and deletes throwaway routes)")
 
 c = st_client.Checker("Route steps metadata, run for real from Admin/API 2.0/bash/30.RouteStepsMetadata (01)")
 SCRIPT = os.path.join(runner.path("Admin", "API 2.0", "bash"), "30.RouteStepsMetadata", "01.routeStepsMetadata_GET.sh")
@@ -51,11 +47,8 @@ KEYS = {"stepType", "stepCategory", "stepDisplayName", "endpointSchema", "uiPage
 
 
 def script(args=None, expect_rc=0):
-    result = runner.run(SCRIPT, args, timeout=60)
-    out = result.stdout + result.stderr
-    c.check("01 %s exits %s" % (" ".join(args or []) or "with no arguments", expect_rc), result.returncode == expect_rc,
-            out.strip()[-300:])
-    return out
+    return harness.run_script(c, os.path.dirname(SCRIPT), os.path.basename(SCRIPT), args, expect_rc,
+                              label=lambda name, shown, rc: "01 %s exits %s" % (shown or "with no arguments", rc))
 
 
 def left_over():
@@ -84,11 +77,7 @@ def read_back_differs(sent, got):
     return differs
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /routeStepsMetadata")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement /routeStepsMetadata")
 if left_over():
     c.check("no route named %s* exists yet" % PREFIX, False, "remove them first; this check will not touch them")
     admin.logout()

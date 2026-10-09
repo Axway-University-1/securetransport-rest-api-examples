@@ -32,77 +32,42 @@ it expects.
 
 Needs --write and st_allow_writes="yes". Needs st_callback_host for the
 stand-ins (those parts are left out, with a note, without it). Refuses to start
-when an example_sites_* account exists; removes the sites, the files it
-uploaded and both accounts in a finally block, and checks that nothing is left.
+when an example_sites_* site exists. The two accounts get a new name and user id
+on every run. Removes the sites, the files it uploaded and both accounts in a
+finally block, and checks that nothing is left. "The site count is as before"
+is the whole server's count, so a site made or removed by somebody else while
+it runs fails it: run it again.
 """
-import base64
+import contextlib
 import os
 import socket
 import sys
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import dummy_servers  # noqa: E402
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the sites examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the sites examples for real")
 
 c = st_client.Checker("Sites, run for real from Admin/API 2.0/bash/06.TransferSites (05 to 11)")
 BASH = runner.path("Admin", "API 2.0", "bash")
 FOLDER = os.path.join(BASH, "06.TransferSites")
-ACCOUNT, OTHER = "example_sites_user", "example_sites_other"
+SUFFIX = harness.suffix()
+ACCOUNT, OTHER = "example_sites_user_" + SUFFIX, "example_sites_other_" + SUFFIX
 PULL, UPPER, FTP, HTTP, WRONG, JUNK, CLOSED = ("example_sites_pull", "EXAMPLE_SITES_PULL", "example_sites_ftp", "example_sites_http",
                                                "example_sites_wrongpw", "example_sites_junk", "example_sites_closed")
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 HOST = config["st_server"]
 CALLBACK = config.get("st_callback_host", "")
-ENDUSER_PORT = config.get("st_enduser_port") or str(int(config["st_port"]) - 1)
+ENDUSER_PORT = harness.ports(config).enduser
 
 
-def wait_until(predicate, seconds=30):
-    deadline = time.time() + seconds
-    while time.time() < deadline:
-        try:
-            if predicate():
-                return True
-        except st_client.STError:
-            pass
-        time.sleep(1)
-    try:
-        return bool(predicate())
-    except st_client.STError:
-        return False
-
-
-def script(name, args=None, expect_rc=0, env=None, retry=True):
-    """Run an example. When its lookup found no site (retry=True: the site exists, but the list is not
-    always complete), run it again, up to five times."""
-    old = {k: os.environ.get(k) for k in (env or {})}
-    os.environ.update(env or {})
-    try:
-        for attempt in range(5):
-            result = runner.run(os.path.join(FOLDER, name), args, timeout=120)
-            out = result.stdout + result.stderr
-            if retry and "Found 0 sites named" in out:
-                time.sleep(2)
-                continue
-            break
-    finally:
-        for k, v in old.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-    c.check("%s %s exits %s" % (name, " ".join(a for a in (args or []) if a != PASSWORD), expect_rc),
-            result.returncode == expect_rc, out.strip()[-400:])
-    return out
+# When a lookup found no site that is known to exist (retry=True: the list is not always complete), the example
+# is run again, up to five times. The password given as an argument is left out of the name of the check.
+script = harness.bind_script(c, FOLDER, timeout=120, tail=400, retry_text="Found 0 sites named", hide=(PASSWORD,))
 
 
 def sites_of(account):
@@ -135,12 +100,6 @@ def ssh_site(name, account=ACCOUNT, password=PASSWORD, port=None, host=None, **m
     return body
 
 
-def create_account(name, uid):
-    response = admin.post("accounts", {"name": name, "type": "user", "uid": uid, "gid": uid, "homeFolder": "/home/" + name,
-                                       "user": {"name": name, "passwordCredentials": {"password": PASSWORD}}})
-    c.check("set up: the account " + name, response.status == 201, response.text[:200])
-
-
 def upload(client, folder, filename, content):
     boundary = "----example_sites"
     body = ("--%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\n\r\n" % (boundary, filename)).encode() \
@@ -153,34 +112,28 @@ def raw_test(body, params=None):
     return response, (response.json() if response.status == 200 else {})
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement /sites or the protocol servers")
-    admin.logout()
-    sys.exit(c.done())
-if any(admin.exists("accounts/" + a) for a in (ACCOUNT, OTHER)) or admin.get("sites", params={"name": "example_sites_*"}).json().get("result"):
-    c.check("no example_sites_* account or site exists yet", False, "remove them first; this check will not touch them")
+admin = harness.connect(config, c, mock="the bundled mock does not implement /sites or the protocol servers")
+if admin.get("sites", params={"name": "example_sites_*"}).json().get("result"):
+    c.check("no example_sites_* site exists yet", False, "remove them first; this check will not touch them")
     admin.logout()
     sys.exit(c.done())
 
-servers = admin.get("servers").json()
-servers = servers if isinstance(servers, list) else servers.get("result", [])
-ssh_ports = [s["port"] for s in servers if s.get("protocol") == "ssh" and s.get("port")]
-ftp_ports = [s["port"] for s in servers if s.get("protocol") == "ftp" and s.get("port")]
+ports = harness.ports(config, admin)
 daemons = admin.get("daemons").json()
-if not ssh_ports or not ftp_ports or daemons.get("sshStatus") != "Running" or daemons.get("ftpStatus") != "Running":
+if not ports.ftp or daemons.get("sshStatus") != "Running" or daemons.get("ftpStatus") != "Running":
     c.info("the SSH and FTP daemons must be running: this check logs in to both")
     admin.logout()
     sys.exit(c.done())
-ssh_port, ftp_port = ssh_ports[0], ftp_ports[0]
+ssh_port, ftp_port = ports.ssh, ports.ftp
 
 sites_before = (admin.get("sites", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount")
 ids = {}
 eu = None
 uploaded = []
+accounts = contextlib.ExitStack()
 try:
-    create_account(ACCOUNT, "1093")
-    create_account(OTHER, "1094")
+    for account in (ACCOUNT, OTHER):
+        accounts.enter_context(harness.throwaway_account(admin, c, config, name=account, password=PASSWORD))
     eu = st_client.EndUserClient(HOST, ENDUSER_PORT, ACCOUNT, PASSWORD)
     eu.login()
     for folder in ("in", "out", "in/sub"):
@@ -190,7 +143,7 @@ try:
         def create(folder=folder):
             made[0] = eu.create_folder(folder)
             return made[0].status == 201
-        c.check("set up: the folder /" + folder, wait_until(create, 15), (made[0].status, made[0].text[:200]))
+        c.check("set up: the folder /" + folder, harness.wait_until(create, 15), (made[0].status, made[0].text[:200]))
     for folder, name, content in (("in", "i1.txt", b"one"), ("in", "i2.dat", b"twotwo"), ("out", "o1.txt", b"o")):
         status = upload(eu, folder, name, content).status
         c.check("set up: the file /%s/%s" % (folder, name), status == 201, status)
@@ -212,9 +165,9 @@ try:
     free.close()
     ids["closed"] = make_site("an SSH site whose port nobody listens on", ssh_site(CLOSED, port=closed_port))
     expected = {PULL, UPPER, FTP, HTTP, WRONG, CLOSED}
-    c.check("the list of the account shows all of its sites", wait_until(lambda: {s["name"] for s in sites_of(ACCOUNT)} >= expected),
+    c.check("the list of the account shows all of its sites", harness.wait_until(lambda: {s["name"] for s in sites_of(ACCOUNT)} >= expected),
             sorted(s["name"] for s in sites_of(ACCOUNT)))
-    c.check("and of the other account its one", wait_until(lambda: [s["name"] for s in sites_of(OTHER)] == [PULL]), [s["name"] for s in sites_of(OTHER)])
+    c.check("and of the other account its one", harness.wait_until(lambda: [s["name"] for s in sites_of(OTHER)] == [PULL]), [s["name"] for s in sites_of(OTHER)])
     duplicate = admin.post("sites", ssh_site(PULL))
     c.check("a second site of the same name on the same account is 409", duplicate.status == 409 and "already exist" in duplicate.text, duplicate.text[:200])
 
@@ -386,7 +339,7 @@ try:
         if CALLBACK:
             with dummy_servers.JunkServer() as junk:
                 ids["junk"] = make_site("an SSH site whose partner is a JunkServer", ssh_site(JUNK, host=CALLBACK, port=junk.port))
-                c.check("the site is listed", wait_until(lambda: find(ACCOUNT, JUNK) is not None))
+                c.check("the site is listed", harness.wait_until(lambda: find(ACCOUNT, JUNK) is not None))
                 out = script("09.sites_operations_POST_test.sh", [ACCOUNT, JUNK], expect_rc=1, env={"SITE_PASSWORD": ""})
                 c.check("09 a partner that is not an SSH server: the connection fails with the server's reason, and the stand-in saw the call",
                         "  connection:      failed" in out and "negotiate" in out and junk.connections >= 1, (out[-300:], junk.connections))
@@ -503,13 +456,12 @@ finally:
     for account in (ACCOUNT, OTHER):
         for s in sites_of(account):
             admin.delete("sites/" + s["id"])
-    admin.delete("accounts/" + ACCOUNT)
-    admin.delete("accounts/" + OTHER)
+    accounts.close()
     c.check("nothing is left behind: no example_sites_* site, no account",
             not admin.get("sites", params={"name": "example_sites_*"}).json().get("result")
             and not admin.exists("accounts/" + ACCOUNT) and not admin.exists("accounts/" + OTHER))
     c.check("the site count is as before",
-            wait_until(lambda: (admin.get("sites", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount") == sites_before),
+            harness.wait_until(lambda: (admin.get("sites", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount") == sites_before),
             (admin.get("sites", params={"limit": 1, "fields": "id"}).json() or {}).get("resultSet", {}).get("totalCount"))
     if eu:
         c.check("the files and folders the check made are gone from the home folder", left == [], left)

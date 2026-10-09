@@ -16,6 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 
 config = st_client.load_config()
 if not config:
@@ -23,13 +24,8 @@ if not config:
 
 c = st_client.Checker("Configurations, read only")
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /configurations; run this "
-           "against a real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /configurations; run this "
+                                          "against a real server to exercise it"))
 
 OPTION = "AddressBook.Enabled"
 response = client.get("configurations/options/" + OPTION)

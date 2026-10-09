@@ -24,17 +24,11 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run stUpdateRouteWithPut.py for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run stUpdateRouteWithPut.py for real")
 
 if not runner.python_available():
     st_client.skip("no tests/local/pyvenv - see 15.python_read_scripts.py's docstring")
@@ -46,13 +40,8 @@ PY_TREE = runner.path("Admin", "API 2.0", "python")
 SCRIPT = os.path.join(PY_TREE, "python3", "stUpdateRouteWithPut.py")
 ROUTE_NAME = "ZZTEST_stUpdateRouteWithPut"
 
-client = st_client.connect(config, c)
-
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /routes; run this against a "
-           "real server to exercise it")
-    client.logout()
-    sys.exit(c.done())
+client = harness.connect(config, c, mock=("the bundled mock does not implement /routes; run this against a "
+                                          "real server to exercise it"))
 
 if client.exists("routes/" + ROUTE_NAME):
     c.info('a route named "%s" already exists on this server; skipping this '

@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.." || exit 1
 TESTS_DIR="$(pwd)"
 UTILS="$(cd ../Admin/API\ 2.0/python/utils && pwd)"
 FIX="${TESTS_DIR}/fixtures"
-OUT="${TESTS_DIR}/output/utils"
+OUT="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/utils"
 
 rm -rf "${OUT}" && mkdir -p "${OUT}"
 

@@ -30,20 +30,15 @@ Needs --write and st_allow_writes="yes", same as 04.accounts_scripts.py.
 """
 import os
 import sys
+from urllib.parse import quote
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the Expression Language scripts for real")
-
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the Expression Language scripts for real")
 
 c = st_client.Checker("Expression Language, run for real from "
                        "Admin/API 2.0/bash/14.ExpressionLanguage")
@@ -65,72 +60,79 @@ def run_and_check(name, expected_snippets):
                 result.stdout[-500:])
 
 
-client = st_client.connect(config, c)
+client = harness.connect(config, c, mock=("the bundled mock does not implement /routes, /sites or "
+                                          "/loginRestrictionPolicies; run this against a real server to exercise it"))
 
-if st_client.is_mock(client):
-    c.info("the bundled mock does not implement /routes, /sites or "
-           "/loginRestrictionPolicies; run this against a real server to exercise it")
+
+def left_behind():
+    """(path, name) of every ZZTEST_EL_ object, the name these examples give what they make, in routes, sites and policies."""
+    found = []
+    for collection in ("routes", "sites", "loginRestrictionPolicies"):
+        for item in client.page(collection):
+            name = item.get("name") or ""
+            if name.startswith("ZZTEST_EL_"):
+                key = name if collection == "loginRestrictionPolicies" else item.get("id")
+                found.append(("%s/%s" % (collection, quote(str(key), safe="")), "%s/%s" % (collection, name)))
+    return found
+
+
+try:
+    with runner.real_credentials(BASH_TREE, config):
+
+        run_and_check("01.loginRestrictionPolicy_sessionExpression.sh", [
+            '"expression" : "${currentSessions <= 3}"',
+        ])
+
+        run_and_check("02.routes_condition_EL.sh", [
+            '"condition" : "${account.disabled != \'0\'}"',
+            '"condition" : "${!empty account.email}"',
+            '"condition" : "${transfer.transferredBytes ge 20}"',
+        ])
+
+        run_and_check("03.routes_step_fileFilterExpression_glob.sh", [
+            '"fileFilterExpression" : "*.xml"',
+            '"fileFilterExpression" : "foo.??"',
+            '"fileFilterExpression" : "*.[0-9]"',
+            '"fileFilterExpression" : "*.[!0-9]"',
+        ])
+
+        run_and_check("04.routes_step_fileFilterExpression_regexp.sh", [
+            '"fileFilterExpression" : ".*\\\\.(xml|txt)"',
+            '"fileFilterExpression" : "(?i)data\\\\.xml"',
+            '"fileFilterExpression" : "^(?!.*__TID\\\\d{6}__[A-Za-z0-9]{16}).*$"',
+        ])
+
+        run_and_check("05.routes_step_condition_matches_backslashDoubling.sh", [
+            '"condition" : "${transfer.target.matches(\'.*\\\\\\\\.txt\')}"',
+            '"condition" : "${transfer.target.matches(\'.*\\\\.txt\')}"',
+        ])
+
+        run_and_check("06.routes_step_renameExpression.sh", [
+            "${basename(transfer.target)}-${date('yyyyMMdd_HHmmss')}${extension(transfer.target)}",
+            "${basename(transfer.target)}-${random()}.${extension(transfer.target)}",
+            "${account.name}_${basename(transfer.target)}",
+        ])
+
+        run_and_check("07.transferSites_downloadPattern.sh", [
+            '"downloadPattern" : "*.xml"',
+            '"downloadPattern" : "*.[0-9]"',
+            '"downloadPattern" : ".*\\\\.(xml|txt)"',
+            '"downloadPatternType" : "glob"',
+            '"downloadPatternType" : "regex"',
+        ])
+
+        run_and_check("08.transferSites_dynamicProperties.sh", [
+            '"host" : "${DXAGENT_TRANSFERSAPI_SERVER}"',
+            '"downloadPattern" : "${DXAGENT_TRANSFERSAPI_FILE}"',
+        ])
+finally:
+    leftovers = [label for _, label in left_behind()]
+    c.check("no ZZTEST_EL_ object is left behind in routes, sites or loginRestrictionPolicies",
+            not leftovers, leftovers)
+    # what a script that failed half way left behind is removed: these are the names of these examples only
+    for path, _ in left_behind():
+        client.delete(path)
     client.logout()
-    sys.exit(c.done())
-
-with runner.real_credentials(BASH_TREE, config):
-
-    run_and_check("01.loginRestrictionPolicy_sessionExpression.sh", [
-        '"expression" : "${currentSessions <= 3}"',
-    ])
-
-    run_and_check("02.routes_condition_EL.sh", [
-        '"condition" : "${account.disabled != \'0\'}"',
-        '"condition" : "${!empty account.email}"',
-        '"condition" : "${transfer.transferredBytes ge 20}"',
-    ])
-
-    run_and_check("03.routes_step_fileFilterExpression_glob.sh", [
-        '"fileFilterExpression" : "*.xml"',
-        '"fileFilterExpression" : "foo.??"',
-        '"fileFilterExpression" : "*.[0-9]"',
-        '"fileFilterExpression" : "*.[!0-9]"',
-    ])
-
-    run_and_check("04.routes_step_fileFilterExpression_regexp.sh", [
-        '"fileFilterExpression" : ".*\\\\.(xml|txt)"',
-        '"fileFilterExpression" : "(?i)data\\\\.xml"',
-        '"fileFilterExpression" : "^(?!.*__TID\\\\d{6}__[A-Za-z0-9]{16}).*$"',
-    ])
-
-    run_and_check("05.routes_step_condition_matches_backslashDoubling.sh", [
-        '"condition" : "${transfer.target.matches(\'.*\\\\\\\\.txt\')}"',
-        '"condition" : "${transfer.target.matches(\'.*\\\\.txt\')}"',
-    ])
-
-    run_and_check("06.routes_step_renameExpression.sh", [
-        "${basename(transfer.target)}-${date('yyyyMMdd_HHmmss')}${extension(transfer.target)}",
-        "${basename(transfer.target)}-${random()}.${extension(transfer.target)}",
-        "${account.name}_${basename(transfer.target)}",
-    ])
-
-    run_and_check("07.transferSites_downloadPattern.sh", [
-        '"downloadPattern" : "*.xml"',
-        '"downloadPattern" : "*.[0-9]"',
-        '"downloadPattern" : ".*\\\\.(xml|txt)"',
-        '"downloadPatternType" : "glob"',
-        '"downloadPatternType" : "regex"',
-    ])
-
-    run_and_check("08.transferSites_dynamicProperties.sh", [
-        '"host" : "${DXAGENT_TRANSFERSAPI_SERVER}"',
-        '"downloadPattern" : "${DXAGENT_TRANSFERSAPI_FILE}"',
-    ])
-
-leftovers = []
-for collection in ("routes", "sites", "loginRestrictionPolicies"):
-    for item in client.page(collection):
-        if (item.get("name") or "").startswith("ZZTEST_EL_"):
-            leftovers.append("%s/%s" % (collection, item.get("name")))
-c.check("no ZZTEST_EL_ object is left behind in routes, sites or loginRestrictionPolicies",
-        not leftovers, leftovers)
-
-client.logout()
 c.info("%d API calls issued by the verification client (not counting the scripts' own curl calls)"
        % client.calls)
 

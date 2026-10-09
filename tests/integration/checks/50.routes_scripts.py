@@ -24,34 +24,25 @@ stand-in server is needed. Refuses to start when any example_routes_* object
 exists, and removes everything it made in a finally block. Needs --write and
 st_allow_writes="yes".
 """
-import base64
 import os
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "lib"))
 import st_client  # noqa: E402
+import harness  # noqa: E402
 import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
-if not config:
-    st_client.skip("no tests/local/integration.conf, so there is no server to talk to")
-if "--write" not in sys.argv:
-    st_client.skip("read only run, pass --write to run the route examples for real")
-if config.get("st_allow_writes", "no").lower() not in ("yes", "true", "1"):
-    st_client.skip('st_allow_writes is not "yes" in integration.conf')
+harness.require_writes(config, "run the route examples for real")
 
 c = st_client.Checker("Routes, run for real from Admin/API 2.0/bash/09.CompositeRoutes (08 to 10)")
 FOLDER = os.path.join(runner.path("Admin", "API 2.0", "bash"), "09.CompositeRoutes")
 ACCOUNT, APPLICATION = "example_routes_user", "example_routes_app"
 SIMPLE, TEMPLATE, COMPOSITE = "example_routes_simple", "example_routes_template", "example_routes_composite"
-PASSWORD = "Ax" + base64.b32encode(os.urandom(9)).decode().rstrip("=") + "1!"
+PASSWORD = harness.new_password()
 
 
-def script(name, args=None, expect_rc=0):
-    result = runner.run(os.path.join(FOLDER, name), args, timeout=90)
-    out = result.stdout + result.stderr
-    c.check("%s %s exits %s" % (name, " ".join(args or []), expect_rc), result.returncode == expect_rc, out.strip()[-300:])
-    return out
+script = harness.bind_script(c, FOLDER, timeout=90)
 
 
 def location_id(response):
@@ -77,11 +68,7 @@ def step(output):
             "fileFilterExpressionType": "GLOB", "fileFilterExpression": "*", "outputFileName": output, "actionOnStepFailure": "FAIL"}
 
 
-admin = st_client.connect(config, c)
-if st_client.is_mock(admin):
-    c.info("the bundled mock does not implement the route operations these examples use")
-    admin.logout()
-    sys.exit(c.done())
+admin = harness.connect(config, c, mock="the bundled mock does not implement the route operations these examples use")
 if (admin.exists("accounts/" + ACCOUNT) or admin.exists("applications/" + APPLICATION)
         or any(by_name(n) for n in (SIMPLE, TEMPLATE, COMPOSITE))):
     c.check("none of the example_routes_* objects exist yet", False, "remove them first; this check will not touch them")
