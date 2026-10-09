@@ -1099,6 +1099,17 @@ from the Admin API reference (`tests/integration/checks/34` onwards):
   Two wrong passwords on `admin` did not lock it. A bash script's exit code is that of its last command: an example that ends in a
   `grep` exits 1 when the grep finds nothing, whatever the call did.
 
+- **Timings and traps seen while replacing the harness' fixed sleeps** (5.5-20260924). A subscription pull puts the file in the
+  folder about 2.5 s after it is asked for; the pull summary says done 0.3 to 1.3 s later; a file deleted at that moment was not
+  pulled again in 8 of 8 tries, and `ClearPullHistory` is effective at once (a pull right after it fetched the file 8 of 8). A
+  running transfer reports "not cancelable" at once and a cancel shows in the pull summary at once. The statistics report shows a
+  transfer within about 2 s. **An sftp `pwd` is answered by the client** and never notices a session the server ended; `ls` does
+  ("Received disconnect ... Manual termination by the server administrator"). `DELETE /files/<non-empty folder>` on the EndUser
+  API is 403, so remove folders bottom-up (an empty one is 204). **The active users report keeps every name that has ever logged
+  in** (314 on the lab), so a throwaway account that logs in adds a name for good, and `limit=0` returns the first 100 of them. A
+  background job started with `&` in a shell ignores SIGINT. The whole lab suite takes about 14 minutes for check 59 alone with a
+  callback address the lab can reach (and about an hour when it cannot, every transfer then waiting for its retry).
+
 - **Features: what the failure handling run on the lab showed** (`audit-billable-transfers`, `trigger-route-after-completed-pull`,
   `Features/lib`; 5.5-20260924). A `#` in an unencoded file path cuts the URL: `DELETE /files/dir/a#1.txt` asks for
   `/dir/a` and answers 404 "Unable to delete file: /dir/a. (file not found)"; a space makes curl send nothing (code 000);

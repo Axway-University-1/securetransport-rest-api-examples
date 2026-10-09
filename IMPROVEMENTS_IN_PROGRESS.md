@@ -19,6 +19,7 @@ things. This is the ledger. Delete it when the open list is empty.
 | Acknowledgment | Exit codes, paging past 100 transfers, the bat twins | `90.EndToEndAcknowledgment`, `test_bash_pesit_ack.sh` |
 | EndUser | Logout ended the wrong session, bash 3.2, exit 0 on failure, the tracked `test.txt`, base64 wrapping | `EndUser/API 2.0/bash`, `test_bash_enduser_api.sh` |
 | Admin bash and bat | About 58 read scripts that never looked at the HTTP status (a 401 printed nothing and exited 0), the `change_me` passwords of `18.AccountSetup`, `01.myself_POST` made the login its name says | `test_bash_admin_sweep_c.sh` |
+| Harness | One helper module for the lab checks (631 lines fewer), polling instead of fixed sleeps, a time limit per check, a private output folder per run, no temp folder left behind | `tests/integration/lib/harness.py`, `run_check.py` |
 | Features | A refused call stops the run in both; the trigger feature heals a stale home folder like the billable one; clean-ups exit 1 and keep their state file; paths are encoded; shared code in `Features/lib` (`home_folder`, `admin_calls`) | `test_feature_*.sh`, `test_feature_bat_twins.py` |
 | Skills | The orientation index in folder order, the covered tags as a table | `.claude/skills` |
 | Repository | `.gitattributes` (CRLF for `.bat`) and the hygiene check that reads CRLF | `.gitattributes` |
@@ -26,9 +27,9 @@ things. This is the ledger. Delete it when the open list is empty.
 
 ## Open
 
-1. **Harness (in progress):** the copied helpers (`script()`, `wait_until`, the port lookups), the fixed sleeps in checks 43, 48
-   and 56, the quiet-server assumptions of 41, 53 and 55, `mkdtemp` without cleanup, a per-check timeout, and a private output
-   folder per run so that two runs do not delete each other's.
+1. **Harness, what is left:** thin per-check `script`/`settled` bindings, `login_until` in 46, the multipart upload body
+   in 33, 54, 56 and 49, `PESIT_SITE_DEFAULTS` in 32, 48, 58 and 59, `location_id` and `sessions()`; checks 54, 56 and 58
+   still compare whole-server counts at the end (documented); check 55 needs a quiet lab.
 2. **Consistency:** 31 scripts need the account `john`; port 8022 is hard coded in several; some objects are not named
    `example_*` (`SSH_TEST_SERVER_*`, `RouteFrom*`, `SimpleRouteName`, `Finance`); the EndUser tree has no bat twins (decide: add
    them, or say so plainly).
