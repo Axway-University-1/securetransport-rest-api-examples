@@ -95,9 +95,20 @@ c.check("an offset past the end is refused", ns["stInsertSteps"](copy(route)) is
 ns = fake_st.load("stUpdateRouteWithPut.py", insertAtOffset=0, stepsToInsert=[new_step])
 r = copy(route)
 ns["stLinkSimpleRoute"](r, "simple-99")
-c.check("linking writes an ExecuteRoute step",
-        r["steps"] == [{"type": "ExecuteRoute", "status": "ENABLED",
-                        "autostart": False, "executeRoute": "simple-99"}])
+linked = {"type": "ExecuteRoute", "status": "ENABLED", "autostart": False, "executeRoute": "simple-99"}
+c.check("linking adds an ExecuteRoute step after the steps the composite already has",
+        r["steps"] == route["steps"] + [linked], r["steps"])
+c.check("and does not touch the original route", route["steps"] == [x for x in route["steps"] if x["type"] != "ExecuteRoute"])
+c.check("linking the same simple route again is a no-op that changes nothing",
+        ns["stLinkSimpleRoute"](r, "simple-99") is False and r["steps"] == route["steps"] + [linked])
+empty = {"name": "composite", "steps": []}
+c.check("linking an empty composite gives it the one step",
+        ns["stLinkSimpleRoute"](empty, "simple-99") is True and empty["steps"] == [linked])
+nosteps = {"name": "composite"}
+c.check("a composite with no steps key is linked too", ns["stLinkSimpleRoute"](nosteps, "simple-99") is True and nosteps["steps"] == [linked])
+other = {"name": "composite", "steps": [dict(linked, executeRoute="simple-1")]}
+c.check("a composite that executes another simple route keeps it and gains this one",
+        ns["stLinkSimpleRoute"](other, "simple-99") is True and [s["executeRoute"] for s in other["steps"]] == ["simple-1", "simple-99"])
 
 r = copy(route)
 ns["stAttachToSubscription"](r, "sub-new")

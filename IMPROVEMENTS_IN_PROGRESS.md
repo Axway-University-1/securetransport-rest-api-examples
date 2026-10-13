@@ -22,6 +22,7 @@ things. This is the ledger. Delete it when the open list is empty.
 | Harness | One helper module for the lab checks (631 lines fewer), polling instead of fixed sleeps, a time limit per check, a private output folder per run, no temp folder left behind | `tests/integration/lib/harness.py`, `run_check.py` |
 | Admin bash and bat | The account `john` and the SSH port 8022 as optional settings `ST_EXAMPLE_ACCOUNT` and `ST_SSH_PORT`, defaults unchanged | `test_bash_example_settings.sh` |
 | Features | A refused call stops the run in both; the trigger feature heals a stale home folder like the billable one; clean-ups exit 1 and keep their state file; paths are encoded; shared code in `Features/lib` (`home_folder`, `admin_calls`) | `test_feature_*.sh`, `test_feature_bat_twins.py` |
+| Python | `stLinkSimpleRoute` adds its `ExecuteRoute` step after a composite's existing steps instead of replacing them all (the link mode itself was not run on the lab; the insert mode, which shares its PUT, was) | `test_python_logic.py` |
 | Docs | The 600 line per resource list of the gotchas is now one subsection per resource in the reference's order, with a link index, and the sweeps' findings in a group of their own (no word was lost: checked by comparing the text) | `.claude/skills/st-api-gotchas` |
 | Skills | The orientation index in folder order, the covered tags as a table | `.claude/skills` |
 | Repository | `.gitattributes` (CRLF for `.bat`) and the hygiene check that reads CRLF | `.gitattributes` |
@@ -38,7 +39,6 @@ things. This is the ledger. Delete it when the open list is empty.
 3. **Left to the owner, on the lab:** run `stGraceful.py` (it stops daemons: never run by the agents; its stop now sends
    `daemon=<protocol>`, untested on a real server), check 23 and the start and stop of `13.servers_operations_POST` (they stop and start
    live daemons and servers), and set `st_callback_host` in `tests/local/integration.conf` to an address the lab can reach (checks 40, 43,
-   47, 48, 54, 55 and 59 need it). Also decide whether `stLinkSimpleRoute` replacing all of a route's steps with one `ExecuteRoute` step is
-   intended, and rotate the password that was in `stBuildFullTestAccount.py` if it was ever real (it is still in git history).
+   47, 48, 54, 55 and 59 need it). Also rotate the password that was in `stBuildFullTestAccount.py` if it was ever real (it is still in git history).
 4. **Out of scope here:** the Windows `.bat` twins (not run on Windows; someone else owns that) and the trainer kit (managed by another
    project).

@@ -28,7 +28,8 @@
 #
 #   1. Insert one or more new steps into an existing route, at a chosen position.
 #   2. Link an existing simple route into a composite route, by giving the
-#      composite an ExecuteRoute step that points at the simple route.
+#      composite an ExecuteRoute step that points at the simple route. The step
+#      is added after the composite's existing steps, which are kept.
 #   3. Attach a composite route to a subscription.
 #
 # All three are a GET of /routes/{id}, an edit of the returned object, and a PUT
@@ -254,15 +255,27 @@ def stInsertSteps(route):
 # Give a composite route an ExecuteRoute step that points at an existing simple
 # route. This is what the admin UI does when you extend a package route.
 #
+# The step is added after the steps the composite already has, which are kept; a
+# composite that already executes this simple route is left alone. (An earlier version
+# replaced all the steps with the one new step, which destroys a multi-step composite.)
+#
 def stLinkSimpleRoute(route, simpleRouteId):
 
-    print('Composite route ' + str(route.get('name')) +
-          ' will be given an ExecuteRoute step for simple route ' + str(simpleRouteId))
+    steps = route.get('steps') or []
+    for step in steps:
+        if step.get('type') == 'ExecuteRoute' and step.get('executeRoute') == simpleRouteId:
+            print('Composite route ' + str(route.get('name')) +
+                  ' already executes simple route ' + str(simpleRouteId))
+            return False
 
-    route['steps'] = [{'type': 'ExecuteRoute',
-                       'status': 'ENABLED',
-                       'autostart': False,
-                       'executeRoute': simpleRouteId}]
+    print('Composite route ' + str(route.get('name')) +
+          ' will be given an ExecuteRoute step for simple route ' + str(simpleRouteId) +
+          ', after its ' + str(len(steps)) + ' existing step(s)')
+
+    route['steps'] = steps + [{'type': 'ExecuteRoute',
+                               'status': 'ENABLED',
+                               'autostart': False,
+                               'executeRoute': simpleRouteId}]
     return True
 
 
