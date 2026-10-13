@@ -35,9 +35,10 @@ things. This is the ledger. Delete it when the open list is empty.
 2. **Consistency:** some objects are not named `example_*` (`SSH_TEST_SERVER_*`, `RouteFrom*`, `SimpleRouteName`, `Finance`): the integration
    checks and the trainer kit depend on those names, so they stay until both can follow. (The account `john` and the SSH port 8022 are now
    optional settings, `ST_EXAMPLE_ACCOUNT` and `ST_SSH_PORT`, with the old values as defaults; the EndUser tree is bash only, and says so.)
-3. **The bat twins have never run:** none of the bat changes could be run (no Windows here). A short run of the ones with
-   PowerShell in them (`Features/lib/admin_calls.bat`, the acknowledgment scripts, `03.Connect/11`) would be worth it.
-4. **For the owner:** the password that was in `stBuildFullTestAccount.py` is still in git history (rotate it if it was ever
-   real); `st_callback_host` in `tests/local/integration.conf` is stale, so checks 40 and 47 fail on it; the trainer kit needs
-   the new arguments of the changed scripts and a new `python.tsv`; `stLinkSimpleRoute` replaces all of a route's steps with one
-   `ExecuteRoute` step (data loss, or intended?).
+3. **Left to the owner, on the lab:** run `stGraceful.py` (it stops daemons: never run by the agents; its stop now sends
+   `daemon=<protocol>`, untested on a real server), check 23 and the start and stop of `13.servers_operations_POST` (they stop and start
+   live daemons and servers), and set `st_callback_host` in `tests/local/integration.conf` to an address the lab can reach (checks 40, 43,
+   47, 48, 54, 55 and 59 need it). Also decide whether `stLinkSimpleRoute` replacing all of a route's steps with one `ExecuteRoute` step is
+   intended, and rotate the password that was in `stBuildFullTestAccount.py` if it was ever real (it is still in git history).
+4. **Out of scope here:** the Windows `.bat` twins (not run on Windows; someone else owns that) and the trainer kit (managed by another
+   project).
