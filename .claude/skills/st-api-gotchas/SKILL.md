@@ -327,25 +327,12 @@ a PKCS#12 file that `openssl pkcs12 -info` opens with that password and shows a
 "Shrouded Keybag" (the private key) and the certificate; without the field 400;
 with `Accept: application/json` 406.
 
-## stBuildFullTestAccount.py hardcoded the wrong account name in two places
+## An import against an account that does not exist is a 403, not a 404
 
-Confirmed directly, a real bug: `stImportKey` and `stGetKeyId` both
-hardcoded the literal string `"TestAccount1"` instead of using the
-script's own configured `accName` variable, which every other function in
-the file (`stCreateSiteFolder`, `stCreateSiteSFTP`, `stCreateSubscription`,
-`stCreatePackageRoute`) already does correctly. Fixed to use `accName` in
-both places. The failure mode this produced is worth knowing on its own:
-importing a certificate against an account name that does not exist got a
-403, not a 404 - nothing to do with CSRF or permissions, confirmed by
-reproducing the exact same request against a real, existing account, which
-succeeded immediately.
-
-Also confirmed while tracking that down: a GET call inside a kept session
-does not need a `csrfToken` the way a POST/PATCH/PUT/DELETE does -
-`stGetKeyId()` and `stGetTemplateRouteId()` never send one, and that is
-fine. CSRF here gates writes, not reads - the existing "CSRF tokens" entry
-above was never wrong about POST/PATCH/DELETE, this just confirms GET was
-never in scope either.
+Confirmed directly: importing a certificate for an account name the server does not
+know answers 403, which looks like a permission or CSRF problem and is neither: the same
+request against a real account succeeded at once. When a certificate call answers 403,
+check the account name first.
 
 ## Client certificate auth needs a server-wide policy flag, off by default
 
@@ -1805,3 +1792,10 @@ alongside the `posix` check, not instead of it.
 - **Test the payload, not the script.** Point `curl` at a stub that prints the
   `-d` argument, then validate that it is the JSON you intended. That is how the
   silent `sed` corruption above was found.
+
+# Part 4: how some of these were found
+
+- `stBuildFullTestAccount.py` hard coded the literal account name `TestAccount1` in `stImportKey`
+  and `stGetKeyId` instead of its own `accName`, which is how the 403 above was met. Fixed.
+  (A GET inside a kept session needs no `csrfToken`, as the CSRF entry says: those two functions
+  never sent one, which is fine.)

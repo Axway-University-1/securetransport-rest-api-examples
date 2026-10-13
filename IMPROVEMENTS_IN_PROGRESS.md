@@ -37,9 +37,7 @@ things. This is the ledger. Delete it when the open list is empty.
    optional settings, `ST_EXAMPLE_ACCOUNT` and `ST_SSH_PORT`, with the old values as defaults; the EndUser tree is bash only, and says so.)
 3. **The bat twins have never run:** none of the bat changes could be run (no Windows here). A short run of the ones with
    PowerShell in them (`Features/lib/admin_calls.bat`, the acknowledgment scripts, `03.Connect/11`) would be worth it.
-4. **Docs:** the gotchas history and incident entries of Part 1 (a hardcoded account name, a graceful stop that kept running,
-   the PeSIT loop) belong in a changelog, not among the rules.
-5. **For the owner:** the password that was in `stBuildFullTestAccount.py` is still in git history (rotate it if it was ever
+4. **For the owner:** the password that was in `stBuildFullTestAccount.py` is still in git history (rotate it if it was ever
    real); `st_callback_host` in `tests/local/integration.conf` is stale, so checks 40 and 47 fail on it; the trainer kit needs
    the new arguments of the changed scripts and a new `python.tsv`; `stLinkSimpleRoute` replaces all of a route's steps with one
    `ExecuteRoute` step (data loss, or intended?).
