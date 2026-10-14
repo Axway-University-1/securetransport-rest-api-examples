@@ -90,6 +90,12 @@ with tempfile.TemporaryDirectory(prefix="review_status_") as root:
         refused = True
     check("marking something that is not in the repository is refused", refused)
 
+    run(root, "--mark", "review")
+    check("the list file is kept by the tool: marking its folder marks nothing and raises no error",
+          "review/checked.tsv" not in rs.read_list(root))
+    _, ch, _, nope = rs.status(root)
+    check("so it never shows up as changed or as unchecked", "review/checked.tsv" not in ch and "review/checked.tsv" not in nope)
+
     out = run(root, "--unchecked")
     check("--unchecked lists what is not checked yet", "Not checked yet" in out and "dir/b.md" in out, out)
 

@@ -1,2 +1,24 @@
 # path<TAB>sha256 of the content when it was checked<TAB>date. Kept by tools/review_status.py: do not edit by hand.
-README.md	8dcfeaec37e5bb7def6093093ef725d8cca23853065403b7d7986f2128fc062c	2026-10-14
+.claude/README.md	23d9dc5ff3daa5047232f050d8e602efef1abf1d1ad57db61bac67d759b14cf9	2026-10-14
+.claude/agents/st-api-expert.md	ba1a2f0c1486c4fcfc43aec1373e041829f340c953de89901cb6505b6fc5d884	2026-10-14
+.claude/agents/st-api-resource-author.md	57b7c1fd4deda9270546f484e609212dcb039c57b519e1bfbb9242bd88309770	2026-10-14
+.claude/skills/st-api-add-example/SKILL.md	3efe14e8d42c07b4c69011d5b426c5f7a8705e2e54168d20558eeca7f016f4f2	2026-10-14
+.claude/skills/st-api-cover-resource/SKILL.md	e14976ecec129ca8d0ae28fb52018f0a0b6699b801925c4fb03cb6808228337d	2026-10-14
+.claude/skills/st-api-cover-resource/scripts/_repo.py	57c8d810ef60b27e9de1251d56e3b5b05f7852b19ea87dccf4c320c0d3088e96	2026-10-14
+.claude/skills/st-api-cover-resource/scripts/authoring.py	59f347a7f1e10a52c5ffc43c49304316784eb79d5b0e82380cdc1487342159de	2026-10-14
+.claude/skills/st-api-cover-resource/scripts/coverage.py	2147cc4aab4ceb90d751f92e99b7cdc9b568338a64a80abd5d041e7112bb7636	2026-10-14
+.claude/skills/st-api-cover-resource/scripts/endpoint.py	858c89b7ac30f6f7aaba84f8756a62601b7c094a48d3f099da58ccd8f64d6686	2026-10-14
+.claude/skills/st-api-cover-resource/scripts/fetch_spec.sh	ab5bca84307136ce626d0bef9b72ffa54e8289084f2f7560b0b237895bedd006	2026-10-14
+.claude/skills/st-api-cover-resource/scripts/lab.py	284882fb3d815c0af76ae6a90f3b30dc9ca71528582f8bb0f4a5a69850553b29	2026-10-14
+.claude/skills/st-api-cover-resource/scripts/sync_docs.py	b4a4748172a34570248c55daced58770ad1f49467a7baf6c2a5d2efc1775a6a3	2026-10-14
+.claude/skills/st-api-gotchas/SKILL.md	e646271bef21cbb712ed1c4afb1cccf6fd554e46e0da1e0bd4dd3e9060aa45bb	2026-10-14
+.claude/skills/st-api-orientation/SKILL.md	cecdb944313984eb0e5505c7132ffc49f695c55612115f94cb6c94162c404ee5	2026-10-14
+.gitattributes	452eae77c8a39ca4f8fa225bf90f5302ba43cb1223419e06b754e640e566992c	2026-10-14
+.github/workflows/tests.yml	b7ea7a2b7151927894a54359d036b0cef5929fa1d304a1b326cf8aa20e1c7b4c	2026-10-14
+.gitignore	7c3229df68802dc1f7932dae51eaa18ffaf4ae5f79f473682eb39ba80d7ecb2f	2026-10-14
+CLAUDE.md	c2c490220e7f67ac80471f49b3e22066c49ecab0e7034b8cfd49097e2fb8de2c	2026-10-14
+IMPROVEMENTS_IN_PROGRESS.md	659250f311e9ceb580bfa1cfe8a9f84517719678b3fff70b304c3e54d119df84	2026-10-14
+LICENSE	c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4	2026-10-14
+README.md	2c4c37d6fb369d2dd78f267d129137464b978b300ddd5b0642478b14fb0ab4fa	2026-10-14
+images/swagger_20.jpg	86af8b58ecd6b4c2726c5eb6f4285f625ac295741d34cac3310fb4b190c0dd09	2026-10-14
+images/swagger_get_account.jpg	84170e94d4f2f5e034fbb56f8bfff167dd304a5645afc7cd28dbad5bd6266dc4	2026-10-14

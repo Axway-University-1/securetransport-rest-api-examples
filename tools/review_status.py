@@ -80,9 +80,10 @@ def expand(root, paths):
         rel = os.path.normpath(p).replace(os.sep, "/")
         hits = [f for f in files if f == rel or f.startswith(rel.rstrip("/") + "/")]
         if not hits:
-            raise SystemExit("not a file or folder of this repository: " + p)
+            raise SystemExit("not a file or folder of this repository (a folder git ignores has nothing to mark): " + p)
         chosen.extend(hits)
-    return sorted(set(chosen))
+    # The list is rewritten by every mark, so its own hash could never stay the same
+    return sorted(set(chosen) - {LIST_FILE.replace(os.sep, "/")})
 
 
 def main(argv=None):
