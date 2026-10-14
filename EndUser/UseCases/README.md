@@ -12,7 +12,13 @@ transfers) and shows one call at a time. This folder is for **scenarios**: what 
 or a partner actually does, from start to finish, for example uploading a set of files
 and checking what became of them.
 
-This folder is empty for now; the first use cases will be added here.
+## The use cases
+
+They are meant to be read in this order, each building on what the one before taught.
+
+| Use case | What it teaches |
+| -------- | --------------- |
+| [01-authentication](01-authentication/README.md) | Getting in: Basic authentication on a single call, then the session (cookie jar and csrfToken), recovering from an expired session, and logging out. |
 
 ## How a use case is organised
 
