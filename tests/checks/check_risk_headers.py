@@ -2,7 +2,7 @@
 """
 Every example says how much it can change on the server, in a 'Risk:' line of
 its header, and its bat twin says the same. tools/list_examples.py reads that
-line for other projects (the trainer kit), so a missing or unknown level, or a
+line for other projects, so a missing or unknown level, or a
 read that writes, is caught here.
 
 Runs offline. Exit code 0 means clean.

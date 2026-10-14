@@ -197,20 +197,53 @@ which file to create rather than failing part way through a request.
 
 ## Repository Layout
 
+This is what you see at the root of the repository.
+
+### The examples
+
+| Folder | What is in it |
+| ------ | ------------- |
+| `Admin/` | The examples for the **administrator API** (port 444, or 8444 on a non root install): `API 2.0/bash` (curl examples, numbered by topic), `API 2.0/bat` (the same examples for Windows) and `API 2.0/python` (small complete programs for real tasks, and `utils` for tools that work on an exported configuration XML). |
+| `EndUser/` | The examples for the **end user API** (port 443, or 8443): `API 2.0/bash` has one example per call, `UseCases` is for complete end user scenarios (to be filled). |
+| `Features/` | Complete solutions, one folder per feature, grouped by the release that introduced it. Each is a whole scenario you can run from `00.run_all` to the clean-up. See [Features](Features/README.md). |
+
+### Working on the repository
+
+| Folder | What is in it |
+| ------ | ------------- |
+| `tests/` | The checks. `./tests/run_all.sh` runs the offline ones (no server, no credentials); `tests/integration` runs the same examples against a real server you name in `tests/local/integration.conf`. `tests/local` and `tests/output` are yours and git ignores them. See [tests](tests/README.md). |
+| `tools/` | Two small scripts. `list_examples.py` lists every example with the endpoint it calls and its `Risk` line (`--table` for a table). `review_status.py` keeps `review/checked.tsv`. |
+| `review/` | `checked.tsv`, the list of files a person has read and confirmed, each with a hash of its content, so that a file that changed since is easy to find. Kept by `tools/review_status.py`; do not edit it by hand. |
+| `.claude/` | A knowledge pack for people and for AI assistants working here: `skills/` holds the three guides linked under [Start with the guides](#start-with-the-guides) and the procedure for covering a new API resource, `agents/` holds two assistant definitions. See [its README](.claude/README.md). Your own `settings.json` and `settings.local.json` in this folder are git ignored. |
+| `.github/` | `workflows/tests.yml`: runs `./tests/run_all.sh` on Linux for every push and pull request. |
+| `images/` | The screenshots used by this README. |
+| `tmp/` | A scratch folder for the files the helper scripts write while probing a server. It is git ignored, so a fresh clone does not have it, and you can delete what is in it. |
+
+### The files
+
+| File | What it is |
+| ---- | ---------- |
+| `README.md` | This file. |
+| `LICENSE` | The Apache License 2.0. |
+| `CLAUDE.md` | The working rules for anyone changing the repository with Claude Code: every change is covered by a test, how to run the suite, the safety rules for a lab. |
+| `IMPROVEMENTS_IN_PROGRESS.md` | What the last review of the repository found, what is done and what is still open. It goes away when nothing is open. |
+| `.gitignore` | What git does not track: your own configuration (`*.local.*`, `config`), passwords, `tests/local`, `tests/output`, `tmp/`. |
+| `.gitattributes` | Line endings: `.sh` and `.py` files use LF, `.bat` files use CRLF, so a checkout works on Linux and on Windows. |
+| `.DS_Store` | A macOS Finder file. It is not tracked; ignore it. |
+
+### Inside the examples
+
 ```
-Admin/API 2.0/          Administrator API, on the admin port
+Admin/API 2.0/
     bash/               curl examples, numbered by topic
     bat/                the same examples for Windows
     python/
         python3/         the python examples
         utils/           tools that work on an exported configuration XML
 EndUser/
-    API 2.0/
-        bash/           end user API, on the user port
+    API 2.0/bash/       end user API, on the user port
     UseCases/           complete end user scenarios (to be filled)
 Features/               complete solutions, one folder per feature
-tools/                  list_examples.py: every example, its endpoint and Risk
-images/                 screenshots used by this README
 ```
 
 The bash and bat examples are numbered by topic and, within a topic, by HTTP

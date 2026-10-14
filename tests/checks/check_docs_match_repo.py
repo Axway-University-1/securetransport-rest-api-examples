@@ -211,6 +211,13 @@ chk("the PeSIT acknowledgment lives under Features, not under the Admin API fold
     and "pesit-end-to-end-acknowledgment" in open(os.path.join(REPO, "Features", "README.md")).read()
     and "90. End To End" not in README)
 
+print("=== the README describes everything at the root ===")
+import subprocess as _subprocess  # noqa: E402
+root_items = sorted({p.split("/")[0] for p in _subprocess.run(["git", "-C", REPO, "ls-files"], capture_output=True, text=True).stdout.split("\n") if p})
+root_items += ["tmp", ".DS_Store"]  # git ignores these, and a reader still sees them
+undescribed = [i for i in root_items if "`%s" % i not in README]
+chk("every item at the root (files, folders, and the ignored tmp and .DS_Store) is named in the README", not undescribed, ", ".join(undescribed))
+
 print()
 if failed:
     print("check_docs_match_repo: FAIL (%d)" % failed)

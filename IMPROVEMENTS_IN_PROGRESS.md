@@ -34,11 +34,10 @@ things. This is the ledger. Delete it when the open list is empty.
    in 33, 54, 56 and 49, `PESIT_SITE_DEFAULTS` in 32, 48, 58 and 59, `location_id` and `sessions()`; checks 54, 56 and 58
    still compare whole-server counts at the end (documented); check 55 needs a quiet lab.
 2. **Consistency:** some objects are not named `example_*` (`SSH_TEST_SERVER_*`, `RouteFrom*`, `SimpleRouteName`, `Finance`): the integration
-   checks and the trainer kit depend on those names, so they stay until both can follow. (The account `john` and the SSH port 8022 are now
+   checks depend on those names, so they stay until the checks can follow. (The account `john` and the SSH port 8022 are now
    optional settings, `ST_EXAMPLE_ACCOUNT` and `ST_SSH_PORT`, with the old values as defaults; the EndUser tree is bash only, and says so.)
 3. **Left to the owner, on the lab:** run `stGraceful.py` (it stops daemons: never run by the agents; its stop now sends
    `daemon=<protocol>`, untested on a real server), check 23 and the start and stop of `13.servers_operations_POST` (they stop and start
    live daemons and servers), and set `st_callback_host` in `tests/local/integration.conf` to an address the lab can reach (checks 40, 43,
    47, 48, 54, 55 and 59 need it). Also rotate the password that was in `stBuildFullTestAccount.py` if it was ever real (it is still in git history).
-4. **Out of scope here:** the Windows `.bat` twins (not run on Windows; someone else owns that) and the trainer kit (managed by another
-   project).
+4. **Out of scope here:** the Windows `.bat` twins (not run on Windows; someone else owns that).

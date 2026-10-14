@@ -2,7 +2,7 @@
 """
 List every example script with what its header says, as JSON or as a table.
 
-Other projects (the trainer kit, for one) build on this instead of parsing the
+Other projects can build on this instead of parsing the
 headers themselves, so the header format has one reader, tested here.
 
     python3 tools/list_examples.py            JSON, one object per bash example

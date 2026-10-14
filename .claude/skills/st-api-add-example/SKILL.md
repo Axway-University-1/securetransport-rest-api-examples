@@ -82,7 +82,7 @@ checked.
 In a `.bat` the same block uses `REM` instead of `#`.
 
 The **Risk** line says how much the example can change on the server, so that
-a reader (and the trainer kit, through `tools/list_examples.py`) can tell what
+a reader (and other projects, through `tools/list_examples.py`) can tell what
 is safe to run. One of:
 
 | Level | Meaning |
