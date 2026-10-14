@@ -26,6 +26,7 @@ pass() { printf "  PASS  %s\n" "$1"; }
 fail() { printf "  FAIL  %s\n" "$1"; FAILED=1; }
 expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1  (expected '$3', got '$2')"; fi; }
 has() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then pass "$1"; else fail "$1  (no '$2' in the output)"; fi; }
+hasre() { if printf '%s\n' "${OUT}" | grep -qE -- "$2"; then pass "$1"; else fail "$1  (nothing like '$2' in the output)"; fi; }
 hasnt() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then fail "$1  ('$2' is in the output)"; else pass "$1"; fi; }
 
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
@@ -72,7 +73,7 @@ rm -f "${UC}"/session.cookie.jar "${UC}"/state.local.csrf
 CSRF=tok123 run 03.session_login_POST.sh
 expect "03: one POST /myself" "$(calls)" "POST ${BASE}/myself"
 has "03: with the user and password" "BASIC_AUTH: "
-has "03: writing the cookie jar of this use case, not myCookie.jar" "COOKIE_JAR_WRITE: ${UC}/session.cookie.jar"
+hasre "03: writing the cookie jar of this use case, not myCookie.jar" "^COOKIE_JAR_WRITE: .*/01-authentication/session\.cookie\.jar$"
 expect "03: saves the csrfToken" "$(cat "${UC}/state.local.csrf")" "tok123"
 expect "03: exit 0" "${RC}" "0"
 STATUS=401 run 03.session_login_POST.sh
@@ -85,7 +86,7 @@ expect "04: with no session it says to run 03 and exits 2, sending nothing" "${R
 touch "${UC}/session.cookie.jar"
 run 04.session_cookie_GET_myself.sh
 expect "04: one GET /myself" "$(calls)" "GET ${BASE}/myself"
-has "04: sends the cookie jar" "COOKIE: ${UC}/session.cookie.jar"
+hasre "04: sends the cookie jar" "^COOKIE: .*/01-authentication/session\.cookie\.jar$"
 hasnt "04: and no password" "BASIC_AUTH:"
 STATUS=401 run 04.session_cookie_GET_myself.sh
 expect "04: a refused session exits 1" "${RC}" "1"
@@ -94,7 +95,7 @@ echo "=== 05 the csrfToken header ==="
 echo tok123 > "${UC}/state.local.csrf"
 run 05.session_csrf_header_GET_myself.sh
 has "05: sends the csrfToken header" "HEADER: csrfToken: tok123"
-has "05: and the cookie" "COOKIE: ${UC}/session.cookie.jar"
+hasre "05: and the cookie" "^COOKIE: .*/01-authentication/session\.cookie\.jar$"
 rm -f "${UC}/state.local.csrf"
 run 05.session_csrf_header_GET_myself.sh
 expect "05: with no saved token it sends nothing and exits 1" "${RC}:$(ncalls)" "1:0"
