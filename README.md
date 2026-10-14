@@ -15,7 +15,7 @@
 7. [OpenAPI](#openapi)
 8. [HTTP Methods](#st-api-20-methods)
 9. [What Is Covered](#what-is-covered)
-10. [Features by Release](#features-by-release)
+10. [Features and Use Cases](#features-and-use-cases)
 11. [License and Support](#license-and-support)
 
 ## Introduction
@@ -76,7 +76,7 @@ Three short guides save you working this out for yourself:
 ./tests/run_all.sh
 ```
 
-Takes about 5 seconds, needs no server and no credentials. See the
+Takes up to 5 minutes, needs no server and no credentials. See the
 [tests Quick Start](tests/README.md) for what it checks and how to add a test
 with your change.
 
@@ -130,8 +130,13 @@ For example:
 ```
 cd "Admin/API 2.0/bash"
 cp set_variables.local.example.sh set_variables.local.sh
-$EDITOR set_variables.local.sh
+vi set_variables.local.sh
 ```
+
+The files you create this way (`set_variables.local.sh`, `set_variables.local.bat`,
+`config`, and the `settings.local.*` and `state.local.*` files of the features) are
+listed in `.gitignore`: git does not track them, so they are never committed or
+pushed, and your server address and password stay on your machine.
 
 The scripts then pick your values up on their own. There is nothing to
 configure inside the individual examples, and nothing to edit in the committed
@@ -177,6 +182,16 @@ cd "Admin/API 2.0/bash/01.Authentication"
 ./01.myself_POST.sh
 ```
 
+The examples of a topic are numbered in the order to run them, one after the other:
+`02` needs what `01` created or logged in to, so run `01` before `02`, and so on. The
+last numbers of a topic usually delete again what the earlier ones created.
+
+A feature (see [Features](Features/README.md)) is a whole scenario with its own helpers.
+Its `00.run_all` script runs all the numbered scripts of the feature in order, and a
+`99.cleanup_DELETE` script removes every object they created; `./00.run_all.sh --cleanup`
+runs that clean-up at the end of the scenario. The topic folders of the Admin and EndUser
+API have no `00` or `99` script.
+
 If the configuration is missing, the scripts stop with a message telling you
 which file to create rather than failing part way through a request.
 
@@ -189,8 +204,10 @@ Admin/API 2.0/          Administrator API, on the admin port
     python/
         python3/         the python examples
         utils/           tools that work on an exported configuration XML
-EndUser/API 2.0/
-    bash/               end user API, on the user port
+EndUser/
+    API 2.0/
+        bash/           end user API, on the user port
+    UseCases/           complete end user scenarios (to be filled)
 Features/               complete solutions, one folder per feature
 tools/                  list_examples.py: every example, its endpoint and Risk
 images/                 screenshots used by this README
@@ -324,7 +341,6 @@ already exists.
 | 35. Transfer Profiles | `/transferProfiles`, the PeSIT profiles of an account that say which file to send, what to call the file received and how it is labelled: list, create, HEAD, read, replace, patch and delete | 7 | 7 |
 | 36. User Classes | `/userClasses`, the classes that decide which class an account is in when it logs in (a user name pattern, a type, a membership expression, an order): list, create, HEAD, read, replace, patch and delete | 7 | 7 |
 | 37. Zones | `/zones`, the network (DMZ) zones with their edges, protocols and proxies, and the business units that name one: list, create, HEAD, read, replace, patch and delete | 7 | 7 |
-| 90. End To End Acknowledgment | `/logs/transfers`, PeSIT ACK and NACK | 2 | 2 |
 
 Every bash example has a bat equivalent, so Windows users can follow the same
 path through the material, with one exception: `14. Expression Language` has
@@ -437,22 +453,17 @@ list doubles as a rough roadmap.
 Bulk changes across every route or subscription exist as python programs (`stUpdateAll*.py`), not as bash or bat examples.
 
 
-## Features by Release
+## Features and Use Cases
 
 New SecureTransport releases add features that are easier to learn as a complete
-solution than as a list of API calls. Those live in [Features](Features/), one
-folder per feature, with the same examples in bash and as Windows batch files.
+solution than as a list of API calls. Those live in [Features](Features/README.md), one
+folder per feature, with the same examples in bash and as Windows batch files. The
+index there lists them, grouped by the release that introduced them, so you can see
+which ones your version supports. Every script also checks the server version with
+`GET /version` before it does anything, and skips itself on a release that is too old.
 
-The folders are organised by feature, so that a feature is easy to find. The
-[Features index](Features/README.md) lists them grouped by the release that
-introduced them, so you can see which ones your version supports. Every script
-also checks the server version with `GET /version` before it does anything, and
-skips itself on a release that is too old.
-
-| Release | Feature |
-| ------- | ------- |
-| 5.5-20260924 | [Trigger route execution after a completed pull operation](Features/trigger-route-after-completed-pull/) |
-| 5.5-20260924 | [Audit and report on billable transfers](Features/audit-billable-transfers/) |
+The end user API has its own folder of complete scenarios,
+[Use Cases](EndUser/UseCases/README.md).
 
 ## License and Support
 

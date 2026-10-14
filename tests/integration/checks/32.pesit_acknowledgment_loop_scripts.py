@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 WRITES TO THE SERVER. A PeSIT loop between two throwaway accounts on this one
-server, and the real, unmodified 90.EndToEndAcknowledgment scripts run on the
+server, and the real, unmodified Features/pesit-end-to-end-acknowledgment scripts run on the
 transfers it makes - the ACK branch as well as the NACK branch, and
 IteratePesitInbounds.sh.
 
@@ -77,7 +77,7 @@ config = st_client.load_config()
 harness.require_writes(config, "run a PeSIT loop and the acknowledgment scripts for real")
 
 c = st_client.Checker("PeSIT loop between two throwaway accounts, and the scripts in "
-                      "Admin/API 2.0/bash/90.EndToEndAcknowledgment, run for real")
+                      "Features/pesit-end-to-end-acknowledgment, run for real")
 
 PREFIX = config.get("st_object_prefix") or "ZZTEST_"
 # The two accounts' names are also their PeSIT partner identifiers, which are
@@ -103,7 +103,7 @@ WAIT = int(config.get("st_chain_wait_seconds") or "90")
 wait_until = lambda predicate, timeout=WAIT, interval=3: harness.wait_until(predicate, timeout, interval)  # noqa: E731
 
 BASH_TREE = runner.path("Admin", "API 2.0", "bash")
-ACK_DIR = os.path.join(BASH_TREE, "90.EndToEndAcknowledgment")
+ACK_DIR = runner.path("Features", "pesit-end-to-end-acknowledgment")
 
 client = harness.connect(config, c, mock=("the bundled mock does not implement PeSIT, /transfers or /logs/transfers; "
                                           "run this against a real server to exercise it"))

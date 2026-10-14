@@ -5,6 +5,8 @@ description: The non-obvious traps in the SecureTransport REST API 2.0 and in sc
 
 # SecureTransport API and scripting gotchas
 
+[← Back to the repository README](../../../README.md)
+
 Each of these cost real debugging time. Part 1 is the API: the rules that hold
 everywhere come first, then one entry per resource of the reference, each with what
 was confirmed directly (and on which release); Part 2 is scripting traps; Part 3 is
@@ -1475,7 +1477,7 @@ timeout:
 Confirmed directly: this is the actual call that makes an account pull files
 from one of its own sites - the mechanism `customProperties` (see the
 Expression Language section above) is documented against, and the one
-`90.EndToEndAcknowledgment/Acknowledgment.sh` needs a real transfer to exist
+`Features/pesit-end-to-end-acknowledgment/Acknowledgment.sh` needs a real transfer to exist
 before it has anything to acknowledge. The body is `{accountName, site,
 destinationDirectory, transferProfile, customProperties, awaitResult}` -
 `transferProfile` is required specifically for PeSIT transfers, per its own
@@ -1799,3 +1801,4 @@ alongside the `posix` check, not instead of it.
   and `stGetKeyId` instead of its own `accName`, which is how the 403 above was met. Fixed.
   (A GET inside a kept session needs no `csrfToken`, as the CSRF entry says: those two functions
   never sent one, which is fine.)
+

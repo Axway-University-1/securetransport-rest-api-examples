@@ -513,7 +513,7 @@ flag beyond `--write`/`st_allow_writes` before it does anything. Read its
 own docstring - the full incident account above lives there - before ever
 running it by hand.
 
-**`EndToEndAcknowledgment` needs live PeSIT transfers**, and
+**`Features/pesit-end-to-end-acknowledgment` needs live PeSIT transfers**, and
 `32.pesit_acknowledgment_loop_scripts.py` makes its own: two throwaway
 accounts, each with a PeSIT site named after the other, pointing at this
 server's own PeSIT listener. An earlier manual check borrowed two real accounts

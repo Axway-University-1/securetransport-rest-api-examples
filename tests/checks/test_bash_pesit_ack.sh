@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Run the 90.EndToEndAcknowledgment examples against a stub curl, and check
+# Run the Features/pesit-end-to-end-acknowledgment examples against a stub curl, and check
 # which PeSIT transfers they acknowledge, and how.
 #
 # Acknowledgment.sh looks up the inbound transfer and its outbound transfers by
@@ -17,7 +17,7 @@ REPO="$(cd .. && pwd)"
 
 WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/bash_pesit_ack"
 rm -rf "${WORK}"
-mkdir -p "${WORK}/bin" "${WORK}/admin" "${WORK}/elsewhere" "${WORK}/logs"
+mkdir -p "${WORK}/bin" "${WORK}/Features" "${WORK}/Admin/API 2.0/bash" "${WORK}/elsewhere" "${WORK}/logs"
 
 FAILED=0
 pass() { printf "  PASS  %s\n" "$1"; }
@@ -25,9 +25,12 @@ fail() { printf "  FAIL  %s\n" "$1"; FAILED=1; }
 expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1  (expected '$3', got '$2')"; fi; }
 
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.sh"
-cp -R "${REPO}/Admin/API 2.0/bash/90.EndToEndAcknowledgment" "${WORK}/admin/"
-ACK_DIR="${WORK}/admin/90.EndToEndAcknowledgment"
+# The tree the scripts expect: the feature next to Features/lib, and the Admin settings the version check loads
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.sh"
+cp -R "${REPO}/Features/lib" "${WORK}/Features/lib"
+cp -R "${REPO}/Features/pesit-end-to-end-acknowledgment" "${WORK}/Features/pesit-end-to-end-acknowledgment"
+ACK_DIR="${WORK}/Features/pesit-end-to-end-acknowledgment"
+echo '{"version":"5.5-20260924"}' > "${WORK}/version.json"
 BASE="https://st.example.com:8444/api/v2.0"
 
 # The answers, one key per line, as the server sends them: the scripts read
@@ -61,6 +64,8 @@ outbound 1 > "${WORK}/outbound_1.json"
 rules() {
     local out="${WORK}/rules_$((++RULE_N)).tsv"
     : > "${out}"
+    # every script asks for the version first (the feature's version check)
+    printf '/version\t%s\n' "${WORK}/version.json" >> "${out}"
     while [ "$#" -gt 1 ]; do printf '%s\t%s\n' "$1" "$2" >> "${out}"; shift 2; done
     echo "${out}"
 }
@@ -73,7 +78,7 @@ run() {
     RC=$?
 }
 posts() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); if (m == "POST") print}'; }
-gets() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); if (m == "GET") print}'; }
+gets() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); if (m == "GET") print}' | grep -v '/version$'; }
 
 echo "=== Acknowledgment.sh ==="
 
@@ -127,6 +132,16 @@ OUT=$(cd "${ACK_DIR}" && PATH="${WORK}/bin_fail:${WORK}/bin:${PATH}" STUB_CURL_G
 RC=$?
 ATTEMPTS=$(cat "${WORK}"/logs/acks/*/COREID_CORE1.log | grep -c 'Retry count: 3')
 expect "a curl that cannot connect exits 1, after all three attempts (set -e used to end it at the first)" "${RC}:${ATTEMPTS}" "1:1"
+
+# The feature's version check: on a server older than 5.5 nothing is sent, and the script says so
+echo '{"version":"5.4-20250101"}' > "${WORK}/version_old.json"
+printf '/version\t%s\n' "${WORK}/version_old.json" > "${WORK}/rules_old.tsv"
+RULES="${WORK}/rules_old.tsv"
+run "${ACK_DIR}" ./Acknowledgment.sh CORE1 st.example.com MIX 1 TRUE "${WORK}/logs"
+expect "an older server: Acknowledgment.sh sends and looks up nothing, and exits 0" "${RC}:$(posts | wc -l | tr -d ' '):$(gets | wc -l | tr -d ' ')" "0:0:0"
+printf '%s\n' "${OUT}" | grep -q "SKIPPED" && pass "and says SKIPPED" || fail "it does not say SKIPPED: ${OUT}"
+run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs_old"
+expect "an older server: IteratePesitInbounds.sh sends and looks up nothing either" "${RC}:$(posts | wc -l | tr -d ' '):$(gets | wc -l | tr -d ' ')" "0:0:0"
 
 echo
 echo "=== IteratePesitInbounds.sh ==="
@@ -191,7 +206,7 @@ expect "with CLEAR_API_OUTPUT_FILES=TRUE none is left, not just the last Core ID
 echo
 echo "=== The bat twins, read as text (they cannot run here) ==="
 
-BAT_DIR="${REPO}/Admin/API 2.0/bat/90.EndToEndAcknowledgment"
+BAT_DIR="${REPO}/Features/pesit-end-to-end-acknowledgment"
 ACK_BAT=$(grep -v '^REM' "${BAT_DIR}/Acknowledgment.bat")
 ITER_BAT=$(grep -v '^REM' "${BAT_DIR}/IteratePesitInbounds.bat")
 ! printf '%s\n' "${ACK_BAT}" | grep -F 'findstr "self"' | grep -qF 'delims=:' \
@@ -235,6 +250,13 @@ ITER_BAT=$(grep -v '^REM' "${BAT_DIR}/IteratePesitInbounds.bat")
 [[ "${ITER_BAT}" == *'SET ACK_RC=!ERRORLEVEL!'* ]] && [[ "${ITER_BAT}" == *'SET /A FAILED+=1'* ]] && [[ "${ITER_BAT}" == *'IF %FAILED% GTR 0'* ]] \
     && pass "IteratePesitInbounds.bat counts the transfers Acknowledgment.bat failed on, and exits 1" \
     || fail "IteratePesitInbounds.bat ignores what Acknowledgment.bat returns"
+
+for twin in Acknowledgment IteratePesitInbounds; do
+    TWIN_BAT=$(grep -v '^REM' "${BAT_DIR}/${twin}.bat")
+    [[ "${TWIN_BAT}" == *'CALL "%~dp0..\lib\st_feature_check.bat" 5.5'* ]] && [[ "${TWIN_BAT}" == *'IF ERRORLEVEL 11 EXIT /B 1'* ]] && [[ "${TWIN_BAT}" == *'IF ERRORLEVEL 10 EXIT /B 0'* ]] \
+        && pass "${twin}.bat runs the feature's version check and ends on an old server or an unreadable version" \
+        || fail "${twin}.bat has no version check, or does not act on its result"
+done
 echo
 if [ "${FAILED}" -eq 0 ]; then
     echo "test_bash_pesit_ack: PASS"

@@ -21,7 +21,7 @@ from _repo import REPO  # noqa: E402
 
 A, B = "Admin/API 2.0/bash", "Admin/API 2.0/bat"
 HEADER = "| Topic | Endpoints | bash | bat |"
-LAST_CHECK_ENTRY = '        ("90. End To End Acknowledgment", "90.EndToEndAcknowledgment")]'
+LAST_CHECK_ENTRY = '        ("37. Zones", "37.Zones")]'
 
 
 def count(folder, ext):

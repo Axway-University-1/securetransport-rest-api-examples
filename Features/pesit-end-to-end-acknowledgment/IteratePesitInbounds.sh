@@ -107,8 +107,10 @@ EXIT_CODE_ERROR=1
 # set_variables.local.sh so that they stay out of the repository.
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
+# Loads the same set_variables.sh as the Admin examples, and ends this script, without
+# changing anything, on a server older than 5.5 (the base release this feature needs)
 # shellcheck source=/dev/null
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${SCRIPT_DIR}/../lib/st_feature_check.sh" "5.5"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 

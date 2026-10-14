@@ -39,6 +39,13 @@ database, replication and Oracle-only configuration operations.
 release adds, with the list of what is covered and the tools (spec, coverage,
 lab, generators, docs sync). Update its list when a resource is added.
 
+## Files checked by a person
+
+Every file counts as NOT checked until its owner has read it and marked it. The marked files are
+in `review/checked.tsv`, each with a hash of its content; `python3 tools/review_status.py` lists
+the ones that have changed since, which are to be read again. Do not mark a file yourself unless
+asked, and when you change a marked file, say so in your answer: it goes back on the list to read.
+
 ## Which model
 
 - **Sonnet** for covering a new resource by that procedure: reading the
@@ -63,5 +70,5 @@ lab, generators, docs sync). Update its list when a resource is added.
 New product-release features go in `Features/<feature-name>/` (by feature, not by
 release). Each script starts with the version check from `Features/lib/`, using
 the release that introduced the feature, and the feature is added to
-`Features/README.md` and the main README under that release. The whole procedure
+the index in `Features/README.md` under that release (the main README links there and keeps no list of its own). The whole procedure
 is in `Features/README.md` under "Adding a feature".

@@ -5,6 +5,8 @@ description: Orient yourself in the SecureTransport REST API 2.0 examples reposi
 
 # SecureTransport API examples: orientation
 
+[← Back to the repository README](../../../README.md)
+
 This repository holds working examples of the **Axway SecureTransport REST API 2.0**,
 in three languages, for two API surfaces. This skill tells you what is here and how
 to find the right example, so you do not have to read the tree to find out.
@@ -31,8 +33,8 @@ not served on the user port and vice versa.
 
 ```
 Admin/API 2.0/
-    bash/     263 curl examples, numbered by topic
-    bat/      255 of them, for Windows
+    bash/     261 curl examples, numbered by topic
+    bat/      253 of them, for Windows
     python/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
@@ -51,7 +53,7 @@ you change any other bash example, change its bat twin too.
 ## How to find an example
 
 The bash and bat examples are named `NN.resource_METHOD.ext`, numbered by topic
-and then by HTTP method (the scripts of `90.EndToEndAcknowledgment` are named by what they do). So `04.Applications/02.applications_POST.sh` is the POST
+and then by HTTP method. So `04.Applications/02.applications_POST.sh` is the POST
 example for applications. Reading a topic folder in order walks the full
 create, read, update, delete cycle for that object.
 
@@ -104,7 +106,7 @@ create, read, update, delete cycle for that object.
 | List, create, read, replace, patch or delete the transfer profile of an account (PeSIT: which file it sends, what a file it receives is called, and with `advancedSettings` what happens to its bytes: character set, records, padding, line ending; the account needs a PeSIT site). What each setting does is in st-api-gotchas, "What a transfer profile does to the bytes of a file" | `bash/35.TransferProfiles/` |
 | Create, list, change, reorder or delete a user class (the rule that puts an account in VirtClass, RealClass or a class of your own at login, by user name pattern, type and a membership expression; the first enabled class that fits wins). See st-api-gotchas, "User classes" | `bash/36.UserClasses/` |
 | Create, list, read, replace, patch or delete a network (DMZ) zone: its edges (title, addresses, protocols and ports, proxies), whether it is the default, and which business units name it (a unit's `dmz`). The lab has one zone, `Private`: never change it. See st-api-gotchas, "Zones" | `bash/37.Zones/` |
-| Correlate PeSIT transfers and send ACK or NACK | `bash/90.EndToEndAcknowledgment/` |
+| Correlate PeSIT transfers and send ACK or NACK | `Features/pesit-end-to-end-acknowledgment/` |
 | Upload or download files as an end user | `EndUser/API 2.0/bash/02.Files/` |
 | Create a folder, or upload to a chosen path, as an end user, with the csrfToken | `EndUser/API 2.0/bash/02.Files/02.files_name_POST_folder.sh`, `08.fileOperations_POST_upload.sh` |
 | List files with paging, sorting, metadata or a glob; rename; share a folder | `EndUser/API 2.0/bash/02.Files/` 09 to 15 |
@@ -223,3 +225,4 @@ disagrees with it, believe the Open API page for your version.
 
 By default a list call returns at most 100 objects. That limit is the
 `Webservices.EntriesPerPage` Server Configuration Option.
+

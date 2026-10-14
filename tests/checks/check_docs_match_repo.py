@@ -83,8 +83,7 @@ rows = [("01. Authentication", "01.Authentication"),
         ("34. Transaction Manager", "34.TransactionManager"),
         ("35. Transfer Profiles", "35.TransferProfiles"),
         ("36. User Classes", "36.UserClasses"),
-        ("37. Zones", "37.Zones"),
-        ("90. End To End Acknowledgment", "90.EndToEndAcknowledgment")]
+        ("37. Zones", "37.Zones")]
 
 for label, folder in rows:
     sh, bat = count(A + "/" + folder, ".sh"), count(B + "/" + folder, ".bat")
@@ -190,6 +189,27 @@ tests_readme = open(os.path.join(REPO, "tests", "README.md")).read()
 unlisted = sorted(f for f in os.listdir(os.path.join(REPO, "tests", "checks"))
                   if f.endswith((".sh", ".py")) and f not in tests_readme)
 chk("every file of tests/checks is named in tests/README.md", not unlisted, ", ".join(unlisted))
+
+print("=== the README structure ===")
+for skill in ("st-api-orientation", "st-api-gotchas", "st-api-add-example"):
+    text = open(os.path.join(REPO, ".claude", "skills", skill, "SKILL.md")).read()
+    chk("%s links back to the root README" % skill, "](../../../README.md)" in text)
+    chk("%s links back near the top, after its first heading" % skill,
+        "](../../../README.md)" in text[:text.index("\n## ", 200) if "\n## " in text[200:] else 2000])
+chk("the README tells the reader to edit with vi, not $EDITOR", "vi set_variables.local.sh" in README and "$EDITOR" not in README)
+chk("the README says the .local files are git ignored and never pushed",
+    ".gitignore" in README and "never committed or" in README.replace("\n", " "))
+chk("the README says the examples of a topic run in order, and what 00 and 99 are",
+    "run `01` before `02`" in README.replace("\n", " ") and "`00.run_all`" in README and "`99.cleanup_DELETE`" in README)
+chk("the README does not say the suite takes seconds, but minutes", "about 5 seconds" not in README and "up to 5 minutes" in README)
+chk("the README keeps no table of features by release (Features/README.md is the one place)",
+    "Features by Release" not in README and "| 5.5-20260924 |" not in README and "Features/README.md" in README)
+chk("the README links the end user Use Cases", "EndUser/UseCases/README.md" in README and os.path.isfile(os.path.join(REPO, "EndUser", "UseCases", "README.md")))
+chk("the PeSIT acknowledgment lives under Features, not under the Admin API folders",
+    os.path.isdir(os.path.join(REPO, "Features", "pesit-end-to-end-acknowledgment"))
+    and not glob.glob(os.path.join(REPO, "Admin", "API 2.0", "*", "90.*"))
+    and "pesit-end-to-end-acknowledgment" in open(os.path.join(REPO, "Features", "README.md")).read()
+    and "90. End To End" not in README)
 
 print()
 if failed:

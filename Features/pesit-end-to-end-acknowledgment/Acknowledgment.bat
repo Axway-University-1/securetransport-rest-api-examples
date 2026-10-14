@@ -12,7 +12,11 @@ REM
 REM Load the connection details and credentials. Put your own values in
 REM set_variables.local.bat so that they stay out of the repository.
 REM
-CALL "%~dp0..\set_variables.bat"
+REM Loads the same set_variables.bat as the Admin examples, and ends this script, without
+REM changing anything, on a server older than 5.5 (the base release this feature needs)
+CALL "%~dp0..\lib\st_feature_check.bat" 5.5
+IF ERRORLEVEL 11 EXIT /B 1
+IF ERRORLEVEL 10 EXIT /B 0
 
 REM Exit codes
 SET EXIT_CODE_SUCCESS=0

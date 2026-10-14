@@ -24,6 +24,12 @@ feature works on that release and on every later one.
 | [Trigger route execution after a completed pull operation](trigger-route-after-completed-pull/) | Process all files from one pull as a single batch, in one route execution. |
 | [Audit and report on billable transfers](audit-billable-transfers/) | Tell billable transfers from non-billable ones, with `GET /logs/transfers?isBillable=`, across six scenarios covering the billing rule, measured account by account: a partner to pull from, the test account, a partner to push to. |
 
+### 5.5
+
+| Feature | What it does |
+| ------- | ------------ |
+| [PeSIT end to end acknowledgment](pesit-end-to-end-acknowledgment/) | Send a PeSIT ACK to the partner once its file has gone on to its next destination, or a NACK when it did not, by `coreId`, for one transfer or for every one in a time window. |
+
 ## Version check
 
 Every script in this folder starts by asking the server for its version with

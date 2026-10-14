@@ -5,6 +5,8 @@ description: Add or change an example in the SecureTransport REST API 2.0 exampl
 
 # Adding an example
 
+[← Back to the repository README](../../../README.md)
+
 Read **st-api-gotchas** first if you are writing a new call. This skill is about
 making the file look and behave like the ones already here.
 
@@ -259,3 +261,4 @@ ls "Admin/API 2.0/bash/05.Accounts"/*.sh | wc -l
   quietly dropping it.
 - `python2` and its scripts were removed. Do not reintroduce that style; there
   is a python3 equivalent for every flow it covered.
+

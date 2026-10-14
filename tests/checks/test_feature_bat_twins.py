@@ -37,6 +37,9 @@ ALLOWED_DIFFERENCES = {
     # the next name. A batch file cannot call back into the script that called it, so the same
     # loop is in each feature's 00.run_all.bat, on its own variables (PROBE_N, BT_RUN_ACCOUNT, ...)
     "AR_HOME_ACCOUNT",
+    # pesit-end-to-end-acknowledgment: the bash log function's local variable, and the date format PowerShell
+    # is given where bash uses date +%Y%m%d
+    "logFile", "yyyyMMdd",
 }
 
 
@@ -145,6 +148,10 @@ raw = []
 for rel in steps_bat + steps_sh:
     base = os.path.basename(rel)
     if base in ("billable_GET_report.sh", "billable_GET_report.bat", "files_GET_download.sh", "files_GET_download.bat"):
+        continue
+    # Acknowledgment reads the HTTPC= line that curl -w writes into the answer and acts on it (exit 1,
+    # retry), which test_bash_pesit_ack.sh proves; it is not a call that only prints the code
+    if base in ("Acknowledgment.sh", "Acknowledgment.bat"):
         continue
     text = open(os.path.join(REPO, rel), newline="").read().replace("\r\n", "\n")
     code = "\n".join(l for l in text.split("\n") if not re.match(r"\s*(#|REM\b)", l))

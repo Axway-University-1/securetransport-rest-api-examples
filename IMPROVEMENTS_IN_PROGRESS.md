@@ -16,7 +16,7 @@ things. This is the ledger. Delete it when the open list is empty.
 | Python | Every example: CSRF token on every write, every failure exits non-zero, every status checked, bounded waits, `daemon=` (not `serverName=`) to stop a daemon, dry run by default where it deletes, a Risk line, optional `st_verify` | `Admin/API 2.0/python`, `test_python_*.py`, `tests/lib/fake_requests` |
 | Admin bash and bat | 19 scripts that changed real or server wide things when run bare, and 35 write scripts that could not fail: arguments or `example_*` defaults, `HTTP <code>`, exit 1 and 2, jq, encoded names | `test_bash_admin_api.sh`, `test_bash_admin_sweep_a.sh`, `_b.sh` |
 | Admin bash | `14.ExpressionLanguage` tested and made refuse to touch what exists | `test_bash_expression_language.sh` |
-| Acknowledgment | Exit codes, paging past 100 transfers, the bat twins | `90.EndToEndAcknowledgment`, `test_bash_pesit_ack.sh` |
+| Acknowledgment | Exit codes, paging past 100 transfers, the bat twins | `Features/pesit-end-to-end-acknowledgment`, `test_bash_pesit_ack.sh` |
 | EndUser | Logout ended the wrong session, bash 3.2, exit 0 on failure, the tracked `test.txt`, base64 wrapping | `EndUser/API 2.0/bash`, `test_bash_enduser_api.sh` |
 | Admin bash and bat | About 58 read scripts that never looked at the HTTP status (a 401 printed nothing and exited 0), the `change_me` passwords of `18.AccountSetup`, `01.myself_POST` made the login its name says | `test_bash_admin_sweep_c.sh` |
 | Harness | One helper module for the lab checks (631 lines fewer), polling instead of fixed sleeps, a time limit per check, a private output folder per run, no temp folder left behind | `tests/integration/lib/harness.py`, `run_check.py` |
