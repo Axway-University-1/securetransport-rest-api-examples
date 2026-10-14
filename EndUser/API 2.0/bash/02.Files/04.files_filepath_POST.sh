@@ -16,7 +16,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - FILE_NAME is a file next to this script (default test.txt). A temporary copy
 #   of it with one more line is what is uploaded, under the same name, so the
 #   file in the repository is never changed. An earlier version appended the line
@@ -37,6 +38,7 @@ printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 
 #
 # Set the file name to upload
@@ -46,6 +48,7 @@ if [[ "${FILE_NAME}" == */* ]] || [ ! -f "${SCRIPT_DIR}/${FILE_NAME}" ]; then
     printf "\nThere is no file named %s next to this script.\n" "${FILE_NAME}"
     exit 2
 fi
+st_ensure_session
 TEMP_FILE=$(mktemp)
 trap 'rm -f "${TEMP_FILE}"' EXIT
 cp "${SCRIPT_DIR}/${FILE_NAME}" "${TEMP_FILE}"

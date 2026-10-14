@@ -26,7 +26,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - The site belongs to the user's account; an administrator creates it.
 # - Confirmed directly: a synchronous push answers 200, an asynchronous one
 #   202, and the file arrives at the site's upload folder.
@@ -43,6 +44,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 SITE="$1"
@@ -54,10 +56,7 @@ if [ -z "${SITE}" ] || [ "${FILE}" = "/" ]; then
     printf "Usage: ./05.transfers_operations_POST_push.sh SITE FILE [async]\n"
     exit 2
 fi
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 BODY=$(jq -n --arg site "${SITE}" --arg file "${FILE}" --arg index "${OPERATION_INDEX}" --argjson async "${ASYNC}" \
   '{operation: "push",

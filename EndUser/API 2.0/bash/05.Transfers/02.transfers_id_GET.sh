@@ -20,7 +20,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - The id is base64 of 'Id [transferStatusId=..., transferStartTime=...]'.
 #   Take it as the list gives it; it is used in the path as it is.
 # - Requires `jq`, which prints the summary.
@@ -34,13 +35,11 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 TRANSFER_ID="$1"
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 if [ -z "${TRANSFER_ID}" ]; then
     TRANSFER_ID=$(curl -s -k -b "${COOKIE}" -X GET "${ST_URL}/transfers?limit=1" \

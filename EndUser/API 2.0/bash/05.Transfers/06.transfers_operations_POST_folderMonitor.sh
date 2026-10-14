@@ -22,7 +22,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Both folders must exist. No transfer site is needed.
 # - Confirmed directly: it answers 200, "Folder monitor executed
 #   successfully", the files are moved out of FROM into TO, and the log lists
@@ -40,6 +41,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 FROM="/${1#/}"
@@ -50,10 +52,7 @@ if [ "${FROM}" = "/" ] || [ "${TO}" = "/" ]; then
     printf "Usage: ./06.transfers_operations_POST_folderMonitor.sh FROM TO [PATTERN]\n"
     exit 2
 fi
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 BODY=$(jq -n --arg from "${FROM}" --arg to "${TO}" --arg pattern "${PATTERN}" --arg index "${OPERATION_INDEX}" \
   '{operation: "folderMonitor",

@@ -17,7 +17,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Each copy is removed again after it has been uploaded.
 # - Exits 2 without a whole number, and 1 at the first upload the server refuses.
 # ==============================================================================
@@ -35,6 +36,7 @@ printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 NUMBER_OF_FILES=$1
 
 if ! [[ "${NUMBER_OF_FILES}" =~ ^[1-9][0-9]*$ ]] ; then
@@ -46,6 +48,7 @@ fi
 # Set the file name to upload
 #
 FILE_NAME="${SCRIPT_DIR}/test.txt"
+st_ensure_session
 printf "Pushing ${NUMBER_OF_FILES} of files...\n"
 
 for i in $(seq 1 "${NUMBER_OF_FILES}") ; do

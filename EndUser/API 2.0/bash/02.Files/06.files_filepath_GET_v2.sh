@@ -17,7 +17,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Run 05.files_filepath_POST_v2.sh first, so that the files exist.
 # - Exits 2 without a whole number, and 1 at the first download the server refuses.
 # - The body is written straight to disk with curl's own -o, and the status
@@ -40,6 +41,7 @@ printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 NUMBER_OF_FILES=$1
 
 if ! [[ "${NUMBER_OF_FILES}" =~ ^[1-9][0-9]*$ ]] ; then
@@ -54,6 +56,7 @@ FILE_NAME_BASE="test.txt"
 DOWNLOAD_FOLDER="downloaded_files"
 
 
+st_ensure_session
 mkdir -p "${DOWNLOAD_FOLDER}"
 
 for i in $(seq 1 "${NUMBER_OF_FILES}") ; do

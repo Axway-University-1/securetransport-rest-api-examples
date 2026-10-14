@@ -23,7 +23,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Only the logged-in user's own transfers are listed.
 # - The answer is a plain JSON array, not a {result: [...]} envelope.
 # - status, protocol, application and operationIndex take several values, each
@@ -41,13 +42,11 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 LIMIT="${1:-10}"
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 # Today's midnight, in RFC 2822
 if date -v0H >/dev/null 2>&1; then

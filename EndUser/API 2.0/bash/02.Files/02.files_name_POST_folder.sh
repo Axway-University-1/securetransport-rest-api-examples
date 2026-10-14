@@ -62,11 +62,24 @@ if [ "${LOGIN_CODE}" != "200" ]; then
     exit 1
 fi
 
+# A folder that is already there is answered 409 "Error occurred while creating file: null",
+# which says nothing: look first, and say it plainly
+if [ "$(curl -s -k -o /dev/null -w "%{http_code}" -b "${COOKIE}" -G "${ST_URL}/files/${ENCODED_FOLDER}" --data-urlencode "metadata=true" \
+        -H "accept: application/json" -H "${REFERER_HEADER}")" = "200" ]; then
+    printf "The folder '%s' already exists. Nothing to create.\n" "${FOLDER}"
+    curl -s -k -o /dev/null -b "${COOKIE}" -X DELETE "${ST_URL}/myself" \
+      -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
+    rm -f "${COOKIE}"
+    exit 0
+fi
+
 printf "Creating the folder '%s'...\n" "${FOLDER}"
 BODY=$(jq -n '{isDirectory: true, isRegularFile: false, isSymbolicLink: false, isOther: false, isShared: false}')
-curl -s -k -b "${COOKIE}" -X POST "${ST_URL}/files/${ENCODED_FOLDER}" \
+RESPONSE=$(curl -s -k -b "${COOKIE}" -X POST "${ST_URL}/files/${ENCODED_FOLDER}" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}" \
-  -H "Content-Type: application/json" -w "\nHTTP %{http_code}\n" -d "${BODY}"
+  -H "Content-Type: application/json" -w "\nHTTP %{http_code}\n" -d "${BODY}")
+printf '%s\n' "${RESPONSE}"
+CREATE_CODE=$(printf '%s\n' "${RESPONSE}" | tail -n 1 | awk '{print $2}')
 
 #
 # Log out, and remove the session
@@ -74,3 +87,4 @@ curl -s -k -b "${COOKIE}" -X POST "${ST_URL}/files/${ENCODED_FOLDER}" \
 curl -s -k -o /dev/null -b "${COOKIE}" -X DELETE "${ST_URL}/myself" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
 rm -f "${COOKIE}"
+[[ "${CREATE_CODE}" == 20* ]] || exit 1

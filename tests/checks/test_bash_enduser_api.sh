@@ -33,6 +33,7 @@ printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sl
 # a cookie jar, as 01.Authenticate/01.myself_POST.sh leaves it
 cp "${EU_TREE}/set_variables.sh" "${WORK}/eu/set_variables.sh"
 cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/eu/set_variables.local.sh"
+cp "${EU_TREE}/ensure_session.sh" "${WORK}/eu/ensure_session.sh"
 for folder in 01.Authenticate 02.Files 03.Myself 04.FileOperations 05.Transfers 06.ServerTime; do
     cp -R "${EU_TREE}/${folder}" "${WORK}/eu/"
 done
@@ -51,6 +52,9 @@ rules() {
 # run SCRIPT ARGS...: GET_BODY, RULES, POST_BODY, STATUS and STATUS_GET set the answers
 run() {
     local rel="$1"; shift
+    # the stub never writes a cookie jar, and a login deletes the old one: a test that is not about
+    # having none starts with one, as after 01.myself_POST.sh (KEEP_NO_JAR=1 leaves it as it is)
+    [ -n "${KEEP_NO_JAR:-}" ] || touch "${WORK}/eu/myCookie.jar"
     OUT=$(cd "${WORK}/eu/$(dirname "${rel}")" && PATH="${WORK}/bin:${PATH}" \
           STUB_CURL_GET_BODY="${GET_BODY:-}" STUB_CURL_GET_RULES="${RULES:-}" \
           STUB_CURL_POST_BODY="${POST_BODY:-}" STUB_CURL_STATUS="${STATUS:-200}" \
@@ -58,18 +62,50 @@ run() {
           bash "./$(basename "${rel}")" "$@" 2>&1)
     RC=$?
 }
-calls() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); print m " " $0}'; }
+# Every call, METHOD URL. raw_calls has them all; calls leaves out the check for an active session that
+# every example starts with (a GET of /myself, first), so that each test reads what the example itself sends
+raw_calls() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); print m " " $0}'; }
+calls() { raw_calls | awk 'NR==1 && /^GET .*\/myself$/ {next} {print}'; }
 payload() { printf '%s\n' "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | sed -n "${1}p" | base64 -d; }
 headers() { printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p'; }
 
-echo "=== Every new script needs the session, except the password reset ones ==="
-mv "${WORK}/eu/myCookie.jar" "${WORK}/eu/myCookie.jar.off"
-for rel in 03.Myself/01.myself_GET.sh 03.Myself/09.myself_addressBook_GET.sh 02.Files/09.files_GET_query.sh \
-           04.FileOperations/05.fileOperations_id_DELETE.sh 05.Transfers/01.transfers_GET.sh 06.ServerTime/01.serverTime_GET.sh; do
-    run "${rel}"
-    expect "${rel}: stops before any call without a session" "${RC}:$(calls | wc -l | tr -d ' ')" "1:0"
+echo "=== Every example that needs a session checks for one first, and logs in when there is none ==="
+NEEDS_SESSION="03.Myself/01.myself_GET.sh 03.Myself/09.myself_addressBook_GET.sh 02.Files/09.files_GET_query.sh 04.FileOperations/05.fileOperations_id_DELETE.sh 05.Transfers/01.transfers_GET.sh 06.ServerTime/01.serverTime_GET.sh 02.Files/01.files_GET.sh"
+for rel in ${NEEDS_SESSION}; do
+    rm -f "${WORK}/eu/myCookie.jar"
+    KEEP_NO_JAR=1 run "${rel}"
+    expect "${rel}: with no cookie jar it logs in first (POST /myself), then goes on with its own call" \
+      "$(raw_calls | head -1):$([ "$(raw_calls | wc -l | tr -d ' ')" -ge 2 ] && echo goes-on)" "POST ${BASE}/myself:goes-on"
+    has "${rel}: and says there is no session" "There is no session (no myCookie.jar). Logging in first, with 01.Authenticate/01.myself_POST.sh"
 done
-mv "${WORK}/eu/myCookie.jar.off" "${WORK}/eu/myCookie.jar"
+rm -f "${WORK}/eu/myCookie.jar"
+STATUS=401 KEEP_NO_JAR=1 run 06.ServerTime/01.serverTime_GET.sh
+expect "no cookie jar and the login refused: it stops after the login, exit 1, nothing else sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "1:1"
+has "and says why" "The login failed, so this example cannot continue."
+touch "${WORK}/eu/myCookie.jar"
+
+STATUS_GET=401 run 06.ServerTime/01.serverTime_GET.sh
+expect "a cookie jar whose session the server refuses (401): check, login, then its own call" \
+  "$(raw_calls | cut -d' ' -f1 | tr '\n' ' ')" "GET POST GET "
+has "and says the session is no longer active" "The session in myCookie.jar is no longer active (HTTP 401)"
+STATUS_GET=403 run 06.ServerTime/01.serverTime_GET.sh
+has "a 403 is a lost session too" "no longer active (HTTP 403)"
+run 06.ServerTime/01.serverTime_GET.sh
+expect "an active session: one check, no login" "$(raw_calls | cut -d' ' -f1 | tr '\n' ' ')" "GET GET "
+STATUS_GET=500 run 06.ServerTime/01.serverTime_GET.sh
+expect "any other answer to the check (a 500) is not taken for a lost session: no login, the example goes on and reports" \
+  "$(raw_calls | grep -c '^POST')" "0"
+run 03.Myself/07.myself_secretQuestion_GET.sh a-token
+expect "03.Myself/07 with a token needs no session: it makes no check" "$(raw_calls | wc -l | tr -d ' '):$(raw_calls | grep -c '/myself$')" "1:0"
+
+# a new example must not forget the check: every one that uses the cookie jar sources the helper, bar the ones that log in themselves
+NO_CHECK="01.Authenticate/01.myself_POST.sh 01.Authenticate/02.myself_DELETE.sh 02.Files/02.files_name_POST_folder.sh 02.Files/08.fileOperations_POST_upload.sh 03.Myself/04.myself_password_POST_requestLink.sh 03.Myself/05.myself_password_POST_reset.sh"
+MISSING=""
+for f in $(cd "${EU_TREE}" && ls */*.sh); do
+    case " ${NO_CHECK} " in *" ${f} "*) continue ;; esac
+    grep -q "st_ensure_session" "${EU_TREE}/${f}" || MISSING="${MISSING} ${f}"
+done
+expect "every EndUser example that needs a session calls st_ensure_session (the six that log in or need none are listed)" "${MISSING}" ""
 
 echo
 echo "=== 03.Myself ==="
@@ -344,7 +380,7 @@ touch "${WORK}/eu/myCookie.jar"
 STATUS=401 run 01.Authenticate/02.myself_DELETE.sh
 expect "02 logout: refused, exit 1, the jar is kept" "${RC}:$([ -f "${WORK}/eu/myCookie.jar" ] && echo there || echo gone)" "1:there"
 rm -f "${WORK}/eu/myCookie.jar"
-run 01.Authenticate/02.myself_DELETE.sh
+KEEP_NO_JAR=1 run 01.Authenticate/02.myself_DELETE.sh
 expect "02 logout: no session, exit 1, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "1:0"
 touch "${WORK}/eu/myCookie.jar"
 POST_BODY=

@@ -20,7 +20,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Confirmed directly: the DELETE answers 200, and a GET of the operation
 #   afterwards answers 404.
 # - Requires `jq`, which builds the body.
@@ -34,13 +35,11 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 OPERATION_ID="$1"
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 if [ -z "${OPERATION_ID}" ]; then
     printf "Declaring an upload of /cancelled_upload.txt, to cancel it...\n"

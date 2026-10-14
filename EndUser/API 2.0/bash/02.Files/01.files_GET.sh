@@ -19,7 +19,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # ==============================================================================
 
 #
@@ -35,6 +36,7 @@ printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 
 #
 # Curl command to list all files under the user's home folder, including the home folder name
@@ -42,6 +44,7 @@ COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 # Session cookies are read from a file called myCookie.jar
 # Exits 1 when the server refuses.
 #
+st_ensure_session
 result=$(curl -L -b "${COOKIE}" -w "\n%{http_code}" -s -k -X GET "${ST_URL}/files" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 http_status=${result##*$'\n'}
 printf '%s\n' "${result%$'\n'*}"

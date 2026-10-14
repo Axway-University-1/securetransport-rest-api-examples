@@ -20,7 +20,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Pulls that share an operationIndex are counted together.
 # - Confirmed directly: an operationIndex no pull used answers 200 with every
 #   count 0, not 404.
@@ -37,6 +38,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 OPERATION_INDEX="$1"
@@ -44,10 +46,7 @@ if [ -z "${OPERATION_INDEX}" ]; then
     printf "Usage: ./04.transfers_pullSummary_GET.sh OPERATION_INDEX\n"
     exit 2
 fi
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 ENCODED=$(printf '%s' "${OPERATION_INDEX}" | jq -sRr '@uri')
 RESPONSE=$(curl -s -k -b "${COOKIE}" -X GET "${ST_URL}/transfers/pullSummary/${ENCODED}" \

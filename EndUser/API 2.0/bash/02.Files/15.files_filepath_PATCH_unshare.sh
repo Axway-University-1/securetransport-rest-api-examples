@@ -18,7 +18,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Confirmed directly: a success answers 204, with no body.
 # - 14.files_filepath_PATCH_share.sh shares a folder.
 # - Requires `jq`, which URL-encodes the path.
@@ -32,6 +33,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 FOLDER="${1#/}"
@@ -40,10 +42,7 @@ if [ -z "${FOLDER}" ]; then
     printf "Usage: ./15.files_filepath_PATCH_unshare.sh FOLDER\n"
     exit 2
 fi
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 ENCODED=$(printf '%s' "${FOLDER}" | jq -Rr 'split("/") | map(@uri) | join("/")')
 

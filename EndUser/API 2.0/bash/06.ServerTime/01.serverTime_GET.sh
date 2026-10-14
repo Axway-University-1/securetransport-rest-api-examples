@@ -17,7 +17,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Confirmed directly: the time is ISO-8601 with a numeric offset, for example
 #   2026-10-06T12:28:47.787+0300, not with a Z as the API reference shows.
 # - Useful before a time-filtered query, such as 05.Transfers/01.transfers_GET.sh
@@ -33,12 +34,10 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 RESPONSE=$(curl -s -k -b "${COOKIE}" -X GET "${ST_URL}/serverTime" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")

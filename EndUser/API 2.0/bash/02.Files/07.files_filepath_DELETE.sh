@@ -18,7 +18,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - The file named in FILE_NAME must exist in the account's home folder - run
 #   04.files_filepath_POST.sh first if you have not uploaded one yet.
 # - Confirmed directly: this call returns 204, and the file is gone from the
@@ -39,6 +40,7 @@ printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 
 #
 # Set the file name to delete
@@ -48,6 +50,7 @@ FILE_NAME="test.txt"
 #
 # Curl command to delete a file on SecureTransport.
 #
+st_ensure_session
 printf "\n\nDeleting file from SecureTransport...\n"
 http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o /dev/null -X DELETE "${ST_URL}/files/${FILE_NAME}" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 

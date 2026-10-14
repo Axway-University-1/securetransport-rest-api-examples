@@ -49,7 +49,7 @@ run() {
     cp "${src}" "${WORK}/${tree}/sub/${base}"
     OUT=$(cd "${WORK}/${tree}/sub" && PATH="${WORK}/bin:${PATH}" \
           STUB_CURL_GET_BODY="${GET_BODY:-}" STUB_CURL_POST_BODY="${POST_BODY:-}" \
-          STUB_CURL_STATUS="${STATUS:-201}" STUB_CURL_PRINT_CODE="${PRINT_CODE:-}" \
+          STUB_CURL_STATUS="${STATUS:-201}" STUB_CURL_STATUS_GET="${STATUS_GET:-}" STUB_CURL_PRINT_CODE="${PRINT_CODE:-}" \
           STUB_CURL_CSRF="${CSRF:-}" bash "./${base}" "$@" 2>&1)
     RC=$?
 }
@@ -122,10 +122,12 @@ echo "=== EndUser 02.Files ==="
 
 AUTH=$(printf '%s' "apiadmin:s3cret" | base64)
 
-STATUS=200 PRINT_CODE=1 CSRF=tok-1 run eu "02.Files/02.files_name_POST_folder.sh" "/reports/my folder"
-expect "folder: logs in, creates the folder, logs out" "$(calls)" "POST ${BASE}/myself
+STATUS=200 STATUS_GET=404 PRINT_CODE=1 CSRF=tok-1 run eu "02.Files/02.files_name_POST_folder.sh" "/reports/my folder"
+expect "folder: logs in, looks whether it is there, creates the folder, logs out" "$(calls)" "POST ${BASE}/myself
+GET ${BASE}/files/reports/my%20folder?metadata=true
 POST ${BASE}/files/reports/my%20folder
 DELETE ${BASE}/myself"
+expect "folder: created, exit 0" "${RC}" "0"
 has "folder: logs in with the configured user" "HEADER: Authorization: Basic ${AUTH}"
 expect "folder: sends the login's csrfToken on both later calls" "$(printf '%s\n' "${OUT}" | grep -c '^HEADER: csrfToken: tok-1$')" "2"
 FOLDER_BODY=$(payload 1)
@@ -134,6 +136,19 @@ expect "folder: the body says it is a directory, and holds no name" \
 
 STATUS=401 PRINT_CODE=1 run eu "02.Files/02.files_name_POST_folder.sh"
 expect "folder: stops when the login fails" "${RC}:$(count_calls "/files")" "1:0"
+
+STATUS=200 STATUS_GET=200 PRINT_CODE=1 CSRF=tok-1 run eu "02.Files/02.files_name_POST_folder.sh" "reports"
+expect "folder: one that is already there is not created again: it says so, logs out, exits 0" \
+  "${RC}:$(calls | cut -d' ' -f1 | tr '\n' ' ')" "0:POST GET DELETE "
+has "folder: and the message is plain, not the server's 'creating file: null'" "The folder 'reports' already exists. Nothing to create."
+# only the create is refused: a wrapper answers 409 for the POST of /files/ and passes everything else to the stub
+mkdir -p "${WORK}/bin_409"
+printf '#!/bin/bash\nif [[ "$*" == *"-X POST"* && "$*" == */files/* ]]; then printf "{}\\nHTTP 409\\n"; echo "METHOD: POST" >&2; echo "URL: refused" >&2; exit 0; fi\nexec "%s/bin/curl" "$@"\n' "${WORK}" > "${WORK}/bin_409/curl"
+chmod +x "${WORK}/bin_409/curl"
+OUT=$(cd "${WORK}/eu/sub" && PATH="${WORK}/bin_409:${WORK}/bin:${PATH}" STUB_CURL_STATUS=200 STUB_CURL_STATUS_GET=404 STUB_CURL_PRINT_CODE=1 STUB_CURL_CSRF=tok-1 bash ./02.files_name_POST_folder.sh reports 2>&1)
+RC=$?
+expect "folder: a refused create (409) shows the code, still logs out, and exits 1" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^METHOD: DELETE')" "1:1"
+has "folder: with the HTTP code" "HTTP 409"
 
 UPLOAD_FILE="${WORK}/upload.txt"
 printf 'hello upload' > "${UPLOAD_FILE}"

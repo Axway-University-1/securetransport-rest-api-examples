@@ -479,6 +479,18 @@ request body is a safe stand-in for another's.
   gone from the listing immediately. `EndUser/API 2.0/bash/02.Files/07.files_filepath_DELETE.sh`
   now demonstrates it (no `.bat` twin - the EndUser tree has no `bat/` folder
   at all, unlike Admin).
+- **A folder that already exists is answered 409, with the message of a failed create.** Confirmed directly
+  (5.5-20260924): `POST /files/new-folder` for a folder that is there is 409 "Error occurred while creating
+  file: null", the same words as the 403 of a stale home folder, so the message cannot tell them apart; look
+  with `GET /files/<path>?metadata=true` (200 or 404) first, as `02.Files/02` does. A folder created a moment
+  ago may be missing from the first page of `GET /files` (100 entries, in no fixed order), though a GET of it is
+  200. `GET /files/<name>` for a file that is not there is 404 "Error occurred while getting file size and
+  type.", so `03.Files` needs `04` to have uploaded `test.txt` first.
+- **Every EndUser example that needs a session checks for one first** (`ensure_session.sh`, sourced by 34 of the 40):
+  `GET /myself` with the cookie jar; a missing jar or a 401 or 403 means no active session, and the example says so
+  and runs `01.Authenticate/01.myself_POST.sh`; any other answer (a 500, the server unreachable) is not taken for a
+  lost session, so the example's own call reports the real problem. The six that do not: the login and the logout,
+  the two that log in and out on their own (`02.Files/02` and `08`), and the two password-reset ones.
 - **Log out with the session cookie, not with Basic authentication.** Confirmed
   directly (5.5-20260924): `DELETE /myself` with `-b myCookie.jar` and nothing else
   answers 200 and that session is refused (401) afterwards. `DELETE /myself` with

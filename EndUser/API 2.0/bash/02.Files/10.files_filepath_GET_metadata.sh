@@ -20,7 +20,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Without metadata=true the same call downloads the file (see
 #   03.files_filepath_GET.sh).
 # - The answer holds the file as "self", and the folder it is in as "parent".
@@ -35,6 +36,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 FILE="${1#/}"
@@ -42,10 +44,7 @@ if [ -z "${FILE}" ]; then
     printf "Usage: ./10.files_filepath_GET_metadata.sh FILE\n"
     exit 2
 fi
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 ENCODED=$(printf '%s' "${FILE}" | jq -Rr 'split("/") | map(@uri) | join("/")')
 RESPONSE=$(curl -s -k -G -b "${COOKIE}" -X GET "${ST_URL}/files/${ENCODED}" --data-urlencode "metadata=true" \

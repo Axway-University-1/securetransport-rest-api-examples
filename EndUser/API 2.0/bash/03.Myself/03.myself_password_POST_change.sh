@@ -19,7 +19,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - The old password is ST_PASSWORD. Afterwards, put the new one in
 #   set_variables.local.sh, or the next login fails.
 # - Confirmed directly: the session ends with the change, and the next call
@@ -38,6 +39,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 NEW_PASSWORD="$1"
@@ -45,10 +47,7 @@ if [ -z "${NEW_PASSWORD}" ]; then
     printf "Usage: ./03.myself_password_POST_change.sh NEW_PASSWORD\n"
     exit 2
 fi
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 BODY=$(jq -n --arg old "${ST_PASSWORD}" --arg new "${NEW_PASSWORD}" \
   '{operation: "change", oldPassword: $old, newPassword: $new}')

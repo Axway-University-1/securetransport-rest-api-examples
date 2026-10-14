@@ -25,7 +25,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Confirmed directly: each chunk answers 200, and the file is whole after the
 #   last one. The operation's own status stays IN_PROGRESS throughout.
 # - END in Content-Range is the last byte of the chunk, not the one after it.
@@ -42,6 +43,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 LOCAL_FILE="$1"
@@ -54,10 +56,7 @@ if [ -z "${LOCAL_FILE}" ] || [ ! -f "${LOCAL_FILE}" ]; then
     exit 2
 fi
 [[ "${CHUNK_SIZE}" =~ ^[1-9][0-9]*$ ]] || { printf "CHUNK_SIZE must be a whole number: %s\n" "${CHUNK_SIZE}"; exit 2; }
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 SIZE=$(wc -c < "${LOCAL_FILE}" | tr -d ' ')
 REMOTE_PATH="/${FOLDER:+${FOLDER}/}$(basename "${LOCAL_FILE}")"

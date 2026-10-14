@@ -18,7 +18,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - The file named in FILE_NAME (default test.txt, the one 04 uploads) must exist
 #   in the account's home folder. It is saved as downloaded_files/<FILE_NAME>, a
 #   folder git ignores, so it can never overwrite a file of these examples.
@@ -43,6 +44,7 @@ printf "Loading variables into our context..."
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 
 # 
 # Curl command to pull a file from SecureTransport.
@@ -63,6 +65,7 @@ ENCODED_NAME=$(printf '%s' "${FILE_NAME#/}" | jq -Rr 'split("/") | map(@uri) | j
 #
 # Curl command to pull a file from SecureTransport.
 #
+st_ensure_session
 printf "\n\nPulling file from SecureTransport...\n"
 http_status=$(curl -L -b "${COOKIE}" -w "%{http_code}" -s -k -o "${LOCAL_FILE}" -X GET "${ST_URL}/files/${ENCODED_NAME}" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 
@@ -70,6 +73,10 @@ if [[ $http_status -ne 200 ]] ; then
         echo "Get File failure: $http_status"
         cat "${LOCAL_FILE}"
         rm -f "${LOCAL_FILE}"
+        if [[ $http_status -eq 404 ]] ; then
+            echo
+            echo "There is no file named ${FILE_NAME} in your home folder. Upload it first (04.files_filepath_POST.sh uploads test.txt), or name a file that exists."
+        fi
         exit 1
 fi
 

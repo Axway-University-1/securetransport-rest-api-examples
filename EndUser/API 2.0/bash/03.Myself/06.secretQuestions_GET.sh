@@ -16,7 +16,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - When the secret question service is not configured or enabled, the answer
 #   is 503, error.secretQuestion.serviceDisabled (confirmed directly). This
 #   script says so and exits 3.
@@ -31,12 +32,10 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 RESPONSE=$(curl -s -k -b "${COOKIE}" -X GET "${ST_URL}/secretQuestions" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")

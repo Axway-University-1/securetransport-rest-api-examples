@@ -20,7 +20,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - A session must already exist. Run 01.Authenticate/01.myself_POST.sh first.
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - verifymdn is the only operation this endpoint has.
 # - Not confirmed on a real server: it needs an AS2 transfer with a receipt,
 #   and AS2 was not enabled on the server these examples were tested against.
@@ -35,6 +36,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 TRANSFER_ID="$1"
@@ -42,10 +44,7 @@ if [ -z "${TRANSFER_ID}" ]; then
     printf "Usage: ./07.transfers_id_operations_POST_verifymdn.sh TRANSFER_ID\n"
     exit 2
 fi
-if [ ! -f "${COOKIE}" ]; then
-    printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-    exit 1
-fi
+st_ensure_session
 
 printf "Verifying the receipt of transfer %s...\n" "${TRANSFER_ID}"
 RESPONSE=$(curl -s -k -b "${COOKIE}" -X POST "${ST_URL}/transfers/${TRANSFER_ID}/operations?operation=verifymdn" \

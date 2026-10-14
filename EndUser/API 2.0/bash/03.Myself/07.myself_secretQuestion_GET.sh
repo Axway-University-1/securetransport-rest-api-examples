@@ -22,8 +22,8 @@
 #
 # Notes:
 # - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - Without a token, a session must already exist. Run
-#   01.Authenticate/01.myself_POST.sh first.
+# - Without a token it needs a session: it checks for an active one first and, if there
+#   is none, logs in with 01.Authenticate/01.myself_POST.sh.
 # - When the secret question service is not configured or enabled, the answer
 #   is 503 (confirmed directly). This script says so and exits 3.
 # - Requires `jq`.
@@ -37,6 +37,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 source "${SCRIPT_DIR}/../set_variables.sh"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 TOKEN="$1"
@@ -45,10 +46,7 @@ if [ -n "${TOKEN}" ]; then
     RESPONSE=$(curl -s -k -G -X GET "${ST_URL}/myself/secretQuestion" --data-urlencode "token=${TOKEN}" \
       -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
 else
-    if [ ! -f "${COOKIE}" ]; then
-        printf "There is no session. Run 01.Authenticate/01.myself_POST.sh first.\n"
-        exit 1
-    fi
+    st_ensure_session
     RESPONSE=$(curl -s -k -b "${COOKIE}" -X GET "${ST_URL}/myself/secretQuestion" \
       -H "accept: application/json" -H "${REFERER_HEADER}" -w "\n%{http_code}")
 fi
