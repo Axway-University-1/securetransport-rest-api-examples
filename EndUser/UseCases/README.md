@@ -19,6 +19,10 @@ They are meant to be read in this order, each building on what the one before ta
 | Use case | What it teaches |
 | -------- | --------------- |
 | [01-authentication](01-authentication/README.md) | Getting in: Basic authentication on a single call, then the session (cookie jar and csrfToken), recovering from an expired session, and logging out. |
+| [02-knowing-yourself](02-knowing-yourself/README.md) | What the server says about the account: `/myself` whole and narrowed with jq, password expiry, the server's clock, the address book. |
+| [03-files-and-folders](03-files-and-folders/README.md) | One story: create a folder, upload, list, read, details, update, rename, delete the file and the folder. |
+| [04-larger-files](04-larger-files/README.md) | Trust a transfer: Content-MD5 on the way in, an MD5 asked for afterwards, uploads in pieces, by operation, and in bulk. |
+| [05-checking-transfers](05-checking-transfers/README.md) | What became of the files: the transfer list, filters, one transfer, a summary. |
 
 ## How a use case is organised
 

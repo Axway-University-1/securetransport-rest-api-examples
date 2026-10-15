@@ -491,6 +491,19 @@ request body is a safe stand-in for another's.
   and runs `01.Authenticate/01.myself_POST.sh`; any other answer (a 500, the server unreachable) is not taken for a
   lost session, so the example's own call reports the real problem. The six that do not: the login and the logout,
   the two that log in and out on their own (`02.Files/02` and `08`), and the two password-reset ones.
+- **Files and transfers, as the use cases (`EndUser/UseCases`) found them** (5.5-20261015, lab):
+  - Basic authentication works on every call with no session (`curl -u`); a call with neither is 401.
+  - A multipart upload takes the folder from the URL (`POST /files/<folder>`); a `filename=` with a folder in it
+    is cut to its last part and the file lands in the home folder. Uploading under an existing name overwrites it
+    (201 again); a `PUT` of raw bytes to a file is 415.
+  - A rename (`PATCH` `/newFilePath` or `PUT`) of a file that is not there is 403, not 404. A folder with a file in
+    it is 403 on delete ("directory is not empty").
+  - A wrong `Content-MD5` is refused with a 500. A multipart upload to a `/fileOperations/<id>` stores the file under
+    the name of the local file unless the form says `filename=`.
+  - Sharing a folder answers 400 "Shared folders functionality is disabled" when the server has it off.
+  - `GET /transfers` is 403 for an account without `transfersWebServiceAllowed` (set it when creating the account).
+    `startTimeAfter` wants RFC 2822 (`date -R`), a plain date is 400. A single transfer (`/transfers/<id>`) says
+    `file` and `transferType` where the list says `filename` and `direction`; the id is base64, so encode it in the URL.
 - **Log out with the session cookie, not with Basic authentication.** Confirmed
   directly (5.5-20260924): `DELETE /myself` with `-b myCookie.jar` and nothing else
   answers 200 and that session is refused (401) afterwards. `DELETE /myself` with
