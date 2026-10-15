@@ -35,6 +35,15 @@ EndUser/API 2.0/bash/02.Files/13.files_filepath_PATCH_rename.sh	00241fc1403d2961
 EndUser/API 2.0/bash/02.Files/14.files_filepath_PATCH_share.sh	1cf6c9aab2d00067eb647ee599527141834379f0e4afe3f1f72c099b0fea4a95	2026-10-15
 EndUser/API 2.0/bash/02.Files/15.files_filepath_PATCH_unshare.sh	959490bb4d0ca32b7047e75f6fb8f52499124baa8f0c19e91d6420991c3574b2	2026-10-15
 EndUser/API 2.0/bash/02.Files/test.txt	fe7ce5782a54a60a19ba58e38050a0659dea79fb701f80592a56b3cfb65fbab0	2026-10-15
+EndUser/API 2.0/bash/03.Myself/01.myself_GET.sh	a68081f4f2c5942dc748a99846c13a5195f4ef6c970cbecf0a153853deb2c76b	2026-10-15
+EndUser/API 2.0/bash/03.Myself/02.myself_passwordExpired_GET.sh	2b1745cd1f7a41549cbf416e4072fab9793c56965c1964ea33865abdead85dff	2026-10-15
+EndUser/API 2.0/bash/03.Myself/04.myself_password_POST_requestLink.sh	3f041d345cb142e4d201d0847f0f983129b492b06b4cdf54bdf612287ff1eb3e	2026-10-15
+EndUser/API 2.0/bash/03.Myself/05.myself_password_POST_reset.sh	2bd149a5862f5f72debb5740889285a916f452ea3c4481335e606d74f0cbba97	2026-10-15
+EndUser/API 2.0/bash/03.Myself/06.secretQuestions_GET.sh	835b0fadc41d03e1c6f64e816eaf12ad9a919288e1b931fb2b2946f3af1fd876	2026-10-15
+EndUser/API 2.0/bash/03.Myself/07.myself_secretQuestion_GET.sh	c45ba8ec052ba612fcca8b9e8f51cb1285786124b559b7dbb3895f265c902a89	2026-10-15
+EndUser/API 2.0/bash/03.Myself/08.myself_secretQuestion_PUT.sh	e9a49951cd79fbadfac008b9c3f51e3701f61da0fe68220cb781a73392b7b03f	2026-10-15
+EndUser/API 2.0/bash/03.Myself/09.myself_addressBook_GET.sh	3a2ff9e63b9bfbcd34c121788521a672013b71bf2253f3451f141140f5c77de9	2026-10-15
+EndUser/API 2.0/bash/03.Myself/10.myself_addressBook_id_GET.sh	736fa179781134bd1ad4d5b5de54fe8fde5469b3a4a30714a2dd606b7a268766	2026-10-15
 IMPROVEMENTS_IN_PROGRESS.md	659250f311e9ceb580bfa1cfe8a9f84517719678b3fff70b304c3e54d119df84	2026-10-14
 LICENSE	c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4	2026-10-14
 README.md	2c4c37d6fb369d2dd78f267d129137464b978b300ddd5b0642478b14fb0ab4fa	2026-10-14
