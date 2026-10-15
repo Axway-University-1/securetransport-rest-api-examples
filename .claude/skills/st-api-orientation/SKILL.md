@@ -39,9 +39,9 @@ Admin/API 2.0/
         python3/   16 complete programs for real maintenance tasks
         utils/     2 tools that read an exported systemConfiguration.xml
 EndUser/API 2.0/
-    bash/     40 examples: every resource of the EndUser API reference - files,
+    bash/     42 examples: every resource of the EndUser API reference - files,
               file operations, the account and password, the address book,
-              the user's own transfers, the server time
+              the user's own transfers, the server time, the secret questions
 ```
 
 `bash` and `bat` are kept at **exact parity** — every bash example has a bat
