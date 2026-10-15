@@ -97,7 +97,8 @@ the single most common reason an old script stops working.
   session. It makes sense: CSRF protects against a browser attaching a cookie the user
   did not intend, which cannot happen when the credential is put on each request.
 - A GET inside a kept session needs no token. CSRF gates writes, not reads.
-- A write inside a kept session was also accepted without one, on the Admin API and on
+- A write inside a kept session was also accepted without one, and even with a wrong one
+  (`csrfToken: nope`, confirmed 2026-10-15 with a PATCH of `/myself` to its own value), on the Admin API and on
   the EndUser API. The lab is therefore more lenient than the documented contract, and
   a script that omits the token works there and fails on a server that enforces it. The
   bundled mock and `tests/lib/fake_requests` are strict, which is what finds the omission.

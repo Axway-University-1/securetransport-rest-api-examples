@@ -120,6 +120,8 @@ Features/**/state.local.bat
 EndUser/UseCases/**/state.local.*
 EndUser/UseCases/**/session.cookie.jar
 EndUser/UseCases/**/downloaded_files/
+Admin/UseCases/**/state.local.*
+Admin/UseCases/**/session.cookie.jar
 
 # The python examples read this config file
 Admin/API 2.0/python/config
