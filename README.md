@@ -388,10 +388,11 @@ running them on Windows: if one misbehaves, please report it.
 | ----- | --------- | :--: |
 | 01. Authenticate | `/myself`, login and logout | 2 |
 | 02. Files | `/files` and `/fileOperations`: list, with paging, sorting, metadata and glob patterns; create a folder; upload, with an MD5 check; download; rename; share and unshare; delete | 15 |
-| 03. Myself | `/myself`, `/myself/password`, `/myself/passwordExpired`, `/myself/secretQuestion`, `/secretQuestions`, `/myself/addressBook`: the account, password change and reset, secret questions, the address book | 10 |
+| 03. Myself | `/myself`, `/myself/password`, `/myself/passwordExpired`, `/myself/secretQuestion`, `/myself/addressBook`: the account, password change and reset, the account's own secret question, the address book | 9 |
 | 04. File Operations | `/fileOperations`: MD5 checksum, an operation's state, chunked and multipart uploads, cancel | 5 |
 | 05. Transfers | `/transfers`, `/transfers/operations`, `/transfers/pullSummary`: the user's transfer log, pull, push, folder monitor, pull summary, AS2 receipt check | 7 |
 | 06. Server Time | `/serverTime` | 1 |
+| 07. Secret Questions | `/secretQuestions`: the questions the server offers, a check that one is on the list, the Nth question for a script | 3 |
 
 The EndUser examples are bash only, with no bat twins. Every resource of the EndUser API 2.0 reference has an example. All of them
 were run against a real server except three, which say so in their own header:

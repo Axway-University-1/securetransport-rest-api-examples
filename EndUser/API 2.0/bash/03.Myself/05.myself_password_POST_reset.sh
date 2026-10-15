@@ -17,7 +17,7 @@
 #   NEW_PASSWORD   the password to set
 #   SECRET_ANSWER  the answer to the account's secret question, when the secret
 #                  question service is enabled and the user has set one. See
-#                  07.myself_secretQuestion_GET.sh, which reads the question
+#                  06.myself_secretQuestion_GET.sh, which reads the question
 #                  with the same token.
 #   USERNAME       the account's login name, which the server may also require
 #                  (default ST_USER)

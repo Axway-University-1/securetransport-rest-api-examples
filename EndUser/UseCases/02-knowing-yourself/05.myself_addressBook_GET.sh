@@ -14,7 +14,7 @@
 # Risk: read
 #
 # Notes:
-# - Copied from EndUser/API 2.0/bash/03.Myself/09.myself_addressBook_GET.sh, with jq added.
+# - Copied from EndUser/API 2.0/bash/03.Myself/08.myself_addressBook_GET.sh, with jq added.
 # ==============================================================================
 
 source "$(dirname "$(realpath "$0")")/lib.sh"

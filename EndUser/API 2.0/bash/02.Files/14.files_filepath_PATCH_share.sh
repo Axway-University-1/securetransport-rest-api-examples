@@ -27,7 +27,7 @@
 # - The account must be allowed to share (sharingAllowed, see
 #   01.myself_GET.sh), and the email must be one the server knows: confirmed
 #   directly, an unknown one answers 400 "Unable to share folder ... with
-#   user ...". 09.myself_addressBook_GET.sh lists the users to share with.
+#   user ...". 08.myself_addressBook_GET.sh lists the users to share with.
 # - Notifications are off here; enableNotifications and
 #   enableOwnerNotifications turn them on.
 # - Requires `jq`, which builds the body and URL-encodes the path.

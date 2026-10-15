@@ -161,23 +161,23 @@ try:
         with eu() as check:
             c.check("and the original one again, after changing it back", True)
 
-        rc, out = script("03.Myself/06.secretQuestions_GET.sh", expect=(0, 3))
+        rc, out = script("07.SecretQuestions/01.secretQuestions_GET.sh", expect=(0, 3))
         if rc == 3:
             c.info("the secret question service is not enabled on this server: 06, 07 and 08 "
                    "were checked to say so cleanly")
-            script("03.Myself/07.myself_secretQuestion_GET.sh", expect=(3,))
-            script("03.Myself/08.myself_secretQuestion_PUT.sh", ["Q", "A"], expect=(3,))
+            script("03.Myself/06.myself_secretQuestion_GET.sh", expect=(3,))
+            script("03.Myself/07.myself_secretQuestion_PUT.sh", ["Q", "A"], expect=(3,))
         else:
             question = re.findall(r"^  (.+)$", out, re.M)[0]
-            script("03.Myself/08.myself_secretQuestion_PUT.sh", [question, "zztest answer"])
-            rc, out = script("03.Myself/07.myself_secretQuestion_GET.sh")
+            script("03.Myself/07.myself_secretQuestion_PUT.sh", [question, "zztest answer"])
+            rc, out = script("03.Myself/06.myself_secretQuestion_GET.sh")
             c.check("07 reads back the question 08 set", question in out, out[-200:])
 
-        rc, out = script("03.Myself/09.myself_addressBook_GET.sh", [PARTNER.lower()[:8] + "*"])
+        rc, out = script("03.Myself/08.myself_addressBook_GET.sh", [PARTNER.lower()[:8] + "*"])
         match = re.search(r"^  (\S+)  \S+  .*%s" % re.escape(PARTNER_EMAIL), out, re.M | re.I)
         c.check("09 finds the partner in the address book", match is not None, out[-400:])
         if match:
-            rc, out = script("03.Myself/10.myself_addressBook_id_GET.sh", [match.group(1)])
+            rc, out = script("03.Myself/09.myself_addressBook_id_GET.sh", [match.group(1)])
             c.check("10 reads the partner's entry by its id", PARTNER_EMAIL in out.lower() and "HTTP 200" in out, out[-300:])
 
         # -- 02.Files 09 to 15 ----------------------------------------------------

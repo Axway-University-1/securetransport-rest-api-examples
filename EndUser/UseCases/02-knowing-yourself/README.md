@@ -21,7 +21,7 @@ first and logs in when there is none, so each can also be run on its own once wh
 | `02.myself_GET_narrowed` | The same answer narrowed with jq: one value, a few, a default for a null, the field names. Shows that `?fields=` is ignored. | `03.Myself/01.myself_GET.sh` |
 | `03.myself_passwordExpired_GET` | Has the password expired? Exit 0 when not, 3 when it has. | `03.Myself/02.myself_passwordExpired_GET.sh` |
 | `04.serverTime_GET` | The server's clock, next to yours. | `06.ServerTime/01.serverTime_GET.sh` |
-| `05.myself_addressBook_GET` | The address book, counted by type and narrowed to the users with an e-mail. | `03.Myself/09.myself_addressBook_GET.sh` |
+| `05.myself_addressBook_GET` | The address book, counted by type and narrowed to the users with an e-mail. | `03.Myself/08.myself_addressBook_GET.sh` |
 | `99.cleanup_DELETE` | Ends the session and removes the jar. Nothing was created on the server. |  |
 
 `lib.sh` is the one small file they share: it loads `../session.sh` (the settings, the

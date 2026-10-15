@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 08.myself_secretQuestion_PUT.sh
+# Script Name: 07.myself_secretQuestion_PUT.sh
 # Author: Plamen Milenkov
 # Created: 2026-10-06
 # Location: Sofia
@@ -11,9 +11,9 @@
 # answer (see 05.myself_password_POST_reset.sh).
 #
 # Usage:
-# ./08.myself_secretQuestion_PUT.sh "QUESTION" "ANSWER"
+# ./07.myself_secretQuestion_PUT.sh "QUESTION" "ANSWER"
 #
-#   QUESTION  one of the questions 06.secretQuestions_GET.sh lists
+#   QUESTION  one of the questions 07.SecretQuestions/01.secretQuestions_GET.sh lists
 #   ANSWER    its answer
 #
 # Risk: write
@@ -43,7 +43,7 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 QUESTION="$1"
 ANSWER="$2"
 if [ -z "${QUESTION}" ] || [ -z "${ANSWER}" ]; then
-    printf "Usage: ./08.myself_secretQuestion_PUT.sh \"QUESTION\" \"ANSWER\"\n"
+    printf "Usage: ./07.myself_secretQuestion_PUT.sh \"QUESTION\" \"ANSWER\"\n"
     exit 2
 fi
 st_ensure_session

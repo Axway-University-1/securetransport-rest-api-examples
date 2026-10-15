@@ -97,7 +97,8 @@ for label, folder in rows:
 
 for label, folder in (("01. Authenticate", "01.Authenticate"), ("02. Files", "02.Files"),
                       ("03. Myself", "03.Myself"), ("04. File Operations", "04.FileOperations"),
-                      ("05. Transfers", "05.Transfers"), ("06. Server Time", "06.ServerTime")):
+                      ("05. Transfers", "05.Transfers"), ("06. Server Time", "06.ServerTime"),
+                      ("07. Secret Questions", "07.SecretQuestions")):
     n = str(count("EndUser/API 2.0/bash/" + folder, ".sh"))
     m = re.search(r"^\| %s \| [^|]*\| *(\S+) *\|" % re.escape(label), README, re.M)
     chk("EndUser %s  %s" % (label, n), bool(m) and m.group(1) == n,

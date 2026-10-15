@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 09.myself_addressBook_GET.sh
+# Script Name: 08.myself_addressBook_GET.sh
 # Author: Plamen Milenkov
 # Created: 2026-10-06
 # Location: Sofia
@@ -12,7 +12,7 @@
 # - Keeping to users only (type=USER), sorted by email, a page at a time
 #
 # Usage:
-# ./09.myself_addressBook_GET.sh [SEARCH] [LIMIT]
+# ./08.myself_addressBook_GET.sh [SEARCH] [LIMIT]
 #
 #   SEARCH  what to look for, for example jo* (default: everything)
 #   LIMIT   how many entries to return (default 20)

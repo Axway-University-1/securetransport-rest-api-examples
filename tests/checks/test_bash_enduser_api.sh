@@ -37,7 +37,7 @@ printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sl
 cp "${EU_TREE}/set_variables.sh" "${WORK}/eu/set_variables.sh"
 cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/eu/set_variables.local.sh"
 cp "${EU_TREE}/ensure_session.sh" "${WORK}/eu/ensure_session.sh"
-for folder in 01.Authenticate 02.Files 03.Myself 04.FileOperations 05.Transfers 06.ServerTime; do
+for folder in 01.Authenticate 02.Files 03.Myself 04.FileOperations 05.Transfers 06.ServerTime 07.SecretQuestions; do
     cp -R "${EU_TREE}/${folder}" "${WORK}/eu/"
 done
 touch "${WORK}/eu/myCookie.jar"
@@ -73,7 +73,7 @@ payload() { printf '%s\n' "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | sed -n "${1}
 headers() { printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p'; }
 
 echo "=== Every example that needs a session checks for one first, and logs in when there is none ==="
-NEEDS_SESSION="03.Myself/01.myself_GET.sh 03.Myself/09.myself_addressBook_GET.sh 02.Files/09.files_GET_query.sh 04.FileOperations/05.fileOperations_id_DELETE.sh 05.Transfers/01.transfers_GET.sh 06.ServerTime/01.serverTime_GET.sh 02.Files/01.files_GET.sh"
+NEEDS_SESSION="03.Myself/01.myself_GET.sh 03.Myself/08.myself_addressBook_GET.sh 02.Files/09.files_GET_query.sh 04.FileOperations/05.fileOperations_id_DELETE.sh 05.Transfers/01.transfers_GET.sh 06.ServerTime/01.serverTime_GET.sh 02.Files/01.files_GET.sh"
 for rel in ${NEEDS_SESSION}; do
     rm -f "${WORK}/eu/myCookie.jar"
     KEEP_NO_JAR=1 run "${rel}"
@@ -98,7 +98,7 @@ expect "an active session: one check, no login" "$(raw_calls | cut -d' ' -f1 | t
 STATUS_GET=500 run 06.ServerTime/01.serverTime_GET.sh
 expect "any other answer to the check (a 500) is not taken for a lost session: no login, the example goes on and reports" \
   "$(raw_calls | grep -c '^POST')" "0"
-run 03.Myself/07.myself_secretQuestion_GET.sh a-token
+run 03.Myself/06.myself_secretQuestion_GET.sh a-token
 expect "03.Myself/07 with a token needs no session: it makes no check" "$(raw_calls | wc -l | tr -d ' '):$(raw_calls | grep -c '/myself$')" "1:0"
 
 # a new example must not forget the check: every one that uses the cookie jar sources the helper, bar the ones that log in themselves
@@ -181,43 +181,99 @@ expect "05 reset: token, new password, username; no secret answer when none is g
 run 03.Myself/05.myself_password_POST_reset.sh tok-1 'N3w p@ss' 'blue' john
 expect "05 reset: the secret answer and username, when given" "$(payload 1 | jq -c '[.secretAnswer, .username]')" '["blue","john"]'
 
+echo "=== 07.SecretQuestions ==="
 GET_BODY=$(body questions '["Your first pet?","Your first school?"]')
-run 03.Myself/06.secretQuestions_GET.sh
-expect "06 secretQuestions: GET /secretQuestions" "$(calls)" "GET ${BASE}/secretQuestions"
-has "06 secretQuestions: one question per line" "  Your first school?"
-STATUS_GET=503 run 03.Myself/06.secretQuestions_GET.sh
-expect "06 secretQuestions: service disabled (503), exit 3" "${RC}" "3"
-has "06 secretQuestions: says so" "not enabled on this server"
+run 07.SecretQuestions/01.secretQuestions_GET.sh
+expect "01 secretQuestions: GET /secretQuestions" "$(calls)" "GET ${BASE}/secretQuestions"
+has "01 secretQuestions: one question per line" "  Your first school?"
+STATUS_GET=503 run 07.SecretQuestions/01.secretQuestions_GET.sh
+expect "01 secretQuestions: service disabled (503), exit 3" "${RC}" "3"
+has "01 secretQuestions: says so" "not enabled on this server"
+STATUS_GET=500 run 07.SecretQuestions/01.secretQuestions_GET.sh
+expect "01 secretQuestions: any other refusal is exit 1" "${RC}" "1"
 
-GET_BODY=$(body question '{"secretQuestion":"Your first pet?"}')
-run 03.Myself/07.myself_secretQuestion_GET.sh
-expect "07 secretQuestion: the user's own, with the session" "$(calls)" "GET ${BASE}/myself/secretQuestion"
-has "07 secretQuestion: prints it" "The secret question: Your first pet?"
-run 03.Myself/07.myself_secretQuestion_GET.sh 'a b+c'
-expect "07 secretQuestion: with a reset token instead" "$(calls)" "GET ${BASE}/myself/secretQuestion?token=a b+c"
-STATUS_GET=503 run 03.Myself/07.myself_secretQuestion_GET.sh
-expect "07 secretQuestion: service disabled, exit 3" "${RC}" "3"
+run 07.SecretQuestions/02.secretQuestions_GET_check.sh "Your first school?"
+expect "02 check: GET /secretQuestions, and nothing else" "$(calls)" "GET ${BASE}/secretQuestions"
+has "02 check: a question on the list is said to be" "On the list: Your first school?"
+expect "02 check: on the list, exit 0" "${RC}" "0"
+run 07.SecretQuestions/02.secretQuestions_GET_check.sh "your first school"
+has "02 check: the match is exact (case and punctuation)" "Not on the list: your first school"
+expect "02 check: not on the list, exit 1" "${RC}" "1"
+run 07.SecretQuestions/02.secretQuestions_GET_check.sh
+expect "02 check: no question is exit 2, and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+STATUS_GET=503 run 07.SecretQuestions/02.secretQuestions_GET_check.sh "Your first pet?"
+expect "02 check: service disabled, exit 3" "${RC}" "3"
+STATUS_GET=500 run 07.SecretQuestions/02.secretQuestions_GET_check.sh "Your first pet?"
+expect "02 check: any other refusal is exit 1" "${RC}" "1"
+
+run 07.SecretQuestions/03.secretQuestions_GET_pick.sh
+expect "03 pick: GET /secretQuestions" "$(calls)" "GET ${BASE}/secretQuestions"
+has "03 pick: the first question by default" "Your first pet?"
+run 07.SecretQuestions/03.secretQuestions_GET_pick.sh 2
+has "03 pick: the Nth" "Your first school?"
+expect "03 pick: exit 0" "${RC}" "0"
+# only the question on standard output (the stub and the session message go to standard error), so $(...) can use it
+touch "${WORK}/eu/myCookie.jar"
+PICKED=$(cd "${WORK}/eu/07.SecretQuestions" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${GET_BODY}" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./03.secretQuestions_GET_pick.sh 2 2>/dev/null)
+expect "03 pick: standard output is the question and nothing else" "${PICKED}" "Your first school?"
+rm -f "${WORK}/eu/myCookie.jar"
+PICKED=$(cd "${WORK}/eu/07.SecretQuestions" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${GET_BODY}" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./03.secretQuestions_GET_pick.sh 1 2>/dev/null)
+expect "03 pick: even when it has to log in first" "${PICKED}" "Your first pet?"
+run 07.SecretQuestions/03.secretQuestions_GET_pick.sh 3
+expect "03 pick: past the end of the list is exit 1" "${RC}" "1"
+has "03 pick: and says how long the list is" "the list has 2"
+for bad in 0 abc -1; do
+    run 07.SecretQuestions/03.secretQuestions_GET_pick.sh "${bad}"
+    expect "03 pick: '${bad}' is exit 2, and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS_GET=503 run 07.SecretQuestions/03.secretQuestions_GET_pick.sh
+expect "03 pick: service disabled, exit 3" "${RC}" "3"
 GET_BODY=
 
-STATUS=204 run 03.Myself/08.myself_secretQuestion_PUT.sh "Your first pet?" "Rex"
-expect "08 secretQuestion PUT: PUT /myself/secretQuestion, 204, exit 0" "${RC}:$(calls)" "0:PUT ${BASE}/myself/secretQuestion"
-expect "08 secretQuestion PUT: the password, the question and the answer" \
+echo "=== 03.Myself: the secret question ==="
+GET_BODY=$(body question '{"secretQuestion":"Your first pet?"}')
+run 03.Myself/06.myself_secretQuestion_GET.sh
+expect "06 secretQuestion: the user's own, with the session" "$(calls)" "GET ${BASE}/myself/secretQuestion"
+has "06 secretQuestion: prints it" "The secret question: Your first pet?"
+run 03.Myself/06.myself_secretQuestion_GET.sh 'a b+c'
+expect "06 secretQuestion: with a reset token instead" "$(calls)" "GET ${BASE}/myself/secretQuestion?token=a b+c"
+STATUS_GET=503 run 03.Myself/06.myself_secretQuestion_GET.sh
+expect "06 secretQuestion: service disabled, exit 3" "${RC}" "3"
+expect "06 secretQuestion: it asks the list too, to tell that from an account with no question" \
+  "$(calls | tr '\n' ' ')" "GET ${BASE}/myself/secretQuestion GET ${BASE}/secretQuestions "
+has "06 secretQuestion: and says the service is not enabled" "not enabled on this server"
+# the session check, then 503 for the question, then 200 for the list: the service is on, the account has none
+STUB_STATUS_GET_SEQ="200 503 200" STUB_COUNTER="${WORK}/ctr_sq" run 03.Myself/06.myself_secretQuestion_GET.sh
+rm -f "${WORK}"/ctr_sq.*
+expect "06 secretQuestion: enabled but none set is exit 4" "${RC}" "4"
+has "06 secretQuestion: and says so, and how to set one" "has no secret question yet"
+has "06 secretQuestion: pointing at the PUT script" "07.myself_secretQuestion_PUT.sh"
+run 03.Myself/06.myself_secretQuestion_GET.sh a-token
+expect "06 secretQuestion: with a token, a 503 is exit 3 with no list call (there is no session to ask with)" "${RC}:$(calls | wc -l | tr -d ' ')" "0:1"
+STATUS_GET=503 run 03.Myself/06.myself_secretQuestion_GET.sh a-token
+expect "06 secretQuestion: with a token, a 503 is exit 3" "${RC}:$(calls | wc -l | tr -d ' ')" "3:1"
+has "06 secretQuestion: and says it is one or the other" "or the account has no question set"
+GET_BODY=
+
+STATUS=204 run 03.Myself/07.myself_secretQuestion_PUT.sh "Your first pet?" "Rex"
+expect "07 secretQuestion PUT: PUT /myself/secretQuestion, 204, exit 0" "${RC}:$(calls)" "0:PUT ${BASE}/myself/secretQuestion"
+expect "07 secretQuestion PUT: the password, the question and the answer" \
   "$(payload 1 | jq -c '[.password, .secretQuestion, .secretAnswer]')" '["s3cret","Your first pet?","Rex"]'
-STATUS=503 run 03.Myself/08.myself_secretQuestion_PUT.sh "Q" "A"
-expect "08 secretQuestion PUT: service disabled, exit 3" "${RC}" "3"
+STATUS=503 run 03.Myself/07.myself_secretQuestion_PUT.sh "Q" "A"
+expect "07 secretQuestion PUT: service disabled, exit 3" "${RC}" "3"
 
 GET_BODY=$(body book '[{"id":"u1:g1","displayName":"Jo","mail":"jo@example.com","parentGroup":"","type":"USER"}]')
-run 03.Myself/09.myself_addressBook_GET.sh 'jo*' 5
-expect "09 addressBook: searches users by email order, a page at a time" "$(calls)" \
+run 03.Myself/08.myself_addressBook_GET.sh 'jo*' 5
+expect "08 addressBook: searches users by email order, a page at a time" "$(calls)" \
   "GET ${BASE}/myself/addressBook?searchFor=jo*&type=USER&orderBy=email&limit=5&offset=0"
-has "09 addressBook: one entry per line" "  u1:g1  USER  Jo  jo@example.com"
-run 03.Myself/09.myself_addressBook_GET.sh
-expect "09 addressBook: no searchFor when there is nothing to search for" "$(calls | grep -c searchFor)" "0"
+has "08 addressBook: one entry per line" "  u1:g1  USER  Jo  jo@example.com"
+run 03.Myself/08.myself_addressBook_GET.sh
+expect "08 addressBook: no searchFor when there is nothing to search for" "$(calls | grep -c searchFor)" "0"
 
-run 03.Myself/10.myself_addressBook_id_GET.sh 'u1:g1'
-expect "10 addressBook id: the id URL-encoded in the path" "$(calls)" "GET ${BASE}/myself/addressBook/u1%3Ag1"
-run 03.Myself/10.myself_addressBook_id_GET.sh
-expect "10 addressBook id: without one, reads the first entry's" "$(calls)" "GET ${BASE}/myself/addressBook?limit=1
+run 03.Myself/09.myself_addressBook_id_GET.sh 'u1:g1'
+expect "09 addressBook id: the id URL-encoded in the path" "$(calls)" "GET ${BASE}/myself/addressBook/u1%3Ag1"
+run 03.Myself/09.myself_addressBook_id_GET.sh
+expect "09 addressBook id: without one, reads the first entry's" "$(calls)" "GET ${BASE}/myself/addressBook?limit=1
 GET ${BASE}/myself/addressBook/u1%3Ag1"
 GET_BODY=
 

@@ -552,7 +552,19 @@ resource of the EndUser API reference (`tests/integration/checks/33.enduser_api_
   count 0, not 404.
 - **`/serverTime`** writes the offset as `+0300`, not the `Z` the reference shows.
 - **The secret question service** answers 503,
-  `error.secretQuestion.serviceDisabled`, when it is not enabled.
+  `error.secretQuestion.serviceDisabled`, when it is not enabled. The switch is the server option
+  `Users.SecretQuestion.Enabled` (false by default; `Users.SecretQuestions` is the list on offer, `.Required`,
+  `.MaxAttempts` and `Users.SecretAnswer.MinLength` the rest). Confirmed with it switched on (2026-10-15, restored after):
+  - **`GET /myself/secretQuestion` is the same 503 "Service not available." for an account that has no question
+    set yet**, although the service is on. Only `GET /secretQuestions` (200 when on) tells the two apart, which is what
+    `03.Myself/06` does (exit 4 for "on, but none set", 3 for "off").
+  - `GET /secretQuestions` is a plain JSON list of texts, GET only (every other method is 405, and it has no
+    sub-paths). A question cannot be cleared once set: `DELETE /myself/secretQuestion` is 405.
+  - `PUT /myself/secretQuestion` needs the account's password in the body, and an answer that is not empty
+    ("secretAnswer may not be empty", 400, also when it is left out). A question that is not on the list is 400,
+    `error.secretQuestion.notFound`; a wrong password is 400, `error.password.invalid`. The match is exact.
+  - The admin API shows it as `user.secretQuestion` with `secretAnswerGuessFailures` (the answer is not returned).
+  - A password reset link is sent once an hour per user: a second `requestLink` is 400 "A reset email was recently sent".
 
 ## The Admin API, against its own reference
 

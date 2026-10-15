@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 10.myself_addressBook_id_GET.sh
+# Script Name: 09.myself_addressBook_id_GET.sh
 # Author: Plamen Milenkov
 # Created: 2026-10-06
 # Location: Sofia
@@ -10,9 +10,9 @@
 # `/myself/addressBook/{id}` endpoint.
 #
 # Usage:
-# ./10.myself_addressBook_id_GET.sh [ID]
+# ./09.myself_addressBook_id_GET.sh [ID]
 #
-#   ID  the entry's id, as 09.myself_addressBook_GET.sh prints it (default:
+#   ID  the entry's id, as 08.myself_addressBook_GET.sh prints it (default:
 #       the first entry of the address book)
 #
 # Risk: read
