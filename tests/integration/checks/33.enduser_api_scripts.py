@@ -144,11 +144,20 @@ try:
         c.check("01.myself_GET.sh prints the account", "account           %s (user)" % USER in out, out[-300:])
         script("03.Myself/02.myself_passwordExpired_GET.sh")
 
-        rc, out = script("03.Myself/03.myself_password_POST_change.sh", [NEW_PASSWORD])
+        # By default it changes the password to a random one and back: run it twice, the second run
+        # would have failed on a stale password before it restored the original
+        for run_number in (1, 2):
+            rc, out = script("03.Myself/03.myself_password_POST_change.sh")
+            c.check("change run %d: it ended back on the original password" % run_number,
+                    "Back on the original password" in out, out[-300:])
+        with eu() as check:
+            c.check("the original password still logs in after two round trips", True)
+
+        rc, out = script("03.Myself/03.myself_password_POST_change.sh", [NEW_PASSWORD, "--keep"])
         with eu(USER, NEW_PASSWORD) as check:
             c.check("the new password logs in", True)
         with runner.real_credentials(TREE, dict(eu_config, st_password=NEW_PASSWORD)):
-            script("03.Myself/03.myself_password_POST_change.sh", [PASSWORD])
+            script("03.Myself/03.myself_password_POST_change.sh", [PASSWORD, "--keep"])
         with eu() as check:
             c.check("and the original one again, after changing it back", True)
 

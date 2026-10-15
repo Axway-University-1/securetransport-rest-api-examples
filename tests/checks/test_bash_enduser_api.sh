@@ -24,9 +24,12 @@ FAILED=0
 pass() { printf "  PASS  %s\n" "$1"; }
 fail() { printf "  FAIL  %s\n" "$1"; FAILED=1; }
 expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1  (expected '$3', got '$2')"; fi; }
+hasnt() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then fail "$1  ('$2' is in the output)"; else pass "$1"; fi; }
 has() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then pass "$1"; else fail "$1  (no '$2' in the output)"; fi; }
 
-cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
+# the stub, behind the wrapper that answers each method with its own status (STUB_STATUS_POST_SEQ and so on)
+cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/stub_curl_real" && chmod +x "${WORK}/bin/stub_curl_real"
+cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
 printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sleep"
 
 # The real EndUser set_variables.sh, with the test values as its local file, and
@@ -124,16 +127,46 @@ expect "02 passwordExpired: expired, exit 2" "${RC}" "2"
 has "02 passwordExpired: names the URL to change it at" "Change it at https://x/api/v2.0/myself/password?operation=change"
 GET_BODY=
 
-run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
-expect "03 change: POSTs the change, then logs in again" "$(calls)" "POST ${BASE}/myself/password?operation=change
+run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss' --keep
+expect "03 change --keep: POSTs the change, then logs in again, and stops" "$(calls)" "POST ${BASE}/myself/password?operation=change
 POST ${BASE}/myself"
 expect "03 change: the operation is in the body too, with the old and new passwords" \
   "$(payload 1 | jq -c '[.operation, .oldPassword, .newPassword]')" '["change","s3cret","N3w p@ss"]'
 has "03 change: logs in again with the new password" "BASIC_AUTH: apiadmin:N3w p@ss"
+has "03 change --keep: says to put the new password in the settings" "Put the new password in set_variables.local.sh"
+run 03.Myself/03.myself_password_POST_change.sh --keep 'N3w p@ss'
+expect "03 change: the flag may come first" "${RC}" "0"
+run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
+expect "03 change: by default it changes, logs in, changes back, and logs in with the original" "$(calls)" "POST ${BASE}/myself/password?operation=change
+POST ${BASE}/myself
+POST ${BASE}/myself/password?operation=change
+POST ${BASE}/myself"
+expect "03 change: the change back carries the new password as the old one and the original as the new" \
+  "$(payload 2 | jq -c '[.oldPassword, .newPassword]')" '["N3w p@ss","s3cret"]'
+has "03 change: the last login is with the original password" "BASIC_AUTH: apiadmin:s3cret"
+has "03 change: and it says so" "Back on the original password, and logged in."
+expect "03 change: default exit 0" "${RC}" "0"
+run 03.Myself/03.myself_password_POST_change.sh
+expect "03 change: with no NEW_PASSWORD a random one is used, and put back" "${RC}:$(calls | wc -l | tr -d ' ')" "0:4"
+has "03 change: and says it made one" "using a random one"
+expect "03 change: the random password is 20 characters or more, and not the original" \
+  "$(payload 1 | jq -r '.newPassword | length >= 20 and . != "s3cret"')" "true"
+# the stub echoes every call it is given (BASIC_AUTH, HEADER, PAYLOAD_B64...): only what the script itself prints counts
+if printf '%s\n' "${OUT}" | grep -v '^\(BASIC_AUTH\|HEADER\|PAYLOAD_B64\|METHOD\|URL\|COOKIE\|COOKIE_JAR_WRITE\|HTTP \)' | grep -qF -- "$(payload 1 | jq -r .newPassword)"; then
+    fail "03 change: the random password is shown although the account was put back"
+else pass "03 change: the random password is not printed when the account is put back"; fi
 STATUS=400 run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
 expect "03 change: refused, no new login, exit 1" "${RC}:$(calls | grep -c '/myself$')" "1:0"
-run 03.Myself/03.myself_password_POST_change.sh
-expect "03 change: needs NEW_PASSWORD" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STUB_STATUS_POST_SEQ="200 200 400" STUB_COUNTER="${WORK}/ctr_pw" run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
+rm -f "${WORK}"/ctr_pw.*
+expect "03 change: a change back that is refused exits 1" "${RC}" "1"
+has "03 change: and prints the password the account is on" "The password of apiadmin is now: N3w p@ss"
+run 03.Myself/03.myself_password_POST_change.sh s3cret
+expect "03 change: the password it already has is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run 03.Myself/03.myself_password_POST_change.sh a b
+expect "03 change: two passwords is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run 03.Myself/03.myself_password_POST_change.sh --nope
+expect "03 change: an unknown option is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 
 run 03.Myself/04.myself_password_POST_requestLink.sh john@example.com
 expect "04 requestLink: POST with the operation in the query" "$(calls)" "POST ${BASE}/myself/password?operation=requestLink"
