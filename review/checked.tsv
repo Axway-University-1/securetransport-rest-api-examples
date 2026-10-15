@@ -11,11 +11,11 @@
 .claude/skills/st-api-cover-resource/scripts/fetch_spec.sh	ab5bca84307136ce626d0bef9b72ffa54e8289084f2f7560b0b237895bedd006	2026-10-14
 .claude/skills/st-api-cover-resource/scripts/lab.py	284882fb3d815c0af76ae6a90f3b30dc9ca71528582f8bb0f4a5a69850553b29	2026-10-14
 .claude/skills/st-api-cover-resource/scripts/sync_docs.py	b4a4748172a34570248c55daced58770ad1f49467a7baf6c2a5d2efc1775a6a3	2026-10-14
-.claude/skills/st-api-gotchas/SKILL.md	e646271bef21cbb712ed1c4afb1cccf6fd554e46e0da1e0bd4dd3e9060aa45bb	2026-10-14
+.claude/skills/st-api-gotchas/SKILL.md	ddad84dcee74ede2df6dbc04d7de443b1f7f2bc1a4e08567953923b5b33ab22e	2026-10-15
 .claude/skills/st-api-orientation/SKILL.md	cecdb944313984eb0e5505c7132ffc49f695c55612115f94cb6c94162c404ee5	2026-10-14
 .gitattributes	452eae77c8a39ca4f8fa225bf90f5302ba43cb1223419e06b754e640e566992c	2026-10-14
 .github/workflows/tests.yml	b7ea7a2b7151927894a54359d036b0cef5929fa1d304a1b326cf8aa20e1c7b4c	2026-10-14
-.gitignore	7c3229df68802dc1f7932dae51eaa18ffaf4ae5f79f473682eb39ba80d7ecb2f	2026-10-14
+.gitignore	9a263affd605f4e960419735b1928fdb4ff081c3bf6b34bbea49270563cafee2	2026-10-15
 CLAUDE.md	c2c490220e7f67ac80471f49b3e22066c49ecab0e7034b8cfd49097e2fb8de2c	2026-10-14
 EndUser/API 2.0/bash/01.Authenticate/01.myself_POST.sh	c8a14266784183c56815a77be46fc655c33141ee21ac47d52d9f470955015396	2026-10-15
 EndUser/API 2.0/bash/01.Authenticate/02.myself_DELETE.sh	f4670bfab33a791ce1bc426755d5d4db8b27569797f95117a5ab0935b293642b	2026-10-15
