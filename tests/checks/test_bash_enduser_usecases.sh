@@ -197,7 +197,7 @@ expect "02: the object, then the same with ?fields=name" "$(ucalls | tr '\n' ' '
 has "02: one value" "One value:        john"
 has "02: a few, as JSON" '{"name":"john","type":"user","uid":null,"gid":null}'
 has "02: a null becomes the default" "language = none"
-has "02: sees that the server ignored fields=" "So /myself ignores fields="
+has "02: says the end user API has no fields parameter" "The end user API has no fields parameter"
 urun ../02-knowing-yourself/03.myself_passwordExpired_GET.sh
 GET_BODY=$(body expired_false '{"expired": false}') urun ../02-knowing-yourself/03.myself_passwordExpired_GET.sh
 expect "03: GET /myself/passwordExpired" "$(ucalls)" "GET ${BASE}/myself/passwordExpired"

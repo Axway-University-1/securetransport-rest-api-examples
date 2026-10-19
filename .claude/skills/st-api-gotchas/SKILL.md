@@ -614,6 +614,25 @@ moves the role's administrators to that role.
 under, though the reference does not mark it required: 400 "Please specify
 parent administrator" without it.
 
+**The End User API's HTTP codes, as found (5.5-20260924), where they are not what the standard says:** a wrong `Content-MD5` and a
+chunk sent out of order are 500 (client errors, so 400 or 409); the secret question is 503 both when the service is off and when
+the account has no question; renaming a file that is not there is 403 (404); deleting a folder that is not empty is 403 (409);
+an upload over an existing file is 201 (it overwrites); a locked account is the same 401 "Login failed" as a wrong password; a 405
+carries no `Allow` header on either API; the error bodies come in four shapes (`{message, url, status:"401"}` with the status as
+text, `{message, validationErrors, docLink}`, `{errors:[{code, detail}]}`, and plain text). A `DELETE /files/...` is logged in the
+transfer list as an Outgoing "User download". A 401 does carry `WWW-Authenticate`. The Admin API takes a session write with a
+wrong or missing `csrfToken` (204) although `Webservices.Admin.CsrfToken.enabled` is true.
+
+**`fields=` is an administration API feature.** Surveyed on 5.5-20260924 (2026-10-19): the Admin API
+description declares `fields` on 72 GET operations, and on every one that could be tried it narrows the answer
+(50 of 50 that had data: `accounts`, `routes`, `certificates`, `logs/*`, `configurations/*`, `version`, `myself`, ...). None was
+ignored. The 13 left untried are collections with no entry on the lab (`icapServers`, `ldapDomains`, `loginRestrictionPolicies`,
+`siteTemplates`, `events`, `sessions/statistics/bandwidth`) and their `{id}`. The only inconsistency: the **type discriminator**
+(`protocol` of a server, `type` of a site) is always returned but refused as a field, 400 "Field protocol does not exist."
+(see `GET /servers?fields=isActive` above). `routeStepsCharsets` and `transactionManager` do not declare it and ignore it. The
+**end user API declares no `fields` at all** (its description does not contain the word), so `?fields=name` on `/myself` or `/files`
+changes nothing: that is "not offered", not "broken". Narrow end user answers with `jq`.
+
 **API keys are for administrators only.** The end user API's published description (`/api/v2.0/docs/swagger.yaml`
 on the server, 5.5-20260924) declares `basicAuthScheme` and nothing else, there is no api-keys path on it (404), and a
 made-up `SECURETRANSPORT-API-KEY` header is a 401 there, so the end user examples use Basic and the session only. The

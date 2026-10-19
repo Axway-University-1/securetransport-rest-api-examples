@@ -32,6 +32,7 @@ ignores).
 
 - Filters go in the query, and one that takes several values (`status`) is repeated. A filter that finds nothing is an empty list, not an error.
 - `startTimeAfter` takes a date in RFC 2822 form (what `date -R` prints): a plain date is refused with 400. The `date` options differ on macOS and Linux, so the script tries both.
+- A `DELETE /files/...` shows up in the transfer list too, as an `Outgoing` transfer of type "User download" (confirmed 2026-10-19 with one upload and one delete): a delete is logged like a download, so the newest entries after a cleanup are deletes, not reads. An upload is `Incoming` / "User upload".
 - The list and the single transfer name some fields differently (`filename` and `direction`, against `file` and `transferType`).
 - A 403 on `/transfers` usually means the account may not use the transfers web service (`transfersWebServiceAllowed` in `GET /myself`; the administrator sets it).
 - The server has no summary call: `group_by` on the list makes one (the list is at most 100 long).

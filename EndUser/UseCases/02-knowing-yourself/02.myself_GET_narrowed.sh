@@ -6,7 +6,7 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# The same answer, narrowed with jq. The server sends the whole object, and /myself ignores a fields= query, so the narrowing is done on this side: one value, a few, or the names of all of them.
+# The same answer, narrowed with jq. The server sends the whole object, and /myself takes no fields= query, so the narrowing is done on this side: one value, a few, or the names of all of them.
 #
 # Usage:
 # ./02.myself_GET_narrowed.sh
@@ -35,4 +35,8 @@ echo "Every field name: $(echo "${ME}" | jq -r 'keys | join(", ")')"
 ALL=$(echo "${ME}" | jq 'keys | length')
 ASKED=$(curl -k -s -b "${JAR}" -X GET "${ST_URL}/myself?fields=name" -H "accept: application/json" -H "Referer: ${REFERER}" | jq 'keys | length')
 echo "Fields in the whole answer: ${ALL}; with ?fields=name: ${ASKED}"
-[ "${ALL}" = "${ASKED}" ] && echo "So /myself ignores fields=: narrow with jq."
+if [ "${ALL}" = "${ASKED}" ]; then
+    echo "The end user API has no fields parameter (its description lists none; the administration API has one), so the whole object comes back: narrow with jq."
+else
+    echo "This server narrowed the answer to ${ASKED} field(s)."
+fi

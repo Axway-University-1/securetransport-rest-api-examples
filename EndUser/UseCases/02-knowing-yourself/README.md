@@ -18,7 +18,7 @@ first and logs in when there is none, so each can also be run on its own once wh
 | Script | What it does | Copied from (`EndUser/API 2.0/bash`) |
 | ------ | ------------ | ------------------------------------ |
 | `01.myself_GET` | Who am I: the whole object. | `03.Myself/01.myself_GET.sh` |
-| `02.myself_GET_narrowed` | The same answer narrowed with jq: one value, a few, a default for a null, the field names. Shows that `?fields=` is ignored. | `03.Myself/01.myself_GET.sh` |
+| `02.myself_GET_narrowed` | The same answer narrowed with jq: one value, a few, a default for a null, the field names. Shows that the end user API has no `fields=` parameter, so the narrowing is done here. | `03.Myself/01.myself_GET.sh` |
 | `03.myself_passwordExpired_GET` | Has the password expired? Exit 0 when not, 3 when it has. | `03.Myself/02.myself_passwordExpired_GET.sh` |
 | `04.serverTime_GET` | The server's clock, next to yours. | `06.ServerTime/01.serverTime_GET.sh` |
 | `05.myself_addressBook_GET` | The address book, counted by type and narrowed to the users with an e-mail. | `03.Myself/08.myself_addressBook_GET.sh` |
@@ -30,7 +30,7 @@ ignores).
 
 ## What to take from it
 
-- `/myself` ignores a `fields=` query: it sends every field, so narrow with `jq` (`jq -r` prints a text value without quotes).
+- The end user API has no `fields=` parameter (its API description lists none, and `?fields=name` changes nothing): `/myself` sends every field, so narrow with `jq` (`jq -r` prints a text value without quotes). The administration API does have it, on 72 read calls, and it works.
 - A field the account has no value for is `null`: `// "none"` in `jq` gives a readable default.
 - `/myself/passwordExpired` has a fixed message in the answer whether or not the password has expired: read the `expired` field.
 - Exit codes carry meaning: 3 is "the password has expired", 1 is a failure, so a caller can tell them apart.
