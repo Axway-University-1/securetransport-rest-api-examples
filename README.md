@@ -140,7 +140,7 @@ pushed, and your server address and password stay on your machine.
 
 The scripts then pick your values up on their own. There is nothing to
 configure inside the individual examples, and nothing to edit in the committed
-`set_variables.sh`, `set_variables.bat` or `config.example` files.
+`set_variables.local.example.sh`, `set_variables.bat` or `config.example` files.
 
 The password is always entered in plain text. Where the API expects a base64
 encoded `user:password` pair, the scripts derive it for you, so there is no need
@@ -338,7 +338,7 @@ already exists.
 
 | Topic | Endpoints | bash | bat |
 | ----- | --------- | :--: | :-: |
-| 01. Authentication | `/myself`, basic auth and cookie jar | 2 | 2 |
+| 01. Authentication | `/myself`, basic auth and cookie jar (API keys: `21.Administrators`, and `Admin/UseCases`) | 2 | 2 |
 | 02. Introduction | `/version`, `/myself` | 6 | 6 |
 | 03. Connect | `/daemons`, `/servers`, and their operations | 13 | 13 |
 | 04. Applications | `/applications`, flow and maintenance types | 7 | 7 |

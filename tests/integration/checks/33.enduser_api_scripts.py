@@ -221,6 +221,29 @@ try:
             c.check("03 the chunked upload is the whole file",
                     user.download("landing/sample.txt").body == open(local_file, "rb").read())
             user.delete_file("landing/sample.txt")
+        # An upload left after its first chunk, carried on by the script with --resume from chunk 2: the file ends whole
+        import json
+        data = open(local_file, "rb").read()
+        with eu() as user:
+            declared = user._request("POST", "fileOperations", {"Content-Type": "application/json"},
+                                 json.dumps({"operation": "Upload", "filePath": "/landing/sample.txt",
+                                             "customAttributes": {"transferMode": "BINARY"}}).encode())
+            operation_id = declared.json().get("id")
+            first = user._request("PUT", "fileOperations/" + str(operation_id),
+                                  {"Content-Type": "application/octet-stream",
+                                   "Content-Range": "bytes 0-999/%d" % len(data)}, data[:1000])
+            c.check("an upload is left after its first chunk (declared, chunk 1 sent: 200)", bool(operation_id) and first.status == 200,
+                    (declared.status, first.status))
+        rc, out = script("04.FileOperations/03.fileOperations_id_PUT_chunked.sh",
+                         [local_file, "landing", "1000", "--resume", str(operation_id), "2"])
+        c.check("03 --resume says where it carries on", "Continuing operation %s with chunk 2 of 3." % operation_id in out, out[-300:])
+        with eu() as user:
+            c.check("03 --resume ends with the whole file", user.download("landing/sample.txt").body == data)
+            user.delete_file("landing/sample.txt")
+        rc, out = script("04.FileOperations/03.fileOperations_id_PUT_chunked.sh",
+                         [local_file, "landing", "1000", "--resume", "no-such-operation", "1", "--retries", "1", "--wait", "1"], expect=(1,))
+        c.check("03 against an operation that is not there: stops, names chunk 1 and the line to continue with",
+                "Chunk 1 of 3 failed" in out and "--resume no-such-operation 1" in out, out[-400:])
         script("04.FileOperations/04.fileOperations_id_POST_multipart.sh", [local_file, "fm_to"])
         with eu() as user:
             c.check("04 the multipart upload is the whole file",

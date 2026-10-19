@@ -7,7 +7,7 @@
 # ==============================================================================
 # Description:
 # Sourced by every script of this use case. Loads the settings of the EndUser
-# examples (EndUser/API 2.0/bash/set_variables.sh and its .local.sh), and names
+# examples (EndUser/API 2.0/bash/set_variables.local.sh), and names
 # the two files this use case keeps between scripts: the cookie jar of its own
 # session (session.cookie.jar) and the csrfToken the login returned
 # (state.local.csrf). Both are ignored by git, and 99.cleanup_DELETE.sh removes them.
@@ -15,7 +15,9 @@
 # ==============================================================================
 
 UC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${UC_DIR}/../../API 2.0/bash/set_variables.sh"
+source "${ST_ENDUSER_LOCAL_VARIABLES:-${UC_DIR}/../../API 2.0/bash/set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
+export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"
 
 JAR="${UC_DIR}/session.cookie.jar"
 CSRF_FILE="${UC_DIR}/state.local.csrf"

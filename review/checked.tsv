@@ -35,10 +35,27 @@ EndUser/API 2.0/bash/02.Files/13.files_filepath_PATCH_rename.sh	00241fc1403d2961
 EndUser/API 2.0/bash/02.Files/14.files_filepath_PATCH_share.sh	1cf6c9aab2d00067eb647ee599527141834379f0e4afe3f1f72c099b0fea4a95	2026-10-15
 EndUser/API 2.0/bash/02.Files/15.files_filepath_PATCH_unshare.sh	959490bb4d0ca32b7047e75f6fb8f52499124baa8f0c19e91d6420991c3574b2	2026-10-15
 EndUser/API 2.0/bash/02.Files/test.txt	fe7ce5782a54a60a19ba58e38050a0659dea79fb701f80592a56b3cfb65fbab0	2026-10-15
-EndUser/API 2.0/bash/03.Myself/01.myself_GET.sh	a68081f4f2c5942dc748a99846c13a5195f4ef6c970cbecf0a153853deb2c76b	2026-10-15
-EndUser/API 2.0/bash/03.Myself/02.myself_passwordExpired_GET.sh	2b1745cd1f7a41549cbf416e4072fab9793c56965c1964ea33865abdead85dff	2026-10-15
-EndUser/API 2.0/bash/03.Myself/04.myself_password_POST_requestLink.sh	3f041d345cb142e4d201d0847f0f983129b492b06b4cdf54bdf612287ff1eb3e	2026-10-15
-EndUser/API 2.0/bash/03.Myself/05.myself_password_POST_reset.sh	2bd149a5862f5f72debb5740889285a916f452ea3c4481335e606d74f0cbba97	2026-10-15
+EndUser/API 2.0/bash/03.Myself/01.myself_GET.sh	a68081f4f2c5942dc748a99846c13a5195f4ef6c970cbecf0a153853deb2c76b	2026-10-19
+EndUser/API 2.0/bash/03.Myself/02.myself_passwordExpired_GET.sh	2b1745cd1f7a41549cbf416e4072fab9793c56965c1964ea33865abdead85dff	2026-10-19
+EndUser/API 2.0/bash/03.Myself/03.myself_password_POST_change.sh	267cb00edf79b7a8f7f977af1f05e4746c734b93ae35b7806d9e2898613afea3	2026-10-19
+EndUser/API 2.0/bash/03.Myself/04.myself_password_POST_requestLink.sh	3f041d345cb142e4d201d0847f0f983129b492b06b4cdf54bdf612287ff1eb3e	2026-10-19
+EndUser/API 2.0/bash/03.Myself/05.myself_password_POST_reset.sh	718efe79394dac3d33dd2386c89a3576be3efc4011af1ab677f804816d5490da	2026-10-19
+EndUser/API 2.0/bash/03.Myself/06.myself_secretQuestion_GET.sh	60781fd618e916ea25d8129375fa4acbe955a727471fa444860c0b931da95e09	2026-10-19
+EndUser/API 2.0/bash/03.Myself/07.myself_secretQuestion_PUT.sh	4445d2d39cd526ed4034fde44cee144d9332e73bca9ef67221997c1cab6666ec	2026-10-19
+EndUser/API 2.0/bash/03.Myself/08.myself_addressBook_GET.sh	a247f0dea41efcbd4e7bda22e17a71c96836b3baaccdf3e1a29e68d0cce83e4f	2026-10-19
+EndUser/API 2.0/bash/03.Myself/09.myself_addressBook_id_GET.sh	2f270f68f55bfc3d231dac21b9a5c88b4d9944752242f872a9cb2d69c61d07a0	2026-10-19
+EndUser/API 2.0/bash/04.FileOperations/01.fileOperations_POST_md5calc.sh	f7585132403ae74e0891622c734c10e222c00df088d50bc423c8857c4e0b4dca	2026-10-19
+EndUser/API 2.0/bash/04.FileOperations/02.fileOperations_id_GET.sh	34d253c4e156ab18b64f840205d71c9879be9e1695d62796ac457d017887fa50	2026-10-19
+EndUser/API 2.0/bash/04.FileOperations/03.fileOperations_id_PUT_chunked.sh	cd18e11edf543ed32d5cb16639c155f75ab32993a5e110baa31b56e4c114bc35	2026-10-19
+EndUser/API 2.0/bash/04.FileOperations/04.fileOperations_id_POST_multipart.sh	093053f176af6e07d2609231533296ae786152f800be170f2f1d8cfa9577cffa	2026-10-19
+EndUser/API 2.0/bash/04.FileOperations/05.fileOperations_id_DELETE.sh	f5e3d21005dee0fc432311a1625686e976721e6e9cfdf0d7d32e89572b0f7589	2026-10-19
+EndUser/API 2.0/bash/05.Transfers/01.transfers_GET.sh	f14c000f1f3a603cb0fa2255f7b41465138ae44e34c6aa5e55a50929e593701a	2026-10-19
+EndUser/API 2.0/bash/05.Transfers/02.transfers_id_GET.sh	d78ef27ab8017fe9502dd7011ec9b36e56a881757b7d349a9f141883ff1db05a	2026-10-19
+EndUser/API 2.0/bash/05.Transfers/03.transfers_operations_POST_pull.sh	c61ee266ca3c4b458b5e887537a58d25e543c001dc72bfd00f009180c3813aa3	2026-10-19
+EndUser/API 2.0/bash/05.Transfers/04.transfers_pullSummary_GET.sh	305a712b92cd18a868300cd4242404634b020945d17679b3a11fc1c9d874da4d	2026-10-19
+EndUser/API 2.0/bash/05.Transfers/05.transfers_operations_POST_push.sh	a80ce6959a6fafdebe33654a7e8ed01806ee8098dd64e6c221aebe99c17b7ee8	2026-10-19
+EndUser/API 2.0/bash/05.Transfers/06.transfers_operations_POST_folderMonitor.sh	83bdde9edd637b86e7d447f7b87a96ff4927afedd5cb819b352bb00a861308bc	2026-10-19
+EndUser/API 2.0/bash/05.Transfers/07.transfers_id_operations_POST_verifymdn.sh	bf429970abef8a97801d233f9eb72bf6eaf661904503602c8436a0ed0b363ec6	2026-10-19
 IMPROVEMENTS_IN_PROGRESS.md	659250f311e9ceb580bfa1cfe8a9f84517719678b3fff70b304c3e54d119df84	2026-10-14
 LICENSE	c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4	2026-10-14
 README.md	2c4c37d6fb369d2dd78f267d129137464b978b300ddd5b0642478b14fb0ab4fa	2026-10-14

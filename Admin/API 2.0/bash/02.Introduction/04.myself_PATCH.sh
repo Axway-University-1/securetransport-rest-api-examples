@@ -23,7 +23,7 @@
 # Risk: config - changes the password of the administrator every example logs in as; every later call needs the new one
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - THIS CHANGES THE PASSWORD OF THE ADMINISTRATOR IN ST_USER, the one every example logs in as. From the next call on
 #   every example needs the new password: change it in `set_variables.local.sh` (or set_variables.local.bat) as soon as this
 #   has run. Run it against a throwaway administrator, as check 13 does, unless that is what you want.
@@ -44,7 +44,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself"

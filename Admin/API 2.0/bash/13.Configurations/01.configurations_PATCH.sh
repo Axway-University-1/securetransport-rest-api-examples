@@ -23,7 +23,7 @@
 # Risk: config - changes a Server Configuration Option of the whole server; put it back afterwards (the script prints how)
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - An option holds a LIST of values, so the path targets an index: "/values/0" is the first value. Only that one is replaced.
 # - Changing a Server Configuration Option affects the whole server, and the default option is a real feature switch (the address book), so there is no
 #   default value: the value is an argument. The script prints the old values, and the command that puts the first one back, before it changes anything.
@@ -41,7 +41,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/configurations/options"

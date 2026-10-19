@@ -44,7 +44,6 @@ printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sl
 
 # The use case sits two folders under EndUser/, next to "API 2.0/bash" with its settings
 mkdir -p "${WORK}/tree/UseCases"
-cp "${REPO}/EndUser/API 2.0/bash/set_variables.sh" "${WORK}/tree/API 2.0/bash/"
 cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/tree/API 2.0/bash/set_variables.local.sh"
 cp -R "${UC_ROOT}/." "${WORK}/tree/UseCases/"
 UC="${WORK}/tree/UseCases/01-authentication"

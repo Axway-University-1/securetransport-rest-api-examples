@@ -269,7 +269,7 @@ else
 fi
 
 # Config must be resolved from the script, not the working directory
-if scan_scripts | xargs -0 grep -l 'source "\.\./set_variables.sh"' 2>/dev/null | grep -q .; then
+if scan_scripts | xargs -0 grep -l 'source "\.\./set_variables.local.sh"' 2>/dev/null | grep -q .; then
     fail "a script sources set_variables relative to the working directory"
 else
     pass "config always resolved from the script directory"

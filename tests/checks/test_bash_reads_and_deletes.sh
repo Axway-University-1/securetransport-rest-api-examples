@@ -26,11 +26,9 @@ has() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then pass "$1"; else fail 
 
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
 
-# The Admin examples find set_variables.sh one directory above themselves
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.sh"
-# The EndUser one derives ST_URL and ST_BASIC_AUTH, so use the real one, with
-# the test values as its local file
-cp "${REPO}/EndUser/API 2.0/bash/set_variables.sh" "${WORK}/eu/set_variables.sh"
+# The Admin examples find set_variables.local.sh one directory above themselves
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.local.sh"
+# The EndUser scripts build ST_URL from these values themselves
 cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/eu/set_variables.local.sh"
 
 BASE="https://st.example.com:8444/api/v2.0"
@@ -120,34 +118,39 @@ expect "billable: refuses a DAYS that is not a number" "${RC}:$(count_calls "GET
 echo
 echo "=== EndUser 02.Files ==="
 
-AUTH=$(printf '%s' "apiadmin:s3cret" | base64)
+# These two use the shared session like every other EndUser example: the helper, the login script it runs when there is
+# no session, and a jar, as 01.Authenticate/01.myself_POST.sh leaves it (the stub writes none)
+cp "${REPO}/EndUser/API 2.0/bash/ensure_session.sh" "${WORK}/eu/"
+cp -R "${REPO}/EndUser/API 2.0/bash/01.Authenticate" "${WORK}/eu/"
+touch "${WORK}/eu/myCookie.jar"
 
-STATUS=200 STATUS_GET=404 PRINT_CODE=1 CSRF=tok-1 run eu "02.Files/02.files_name_POST_folder.sh" "/reports/my folder"
-expect "folder: logs in, looks whether it is there, creates the folder, logs out" "$(calls)" "POST ${BASE}/myself
+STATUS=200 STATUS_GET=404 PRINT_CODE=1 run eu "02.Files/02.files_name_POST_folder.sh" "/reports/my folder"
+expect "folder: checks the session, looks whether the folder is there, creates it" "$(calls)" "GET ${BASE}/myself
 GET ${BASE}/files/reports/my%20folder?metadata=true
-POST ${BASE}/files/reports/my%20folder
-DELETE ${BASE}/myself"
+POST ${BASE}/files/reports/my%20folder"
 expect "folder: created, exit 0" "${RC}" "0"
-has "folder: logs in with the configured user" "HEADER: Authorization: Basic ${AUTH}"
-expect "folder: sends the login's csrfToken on both later calls" "$(printf '%s\n' "${OUT}" | grep -c '^HEADER: csrfToken: tok-1$')" "2"
+expect "folder: sends no csrfToken and no login of its own: the session is the shared one" \
+  "$(printf '%s\n' "${OUT}" | grep -c 'csrfToken\|BASIC_AUTH')" "0"
 FOLDER_BODY=$(payload 1)
 expect "folder: the body says it is a directory, and holds no name" \
   "$(printf '%s' "${FOLDER_BODY}" | jq -c '[.isDirectory, .isRegularFile, has("name")]')" "[true,false,false]"
 
+rm -f "${WORK}/eu/myCookie.jar"
 STATUS=401 PRINT_CODE=1 run eu "02.Files/02.files_name_POST_folder.sh"
-expect "folder: stops when the login fails" "${RC}:$(count_calls "/files")" "1:0"
+expect "folder: with no session it logs in first, and stops when the login fails" "${RC}:$(count_calls "/files")" "1:0"
+touch "${WORK}/eu/myCookie.jar"
 
-STATUS=200 STATUS_GET=200 PRINT_CODE=1 CSRF=tok-1 run eu "02.Files/02.files_name_POST_folder.sh" "reports"
-expect "folder: one that is already there is not created again: it says so, logs out, exits 0" \
-  "${RC}:$(calls | cut -d' ' -f1 | tr '\n' ' ')" "0:POST GET DELETE "
+STATUS=200 STATUS_GET=200 PRINT_CODE=1 run eu "02.Files/02.files_name_POST_folder.sh" "reports"
+expect "folder: one that is already there is not created again: it says so and exits 0" \
+  "${RC}:$(calls | cut -d' ' -f1 | tr '\n' ' ')" "0:GET GET "
 has "folder: and the message is plain, not the server's 'creating file: null'" "The folder 'reports' already exists. Nothing to create."
 # only the create is refused: a wrapper answers 409 for the POST of /files/ and passes everything else to the stub
 mkdir -p "${WORK}/bin_409"
 printf '#!/bin/bash\nif [[ "$*" == *"-X POST"* && "$*" == */files/* ]]; then printf "{}\\nHTTP 409\\n"; echo "METHOD: POST" >&2; echo "URL: refused" >&2; exit 0; fi\nexec "%s/bin/curl" "$@"\n' "${WORK}" > "${WORK}/bin_409/curl"
 chmod +x "${WORK}/bin_409/curl"
-OUT=$(cd "${WORK}/eu/sub" && PATH="${WORK}/bin_409:${WORK}/bin:${PATH}" STUB_CURL_STATUS=200 STUB_CURL_STATUS_GET=404 STUB_CURL_PRINT_CODE=1 STUB_CURL_CSRF=tok-1 bash ./02.files_name_POST_folder.sh reports 2>&1)
+OUT=$(cd "${WORK}/eu/sub" && PATH="${WORK}/bin_409:${WORK}/bin:${PATH}" STUB_CURL_STATUS=200 STUB_CURL_STATUS_GET=404 STUB_CURL_PRINT_CODE=1 bash ./02.files_name_POST_folder.sh reports 2>&1)
 RC=$?
-expect "folder: a refused create (409) shows the code, still logs out, and exits 1" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^METHOD: DELETE')" "1:1"
+expect "folder: a refused create (409) exits 1" "${RC}" "1"
 has "folder: with the HTTP code" "HTTP 409"
 
 UPLOAD_FILE="${WORK}/upload.txt"
@@ -155,25 +158,26 @@ printf 'hello upload' > "${UPLOAD_FILE}"
 OPERATION="${WORK}/operation.json"
 echo '{"id":"op-1"}' > "${OPERATION}"
 
-STATUS=200 PRINT_CODE=1 CSRF=tok-2 POST_BODY="${OPERATION}" run eu "02.Files/08.fileOperations_POST_upload.sh" "${UPLOAD_FILE}" "/inbox/"
-expect "upload: logs in, declares, sends, logs out" "$(calls)" "POST ${BASE}/myself
+STATUS=200 PRINT_CODE=1 POST_BODY="${OPERATION}" run eu "02.Files/08.fileOperations_POST_upload.sh" "${UPLOAD_FILE}" "/inbox/"
+expect "upload: checks the session, declares, sends" "$(calls)" "GET ${BASE}/myself
 POST ${BASE}/fileOperations
-PUT ${BASE}/fileOperations/op-1
-DELETE ${BASE}/myself"
+PUT ${BASE}/fileOperations/op-1"
 expect "upload: declares the path on the server, in binary" \
   "$(payload 1 | jq -c '[.operation, .filePath, .customAttributes.transferMode]')" '["Upload","/inbox/upload.txt","BINARY"]'
 expect "upload: sends the file's content" "$(payload 2)" "hello upload"
 has "upload: sends it as octet-stream" "HEADER: Content-Type: application/octet-stream"
-expect "upload: sends the login's csrfToken on every later call" "$(printf '%s\n' "${OUT}" | grep -c '^HEADER: csrfToken: tok-2$')" "3"
+expect "upload: sends no csrfToken and no login of its own" "$(printf '%s\n' "${OUT}" | grep -c 'csrfToken\|BASIC_AUTH')" "0"
 expect "upload: succeeds" "${RC}" "0"
 
-STATUS=200 PRINT_CODE=1 CSRF=tok-2 POST_BODY="${EMPTY}" run eu "02.Files/08.fileOperations_POST_upload.sh" "${UPLOAD_FILE}"
-expect "upload: with no operation id, sends nothing but still logs out" \
-  "${RC}:$(count_calls "PUT"):$(count_calls "DELETE ${BASE}/myself")" "1:0:1"
+STATUS=200 PRINT_CODE=1 POST_BODY="${EMPTY}" run eu "02.Files/08.fileOperations_POST_upload.sh" "${UPLOAD_FILE}"
+expect "upload: with no operation id, sends nothing and exits 1" "${RC}:$(count_calls "PUT")" "1:0"
 expect "upload: to the home folder when no folder is given" "$(payload 1 | jq -r '.filePath')" "/upload.txt"
 
+STATUS=500 PRINT_CODE=1 POST_BODY="${OPERATION}" run eu "02.Files/08.fileOperations_POST_upload.sh" "${UPLOAD_FILE}"
+expect "upload: a content that is refused is exit 1 (it used to end 0 when an id had come back)" "${RC}" "1"
+
 STATUS=200 PRINT_CODE=1 run eu "02.Files/08.fileOperations_POST_upload.sh" "${WORK}/no_such_file.txt"
-expect "upload: stops before logging in when the file is missing" "${RC}:$(count_calls "POST")" "1:0"
+expect "upload: stops before any call when the file is missing" "${RC}:$(calls | wc -l | tr -d ' ')" "1:0"
 
 echo
 if [ "${FAILED}" -eq 0 ]; then

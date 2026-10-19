@@ -26,10 +26,10 @@ cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl
 cp -R "${REPO}/Features/lib" "${WORK}/Features/lib"
 cp -R "${REPO}/${FEATURE}" "${WORK}/${FEATURE}"
 rm -f "${WORK}/${FEATURE}/settings.local.sh" "${WORK}/${FEATURE}/settings.local.bat" "${WORK}/${FEATURE}/state.local.sh" "${WORK}/${FEATURE}/state.local.bat"
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.local.sh"
 # An Admin port different from the End User one, as on a root install
-sed 's/^export ST_PORT=.*/export ST_PORT="444"/' "${WORK}/Admin/API 2.0/bash/set_variables.sh" > "${WORK}/set_variables.tmp" \
-    && mv "${WORK}/set_variables.tmp" "${WORK}/Admin/API 2.0/bash/set_variables.sh"
+sed 's/^export ST_PORT=.*/export ST_PORT="444"/' "${WORK}/Admin/API 2.0/bash/set_variables.local.sh" > "${WORK}/set_variables.tmp" \
+    && mv "${WORK}/set_variables.tmp" "${WORK}/Admin/API 2.0/bash/set_variables.local.sh"
 RUN="${WORK}/${FEATURE}"
 
 # A password with characters that break hand-built JSON
@@ -95,7 +95,7 @@ echo "${B}" | jq -e . >/dev/null 2>&1 && pass "the body is valid JSON" || fail "
 [ "$(echo "${B}" | jq -r .name)" = "arTestPullSite" ] && pass "site name" || fail "site name"
 [ "$(echo "${B}" | jq -r .type)" = "ssh" ] && [ "$(echo "${B}" | jq -r .protocol)" = "ssh" ] && pass "SSH site, with its protocol set" || fail "site type/protocol"
 [ "$(echo "${B}" | jq -r .port)" = "8022" ] && pass "SSH port is 8022" || fail "port: $(echo "${B}" | jq -r .port)"
-HOST=$(grep -o 'ST_SERVER="[^"]*"' "${WORK}/Admin/API 2.0/bash/set_variables.sh" | cut -d'"' -f2)
+HOST=$(grep -o 'ST_SERVER="[^"]*"' "${WORK}/Admin/API 2.0/bash/set_variables.local.sh" | cut -d'"' -f2)
 [ "$(echo "${B}" | jq -r .host)" = "${HOST}" ] && pass "host defaults to the server itself" || fail "host"
 [ "$(echo "${B}" | jq -r .downloadFolder)" = "/outbound-drop" ] && pass "downloads from outbound-drop" || fail "download folder"
 [ "$(echo "${B}" | jq -r .postTransmissionActions.doAsIn)" = '${stenv.target}_PULLED' ] && pass "renames files on receive to <name>_PULLED" || fail "doAsIn: $(echo "${B}" | jq -r .postTransmissionActions.doAsIn)"

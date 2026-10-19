@@ -47,7 +47,7 @@ sent_hasnt() { if printf '%s\n' "${SENT}" | grep -qE -- "$2"; then fail "$1  ('$
 # curl: the stub, with a status of its own for each method (see stub_curl_by_method)
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/stub_curl_real" && chmod +x "${WORK}/bin/stub_curl_real"
 cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.local.sh"
 
 # An empty list answers every look-up, so that a script goes on to the call that names the account
 printf '%s' '{"resultSet": {"returnCount": 0, "totalCount": 0}, "result": []}' > "${WORK}/empty.json"
@@ -198,17 +198,12 @@ for rel in "18.AccountSetup/01.accountSetup_POST.sh" "18.AccountSetup/03.account
 done
 
 echo
-echo "=== the committed set_variables files do not set or require them ==="
-seen=$(cd "${ADMIN_TREE}" && env -u ST_EXAMPLE_ACCOUNT -u ST_SSH_PORT ST_ADMIN_LOCAL_VARIABLES=/nonexistent bash -c 'source ./set_variables.sh; echo "rc=$? account=${ST_EXAMPLE_ACCOUNT-unset} port=${ST_SSH_PORT-unset}"' 2>&1 | tail -1)
-expect "bash: sourcing set_variables.sh sets neither and does not fail" "${seen}" "rc=0 account=unset port=unset"
-( cd "${ADMIN_TREE}" || exit 1
-  printf '%s\n' 'export ST_EXAMPLE_ACCOUNT="from_local"' 'export ST_SSH_PORT="2299"' > "${WORK}/local_vars.sh"
-  env -u ST_EXAMPLE_ACCOUNT -u ST_SSH_PORT ST_ADMIN_LOCAL_VARIABLES="${WORK}/local_vars.sh" bash -c 'source ./set_variables.sh; echo "account=${ST_EXAMPLE_ACCOUNT} port=${ST_SSH_PORT}"' ) > "${WORK}/local_seen.txt" 2>&1
-expect "bash: set_variables.local.sh can set them" "$(cat "${WORK}/local_seen.txt")" "account=from_local port=2299"
-SET_ACCOUNT="" SET_PORT=""
+echo "=== the committed settings files do not set or require them ==="
+seen=$(cd "${ADMIN_TREE}" && env -u ST_EXAMPLE_ACCOUNT -u ST_SSH_PORT bash -c 'source ./set_variables.local.example.sh; echo "rc=$? account=${ST_EXAMPLE_ACCOUNT-unset} port=${ST_SSH_PORT-unset}"' 2>&1 | tail -1)
+expect "bash: sourcing set_variables.local.example.sh sets neither and does not fail" "${seen}" "rc=0 account=unset port=unset"
 bat_vars="${BAT_TREE}/set_variables.bat"
 expect "bat: set_variables.bat does not set either (the lines are comments)" "$(tr -d '\r' < "${bat_vars}" | grep -v -i '^ *REM' | grep -c 'ST_EXAMPLE_ACCOUNT\|ST_SSH_PORT')" "0"
-for f in "${ADMIN_TREE}/set_variables.sh" "${ADMIN_TREE}/set_variables.local.example.sh" \
+for f in "${ADMIN_TREE}/set_variables.local.example.sh" \
          "${BAT_TREE}/set_variables.bat" "${BAT_TREE}/set_variables.local.example.bat"; do
     for var in ST_EXAMPLE_ACCOUNT ST_SSH_PORT; do
         if tr -d '\r' < "${f}" | grep -qE "^(#|REM) *(export |set )?${var}="; then
@@ -219,7 +214,7 @@ for f in "${ADMIN_TREE}/set_variables.sh" "${ADMIN_TREE}/set_variables.local.exa
     done
     expect "$(basename "${f}") sets neither for real" "$(tr -d '\r' < "${f}" | grep -cE '^(export |set )(ST_EXAMPLE_ACCOUNT|ST_SSH_PORT)=')" "0"
 done
-expect "the defaults shown are john and 8022" "$(tr -d '\r' < "${ADMIN_TREE}/set_variables.sh" | grep -cE '^# *(export )?(ST_EXAMPLE_ACCOUNT="john"|ST_SSH_PORT="8022")')" "2"
+expect "the defaults shown are john and 8022" "$(tr -d '\r' < "${ADMIN_TREE}/set_variables.local.example.sh" | grep -cE '^# *(export )?(ST_EXAMPLE_ACCOUNT="john"|ST_SSH_PORT="8022")')" "2"
 
 echo
 echo "=== no raw john or 8022 in the code of the bash scripts; the setting is read with a default ==="

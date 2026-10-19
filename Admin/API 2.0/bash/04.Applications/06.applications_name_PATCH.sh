@@ -20,7 +20,7 @@
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - PATCH allows partial updates without replacing the entire object.
 # - It first reads the application and prints the old notes and, when there is one, the first schedule's start date (as an ISO date, ready to be sent back), then the body that undoes
 #   each change. The new start date is the day after tomorrow, 00:00 UTC: a ONCE schedule needs a date in the future.
@@ -41,7 +41,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/applications"

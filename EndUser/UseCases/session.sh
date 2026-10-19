@@ -18,7 +18,9 @@
 # The caller sets UC_DIR (the folder of the use case) before sourcing it.
 # ==============================================================================
 
-source "${UC_DIR}/../../API 2.0/bash/set_variables.sh"
+source "${ST_ENDUSER_LOCAL_VARIABLES:-${UC_DIR}/../../API 2.0/bash/set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
+export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"
 
 JAR="${UC_DIR}/session.cookie.jar"
 CSRF_FILE="${UC_DIR}/state.local.csrf"

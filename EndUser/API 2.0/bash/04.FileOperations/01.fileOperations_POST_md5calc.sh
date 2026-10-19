@@ -15,13 +15,23 @@
 # Usage:
 # ./01.fileOperations_POST_md5calc.sh FILE [LOCAL_COPY]
 #
-#   FILE        the file on the server, relative to the home folder
-#   LOCAL_COPY  a local file to compare the checksum with (optional)
+#   FILE        the path of the file ON THE SERVER, relative to the home folder of the
+#               user, with or without a leading slash: reports/test.txt, or
+#               /reports/test.txt, or test.txt for a file in the home folder itself.
+#               It is not a path on your machine.
+#   LOCAL_COPY  the path of a file ON YOUR MACHINE to compare the server's checksum with
+#               (optional): absolute, or relative to the folder you run the script from,
+#               for example ./test.txt or ~/Downloads/test.txt. It is not uploaded:
+#               the script only reads it to work out its MD5.
+#
+# For example:
+# ./01.fileOperations_POST_md5calc.sh test.txt
+# ./01.fileOperations_POST_md5calc.sh reports/test.txt ./downloaded_files/test.txt
 #
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - It checks for an active session first and, if there is none, logs in with
 #   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Confirmed directly: the first answer is IN_PROGRESS with only the file
@@ -36,7 +46,9 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ENDUSER_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
+export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 source "${SCRIPT_DIR}/../ensure_session.sh"
@@ -46,6 +58,13 @@ FILE="/${1#/}"
 LOCAL_COPY="$2"
 if [ "${FILE}" = "/" ]; then
     printf "Usage: ./01.fileOperations_POST_md5calc.sh FILE [LOCAL_COPY]\n"
+    printf "  FILE        the path of the file on the server, relative to the home folder (reports/test.txt)\n"
+    printf "  LOCAL_COPY  the path of a file on this machine to compare with (./test.txt)\n"
+    exit 2
+fi
+if [ -n "${LOCAL_COPY}" ] && [ ! -f "${LOCAL_COPY}" ]; then
+    printf "LOCAL_COPY must be a file on this machine, and there is none at '%s'.\n" "${LOCAL_COPY}"
+    printf "(It is the path of your local copy, absolute or relative to %s. FILE is the one on the server.)\n" "$(pwd)"
     exit 2
 fi
 st_ensure_session

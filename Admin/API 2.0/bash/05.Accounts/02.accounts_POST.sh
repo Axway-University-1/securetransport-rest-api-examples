@@ -23,7 +23,7 @@
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The three accounts are example_user, example_service and example_template, so running this bare changes nothing that matters. 07.accounts_name_DELETE.sh removes them.
 #   The other scripts of this folder act on example_user by default.
 # - A template account needs a user class (`templateClass`). It is taken from the first argument, or looked up: the classes of the server are read first and the first one of type
@@ -43,7 +43,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts"

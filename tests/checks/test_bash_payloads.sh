@@ -28,7 +28,7 @@ chmod +x "${WORK}/bin/curl"
 
 # A set_variables the copied examples will find, with values we can recognise.
 # The examples look for it one directory above themselves.
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/run/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/run/set_variables.local.sh"
 
 # Decode the bodies an example emitted, one per file
 decode_payloads() {

@@ -18,7 +18,7 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The class is looked up by name, and must be the only one with that name.
 # - Confirmed directly: HEAD answers 200, or 404 with no body, also for an id that is not well formed. The path takes the id: the
 #   NAME in the path (`/userClasses/VirtClass`) is a 404. The `className=` filter ignores case and takes a * wildcard, so `example_x`
@@ -31,7 +31,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/userClasses"

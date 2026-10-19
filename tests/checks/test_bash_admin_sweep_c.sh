@@ -43,7 +43,7 @@ hasnt() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then fail "$1  ('$2' is 
 # curl: the stub, with a status of its own for each method (see stub_curl_by_method)
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/stub_curl_real" && chmod +x "${WORK}/bin/stub_curl_real"
 cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.local.sh"
 BASE="https://st.example.com:8444/api/v2.0"
 
 # rules TEXT FILE [TEXT FILE...]: a file of answers by URL, for a script that reads several things (the stub gives the first FILE

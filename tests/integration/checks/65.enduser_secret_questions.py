@@ -44,6 +44,9 @@ created = False
 original = None
 COOKIE_JAR = os.path.join(ENDUSER_TREE, "myCookie.jar")
 developers_jar = open(COOKIE_JAR, "rb").read() if os.path.exists(COOKIE_JAR) else None
+# The scripts use the session in this jar when it is active, and it would be the developer's: start with none, put it back at the end
+if developers_jar is not None:
+    os.remove(COOKIE_JAR)
 
 
 def option_values():

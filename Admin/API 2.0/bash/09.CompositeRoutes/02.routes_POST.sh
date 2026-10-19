@@ -23,7 +23,7 @@
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The route template must already exist. Run 08.RouteTemplates first.
 # - The account "john" must already exist.
 # - Requires `jq`, which reads the route template ID out of the response.
@@ -39,11 +39,12 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # 
 # First we will load the variables into our context.
-# Put your own values in set_variables.local.sh, which set_variables.sh
-# loads and which git ignores.
+# Put your own values in set_variables.local.sh, which git ignores
+# (copy set_variables.local.example.sh).
 #
 printf "Loading variables into our context...\n\n"
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes"

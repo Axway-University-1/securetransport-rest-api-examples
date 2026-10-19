@@ -72,7 +72,7 @@ checked.
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - Requires `jq`, which is used to edit the retrieved JSON.
 # - The accounts are example_user, example_service and example_template, so running
 #   it bare changes nothing that matters. 07.accounts_name_DELETE.sh removes them.
@@ -111,8 +111,13 @@ Always this, never a bare relative `source`:
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 ```
+
+(`ST_ENDUSER_LOCAL_VARIABLES` for the EndUser tree, which adds
+`export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"` after it.
+The variable lets the test harness hand the scripts another settings file.)
 
 ```bat
 CALL ..\set_variables.bat
@@ -122,8 +127,10 @@ Then use `${ST_SERVER}`, `${ST_PORT}`, `${ST_USER}`, `${ST_PASSWORD}` — or
 `%ST_SERVER%` and friends in a `.bat`. Never add a new configuration variable
 without a matching entry in all four `.example` files.
 
-In the EndUser tree, `set_variables.sh` also derives `${ST_URL}` and
-`${ST_BASIC_AUTH}` for you. Use those rather than rebuilding them.
+There is one settings file per tree, `set_variables.local.sh`, copied from
+`set_variables.local.example.sh` and ignored by git: there is no committed
+`set_variables.sh`. In the EndUser tree the loader also sets `${ST_URL}`: use it rather
+than rebuilding it. For Basic authentication use `curl -u "${ST_USER}:${ST_PASSWORD}"`.
 
 ## The shape of a bash example
 

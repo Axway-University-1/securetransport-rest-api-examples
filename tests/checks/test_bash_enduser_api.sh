@@ -30,11 +30,9 @@ has() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then pass "$1"; else fail 
 # the stub, behind the wrapper that answers each method with its own status (STUB_STATUS_POST_SEQ and so on)
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/stub_curl_real" && chmod +x "${WORK}/bin/stub_curl_real"
 cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
-printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sleep"
+printf '#!/bin/bash\necho "SLEEP: $*" >&2\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sleep"
 
-# The real EndUser set_variables.sh, with the test values as its local file, and
-# a cookie jar, as 01.Authenticate/01.myself_POST.sh leaves it
-cp "${EU_TREE}/set_variables.sh" "${WORK}/eu/set_variables.sh"
+# The test values as the settings file, and a cookie jar, as 01.Authenticate/01.myself_POST.sh leaves it
 cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/eu/set_variables.local.sh"
 cp "${EU_TREE}/ensure_session.sh" "${WORK}/eu/ensure_session.sh"
 for folder in 01.Authenticate 02.Files 03.Myself 04.FileOperations 05.Transfers 06.ServerTime 07.SecretQuestions; do
@@ -102,13 +100,13 @@ run 03.Myself/06.myself_secretQuestion_GET.sh a-token
 expect "03.Myself/07 with a token needs no session: it makes no check" "$(raw_calls | wc -l | tr -d ' '):$(raw_calls | grep -c '/myself$')" "1:0"
 
 # a new example must not forget the check: every one that uses the cookie jar sources the helper, bar the ones that log in themselves
-NO_CHECK="01.Authenticate/01.myself_POST.sh 01.Authenticate/02.myself_DELETE.sh 02.Files/02.files_name_POST_folder.sh 02.Files/08.fileOperations_POST_upload.sh 03.Myself/04.myself_password_POST_requestLink.sh 03.Myself/05.myself_password_POST_reset.sh"
+NO_CHECK="01.Authenticate/01.myself_POST.sh 01.Authenticate/02.myself_DELETE.sh 03.Myself/04.myself_password_POST_requestLink.sh 03.Myself/05.myself_password_POST_reset.sh"
 MISSING=""
 for f in $(cd "${EU_TREE}" && ls */*.sh); do
     case " ${NO_CHECK} " in *" ${f} "*) continue ;; esac
     grep -q "st_ensure_session" "${EU_TREE}/${f}" || MISSING="${MISSING} ${f}"
 done
-expect "every EndUser example that needs a session calls st_ensure_session (the six that log in or need none are listed)" "${MISSING}" ""
+expect "every EndUser example that needs a session calls st_ensure_session (the four that log in, log out or need none are listed)" "${MISSING}" ""
 
 echo
 echo "=== 03.Myself ==="
@@ -339,6 +337,12 @@ expect "01 md5calc: the server's checksum matches the local copy" "${RC}:$(print
 printf 'other\n' > "${WORK}/files/other.txt"
 run 04.FileOperations/01.fileOperations_POST_md5calc.sh up.txt "${WORK}/files/other.txt"
 expect "01 md5calc: a different local file does not match, exit 1" "${RC}" "1"
+run 04.FileOperations/01.fileOperations_POST_md5calc.sh up.txt "${WORK}/files/nosuch.txt"
+expect "01 md5calc: a LOCAL_COPY that is not on this machine is exit 2, and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+has "01 md5calc: and it explains the two paths" "FILE is the one on the server"
+run 04.FileOperations/01.fileOperations_POST_md5calc.sh
+expect "01 md5calc: no FILE is exit 2, with the usage that says where each path is" "${RC}" "2"
+has "01 md5calc: FILE is on the server" "the path of the file on the server"
 
 GET_BODY="${WORK}/op_done.json"; RULES=
 run 04.FileOperations/02.fileOperations_id_GET.sh op-1
@@ -357,8 +361,49 @@ expect "03 chunked: the path in the folder" "$(payload 1 | jq -r .filePath)" "/i
 expect "03 chunked: Content-Range of each chunk, the last one shorter" "$(headers | grep '^Content-Range:' | tr '\n' '|')" \
   "Content-Range: bytes 0-9/25|Content-Range: bytes 10-19/25|Content-Range: bytes 20-24/25|"
 expect "03 chunked: the chunks together are the file" "$(payload 2)$(payload 3)$(payload 4)" "0123456789abcdefghijKLMNO"
-STATUS=400 run 04.FileOperations/03.fileOperations_id_PUT_chunked.sh "${WORK}/files/chunks.bin" "" 10
-expect "03 chunked: stops at the first refused chunk" "${RC}:$(calls | grep -c '^PUT')" "1:1"
+CH="04.FileOperations/03.fileOperations_id_PUT_chunked.sh"
+puts() { calls | grep -c '^PUT'; }
+STATUS=400 run ${CH} "${WORK}/files/chunks.bin" "" 10 --wait 0
+expect "03 chunked: a chunk that keeps failing is tried 1 + 3 times, then the script stops (exit 1)" "${RC}:$(puts)" "1:4"
+has "03 chunked: it says which chunk failed" "Chunk 1 of 3 failed (bytes 0-9 of 25), after 4 attempt(s)."
+has "03 chunked: and gives the command to carry on from it" "--resume op-2 1"
+has "03 chunked: with the same file and chunk size" "chunks.bin '' 10 --resume op-2 1"
+STATUS=400 run ${CH} "${WORK}/files/chunks.bin" "" 10 --retries 0
+expect "03 chunked: --retries 0 is one attempt" "${RC}:$(puts)" "1:1"
+STATUS=400 run ${CH} "${WORK}/files/chunks.bin" "" 10 --retries 1 --wait 0
+expect "03 chunked: --retries 1 is two attempts" "${RC}:$(puts)" "1:2"
+STATUS=404 run ${CH} "${WORK}/files/chunks.bin" "" 10
+expect "03 chunked: a 404 is not retried (nothing a second try can fix)" "${RC}:$(puts)" "1:1"
+STUB_STATUS_PUT=401 run ${CH} "${WORK}/files/chunks.bin" "" 10
+expect "03 chunked: a 401 on a chunk is not retried either" "${RC}:$(puts)" "1:1"
+STUB_STATUS_PUT_SEQ="500 500 200" STUB_COUNTER="${WORK}/ctr_ch1" run ${CH} "${WORK}/files/chunks.bin" "" 10 --wait 0
+rm -f "${WORK}"/ctr_ch1.*
+expect "03 chunked: a chunk that fails twice and then works goes on to the rest (5 PUTs, exit 0)" "${RC}:$(puts)" "0:5"
+has "03 chunked: it says it is trying again" "Waiting 0 second(s) before trying chunk 1 again..."
+expect "03 chunked: the retried chunk is the same bytes each time" "$(payload 2)|$(payload 3)|$(payload 4)" "0123456789|0123456789|0123456789"
+STUB_STATUS_PUT_SEQ="200 500 500 500" STUB_COUNTER="${WORK}/ctr_ch2" run ${CH} "${WORK}/files/chunks.bin" inbox 10 --retries 2 --wait 0
+rm -f "${WORK}"/ctr_ch2.*
+expect "03 chunked: chunk 1 works, chunk 2 fails 3 times: 4 PUTs and exit 1" "${RC}:$(puts)" "1:4"
+has "03 chunked: it names chunk 2 and its bytes" "Chunk 2 of 3 failed (bytes 10-19 of 25), after 3 attempt(s)."
+has "03 chunked: and says chunk 1 is on the server" "Chunks 1 to 1 are on the server."
+has "03 chunked: and the line to continue from chunk 2" "chunks.bin inbox 10 --resume op-2 2"
+run ${CH} "${WORK}/files/chunks.bin" inbox 10 --resume op-2 2
+expect "03 chunked --resume: no new upload is declared, chunks 2 and 3 are sent to the operation" "$(calls | tr '\n' ' ')" \
+  "PUT ${BASE}/fileOperations/op-2 PUT ${BASE}/fileOperations/op-2 "
+expect "03 chunked --resume: from the bytes of chunk 2" "$(headers | grep '^Content-Range:' | tr '\n' '|')" "Content-Range: bytes 10-19/25|Content-Range: bytes 20-24/25|"
+expect "03 chunked --resume: the chunks are the rest of the file" "$(payload 1)$(payload 2)" "abcdefghijKLMNO"
+has "03 chunked --resume: says so" "Continuing operation op-2 with chunk 2 of 3."
+run ${CH} "${WORK}/files/chunks.bin" inbox 10 --resume op-2 4
+expect "03 chunked --resume: a chunk past the end is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+for bad in "--resume op-2" "--resume op-2 0" "--resume op-2 x" "--retries x" "--retries -1" "--wait x" "--nope"; do
+    run ${CH} "${WORK}/files/chunks.bin" inbox 10 ${bad}
+    expect "03 chunked: '${bad}' is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+: > "${WORK}/files/empty.bin"
+run ${CH} "${WORK}/files/empty.bin"
+expect "03 chunked: an empty file is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run ${CH} "${WORK}/files/no_such.bin"
+expect "03 chunked: a file that is not there is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 
 STATUS=200 run 04.FileOperations/04.fileOperations_id_POST_multipart.sh "${WORK}/files/up.txt" inbox
 expect "04 multipart: declares, then POSTs the content to the operation" "${RC}:$(calls)" "0:POST ${BASE}/fileOperations
@@ -449,7 +494,7 @@ rm -f "${WORK}/eu/myCookie.jar"
 POST_BODY=$(body login '{"loginName":"apiadmin","type":"admin"}')
 STATUS=200 run 01.Authenticate/01.myself_POST.sh
 expect "01 login: POST /myself, exit 0" "${RC}:$(calls)" "0:POST ${BASE}/myself"
-has "01 login: sends Basic authentication" "HEADER: Authorization: Basic "
+has "01 login: sends Basic authentication (curl -u, the user and password of the settings)" "BASIC_AUTH: apiadmin:s3cret"
 has "01 login: asks curl to write the cookie jar" "COOKIE_JAR_WRITE: "
 has "01 login: prints the response body, without the status code appended" '"loginName":"apiadmin"'
 expect "01 login: no shell error (bash 3.2 has no negative substring length)" "$(printf '%s\n' "${OUT}" | grep -c 'substring expression')" "0"
@@ -506,7 +551,7 @@ expect "04 upload: the file of the repository is not changed" \
   "$(cmp -s "${WORK}/eu/02.Files/test.txt" "${EU_TREE}/02.Files/test.txt" && echo same || echo changed)" "same"
 run 02.Files/04.files_filepath_POST.sh nosuch.txt
 expect "04 upload: a file that is not there, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
-run 02.Files/04.files_filepath_POST.sh ../set_variables.sh
+run 02.Files/04.files_filepath_POST.sh ../ensure_session.sh
 expect "04 upload: a path outside the folder, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 STATUS=500 run 02.Files/04.files_filepath_POST.sh
 expect "04 upload: refused, exit 1" "${RC}" "1"
@@ -537,17 +582,24 @@ STATUS=404 run 02.Files/07.files_filepath_DELETE.sh
 expect "07 delete: refused, exit 1" "${RC}" "1"
 
 echo
-echo "=== set_variables.sh: the Authorization value is one line, however long the password ==="
-# openssl base64 wraps its lines at 64 characters, as base64 of GNU coreutils does at 76
-mkdir -p "${WORK}/b64" "${WORK}/bin_b64"
-printf '#!/bin/bash\nexec openssl base64 "$@"\n' > "${WORK}/bin_b64/base64" && chmod +x "${WORK}/bin_b64/base64"
-cp "${EU_TREE}/set_variables.sh" "${WORK}/b64/set_variables.sh"
-LONG_PASSWORD=$(printf 'p%.0s' $(seq 1 100))
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/b64/set_variables.local.sh"
-printf 'export ST_PASSWORD=%s\n' "${LONG_PASSWORD}" >> "${WORK}/b64/set_variables.local.sh"
-AUTH=$(cd "${WORK}/b64" && PATH="${WORK}/bin_b64:${PATH}" bash -c 'source ./set_variables.sh >/dev/null; printf "%s" "${ST_BASIC_AUTH}"')
-expect "ST_BASIC_AUTH is a single line" "$(printf '%s' "${AUTH}" | wc -l | tr -d ' ')" "0"
-expect "and it decodes to user:password" "$(printf '%s' "${AUTH}" | base64 -d)" "apiadmin:${LONG_PASSWORD}"
+echo "=== The settings file: set_variables.local.sh is the one file, and a script stops without it ==="
+# A copy of the folder with no settings file at all: every script says what to do and sends nothing
+mkdir -p "${WORK}/nosettings"
+cp -R "${WORK}/eu/03.Myself" "${WORK}/nosettings/"
+cp "${EU_TREE}/ensure_session.sh" "${WORK}/nosettings/"
+OUT=$(cd "${WORK}/nosettings/03.Myself" && PATH="${WORK}/bin:${PATH}" STUB_CURL_PRINT_CODE=1 bash ./01.myself_GET.sh 2>&1); RC=$?
+expect "no set_variables.local.sh: exit 1 and nothing is sent" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^METHOD:')" "1:0"
+has "no set_variables.local.sh: it says to copy the example" "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."
+expect "the repository has no set_variables.sh in the EndUser folder" "$([ -e "${EU_TREE}/set_variables.sh" ] && echo present || echo absent)" "absent"
+# ST_ENDUSER_LOCAL_VARIABLES names another file (the integration checks use it)
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/other_settings.sh"
+printf 'export ST_SERVER=other.example.com\nexport ST_PORT=9443\n' >> "${WORK}/other_settings.sh"
+OUT=$(cd "${WORK}/eu/03.Myself" && PATH="${WORK}/bin:${PATH}" ST_ENDUSER_LOCAL_VARIABLES="${WORK}/other_settings.sh" STUB_CURL_GET_BODY="${WORK}/me.json" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./01.myself_GET.sh 2>&1)
+has "ST_ENDUSER_LOCAL_VARIABLES: the file it names is the one read, ST_URL built from it" "URL: https://other.example.com:9443/api/v2.0/myself"
+# ST_URL set in the settings file wins over the one built from host and port
+printf 'export ST_URL=https://proxy.example.com/api/v2.0\n' >> "${WORK}/other_settings.sh"
+OUT=$(cd "${WORK}/eu/03.Myself" && PATH="${WORK}/bin:${PATH}" ST_ENDUSER_LOCAL_VARIABLES="${WORK}/other_settings.sh" STUB_CURL_GET_BODY="${WORK}/me.json" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./01.myself_GET.sh 2>&1)
+has "an ST_URL in the settings file is used as it is" "URL: https://proxy.example.com/api/v2.0/myself"
 
 echo
 if [ "${FAILED}" -eq 0 ]; then

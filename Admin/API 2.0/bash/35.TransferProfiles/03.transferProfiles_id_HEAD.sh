@@ -19,7 +19,7 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The profile is looked up by account and name, and must be the only one with that name.
 # - Confirmed directly: HEAD answers 200, or 404 with no body, also for an id that is not even well formed (`abc`).
 #   The `name=` filter ignores case and takes a * wildcard, so `p1` and `P1` (two profiles) both come back for either, and
@@ -32,7 +32,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/transferProfiles"

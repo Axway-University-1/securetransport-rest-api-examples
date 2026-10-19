@@ -39,8 +39,7 @@ cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/stub_curl_real" && chmod +x "${WORK
 cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
 printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sleep"
 
-# The real Admin set_variables.sh, with the test values as its local file; the use cases sit next to "API 2.0/bash"
-cp "${REPO}/Admin/API 2.0/bash/set_variables.sh" "${WORK}/tree/API 2.0/bash/"
+# The test values as the settings file; the use cases sit next to "API 2.0/bash"
 cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/tree/API 2.0/bash/set_variables.local.sh"
 cp -R "${UC_ROOT}/." "${WORK}/tree/UseCases/"
 BASE="https://st.example.com:8444/api/v2.0"
@@ -60,7 +59,7 @@ echo "${ME}" > "${WORK}/me.json"
 uc() { UC="${WORK}/tree/UseCases/$1"; }
 run() {
     local rel="$1"; shift
-    OUT=$(cd "${UC}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${GET_BODY:-${WORK}/me.json}" STUB_CURL_GET_RULES="${RULES:-}" \
+    OUT=$(cd "${UC}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${GET_BODY:-${WORK}/me.json}" STUB_CURL_GET_RULES="${RULES:-}" STUB_CURL_POST_BODY="${POST_BODY:-}" \
           STUB_CURL_STATUS="${STATUS:-200}" STUB_CURL_STATUS_GET="${STATUS_GET:-}" STUB_CURL_CSRF="${CSRF:-}" \
           STUB_CURL_PRINT_CODE=1 bash "./${rel}" "$@" 2>&1)
     RC=$?
@@ -156,6 +155,64 @@ rm -f "${UC}/session.cookie.jar"
 run 07.logout_DELETE.sh
 expect "07: with no session it says to run 03 and exits 2" "${RC}:$(ncalls)" "2:0"
 
+echo "=== 08 an API key ==="
+KEYBODY=$(body newkey '{"id":"k1","key":"secret-key-1","expiresAt":"Tue, 20 Oct 2026 15:35:38 +0300","permissions":["read"]}')
+rm -f "${UC}"/state.local.apikey "${UC}"/state.local.apikey_id
+STATUS=201 POST_BODY="${KEYBODY}" run 08.apikey_POST.sh
+expect "08: one POST to the administrator's api-keys" "$(calls)" "POST ${BASE}/administrators/apiadmin/api-keys"
+has "08: with the user and password: a key cannot make its own" "BASIC_AUTH: apiadmin:s3cret"
+expect "08: a day, read only" "$(payload 1 | jq -c '[.validityDays, .permissions]')" '[1,["read"]]'
+expect "08: the key and its id are kept" "$(cat "${UC}/state.local.apikey"):$(cat "${UC}/state.local.apikey_id")" "secret-key-1:k1"
+expect "08: the key file is for its owner only" "$(ls -l "${UC}/state.local.apikey" | cut -c1-10)" "-rw-------"
+hasnt "08: the key is not printed" "secret-key-1"
+has "08: the id and the validity are" "Key id k1"
+expect "08: exit 0" "${RC}" "0"
+STATUS=201 POST_BODY="${KEYBODY}" run 08.apikey_POST.sh
+expect "08: a key left from an earlier run is revoked first (by its id, and shown dead), then a new one is made" "$(calls | tr '\n' ' ')" \
+  "DELETE ${BASE}/administrators/apiadmin/api-keys/k1 GET ${BASE}/myself POST ${BASE}/administrators/apiadmin/api-keys "
+rm -f "${UC}"/state.local.apikey "${UC}"/state.local.apikey_id
+STATUS=409 run 08.apikey_POST.sh
+expect "08: a third key is 409: exit 1, saved nothing, says to revoke one" "${RC}:$([ -e "${UC}/state.local.apikey" ] && echo kept || echo none)" "1:none"
+has "08: and says what to do" "at most 2 API keys"
+STATUS=201 POST_BODY="${WORK}/me.json" run 08.apikey_POST.sh
+expect "08: an answer with no key is exit 1" "${RC}:$([ -e "${UC}/state.local.apikey" ] && echo kept || echo none)" "1:none"
+
+echo "=== 09 the key and nothing else ==="
+rm -f "${UC}"/state.local.apikey "${UC}"/state.local.apikey_id
+run 09.apikey_GET_myself.sh
+expect "09: with no key it says to run 08 and exits 2, sending nothing" "${RC}:$(ncalls)" "2:0"
+printf '%s' secret-key-1 > "${UC}/state.local.apikey"
+STUB_STATUS_PATCH=403 run 09.apikey_GET_myself.sh
+expect "09: a read, then a write that the read-only key must be refused" "$(calls | tr '\n' ' ')" "GET ${BASE}/myself PATCH ${BASE}/myself "
+expect "09: both calls carry the key" "$(headers | grep -c '^SECURETRANSPORT-API-KEY: secret-key-1$')" "2"
+hasnt "09: and neither a password" "BASIC_AUTH:"
+hasnt "09: nor a cookie" "COOKIE:"
+hasnt "09: nor a csrfToken" "csrfToken"
+has "09: prints who you are" "You are admin, role Master Administrator"
+expect "09: exit 0" "${RC}" "0"
+STUB_STATUS_PATCH=204 run 09.apikey_GET_myself.sh
+expect "09: a write that the read-only key is allowed is a failure (exit 1)" "${RC}" "1"
+STATUS_GET=401 run 09.apikey_GET_myself.sh
+expect "09: a read that is refused stops it (exit 1), before the write" "${RC}:$(calls | grep -c PATCH)" "1:0"
+
+echo "=== 10 revoke it ==="
+rm -f "${UC}"/state.local.apikey "${UC}"/state.local.apikey_id
+run 10.apikey_DELETE.sh
+expect "10: with no key it says so and exits 2, sending nothing" "${RC}:$(ncalls)" "2:0"
+printf '%s' secret-key-1 > "${UC}/state.local.apikey"; printf '%s' k1 > "${UC}/state.local.apikey_id"
+STATUS_GET=401 STUB_STATUS_DELETE=204 run 10.apikey_DELETE.sh
+expect "10: DELETE of that key's id, then the revoked key is tried" "$(calls | tr '\n' ' ')" "DELETE ${BASE}/administrators/apiadmin/api-keys/k1 GET ${BASE}/myself "
+has "10: the revoke is made with the password" "BASIC_AUTH: apiadmin:s3cret"
+has "10: and the key is tried alone" "HEADER: SECURETRANSPORT-API-KEY: secret-key-1"
+expect "10: a 401 proves it, exit 0, both files removed" "${RC}:$([ -e "${UC}/state.local.apikey" ] || [ -e "${UC}/state.local.apikey_id" ] && echo kept || echo gone)" "0:gone"
+printf '%s' secret-key-1 > "${UC}/state.local.apikey"; printf '%s' k1 > "${UC}/state.local.apikey_id"
+STATUS_GET=200 STUB_STATUS_DELETE=204 run 10.apikey_DELETE.sh
+expect "10: a revoked key that still works is exit 1" "${RC}" "1"
+printf '%s' secret-key-1 > "${UC}/state.local.apikey"; printf '%s' k1 > "${UC}/state.local.apikey_id"
+STUB_STATUS_DELETE=404 run 10.apikey_DELETE.sh
+expect "10: a revoke that is refused is exit 1, and the files stay (so it can be tried again)" "${RC}:$([ -e "${UC}/state.local.apikey_id" ] && echo kept || echo gone)" "1:kept"
+rm -f "${UC}"/state.local.apikey "${UC}"/state.local.apikey_id
+
 echo "=== 99 cleanup and 00 run_all ==="
 touch "${UC}/session.cookie.jar"; echo tok > "${UC}/state.local.csrf"
 STATUS_GET=401 run 99.cleanup_DELETE.sh
@@ -163,6 +220,9 @@ expect "99: logs out, and removes the jar and the token" "$(calls | tr '\n' ' ')
 rm -f "${UC}/session.cookie.jar"
 run 99.cleanup_DELETE.sh
 expect "99: with no session it sends nothing" "$(ncalls)" "0"
+printf '%s' k9 > "${UC}/state.local.apikey_id"; printf '%s' key9 > "${UC}/state.local.apikey"
+STATUS_GET=401 STUB_STATUS_DELETE=204 run 99.cleanup_DELETE.sh
+expect "99: a key of this use case that is left is revoked by its id, and its files go" "$(calls | head -1):$([ -e "${UC}/state.local.apikey" ] || [ -e "${UC}/state.local.apikey_id" ] && echo kept || echo gone)" "DELETE ${BASE}/administrators/apiadmin/api-keys/k9:gone"
 run 00.run_all.sh
 has "00: stops at the first failing script (02 got a 200)" "02.no_credentials_GET_myself failed."
 has "00: and still runs the cleanup" "Cleaned up."

@@ -15,7 +15,7 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - This script does not use a cookie jar, so authentication is required for each call.
 # - POST /myself is the LOGIN call. Confirmed directly: it answers 200 with {"message": "Logged in"}, not the
 #   administrator's data; GET /myself (02.Introduction/03.myself_GET.sh) answers that. An earlier version of this
@@ -30,7 +30,8 @@ printf "Loading variables into our context..."
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 

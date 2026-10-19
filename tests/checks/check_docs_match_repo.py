@@ -162,13 +162,17 @@ for cited in re.findall(r"`((?:bash|bat|python3|utils)/[A-Za-z0-9_./-]+\.(?:sh|b
     chk("pack cites a real file: " + cited, found)
 
 # The configuration contract the pack documents
-sv = open(os.path.join(REPO, "Admin/API 2.0/bash/set_variables.sh")).read()
+sv = open(os.path.join(REPO, "Admin/API 2.0/bash/set_variables.local.example.sh")).read()
 chk("the four ST_ variables are exported",
     all(("export " + v) in sv for v in ("ST_SERVER", "ST_PORT", "ST_USER", "ST_PASSWORD")))
 chk("PWD is not used as a password variable", "export PWD=" not in sv)
 
-eu = open(os.path.join(REPO, "EndUser/API 2.0/bash/set_variables.sh")).read()
-chk("EndUser derives ST_URL and ST_BASIC_AUTH", "ST_URL=" in eu and "ST_BASIC_AUTH=" in eu)
+eu = open(os.path.join(REPO, "EndUser/API 2.0/bash/set_variables.local.example.sh")).read()
+chk("EndUser: the four ST_ variables are exported",
+    all(("export " + v) in eu for v in ("ST_SERVER", "ST_PORT", "ST_USER", "ST_PASSWORD")))
+chk("there is one settings file per tree: no set_variables.sh is left",
+    not os.path.exists(os.path.join(REPO, "Admin/API 2.0/bash/set_variables.sh"))
+    and not os.path.exists(os.path.join(REPO, "EndUser/API 2.0/bash/set_variables.sh")))
 
 for f in ("Admin/API 2.0/bash/set_variables.local.example.sh",
           "Admin/API 2.0/bat/set_variables.local.example.bat",

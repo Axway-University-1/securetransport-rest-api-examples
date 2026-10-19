@@ -17,7 +17,7 @@
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - This deletes data. Check the name before running it; 02.userClasses_POST.sh creates `example_userclass`. VirtClass and RealClass
 #   are the classes the server's logins fall back to: the script refuses them (exit 2), the server would not.
 # - Confirmed directly: a success is 204. An unknown id (or a second delete) is 400 "User Class with ID X does not exist.", not 404.
@@ -33,7 +33,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/userClasses"

@@ -308,8 +308,9 @@ EU_CFG = dict(CFG, st_port="8443", st_user="enduser", st_password="eupass")
 
 
 def sees(tree, var):
-    """What a script sees in var after it sources the tree's set_variables.sh."""
-    out = _subprocess.run(["bash", "-c", 'source ./set_variables.sh >/dev/null 2>&1; printf "%s" "${!1}"', "_", var],
+    """What a script sees in var after it reads the tree's settings, the way the scripts do."""
+    override = "ST_ENDUSER_LOCAL_VARIABLES" if "EndUser" in tree else "ST_ADMIN_LOCAL_VARIABLES"
+    out = _subprocess.run(["bash", "-c", 'source "${%s:-./set_variables.local.sh}" >/dev/null 2>&1; printf "%%s" "${!1}"' % override, "_", var],
                           cwd=tree, capture_output=True, text=True)
     return out.stdout
 
@@ -324,7 +325,7 @@ with runner.real_credentials(ADMIN_TREE, CFG):
     var_file = os.environ.get("ST_ADMIN_LOCAL_VARIABLES")
     check("the scripts read the credentials from a temporary file", bool(var_file) and os.path.exists(var_file), var_file)
     check("that file is readable by its owner only", (os.stat(var_file).st_mode & 0o777) == 0o600)
-    check("a script sourcing set_variables.sh sees the server", sees(ADMIN_TREE, "ST_SERVER") == "h.example", sees(ADMIN_TREE, "ST_SERVER"))
+    check("a script reading the settings sees the server", sees(ADMIN_TREE, "ST_SERVER") == "h.example", sees(ADMIN_TREE, "ST_SERVER"))
     check("a password with $, a double and a single quote arrives as it was", sees(ADMIN_TREE, "ST_PASSWORD") == CFG["st_password"], sees(ADMIN_TREE, "ST_PASSWORD"))
     check("your own set_variables.local.sh is not touched while it runs", local_state(ADMIN_TREE) == before[0])
     with runner.real_credentials(EU_TREE, EU_CFG):

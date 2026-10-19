@@ -28,15 +28,16 @@
 # it is older than any dated update of the same release.
 #
 # Notes:
-# - Uses the same set_variables.sh as the Admin examples, so there is nothing
-#   extra to configure.
+# - Uses the same settings file as the Admin examples, Admin/API 2.0/bash/set_variables.local.sh,
+#   so there is nothing extra to configure.
 # - Because it is sourced, the exit ends the calling example, which is the point.
 # ==============================================================================
 
 ST_REQUIRED_VERSION="$1"
 ST_FEATURE_LIB_DIR=$(dirname "$(realpath "${BASH_SOURCE[0]}")")
 
-source "${ST_FEATURE_LIB_DIR}/../../Admin/API 2.0/bash/set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${ST_FEATURE_LIB_DIR}/../../Admin/API 2.0/bash/set_variables.local.sh}" ||
+    { echo "Copy Admin/API 2.0/bash/set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 # Turn 5.5-20260924 into 00500520260924, which compares correctly as a string.
 # Prints nothing if the text is not a version.

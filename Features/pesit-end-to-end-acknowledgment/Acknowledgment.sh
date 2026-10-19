@@ -42,7 +42,7 @@
 # Risk: write
 #
 # Notes:
-# - Credentials come from set_variables.sh, which loads set_variables.local.sh.
+# - Credentials come from Admin/API 2.0/bash/set_variables.local.sh.
 # - This script is intended for internal use and assumes trusted network access.
 # ==============================================================================
 
@@ -92,7 +92,7 @@ execute_API(){
 # set_variables.local.sh so that they stay out of the repository.
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
-# Loads the same set_variables.sh as the Admin examples, and ends this script, without
+# Loads the same settings file as the Admin examples, and ends this script, without
 # changing anything, on a server older than 5.5 (the base release this feature needs)
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/../lib/st_feature_check.sh" "5.5"
@@ -128,7 +128,7 @@ ADMIN_USER="${ST_USER}"
 ADMIN_PWD="${ST_PASSWORD}"
 
 if [[ -z "${ADMIN_USER}" || -z "${ADMIN_PWD}" ]]; then
-    echo "No credentials found. Set ST_USER and ST_PASSWORD in set_variables.local.sh next to set_variables.sh."
+    echo "No credentials found. Set ST_USER and ST_PASSWORD in Admin/API 2.0/bash/set_variables.local.sh."
     exit ${EXIT_CODE_ERROR}
 fi
 

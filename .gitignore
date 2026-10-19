@@ -109,8 +109,9 @@ tests/output/
 # Each of these has a committed .example counterpart. Copy the example, fill in
 # the values for your own environment, and your credentials stay out of git.
 #
-# The bash and bat examples read set_variables.local.sh / .bat, which override
-# the placeholders in the committed set_variables.sh / .bat.
+# The bash examples read set_variables.local.sh: it is the one settings file, copied from
+# set_variables.local.example.sh. The bat examples read set_variables.bat, and
+# set_variables.local.bat overrides the placeholders in it.
 set_variables.local.sh
 set_variables.local.bat
 Features/**/settings.local.sh

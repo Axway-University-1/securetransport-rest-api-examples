@@ -614,6 +614,11 @@ moves the role's administrators to that role.
 under, though the reference does not mark it required: 400 "Please specify
 parent administrator" without it.
 
+**API keys are for administrators only.** The end user API's published description (`/api/v2.0/docs/swagger.yaml`
+on the server, 5.5-20260924) declares `basicAuthScheme` and nothing else, there is no api-keys path on it (404), and a
+made-up `SECURETRANSPORT-API-KEY` header is a 401 there, so the end user examples use Basic and the session only. The
+Admin spec says keys are "created per administrator", at most 2, mandatory expiry.
+
 **Administrator API keys** (`/administrators/{name}/api-keys`): the key is in
 the POST answer only; at most 2 per administrator (409); `validityDays` or
 `expiresAt`, not both (400). The `SECURETRANSPORT-API-KEY` header alone
@@ -1734,10 +1739,10 @@ reason nobody will guess. That is why the variables here are `ST_*`.
 
 ```bash
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}"
 ```
 
-`source "../set_variables.sh"` only works if you have `cd`'d into the script's
+`source "../set_variables.local.sh"` only works if you have `cd`'d into the script's
 folder first.
 
 In python, the same rule:

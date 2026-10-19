@@ -7,8 +7,9 @@
 # ==============================================================================
 # Description:
 # Sourced by the lib.sh of the Admin use cases. Loads the settings of the Admin examples
-# (Admin/API 2.0/bash/set_variables.sh and its .local.sh), builds ST_URL, names the cookie jar
-# and the csrfToken file of the use case (session.cookie.jar and state.local.csrf, ignored by git)
+# (Admin/API 2.0/bash/set_variables.local.sh), builds ST_URL, names the cookie jar
+# and the csrfToken, API key and API key id files of the use case (session.cookie.jar and
+# state.local.*, ignored by git)
 # and gives the one helper the scripts share:
 #
 #   st_session   makes sure there is an active session. It tries the cookie jar with a GET of
@@ -18,11 +19,14 @@
 # The caller sets UC_DIR (the folder of the use case) before sourcing it.
 # ==============================================================================
 
-source "${UC_DIR}/../../API 2.0/bash/set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${UC_DIR}/../../API 2.0/bash/set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 ST_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0"
 JAR="${UC_DIR}/session.cookie.jar"
 CSRF_FILE="${UC_DIR}/state.local.csrf"
+APIKEY_FILE="${UC_DIR}/state.local.apikey"        # an API key, as 08 makes it
+APIKEY_ID_FILE="${UC_DIR}/state.local.apikey_id"  # its id, to revoke it
 REFERER="THIS_IS_A_RANDOM_TEXT"   # the server wants a Referer header, any text will do
 
 st_session() {

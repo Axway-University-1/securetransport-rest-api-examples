@@ -8,7 +8,7 @@
 # Description:
 # This script logs in to the EndUser API using the `/myself` endpoint.
 # It demonstrates:
-# - Basic authentication with the derived ST_BASIC_AUTH value
+# - Basic authentication: the user name and password, sent once, with curl -u
 # - Storing the session in a cookie jar for reuse by the other examples
 # - Checking the HTTP response code before continuing
 #
@@ -18,10 +18,13 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The cookie jar is written next to the examples as myCookie.jar, and the
 #   file examples read it. Run this script before them.
 # - See 02.myself_DELETE.sh for logging out.
+# - The end user API offers two ways in: Basic authentication on every call (curl -u), and
+#   this session. It has no API keys (those are for administrators, on the administration
+#   API), so every other example here uses the session this script starts.
 # - ST requires a Referer header on these calls.
 # ==============================================================================
 
@@ -35,7 +38,9 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 # Put the values for your own environment in set_variables.local.sh.
 #
 printf "Loading variables into our context..."
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ENDUSER_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
+export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 rm -f "${COOKIE}"
@@ -49,7 +54,7 @@ rm -f "${COOKIE}"
 # Check 02.myself_DELETE.sh for log out.
 # 
 printf "\n\nBasic authentication...\n"
-result=$(curl -H "Authorization: Basic ${ST_BASIC_AUTH}" --cookie-jar "${COOKIE}" -w "%{http_code}" -k -s -X POST "${ST_URL}/myself" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
+result=$(curl -u "${ST_USER}:${ST_PASSWORD}" --cookie-jar "${COOKIE}" -w "%{http_code}" -k -s -X POST "${ST_URL}/myself" -H "accept: application/json" -H "Referer: THIS_IS_A_RANDOM_TEXT")
 http_status=${result: -3}
 
 if [[ $http_status -ne 200 ]] ; then

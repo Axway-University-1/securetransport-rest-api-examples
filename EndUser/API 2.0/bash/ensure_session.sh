@@ -13,7 +13,7 @@
 # 01.Authenticate/01.myself_POST.sh to log in, and then the example carries on.
 #
 # Usage:
-# Source it after set_variables.sh and after COOKIE is set, then call the function:
+# Source it after the settings (set_variables.local.sh) and after COOKIE is set, then call the function:
 #
 #   source "${SCRIPT_DIR}/../ensure_session.sh"
 #   st_ensure_session

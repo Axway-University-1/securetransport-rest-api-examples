@@ -8,11 +8,10 @@
 # Description:
 # This script creates a folder in the home folder of the user, using the
 # `/files/{name}` endpoint. It demonstrates:
-# - Logging in, and keeping both the session cookie and the csrfToken header
-#   the login returns, since a call that changes something needs both
+# - Checking first whether the folder is there, since creating one that exists
+#   is answered 409 with a message that says nothing
 # - Creating a folder: its path goes in the URL, and the body only says that it
 #   is a directory
-# - Logging out again
 #
 # Usage:
 # ./02.files_name_POST_folder.sh [FOLDER]
@@ -24,8 +23,9 @@
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
-# - It logs in and out on its own, so 01.Authenticate is not needed first.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
+# - It checks for an active session first and, if there is none, logs in with
+#   01.Authenticate/01.myself_POST.sh and then carries on.
 # - Do not put the folder's name in the body. The server answers 409.
 # - Requires `jq`, which URL-encodes the path and builds the body.
 # ==============================================================================
@@ -35,56 +35,33 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ENDUSER_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
+export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"
 
+COOKIE="${SCRIPT_DIR}/../myCookie.jar"
+source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
 FOLDER="${1:-new-folder}"
 FOLDER="${FOLDER#/}"
 # Each part of the path is encoded on its own, so the / between them stays a /
 ENCODED_FOLDER=$(printf '%s' "${FOLDER}" | jq -Rr 'split("/") | map(@uri) | join("/")')
-
-COOKIE=$(mktemp)
-HEADERS=$(mktemp)
-
-#
-# Log in. The csrfToken comes back as a response header.
-#
-LOGIN_CODE=$(curl -s -k -o /dev/null -w "%{http_code}" -D "${HEADERS}" --cookie-jar "${COOKIE}" \
-  -H "Authorization: Basic ${ST_BASIC_AUTH}" -X POST "${ST_URL}/myself" \
-  -H "accept: application/json" -H "${REFERER_HEADER}")
-CSRF_TOKEN=$(grep -i '^csrfToken:' "${HEADERS}" | awk '{print $2}' | tr -d '\r')
-rm -f "${HEADERS}"
-
-if [ "${LOGIN_CODE}" != "200" ]; then
-    printf "Login failure: HTTP %s\n" "${LOGIN_CODE}"
-    rm -f "${COOKIE}"
-    exit 1
-fi
+st_ensure_session
 
 # A folder that is already there is answered 409 "Error occurred while creating file: null",
 # which says nothing: look first, and say it plainly
 if [ "$(curl -s -k -o /dev/null -w "%{http_code}" -b "${COOKIE}" -G "${ST_URL}/files/${ENCODED_FOLDER}" --data-urlencode "metadata=true" \
         -H "accept: application/json" -H "${REFERER_HEADER}")" = "200" ]; then
     printf "The folder '%s' already exists. Nothing to create.\n" "${FOLDER}"
-    curl -s -k -o /dev/null -b "${COOKIE}" -X DELETE "${ST_URL}/myself" \
-      -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
-    rm -f "${COOKIE}"
     exit 0
 fi
 
 printf "Creating the folder '%s'...\n" "${FOLDER}"
 BODY=$(jq -n '{isDirectory: true, isRegularFile: false, isSymbolicLink: false, isOther: false, isShared: false}')
 RESPONSE=$(curl -s -k -b "${COOKIE}" -X POST "${ST_URL}/files/${ENCODED_FOLDER}" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}" \
+  -H "accept: application/json" -H "${REFERER_HEADER}" \
   -H "Content-Type: application/json" -w "\nHTTP %{http_code}\n" -d "${BODY}")
 printf '%s\n' "${RESPONSE}"
 CREATE_CODE=$(printf '%s\n' "${RESPONSE}" | tail -n 1 | awk '{print $2}')
-
-#
-# Log out, and remove the session
-#
-curl -s -k -o /dev/null -b "${COOKIE}" -X DELETE "${ST_URL}/myself" \
-  -H "accept: application/json" -H "${REFERER_HEADER}" -H "csrfToken: ${CSRF_TOKEN}"
-rm -f "${COOKIE}"
 [[ "${CREATE_CODE}" == 20* ]] || exit 1

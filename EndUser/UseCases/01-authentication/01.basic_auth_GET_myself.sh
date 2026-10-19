@@ -19,8 +19,8 @@
 # - Copied from EndUser/API 2.0/bash/03.Myself/01.myself_GET.sh, with the session
 #   replaced by Basic authentication.
 # - curl -u "user:password" is the same as the header
-#   "Authorization: Basic base64(user:password)" (set_variables.sh derives that
-#   as ST_BASIC_AUTH). It is simple, and sends the password every time.
+#   "Authorization: Basic base64(user:password)", which curl builds for you. It is
+#   simple, and sends the password every time.
 # ==============================================================================
 
 source "$(dirname "$(realpath "$0")")/lib.sh"

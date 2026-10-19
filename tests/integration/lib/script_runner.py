@@ -44,7 +44,7 @@ def real_credentials(tree_dir, config):
     Give the scripts in tree_dir the server and credentials from config, as they
     would have them for a person who has filled in set_variables.local.sh.
 
-    The values go into a temporary file that set_variables.sh reads instead of
+    The values go into a temporary file that the scripts read instead of
     set_variables.local.sh (named by ST_ADMIN_LOCAL_VARIABLES, or
     ST_ENDUSER_LOCAL_VARIABLES for the EndUser tree). Nothing in the repository
     is written and your own local file is never touched, whatever happens to

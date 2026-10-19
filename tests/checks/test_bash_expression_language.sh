@@ -37,7 +37,7 @@ has() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then pass "$1"; else fail 
 # curl: the stub, with a status of its own for each method and a different Location id for each POST
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/stub_curl_real" && chmod +x "${WORK}/bin/stub_curl_real"
 cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.local.sh"
 cp -R "${REPO}/Admin/API 2.0/bash/14.ExpressionLanguage" "${WORK}/admin/"
 EL_DIR="${WORK}/admin/14.ExpressionLanguage"
 BASE="https://st.example.com:8444/api/v2.0"

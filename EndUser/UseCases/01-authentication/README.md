@@ -46,6 +46,10 @@ It does not touch `myCookie.jar` of the reference examples.
 - Only 401 and 403 mean a lost session. A 500 or no answer is another problem,
   and a new login would not fix it.
 - A logout that is not checked can look like it worked. Try the old cookie.
+- The end user API has these two ways in and no others: its published API description (`/api/v2.0/docs/swagger.yaml` on the
+  server) declares Basic authentication only, next to the session `POST /myself` gives, and no API key call or header is
+  accepted (a made-up `SECURETRANSPORT-API-KEY` is a 401). API keys belong to the administration API, one per administrator
+  (`Admin/UseCases/01-authentication`). So the rest of the end user examples use the session, from `01.Authenticate/01`.
 
 ## Tests
 

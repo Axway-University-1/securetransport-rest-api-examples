@@ -4,8 +4,10 @@
 #
 #   cp set_variables.local.example.sh set_variables.local.sh
 #
-# set_variables.local.sh is excluded from git, so your credentials are never
-# committed. The values here override the placeholders in set_variables.sh.
+# This is the one settings file of the examples in this folder, and of the use
+# cases that go with it: every script reads set_variables.local.sh, and stops
+# with a message when it is not there. It is excluded from git, so your
+# credentials are never committed.
 # ==============================================================================
 
 # The SecureTransport host, without the protocol or port

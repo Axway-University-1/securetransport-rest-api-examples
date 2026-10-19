@@ -20,7 +20,7 @@
 # Risk: config - changes a protocol server
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The PUT method replaces the entire object, so all required fields must be included.
 # - The server is read first, and the script stops (exit 1) when it does not exist or is not an SSH server: a body
 #   that says `ssh` would otherwise be sent to a server of another protocol.
@@ -40,7 +40,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 NAME="${1:-SSH_TEST_SERVER_1}"

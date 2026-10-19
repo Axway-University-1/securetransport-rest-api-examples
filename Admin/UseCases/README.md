@@ -16,7 +16,7 @@ They are meant to be read in this order, each building on what the one before ta
 
 | Use case | What it teaches |
 | -------- | --------------- |
-| [01-authentication](01-authentication/README.md) | Getting in: Basic authentication on a single call, then the session (cookie jar and `csrfToken`), a write with the token, recovering from an expired session, and logging out. |
+| [01-authentication](01-authentication/README.md) | Getting in: Basic authentication on a single call, then the session (cookie jar and `csrfToken`), a write with the token, recovering from an expired session, logging out, and an API key for automation. |
 | [02-knowing-the-server](02-knowing-the-server/README.md) | What the server is and how it is set up, read-only: release, daemons, servers, a paged list, one setting among a thousand, login settings, open sessions. |
 
 More are planned: onboarding a user and a partner, transfer sites, routes, finding a transfer, sessions and access, audit and

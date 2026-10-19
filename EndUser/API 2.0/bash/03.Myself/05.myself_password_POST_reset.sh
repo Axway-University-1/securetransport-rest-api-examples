@@ -25,7 +25,7 @@
 # Risk: write - resets the end user's password
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced. Only
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh). Only
 #   ST_SERVER, ST_PORT and ST_USER are used: the token authenticates the user,
 #   so there is no session and no credentials are sent.
 # - The operation goes in the query string and in the body, as the API requires.
@@ -38,7 +38,9 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ENDUSER_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
+export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 

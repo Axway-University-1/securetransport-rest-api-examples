@@ -28,7 +28,7 @@
 # Risk: disruptive - stops and starts daemons: every protocol on them goes down meanwhile
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - THIS STOPS A DAEMON of the whole server. There is no default daemon and no environment variable that stands in for the confirmation word:
 #   the daemon and the operation are arguments, and a stop needs `stop-the-DAEMON-daemon` as well. The arguments are checked before anything is sent: a bad one exits 2.
 # - It prints the daemon's status first, and the command that undoes the operation. Starting a daemon again with this script is the way back; a protocol server
@@ -49,7 +49,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/daemons"

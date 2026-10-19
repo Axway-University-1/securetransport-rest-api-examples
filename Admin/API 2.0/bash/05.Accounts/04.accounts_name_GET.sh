@@ -20,7 +20,7 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The type is always returned, even when it is not listed in the fields.
 # - Confirmed directly (5.5-20260924): `fields=addressBookSettings` without `type=user` is refused, 400 "Field addressBookSettings does not exist." (older notes say it answers
 #   only the type); with `type=user` it answers the settings. That third call is the demonstration of it, so its refusal is shown and does not stop the script. The whole object,
@@ -33,7 +33,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts"

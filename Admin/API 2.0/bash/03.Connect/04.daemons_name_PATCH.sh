@@ -25,7 +25,7 @@
 # Risk: config - changes one setting of the SSH daemon; put it back afterwards (the script prints how)
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - This changes the configuration of the real daemon, so there is no default: the daemon, the field and the value are arguments. The script prints the old
 #   value, and the command that puts it back, before it changes anything.
 # - The reference says a changed configuration takes effect when the daemon restarts. This script does not restart it. An open connection is not dropped.
@@ -43,7 +43,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/daemons"

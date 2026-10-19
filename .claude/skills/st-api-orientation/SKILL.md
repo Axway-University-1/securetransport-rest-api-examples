@@ -174,9 +174,10 @@ Two things worth knowing:
 
 - **The password goes in as plain text.** Where the API wants a base64
   `user:password` pair, the scripts derive it. Never hand-encode it.
-- The committed `set_variables.sh` and `set_variables.bat` hold placeholders and
-  load your `.local` file over the top. **Do not edit the committed files** — that
-  is how credentials end up in a commit.
+- The bash examples read one settings file, `set_variables.local.sh`, which you copy from
+  `set_variables.local.example.sh` (there is no committed `set_variables.sh`). The bat examples
+  read `set_variables.bat`, which loads your `set_variables.local.bat` over its placeholders.
+  **Do not edit the committed files** — that is how credentials end up in a commit.
 
 If configuration is missing, the scripts stop with a message naming the file to
 create, rather than failing halfway through a request.

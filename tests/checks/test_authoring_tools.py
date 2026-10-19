@@ -56,8 +56,8 @@ with tempfile.TemporaryDirectory() as work:
     check("bash: the house header, with the name, author and location",
           text.startswith("#!/bin/bash\n# ====") and "# Script Name: 01.widgets_GET.sh\n# Author: Test Author\n" in text
           and "# Location: Testville\n" in text, text[:300])
-    check("bash: set_variables sourced from the script's folder, the Referer and MAIN_URL set",
-          'source "${SCRIPT_DIR}/../set_variables.sh"' in text and 'REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"' in text
+    check("bash: set_variables.local.sh sourced from the script's folder, the Referer and MAIN_URL set",
+          'source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}"' in text and 'REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"' in text
           and 'MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/widgets"' in text)
     check("bash: the Risk line, between Usage and Notes", "# ./01.widgets_GET.sh [NAME]\n#\n# Risk: read\n#\n# Notes:" in text, text[:700])
     try:

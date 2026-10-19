@@ -27,7 +27,7 @@ has() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then pass "$1"; else fail 
 
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
 printf '#!/bin/bash\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sleep"
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/admin/set_variables.local.sh"
 BASE="https://st.example.com:8444/api/v2.0"
 
 # body NAME JSON: a canned answer, in a file

@@ -16,7 +16,7 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - HEAD requests are efficient for existence checks without retrieving full content.
 # - Confirmed directly: the lab answers a HEAD of a server that does not exist with 400 and no body (a HEAD never has one),
 #   not the 404 the reference leads one to expect; a GET of the same name (09.servers_name_GET.sh) is a 404 with an HTML page.
@@ -31,7 +31,8 @@ echo "Loading variables into our context..."
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 

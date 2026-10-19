@@ -23,7 +23,7 @@ cp -R "${REPO}/Features/lib" "${WORK}/Features/lib"
 cp -R "${REPO}/${FEATURE}" "${WORK}/${FEATURE}"
 rm -f "${WORK:?}/${FEATURE:?}/settings.local.sh" "${WORK:?}/${FEATURE:?}/settings.local.bat" \
       "${WORK:?}/${FEATURE:?}/state.local.sh" "${WORK:?}/${FEATURE:?}/state.local.bat"
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.local.sh"
 RUN="${WORK}/${FEATURE}"
 
 echo "export BT_ACCOUNT_PASSWORD='p@ss w0rd'" > "${RUN}/settings.local.sh"

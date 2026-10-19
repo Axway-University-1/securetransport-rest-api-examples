@@ -20,7 +20,7 @@
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - It prints the value before, to put it back with. A change of `order` moves the class and the others shift: the one at that
 #   place and those after it go down by one, so patching VirtClass or RealClass would change which classes come first: do not.
 # - Confirmed directly: a success answers 204, with no body, and an empty patch is 204 too. `replace` works on every field of the class;
@@ -40,7 +40,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/userClasses"

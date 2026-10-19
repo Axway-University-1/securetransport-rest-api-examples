@@ -25,7 +25,7 @@
 # Risk: config - changes the configuration of the SSH daemon; put it back afterwards (the script prints how)
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - This changes the configuration of the real daemon, so there is no default: every value is an argument. Put it back afterwards:
 #   the script prints the old settings, and the command that restores them, before it changes anything.
 # - A PUT replaces the whole object, so it needs all three settings. Confirmed directly: leaving out `banner`, or sending it as null, is not a 400 but a
@@ -45,7 +45,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/daemons"

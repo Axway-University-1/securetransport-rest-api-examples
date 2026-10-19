@@ -48,12 +48,13 @@ def write_sh(folder, name, description, usage, notes, body, main_url=None, root=
     lines += [("# " + line).rstrip() for line in description]
     lines += ["#", "# Usage:"] + [("# " + line).rstrip() for line in usage]
     lines += ["#", "# Risk: " + risk]
-    lines += ["#", "# Notes:", "# - Ensure that `set_variables.sh` is correctly configured and sourced."]
+    lines += ["#", "# Notes:", "# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh)."]
     lines += [("# " + line).rstrip() for line in notes]
     lines += ["# " + RULE, "",
               "#", "# Get the directory of this script, so that it can be run from any location", "#",
               'SCRIPT_DIR=$(dirname "$(realpath "$0")")', "",
-              'source "${SCRIPT_DIR}/../set_variables.sh"', "",
+              'source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||',
+              '    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }', "",
               'REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"']
     if main_url:
         lines.append('MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/%s"' % main_url)
@@ -74,6 +75,8 @@ def bat_header(folder, name, main_url=None, sh_root=BASH):
     for line in lines[start:end]:
         line = line.replace(".sh", ".bat")
         line = line.replace("`set_variables.bat` is correctly configured and sourced",
+                            "set_variables.bat is correctly configured and called")
+        line = line.replace("`set_variables.local.bat` is filled in (copy set_variables.local.example.bat)",
                             "set_variables.bat is correctly configured and called")
         line = re.sub(r"export ([A-Z_]+)='([^']*)'", r"SET \1=\2", line)
         line = line.replace("so export it first", "so set it first").replace("so export them first", "so set them first")

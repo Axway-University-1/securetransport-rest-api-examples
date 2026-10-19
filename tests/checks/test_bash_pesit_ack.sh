@@ -26,7 +26,7 @@ expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1  (expected '$3', go
 
 cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
 # The tree the scripts expect: the feature next to Features/lib, and the Admin settings the version check loads
-cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.sh"
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/Admin/API 2.0/bash/set_variables.local.sh"
 cp -R "${REPO}/Features/lib" "${WORK}/Features/lib"
 cp -R "${REPO}/Features/pesit-end-to-end-acknowledgment" "${WORK}/Features/pesit-end-to-end-acknowledgment"
 ACK_DIR="${WORK}/Features/pesit-end-to-end-acknowledgment"

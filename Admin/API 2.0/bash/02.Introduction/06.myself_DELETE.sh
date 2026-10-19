@@ -16,7 +16,7 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The cookie jar is used to persist session state across requests.
 # - Confirmed directly: the login answers 200 {"message": "Logged in"}, the read 200, the logout 200 {"message": "Logged out"},
 #   and the read after it 401 with the plain text "Authentication required.": that is how this script knows the session ended.
@@ -31,7 +31,8 @@ echo "Loading variables into our context..."
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 

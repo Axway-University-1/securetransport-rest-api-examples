@@ -17,7 +17,7 @@
 # Risk: write
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - It deletes ONLY the templates whose name is one of the 163 names of the list below (the same list as 02.routes_POST.sh), compared
 #   exactly, and only among routes of type TEMPLATE: a template of your own, even one called RouteFromSomething that is not in the list,
 #   is not touched, and neither is a simple or a composite route. A name that is not there is skipped.
@@ -35,7 +35,8 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/routes"

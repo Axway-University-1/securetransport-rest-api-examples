@@ -24,7 +24,7 @@
 # Risk: write - changes the password of the end user it logs in as, and changes it back
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - It checks for an active session first and, if there is none, logs in with
 #   01.Authenticate/01.myself_POST.sh and then carries on.
 # - The old password is ST_PASSWORD. With --keep, put the new one in
@@ -46,7 +46,9 @@
 #
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ENDUSER_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
+export ST_URL="${ST_URL:-https://${ST_SERVER}:${ST_PORT}/api/v2.0}"
 
 COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 source "${SCRIPT_DIR}/../ensure_session.sh"

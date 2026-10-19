@@ -19,7 +19,7 @@
 # Risk: read
 #
 # Notes:
-# - Ensure that `set_variables.sh` is correctly configured and sourced.
+# - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh).
 # - The type is always returned, even when it is not listed in the fields.
 # - Every call is checked: a status other than 200 (401, "Authentication required." as plain text, for refused credentials; 500)
 #   prints the status and the answer and ends the script with exit 1, so a refused read is not mistaken for an empty list.
@@ -33,11 +33,12 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 # 
 # First we will load the variables into our context.
-# Put your own values in set_variables.local.sh, which set_variables.sh
-# loads and which git ignores.
+# Put your own values in set_variables.local.sh, which git ignores
+# (copy set_variables.local.example.sh).
 #
 printf "Loading variables into our context..."
-source "${SCRIPT_DIR}/../set_variables.sh"
+source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
+    { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
