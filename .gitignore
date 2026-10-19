@@ -94,10 +94,10 @@ exportedPrivateKey*
 # The test harness, fixtures and checks under tests/ are shared. These two
 # directories are not: tests/local is where you keep responses captured from a
 # real server and anything else that must not reach the repository, and
-# tests/output holds whatever a run produces. Neither is needed for the checks
+# tests/offline/output holds whatever a run produces. Neither is needed for the checks
 # to pass. See tests/README.md.
 tests/local/
-tests/output/
+tests/offline/output/
 
 # Scratch state for probes and authoring (ids of throwaway lab objects and the like),
 # at the project root. Use scratch_path() from .claude/skills/st-api-cover-resource/scripts.

@@ -73,7 +73,7 @@ Three short guides save you working this out for yourself:
 ### Check your clone works
 
 ```
-./tests/run_all.sh
+./tests/offline/run_all.sh
 ```
 
 Takes up to 5 minutes, needs no server and no credentials. See the
@@ -157,8 +157,8 @@ to run `base64` by hand.
 
 Every example's header has a `Risk:` line, the python programs' too, so you can
 tell before running it what it may change on the server (the python ones are
-held to it by `tests/checks/check_python_risk.py`, the others by
-`tests/checks/check_risk_headers.py`):
+held to it by `tests/offline/checks/check_python_risk.py`, the others by
+`tests/offline/checks/check_risk_headers.py`):
 
 | Risk | Meaning |
 | ---- | ------- |
@@ -204,18 +204,18 @@ This is what you see at the root of the repository.
 | Folder | What is in it |
 | ------ | ------------- |
 | `Admin/` | The examples for the **administrator API** (port 444, or 8444 on a non root install): `API 2.0/bash` (curl examples, numbered by topic), `API 2.0/bat` (the same examples for Windows) and `API 2.0/python` (small complete programs for real tasks, and `utils` for tools that work on an exported configuration XML). |
-| `EndUser/` | The examples for the **end user API** (port 443, or 8443): `API 2.0/bash` has one example per call, `UseCases` is for complete end user scenarios (to be filled). |
+| `EndUser/` | The examples for the **end user API** (port 443, or 8443): `API 2.0/bash` has one example per call, `UseCases` has complete end user scenarios, a learning path in five steps. |
 | `Features/` | Complete solutions, one folder per feature, grouped by the release that introduced it. Each is a whole scenario you can run from `00.run_all` to the clean-up. See [Features](Features/README.md). |
 
 ### Working on the repository
 
 | Folder | What is in it |
 | ------ | ------------- |
-| `tests/` | The checks. `./tests/run_all.sh` runs the offline ones (no server, no credentials); `tests/integration` runs the same examples against a real server you name in `tests/local/integration.conf`. `tests/local` and `tests/output` are yours and git ignores them. See [tests](tests/README.md). |
+| `tests/` | The checks. `./tests/offline/run_all.sh` runs the offline ones (no server, no credentials); `tests/online` runs checks against a real lab server you name in `tests/local/integration.conf` (or the bundled mock), and `tests/common` holds the Python both sides use. `tests/local` and `tests/offline/output` are yours and git ignores them. See [tests](tests/README.md). |
 | `tools/` | Two small scripts. `list_examples.py` lists every example with the endpoint it calls and its `Risk` line (`--table` for a table). `review_status.py` keeps `review/checked.tsv`. |
 | `review/` | `checked.tsv`, the list of files a person has read and confirmed, each with a hash of its content, so that a file that changed since is easy to find. Kept by `tools/review_status.py`; do not edit it by hand. |
 | `.claude/` | A knowledge pack for people and for AI assistants working here: `skills/` holds the three guides linked under [Start with the guides](#start-with-the-guides) and the procedure for covering a new API resource, `agents/` holds two assistant definitions. See [its README](.claude/README.md). Your own `settings.json` and `settings.local.json` in this folder are git ignored. |
-| `.github/` | `workflows/tests.yml`: runs `./tests/run_all.sh` on Linux for every push and pull request. |
+| `.github/` | `workflows/tests.yml`: runs `./tests/offline/run_all.sh` on Linux for every push and pull request. |
 | `images/` | The screenshots used by this README. |
 | `tmp/` | A scratch folder for the files the helper scripts write while probing a server. It is git ignored, so a fresh clone does not have it, and you can delete what is in it. |
 
@@ -227,7 +227,7 @@ This is what you see at the root of the repository.
 | `LICENSE` | The Apache License 2.0. |
 | `CLAUDE.md` | The working rules for anyone changing the repository with Claude Code: every change is covered by a test, how to run the suite, the safety rules for a lab. |
 | `IMPROVEMENTS_IN_PROGRESS.md` | What the last review of the repository found, what is done and what is still open. It goes away when nothing is open. |
-| `.gitignore` | What git does not track: your own configuration (`*.local.*`, `config`), passwords, `tests/local`, `tests/output`, `tmp/`. |
+| `.gitignore` | What git does not track: your own configuration (`*.local.*`, `config`), passwords, `tests/local`, `tests/offline/output`, `tmp/`. |
 | `.gitattributes` | Line endings: `.sh` and `.py` files use LF, `.bat` files use CRLF, so a checkout works on Linux and on Windows. |
 | `.DS_Store` | A macOS Finder file. It is not tracked; ignore it. |
 
@@ -240,9 +240,10 @@ Admin/API 2.0/
     python/
         python3/         the python examples
         utils/           tools that work on an exported configuration XML
+Admin/UseCases/         complete administrator scenarios, a learning path
 EndUser/
     API 2.0/bash/       end user API, on the user port
-    UseCases/           complete end user scenarios (to be filled)
+    UseCases/           complete end user scenarios, a learning path
 Features/               complete solutions, one folder per feature
 ```
 
@@ -423,7 +424,7 @@ The python examples are whole programs for real maintenance tasks, rather than
 single calls. They are CSRF aware, as required from the 20230525 release onwards:
 each logs in once and sends the `csrfToken` of the login on every later call, the
 logout included. The lab accepts a write without it, which hid a script that
-forgot, so `tests/checks/test_python_scripts_run.py` runs every one of them as a
+forgot, so `tests/offline/checks/test_python_scripts_run.py` runs every one of them as a
 whole against a fake server that refuses such a write. The same test checks the
 exit codes: a failure exits 1 (a bad argument 2), never 0, and a connection error
 or a timeout always ends the script.
@@ -497,7 +498,8 @@ which ones your version supports. Every script also checks the server version wi
 `GET /version` before it does anything, and skips itself on a release that is too old.
 
 The end user API has its own folder of complete scenarios,
-[Use Cases](EndUser/UseCases/README.md).
+[Use Cases](EndUser/UseCases/README.md), and so does the administration API,
+[Admin Use Cases](Admin/UseCases/README.md).
 
 ## License and Support
 

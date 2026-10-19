@@ -1,8 +1,8 @@
 # Tests
 
 Checks that keep the examples in this repository correct. **Everything in the
-Quick Start runs offline**: no SecureTransport server, no credentials, no
-network.
+Quick Start runs offline** (the `offline/` folder): no SecureTransport server, no credentials, no
+network. The checks that do need a server are in `online/`, and are opt-in.
 
 ## Quick Start
 
@@ -12,7 +12,7 @@ Ubuntu: `sudo apt install jq`.
 **1. Run the tests** (about three minutes), from the repository root:
 
 ```
-./tests/run_all.sh
+./tests/offline/run_all.sh
 ```
 
 **2. Read the result.** A good run ends with (the number is how many checks there are, and grows):
@@ -23,7 +23,7 @@ Ubuntu: `sudo apt install jq`.
 
 If something fails, scroll up. Each line starts with `PASS` or `FAIL`, and a
 `FAIL` line says what it found. The name of the check that failed is printed
-again at the very end, with the folder (`tests/output/run.XXXXXX`) that holds the files
+again at the very end, with the folder (`tests/offline/output/run.XXXXXX`) that holds the files
 of that run, which is kept when something failed and removed when everything passed.
 Two runs at once, or a run next to one check, do not share a folder, so they do not
 delete each other's files.
@@ -31,7 +31,7 @@ delete each other's files.
 **3. Run just one check** by giving part of its name:
 
 ```
-./tests/run_all.sh hygiene
+./tests/offline/run_all.sh hygiene
 ```
 
 **4. Changed or added a script?** Add a test for it in the same change, then run
@@ -45,16 +45,16 @@ You don't need one to try. The mock is a fake SecureTransport that ships with th
 repository:
 
 ```
-tests/integration/run_integration.sh --mock
+tests/online/run_online.sh --mock
 ```
 
 Read only, expect `3 passed, 58 skipped`. With `--write`, expect
 `5 passed, 56 skipped, 0 failed` (`04.accounts_scripts.py` passes: it used to fail
-here, see [the integration README](integration/README.md)). Most checks skip because the mock
+here, see [the integration README](online/README.md)). Most checks skip because the mock
 does not implement what they need, so the mock proves the harness, not the
 examples: a check that makes no assertion counts as skipped, not passed. The
 numbers move when a check is added; the point is that nothing else fails. To run
-some of the checks only, name them: `run_integration.sh --mock 12 zones`. The mock
+some of the checks only, name them: `run_online.sh --mock 12 zones`. The mock
 never touches your own `tests/local/integration.conf`: it writes a temporary one.
 
 To run against your own lab server, see [Against a real
@@ -68,38 +68,38 @@ server](#against-a-real-server).
 
 | Check | What it catches |
 | ----- | --------------- |
-| `checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. In a `.bat` file: a single `%` before `{http_code}`, which cmd eats; a `%VAR: =%%20%` substitution, which does not URL-encode; and an RFC 2822 date with a `+03:00` offset or day names in the Windows language. |
-| `checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: README coverage tables whose counts differ from the directories, and `.claude` skills that describe a layout, file or variable that no longer exists. |
-| `checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
-| `checks/test_bash_reads_and_deletes.sh` | The examples that look up, read and delete, and the EndUser examples that open their own session: a DELETE going to an id the lookup did not find, or to anything when the lookup found nothing; composite routes not deleted before the simple routes they run; a count read from `returnCount` instead of `totalCount`; an EndUser call without the `csrfToken` its login returned. |
-| `checks/check_risk_headers.py` | An example whose header has no `Risk:` line, an unknown level, a bat twin that says something else, a read that writes (or a write called read), and the list of the disruptive ones changing unnoticed. |
-| `checks/test_bash_admin_api.sh` | The Admin examples of the resource folders (the biggest check: hundreds of runs against the stub curl): the method, URL with its query, body and headers each sends, the answers it acts on, and its exit code. For the examples that were brought up to the house rules, a bare run exiting 2 with nothing sent, the HTTP code printed, exit 1 on a 4xx or 5xx. |
-| `checks/test_bash_admin_sweep_a.sh`, `test_bash_admin_sweep_b.sh` | The older Admin write examples (servers, sites, subscriptions, routes, business units, configurations, access policies, roles, administrators) that used to ignore the status: arguments validated before anything is sent, JSON built by jq, names encoded, the code printed from `curl -w`, exit 1 on a refusal, a delete that matches exact names and refuses an ambiguous one, and the logged in administrator never deleted. Their bat twins are read as text. |
-| `checks/test_bash_admin_sweep_c.sh` | The older Admin READ examples (and the lookups that then read one object, the login and session examples, and the two route creations of `09.CompositeRoutes`) that never looked at the HTTP status: a 401 (the plain text the lab sends) or a 500 (an HTML page) printed nothing or a page and exited 0, so a failed read looked like an empty answer. For each, against the stub curl: what it printed and sent on success exactly as before, a refused call exiting 1 with `HTTP <code>` and the server's answer and no call after it, a wrong or extra argument exiting 2 with nothing sent, the exit code no longer that of the last `grep`, the HEAD of a missing server, the login of `01.myself_POST.sh` being a POST, the session that must be refused after the logout, the password of `18.AccountSetup` generated and printed instead of `change_me`, and the bat twins read as text (the status read with `%%{http_code}` and compared, exit codes, labels, closed quotes). |
-| `checks/test_bash_expression_language.sh` | The `14.ExpressionLanguage` examples: the exact expression strings that reach the server (the `${...}` not expanded by the shell, one or two backslashes, the regular expressions), the objects each creates, and that it deletes only what it created, by the id from `Location`, also after a refused create. |
-| `checks/test_bash_example_settings.sh` | The two optional settings of the Admin examples, `ST_EXAMPLE_ACCOUNT` (the account the 28 examples that used `john` take, 14 of them as their first argument) and `ST_SSH_PORT` (the four that named port 8022): without the setting each script sends exactly what it always did, with it the URL or body names the setting and `john` or 8022 is nowhere in what was sent, and an argument still wins; the committed `set_variables` files set and require neither; and the text of the bat twins and of the bash scripts (the setting read with a default, a quoted `SET`, no raw `john` or 8022 left in code). |
-| `checks/test_mock_st.py` | The bundled mock behaving like the real server where the accounts examples need it: a nested JSON Patch path, and a type specific field carried by the whole object. |
-| `checks/test_review_status.py` | `tools/review_status.py`, the list of files a person has read and confirmed (`review/checked.tsv`): nothing checked at first, marking a file or a folder, an edit making it 'changed since checked', a change of line endings only not counting, a deleted file reported, ignored files never listed. |
-| `checks/test_python_names.py` | A python example with a name defined nowhere it can be reached, or an `except ... as x` that uses another handler's name: errors that only run when something goes wrong. Also the integration checks and their library (`tests/integration`), which only run against a server: a name that is wrong on a path the lab does not take, such as a failure message or a clean-up, is found here. |
-| `checks/test_dummy_servers.py` | The stand-in servers the integration checks point SecureTransport at (the capturing proxy, the PeSIT frame decoder, the fake services): each answers the way the real one does and records what it was asked. |
-| `checks/test_authoring_tools.py` | The tools new Admin examples are written with (spec reader, bash and bat writers, docs sync): a wrong header from them would spread to every file written next. |
-| `checks/test_python_logic.py` | The python examples doing the wrong thing, by running them against a fake ST that serves paged collections and records what they would write. Also a request that cannot complete (a connection error, any kind of timeout) ending the script with exit 1. |
-| `checks/test_python_scripts_run.py` | Every python example run as a whole, as its own process, against an in-memory fake ST that does what the documentation says and the lab does not insist on: it refuses a write with no `csrfToken` (the logout too), a call with no or another `Referer`, a call with no timeout. Then it makes the server fail every way it can (a connection error, a timeout, 401 and 500 on the login, after it, on one verb) and wants a non-zero exit code, no traceback and no loop that does not end. Also `st_verify` and `st_ca_bundle` reaching every call. |
-| `checks/test_python_safety.py` | What each python example does with what it can destroy, the secrets it handles and the files it writes: a delete by prefix, not by substring, that is a dry run unless `--apply`; workers that start fresh (`spawn`); a private key written 0600 with its password out of the URL and the output; a JSON baseline compared in both directions; a cleanup that deletes only what the run created; every missing config, argument or bad value, exit 1 or 2 with nothing sent. |
-| `checks/test_python_graceful.py` | `stGraceful.py`, which can never be run on the lab: it stops nothing without `--yes`, stops a daemon once by `daemon=`, waits for every daemon to be down (bounded, on a fake clock) before the Transaction Manager, and ends with exit 1, the Transaction Manager untouched, when one never goes down. |
-| `checks/check_python_risk.py` | The python examples each having exactly one `Risk:` line with one of the four levels, a reason when it is not `read`, and a level that matches what the script is known to do. |
-| `checks/test_integration_helpers.py` | The real-server check `31` acting on a real object: every Admin example it runs must have every real name (`john`, the application, the routes) substituted with a throwaway one. Also the release comparison that decides whether the 5.5-20260924 checks run, and that every example in the newer folders is run by a real-server check. Also the runner `integration/run_integration.sh` (the order of the checks, a check that asserts nothing counting as a skip, the words that select checks) and what it does with a check that hangs: `ST_CHECK_TIMEOUT` stops it with SIGTERM so that it cleans up, then SIGKILL after `ST_CHECK_GRACE`, and it counts as FAILED with a message; and that `--write` reaches a check only when the config allows writing (`st_allow_writes`). |
-| `checks/test_harness.py` | The shared helpers of the integration checks (`integration/lib/harness.py`), with no server: the wait (an unanswered call is "not yet", the last value comes back, the time is bounded), the ports (the config, then the servers the Admin API lists, then the default), the run of an example (the exit code checked and named, the environment only for that run, a lookup that came back empty run again), the gate for `--write`, the throwaway account (a fresh name and user id, its files then itself deleted whatever happened inside the block), the temporary folder that is removed however a check ends. Also that no check carries its own copy of any of them again, or polls in a loop of its own. |
-| `checks/test_output_folders.py` | Two test runs at once deleting each other's files: no bash check names `tests/output` without `ST_TEST_OUTPUT`; the same check started twice at once with a root each passes both times; `run_all.sh` gives each run a folder of its own (`tests/output/run.XXXXXX`), removes it when everything passed, and keeps it, naming it in the last lines, when something failed. |
-| `checks/test_utils_xml.sh` | The XML helper scripts in `python/utils` (configuration compare and conversion). |
-| `checks/test_feature_version_check.sh` | The version check at the start of every `Features/` example: it must run the example on a server at or after the introducing version, skip it on an older one, and stop with an error when the version cannot be read. Also fails if a feature example has no version check. Also the four shared helpers of `Features/lib` (`post_admin`, `admin_calls`, `enduser`, `home_folder`): the code of a refused or unreachable call, an existence check that tells a 404 from an unreachable server, an encoded path, and the probe of a usable home folder. |
-| `checks/test_feature_trigger_route_pull.sh` | The `Features/trigger-route-after-completed-pull` examples (a refused call stops the run and exits 1, a stale home folder makes the run move to `<name>_2` to `_9`, a clean-up that cannot delete everything exits 1 and keeps its state file): the JSON they send is valid (even with awkward characters in the password), the sites use the right folders and port, the push folder is never the subscription folder, an old server gets nothing sent, and a missing password stops them before any call. |
-| `checks/test_feature_billable_transfers.sh` | The `Features/audit-billable-transfers` examples: the three accounts (a partner reused when it is there), each site logging in as the right partner, each account's folders made logged in as that account, each scenario's site, route and subscription bodies (including the Compress/Decompress steps and the two-backslash trigger condition), the archives built and uploaded are real zips, the billable report's per-day date math and its `account=` query per account (never `accountName=`, which the endpoint ignores), `00.run_all.sh`'s step ordering, stop-on-first-failure and per-account predictions, and `99.cleanup_DELETE.sh` finding everything by name, without touching another account's objects, and keeping a partner another test account still uses. |
-| `checks/test_bash_admin_usecases.sh` | The Admin use cases (`Admin/UseCases`): `01-authentication` (Basic authentication on a call, the 401 without credentials, the login with its jar and `csrfToken`, the cookie call, a session write that carries the `csrfToken` header and sends back the value it read, a lost session followed by a new login, the logout and the 401 that proves it) and `02-knowing-the-server` (the session check each script starts with, and each read's URL, query and paging, the answers it acts on, the cleanups, `00.run_all`), and that each script's "Copied from" file exists. |
-| `checks/test_bash_enduser_usecases.sh` | The EndUser use cases (`EndUser/UseCases`): `01-authentication`, and what `02-knowing-yourself`, `03-files-and-folders`, `04-larger-files` and `05-checking-transfers` call (the session check each starts with, the files, folders, operations and transfers calls with their query, form, body and headers, the refusals they act on, the cleanups by exact name), and for 01: Basic authentication on a call (`-u`, no cookie), the call with no credentials (401 is the expected answer), the login that keeps the jar and the csrfToken, the call with the cookie only, the csrfToken header, a lost session (401 or 403, not a 500) followed by a new login, the logout and the 401 that proves it, the cleanup, `00.run_all` stopping at the first failure, and that each script's "Copied from" file exists. |
-| `checks/test_bash_enduser_api.sh` | The EndUser examples: every one that needs a session checks for an active one first and logs in when there is none (no cookie jar, a refused session, an active one, a 500 that is not a lost session, a login that fails), and the examples added from the API reference (`03.Myself`, `04.FileOperations`, `05.Transfers`, `06.ServerTime`, `02.Files` 09 to 15): each one's method, URL and query, body and headers (`Content-MD5`, `Content-Range`), the answers it acts on (an MD5Calc followed until DONE, a 503 from a disabled service, a pull summary still in retry) and its exit code. |
-| `checks/test_bash_pesit_ack.sh` | `Features/pesit-end-to-end-acknowledgment`: `Acknowledgment.sh` sending an ACK when the outbound transfer is there, a NACK or nothing (exit 2) when it is not, only changing `operation=ack` in the link, and logging an ACK answered 200 as sent; `IteratePesitInbounds.sh` running from another folder, carrying on past a transfer that is not ready, and passing its log folder on. The bat twins are read as text for the same bugs. |
-| `checks/test_feature_bat_twins.py` | A `Features/` `.bat` file drifting out of step with its `.sh` twin: every API field name and every feature's own settings must appear in both, since the `.bat` files cannot be run in this repository to check directly. |
+| `offline/checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. In a `.bat` file: a single `%` before `{http_code}`, which cmd eats; a `%VAR: =%%20%` substitution, which does not URL-encode; and an RFC 2822 date with a `+03:00` offset or day names in the Windows language. |
+| `offline/checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: README coverage tables whose counts differ from the directories, and `.claude` skills that describe a layout, file or variable that no longer exists. |
+| `offline/checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
+| `offline/checks/test_bash_reads_and_deletes.sh` | The examples that look up, read and delete, and the EndUser examples that open their own session: a DELETE going to an id the lookup did not find, or to anything when the lookup found nothing; composite routes not deleted before the simple routes they run; a count read from `returnCount` instead of `totalCount`; an EndUser call without the `csrfToken` its login returned. |
+| `offline/checks/check_risk_headers.py` | An example whose header has no `Risk:` line, an unknown level, a bat twin that says something else, a read that writes (or a write called read), and the list of the disruptive ones changing unnoticed. |
+| `offline/checks/test_bash_admin_api.sh` | The Admin examples of the resource folders (the biggest check: hundreds of runs against the stub curl): the method, URL with its query, body and headers each sends, the answers it acts on, and its exit code. For the examples that were brought up to the house rules, a bare run exiting 2 with nothing sent, the HTTP code printed, exit 1 on a 4xx or 5xx. |
+| `offline/checks/test_bash_admin_sweep_a.sh`, `test_bash_admin_sweep_b.sh` | The older Admin write examples (servers, sites, subscriptions, routes, business units, configurations, access policies, roles, administrators) that used to ignore the status: arguments validated before anything is sent, JSON built by jq, names encoded, the code printed from `curl -w`, exit 1 on a refusal, a delete that matches exact names and refuses an ambiguous one, and the logged in administrator never deleted. Their bat twins are read as text. |
+| `offline/checks/test_bash_admin_sweep_c.sh` | The older Admin READ examples (and the lookups that then read one object, the login and session examples, and the two route creations of `09.CompositeRoutes`) that never looked at the HTTP status: a 401 (the plain text the lab sends) or a 500 (an HTML page) printed nothing or a page and exited 0, so a failed read looked like an empty answer. For each, against the stub curl: what it printed and sent on success exactly as before, a refused call exiting 1 with `HTTP <code>` and the server's answer and no call after it, a wrong or extra argument exiting 2 with nothing sent, the exit code no longer that of the last `grep`, the HEAD of a missing server, the login of `01.myself_POST.sh` being a POST, the session that must be refused after the logout, the password of `18.AccountSetup` generated and printed instead of `change_me`, and the bat twins read as text (the status read with `%%{http_code}` and compared, exit codes, labels, closed quotes). |
+| `offline/checks/test_bash_expression_language.sh` | The `14.ExpressionLanguage` examples: the exact expression strings that reach the server (the `${...}` not expanded by the shell, one or two backslashes, the regular expressions), the objects each creates, and that it deletes only what it created, by the id from `Location`, also after a refused create. |
+| `offline/checks/test_bash_example_settings.sh` | The two optional settings of the Admin examples, `ST_EXAMPLE_ACCOUNT` (the account the 28 examples that used `john` take, 14 of them as their first argument) and `ST_SSH_PORT` (the four that named port 8022): without the setting each script sends exactly what it always did, with it the URL or body names the setting and `john` or 8022 is nowhere in what was sent, and an argument still wins; the committed `set_variables` files set and require neither; and the text of the bat twins and of the bash scripts (the setting read with a default, a quoted `SET`, no raw `john` or 8022 left in code). |
+| `offline/checks/test_mock_st.py` | The bundled mock behaving like the real server where the accounts examples need it: a nested JSON Patch path, and a type specific field carried by the whole object. |
+| `offline/checks/test_review_status.py` | `tools/review_status.py`, the list of files a person has read and confirmed (`review/checked.tsv`): nothing checked at first, marking a file or a folder, an edit making it 'changed since checked', a change of line endings only not counting, a deleted file reported, ignored files never listed. |
+| `offline/checks/test_python_names.py` | A python example with a name defined nowhere it can be reached, or an `except ... as x` that uses another handler's name: errors that only run when something goes wrong. Also the integration checks and their library (`tests/integration`), which only run against a server: a name that is wrong on a path the lab does not take, such as a failure message or a clean-up, is found here. |
+| `offline/checks/test_dummy_servers.py` | The stand-in servers the integration checks point SecureTransport at (the capturing proxy, the PeSIT frame decoder, the fake services): each answers the way the real one does and records what it was asked. |
+| `offline/checks/test_authoring_tools.py` | The tools new Admin examples are written with (spec reader, bash and bat writers, docs sync): a wrong header from them would spread to every file written next. |
+| `offline/checks/test_python_logic.py` | The python examples doing the wrong thing, by running them against a fake ST that serves paged collections and records what they would write. Also a request that cannot complete (a connection error, any kind of timeout) ending the script with exit 1. |
+| `offline/checks/test_python_scripts_run.py` | Every python example run as a whole, as its own process, against an in-memory fake ST that does what the documentation says and the lab does not insist on: it refuses a write with no `csrfToken` (the logout too), a call with no or another `Referer`, a call with no timeout. Then it makes the server fail every way it can (a connection error, a timeout, 401 and 500 on the login, after it, on one verb) and wants a non-zero exit code, no traceback and no loop that does not end. Also `st_verify` and `st_ca_bundle` reaching every call. |
+| `offline/checks/test_python_safety.py` | What each python example does with what it can destroy, the secrets it handles and the files it writes: a delete by prefix, not by substring, that is a dry run unless `--apply`; workers that start fresh (`spawn`); a private key written 0600 with its password out of the URL and the output; a JSON baseline compared in both directions; a cleanup that deletes only what the run created; every missing config, argument or bad value, exit 1 or 2 with nothing sent. |
+| `offline/checks/test_python_graceful.py` | `stGraceful.py`, which can never be run on the lab: it stops nothing without `--yes`, stops a daemon once by `daemon=`, waits for every daemon to be down (bounded, on a fake clock) before the Transaction Manager, and ends with exit 1, the Transaction Manager untouched, when one never goes down. |
+| `offline/checks/check_python_risk.py` | The python examples each having exactly one `Risk:` line with one of the four levels, a reason when it is not `read`, and a level that matches what the script is known to do. |
+| `offline/checks/test_integration_helpers.py` | The real-server check `31` acting on a real object: every Admin example it runs must have every real name (`john`, the application, the routes) substituted with a throwaway one. Also the release comparison that decides whether the 5.5-20260924 checks run, and that every example in the newer folders is run by a real-server check. Also the runner `integration/run_online.sh` (the order of the checks, a check that asserts nothing counting as a skip, the words that select checks) and what it does with a check that hangs: `ST_CHECK_TIMEOUT` stops it with SIGTERM so that it cleans up, then SIGKILL after `ST_CHECK_GRACE`, and it counts as FAILED with a message; and that `--write` reaches a check only when the config allows writing (`st_allow_writes`). |
+| `offline/checks/test_harness.py` | The shared helpers of the integration checks (`integration/lib/harness.py`), with no server: the wait (an unanswered call is "not yet", the last value comes back, the time is bounded), the ports (the config, then the servers the Admin API lists, then the default), the run of an example (the exit code checked and named, the environment only for that run, a lookup that came back empty run again), the gate for `--write`, the throwaway account (a fresh name and user id, its files then itself deleted whatever happened inside the block), the temporary folder that is removed however a check ends. Also that no check carries its own copy of any of them again, or polls in a loop of its own. |
+| `offline/checks/test_output_folders.py` | Two test runs at once deleting each other's files: no bash check names `tests/offline/output` without `ST_TEST_OUTPUT`; the same check started twice at once with a root each passes both times; `run_all.sh` gives each run a folder of its own (`tests/offline/output/run.XXXXXX`), removes it when everything passed, and keeps it, naming it in the last lines, when something failed. |
+| `offline/checks/test_utils_xml.sh` | The XML helper scripts in `python/utils` (configuration compare and conversion). |
+| `offline/checks/test_feature_version_check.sh` | The version check at the start of every `Features/` example: it must run the example on a server at or after the introducing version, skip it on an older one, and stop with an error when the version cannot be read. Also fails if a feature example has no version check. Also the four shared helpers of `Features/lib` (`post_admin`, `admin_calls`, `enduser`, `home_folder`): the code of a refused or unreachable call, an existence check that tells a 404 from an unreachable server, an encoded path, and the probe of a usable home folder. |
+| `offline/checks/test_feature_trigger_route_pull.sh` | The `Features/trigger-route-after-completed-pull` examples (a refused call stops the run and exits 1, a stale home folder makes the run move to `<name>_2` to `_9`, a clean-up that cannot delete everything exits 1 and keeps its state file): the JSON they send is valid (even with awkward characters in the password), the sites use the right folders and port, the push folder is never the subscription folder, an old server gets nothing sent, and a missing password stops them before any call. |
+| `offline/checks/test_feature_billable_transfers.sh` | The `Features/audit-billable-transfers` examples: the three accounts (a partner reused when it is there), each site logging in as the right partner, each account's folders made logged in as that account, each scenario's site, route and subscription bodies (including the Compress/Decompress steps and the two-backslash trigger condition), the archives built and uploaded are real zips, the billable report's per-day date math and its `account=` query per account (never `accountName=`, which the endpoint ignores), `00.run_all.sh`'s step ordering, stop-on-first-failure and per-account predictions, and `99.cleanup_DELETE.sh` finding everything by name, without touching another account's objects, and keeping a partner another test account still uses. |
+| `offline/checks/test_bash_admin_usecases.sh` | The Admin use cases (`Admin/UseCases`): `01-authentication` (Basic authentication on a call, the 401 without credentials, the login with its jar and `csrfToken`, the cookie call, a session write that carries the `csrfToken` header and sends back the value it read, a lost session followed by a new login, the logout and the 401 that proves it) and `02-knowing-the-server` (the session check each script starts with, and each read's URL, query and paging, the answers it acts on, the cleanups, `00.run_all`), and that each script's "Copied from" file exists. |
+| `offline/checks/test_bash_enduser_usecases.sh` | The EndUser use cases (`EndUser/UseCases`): `01-authentication`, and what `02-knowing-yourself`, `03-files-and-folders`, `04-larger-files` and `05-checking-transfers` call (the session check each starts with, the files, folders, operations and transfers calls with their query, form, body and headers, the refusals they act on, the cleanups by exact name), and for 01: Basic authentication on a call (`-u`, no cookie), the call with no credentials (401 is the expected answer), the login that keeps the jar and the csrfToken, the call with the cookie only, the csrfToken header, a lost session (401 or 403, not a 500) followed by a new login, the logout and the 401 that proves it, the cleanup, `00.run_all` stopping at the first failure, and that each script's "Copied from" file exists. |
+| `offline/checks/test_bash_enduser_api.sh` | The EndUser examples: every one that needs a session checks for an active one first and logs in when there is none (no cookie jar, a refused session, an active one, a 500 that is not a lost session, a login that fails), and the examples added from the API reference (`03.Myself`, `04.FileOperations`, `05.Transfers`, `06.ServerTime`, `02.Files` 09 to 15): each one's method, URL and query, body and headers (`Content-MD5`, `Content-Range`), the answers it acts on (an MD5Calc followed until DONE, a 503 from a disabled service, a pull summary still in retry) and its exit code. |
+| `offline/checks/test_bash_pesit_ack.sh` | `Features/pesit-end-to-end-acknowledgment`: `Acknowledgment.sh` sending an ACK when the outbound transfer is there, a NACK or nothing (exit 2) when it is not, only changing `operation=ack` in the link, and logging an ACK answered 200 as sent; `IteratePesitInbounds.sh` running from another folder, carrying on past a transfer that is not ready, and passing its log folder on. The bat twins are read as text for the same bugs. |
+| `offline/checks/test_feature_bat_twins.py` | A `Features/` `.bat` file drifting out of step with its `.sh` twin: every API field name and every feature's own settings must appear in both, since the `.bat` files cannot be run in this repository to check directly. |
 
 The payload and python checks are the interesting ones. They exercise the real
 scripts without a server, which is how the silent JSON corruption described in
@@ -107,20 +107,38 @@ scripts without a server, which is how the silent JSON corruption described in
 
 ### Layout
 
+Two kinds of test, in two folders, so it is clear which needs a server:
+
 ```
 tests/
-    run_all.sh          runs everything in checks/
-    lib/                the stubs: a fake curl, a fake ST API (fake_st.py, for single functions),
+    README.md           this file
+    offline/            NO server, no credentials, no network. This is what `run_all.sh` runs, and what CI runs.
+        run_all.sh      runs everything in checks/
+        checks/         the checks themselves (check_* and test_*, bash or python)
+        lib/            the stubs: a fake curl, a fake ST API (fake_st.py, for single functions),
                         a fake requests library with an in-memory server (fake_requests/, run by
                         run_example.py, for whole scripts), the worlds they serve (example_worlds.py)
-    fixtures/           small synthetic inputs. No real data, ever.
-    checks/             the checks themselves
-    integration/        opt-in checks against a real server. See its README.
-    local/              YOUR data. Git ignores this. See below.
-    output/             run artifacts. Git ignores this. A run of run_all.sh works in output/run.XXXXXX
+        fixtures/       small synthetic inputs. No real data, ever.
+        output/         run artifacts. Git ignores this. A run of run_all.sh works in output/run.XXXXXX
                         (the checks are told by ST_TEST_OUTPUT), removed when all passed; a check started
                         by hand uses output/<its name>
+    online/             Needs a REAL SecureTransport (a lab, never production), or the bundled mock. Opt-in.
+        run_online.sh   runs everything in checks/ against the server named in local/integration.conf
+        checks/         the numbered checks (01.connect.py, 33.enduser_api_scripts.py, ...)
+        integration.conf.example   the shape of the config you put in local/
+        README.md       how to set up and run it, and a table of what each check does
+    common/             Python that both sides use: the online checks are written with it, and the offline
+                        checks test it (so that a mistake in a helper does not show up as a failing lab check).
+                        st_client.py (the admin and end user clients), harness.py (what the checks share),
+                        script_runner.py (runs a shipped script with real credentials), run_check.py (the
+                        time limit), dummy_servers.py and pesit_wire.py and protocol_logins.py (stand-ins
+                        and protocol helpers for what a check needs the lab to reach), mock_st.py (the mock)
+    local/              YOUR data. Git ignores this. See below.
+    local.example/      the shape of local/, committed
 ```
+
+The rule of thumb: if it can run on a laptop with no network, it is in `offline/`. If it logs in to a server, it is in
+`online/`. Code that both need is in `common/`, and never a copy of it.
 
 ### Adding a check
 
@@ -147,9 +165,9 @@ The same suite runs on GitHub for every push and pull request
 The checks above never touch a server. A separate, opt-in layer does:
 
 ```
-tests/integration/run_integration.sh --mock     try it with no server at all
-tests/integration/run_integration.sh            read only, against your server
-tests/integration/run_integration.sh --write    also create and delete an account
+tests/online/run_online.sh --mock     try it with no server at all
+tests/online/run_online.sh            read only, against your server
+tests/online/run_online.sh --write    also create and delete an account
 ```
 
 It proves the server still behaves the way the examples assume: the CSRF
@@ -158,11 +176,11 @@ handshake, paging, status codes, PATCH semantics. It needs a config in
 system, and needs a second explicit yes before it writes anything (without it
 `--write` is not even passed on to the checks). A check that hangs is stopped after
 `ST_CHECK_TIMEOUT` seconds (1800 when not set), cleans up when it can and counts as
-FAILED. See [integration/README.md](integration/README.md) for setup.
+FAILED. See [integration/README.md](online/README.md) for setup.
 
 ### tests/local: the part git ignores
 
-`tests/local/` and `tests/output/` are excluded from git, so put anything here
+`tests/local/` and `tests/offline/output/` are excluded from git, so put anything here
 that must not reach the repository:
 
 - responses captured from a real server, which carry hostnames, account names,
@@ -188,7 +206,7 @@ are committed. If you are unsure, it belongs in `local/`.
 | Symptom | Likely cause |
 | ------- | ------------ |
 | `jq: command not found` | Install `jq` (see Quick Start). |
-| `Permission denied` on `run_all.sh` | `chmod +x tests/run_all.sh` |
+| `Permission denied` on `run_all.sh` | `chmod +x tests/offline/run_all.sh` |
 | A check named `hygiene` fails | It found something that looks like a credential, hostname or IP. Read the `FAIL` line, then replace it with a placeholder such as `<SERVER>`. |
 | A check named `docs_match_repo` fails | You added or removed a script and the README count or a `.claude` skill is now out of date. Update it. |
-| Integration checks 15 to 18 and 20 skip | They need a one-time venv. See [integration/README.md](integration/README.md). |
+| Integration checks 15 to 18 and 20 skip | They need a one-time venv. See [integration/README.md](online/README.md). |

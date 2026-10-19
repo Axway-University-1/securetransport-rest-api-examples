@@ -31,7 +31,7 @@
 #   script requires icap://, so a typo is caught here.
 # - Confirmed directly: with scanning on, SecureTransport asks the server OPTIONS, then
 #   sends each file as a REQMOD request, with a preview of previewSize KB first.
-#   tests/integration/lib/dummy_servers.py has a FakeIcap that can stand in for one.
+#   tests/common/dummy_servers.py has a FakeIcap that can stand in for one.
 # - 03.icapServers_name_HEAD.sh to 07.icapServers_name_DELETE.sh check, read, change,
 #   switch on and remove it.
 # - Requires `jq`, which builds the body.

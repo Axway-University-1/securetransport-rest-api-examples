@@ -41,7 +41,7 @@ REM   every missing one in validationErrors ("steps[0].compressionType must not 
 REM   route whose step is incomplete with 400 (nothing is created). Adding the fields it named, one round
 REM   after the other, gave the smallest step it accepts for each of the 17 types, and each was created,
 REM   read back with GET /routes/<id> (same type and values) and deleted by
-REM   tests/integration/checks/51.route_steps_metadata_scripts.py. Every step needs `type`, `status`
+REM   tests/online/checks/51.route_steps_metadata_scripts.py. Every step needs `type`, `status`
 REM   (ENABLED or DISABLED) and `actionOnStepFailure` (FAIL or PROCEED); `conditionType` may be left out
 REM   (it reads back ALWAYS). Below, "filter" is fileFilterExpression plus fileFilterExpressionType
 REM   (GLOB, REGEXP or TEXT_FILES), and the rest is what each type needs besides the three:

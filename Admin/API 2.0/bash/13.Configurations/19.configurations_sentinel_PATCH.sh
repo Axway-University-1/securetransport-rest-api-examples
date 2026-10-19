@@ -26,7 +26,7 @@
 #   the ST server; without it, 400 "overflowFilePath must not be null or
 #   empty."
 # - Confirmed directly: the server connects at once and sends XML events, a
-#   HEARTBEAT every heartbeatDelay seconds. tests/integration/lib/dummy_servers.py
+#   HEARTBEAT every heartbeatDelay seconds. tests/common/dummy_servers.py
 #   has a TcpSink that can stand in for Sentinel.
 # - Confirmed directly: once a host is set, the endpoint refuses an empty one,
 #   "host must not be null or empty", even with reporting off, and then any

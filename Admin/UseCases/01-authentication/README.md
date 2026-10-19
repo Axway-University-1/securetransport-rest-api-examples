@@ -52,6 +52,6 @@ jar of this use case, `session.cookie.jar`, which git ignores, and the session h
 
 ## Tests
 
-`tests/checks/test_bash_admin_usecases.sh` runs every script against a stub `curl`.
-`tests/integration/checks/64.admin_usecases_scripts.py` runs them on a real server and checks that the administrator's own
+`tests/offline/checks/test_bash_admin_usecases.sh` runs every script against a stub `curl`.
+`tests/online/checks/64.admin_usecases_scripts.py` runs them on a real server and checks that the administrator's own
 settings are exactly as they were afterwards.

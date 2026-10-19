@@ -94,7 +94,7 @@ is safe to run. One of:
 
 Add the reason after a dash when it is not obvious from the name:
 `# Risk: disruptive - stops and starts daemons`. The bat twin carries the same
-line; `tests/checks/check_risk_headers.py` checks both.
+line; `tests/offline/checks/check_risk_headers.py` checks both.
 
 The **Notes** section is where the value is. Put in it what the reader cannot
 see from the code: prerequisites ("run 08.RouteTemplates first"), things the
@@ -183,7 +183,7 @@ Copy an existing script rather than starting from scratch —
    call is followed by a look at it.
 5. `stLogin()` returning the `csrfToken` of the login, and `stLogout()` sending it: every
    write sends it, the logout included. The lab accepts a write without it and the
-   documentation says it must be there, so `tests/checks/test_python_scripts_run.py` runs
+   documentation says it must be there, so `tests/offline/checks/test_python_scripts_run.py` runs
    your script against a fake server that refuses one.
 6. A `BEGIN / END Configuration Section` block containing the config file read.
 7. `numAPIs = Value('i', 0)`, incremented per call, reported at the end.
@@ -238,9 +238,9 @@ arguments, ends the queue with one `None` per worker, and counts with
 
 - [ ] `bash -n` passes on every shell file you touched, matched case-insensitively
 - [ ] python compiles: `python3 -m py_compile`
-- [ ] a python example is in the `CASES` of `tests/checks/test_python_scripts_run.py`
+- [ ] a python example is in the `CASES` of `tests/offline/checks/test_python_scripts_run.py`
       (csrfToken, exit codes and failures, all at once) and has a `# Risk:` line
-      (`tests/checks/check_python_risk.py`)
+      (`tests/offline/checks/check_python_risk.py`)
 - [ ] the bat twin exists and behaves the same
 - [ ] the `Script Name:` header matches the filename
 - [ ] the `Risk:` line is there, the same in both twins
@@ -249,8 +249,8 @@ arguments, ends the queue with one `None` per worker, and counts with
       `<BASE64_ENCODED_USERNAME_COLON_PASSWORD>`
 - [ ] no JSON edited by text substitution
 - [ ] temporary files removed by the script, and gitignored as a backstop
-- [ ] a test covers the new or changed script (`tests/checks/`, see CLAUDE.md)
-      and `./tests/run_all.sh` passes
+- [ ] a test covers the new or changed script (`tests/offline/checks/`, see CLAUDE.md)
+      and `./tests/offline/run_all.sh` passes
 - [ ] the README coverage table updated — the per-topic counts in it are meant
       to match a live count of the directories
 

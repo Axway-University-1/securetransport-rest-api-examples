@@ -1,0 +1,539 @@
+# Online tests
+
+These talk to a **real SecureTransport**. The checks in `tests/offline/checks` prove the
+examples are internally consistent; these prove the server still behaves the way
+the examples assume.
+
+The harness itself (`tests/common/st_client.py`) is standard library only — no `pip install`
+needed to run the checks against the bash and bat examples. What the checks have in
+common is in `tests/common/harness.py` (see [What the checks share](#what-the-checks-share)).
+
+```
+tests/online/run_online.sh            read only
+tests/online/run_online.sh --write    also create and delete an account
+tests/online/run_online.sh --mock     against the bundled mock, no server
+tests/online/run_online.sh 46 zones   only the checks with one of these words in their file name
+```
+
+Each check's output shows as it runs, with its seconds. A check that asserts nothing (it
+skipped, or bailed out because the mock cannot do it) counts as skipped, not passed.
+
+A check that hangs does not hang the run: each gets `ST_CHECK_TIMEOUT` seconds (1800 when not set,
+`0` turns the limit off; the longest check, 59, took 14 minutes on the lab in October 2026 with a `st_callback_host`
+the server can reach, and about an hour when it cannot, because every pull then waits for its connection to fail). When the time is up the
+check gets SIGTERM, which makes it run its `finally` blocks and remove what it made (`ST_CHECK_GRACE`
+seconds for that, 120 when not set), then SIGKILL. It is reported as FAILED, with a line that says
+so, and the run goes on. The limit is kept by `tests/common/run_check.py`, because macOS has no `timeout`.
+
+Checks `15` through `18` run the real Admin API 2.0 **python3** examples,
+which import `requests` - a third-party
+library the harness itself deliberately does not depend on. Those checks
+need a one-time venv, gitignored under `tests/local/`:
+
+```
+python3 -m venv tests/local/pyvenv
+tests/local/pyvenv/bin/pip install requests
+```
+
+Without it, checks `15`-`18` and `20` report a clean skip rather than fail
+(`19` is bash only and does not need it).
+
+## Try it with no server first
+
+```
+tests/online/run_online.sh --mock --write
+```
+
+That starts a small stand-in SecureTransport on localhost over real HTTPS and
+runs the same checks against it. It proves the harness works — the CSRF
+handshake, the Referer requirement, paging, the status codes — so that when you
+point it at a real server, a failure is a real difference and not a bug in the
+tests.
+
+The mock is not a SecureTransport simulator and does not try to be.
+
+`04.accounts_scripts.py` passes against `--mock --write`. It used to fail there,
+on five assertions (the exists check of `03`, the contact added by `06`, the
+contact from the patch file, and the three deletes of `07`), and the cause was in
+two places, now fixed. In the scripts: `03` and `07` read the HTTP status with
+`curl ... 2>&1 | grep HTTP | awk '{print $2}'`, and the mock answers with a
+`Server: BaseHTTP/0.6 Python/3.14.4` header that also contains `HTTP`, so the
+"status" came out as two words and was never `200` (a real server, whose header
+is `Server: Linux`, never showed it); they now read the status with `curl -w`.
+In the mock: it read the JSON Patch path `/addressBookSettings/contacts/-` as a
+top level field with that name, so the contacts never arrived (it now applies a
+nested path, `tests/offline/checks/test_mock_st.py`), and it did not decode `%2C` in a
+query. Everything passes against the mock, with and without `--write`.
+
+## Pointing it at your own server
+
+```
+mkdir -p tests/local
+cp tests/online/integration.conf.example tests/local/integration.conf
+$EDITOR tests/local/integration.conf
+```
+
+`tests/local/` is gitignored, so the address and credentials never reach the
+repository.
+
+## Safety
+
+Four gates, in order:
+
+1. **No config, no run.** Without `tests/local/integration.conf` the suite
+   reports a skip and exits 0, so a clean clone is not a failure.
+2. **`st_confirm_lab="yes"`** must be in the config. It is a deliberate
+   statement that the server is not production. Nothing runs without it.
+3. **Writing needs two separate yeses:** `--write` on the command line *and*
+   `st_allow_writes="yes"` in the config. With either missing, the read only
+   checks still run and the lifecycle check skips. The runner passes `--write` on to
+   the checks only when the config allows writing (it says "read only, because
+   st_allow_writes is not yes" and passes nothing), and every check that writes
+   repeats the gate itself (`harness.require_writes`), so neither is the only guard.
+4. **Everything created carries `st_object_prefix`**, default `ZZTEST_`. The
+   lifecycle check refuses to delete anything without it, and tears down what it
+   made even when an assertion fails. If teardown cannot complete it says so, by
+   name, so you can remove the object by hand.
+
+Read only means read only: checks 01 and 02 issue nothing but GET and HEAD.
+
+## What each check covers
+
+`01` to `03` prove the API behaves the way the examples assume, using a small
+client written for this harness (`tests/common/st_client.py`). `04` is a different kind of
+check: it runs the actual, unmodified script files that ship in
+`Admin/API 2.0/bash`, so a bug in the real curl invocation — bad quoting, a
+stale field name, a broken `jq` filter — is what it catches, not just a wrong
+assumption about the API.
+
+| Check | Writes? | What it proves |
+| ----- | ------- | -------------- |
+| `01.connect.py` | no | Login, the CSRF handshake, `/myself`, `/version`, logout. Also whether your server really does reject a call with no `Referer`. Run this first: if it fails, nothing else will work and the reason is here. |
+| `02.read.py` | no | The behaviours every example depends on: the `result` and `resultSet.returnCount` envelope, paging that does not overlap or repeat, `fields=` narrowing the response while `type` still comes back, HEAD as an existence check, 404 for a missing object, and that a type specific field needs `type=`. |
+| `03.lifecycle.py` | **yes** | The full cycle on one account, through a harness-written client: POST returning 201 with a `Location` header, GET and HEAD, PATCH returning 204, `replace` on an unset field being rejected, PUT replacing the object while preserving other fields, the object appearing in the collection, and DELETE really removing it. |
+| `04.accounts_scripts.py` | **yes** | The same cycle, but by running the real `01` through `07` scripts in `Admin/API 2.0/bash/05.Accounts` and verifying each step independently through the API. The scripts act on harmless accounts of their own (`example_user`, `example_service`, `example_template`) and on no other: the check keeps the list of accounts and the whole of `john`, and compares them at the end. It also runs them the ways they refuse (too many arguments, an empty name, a missing or bad patch file, an account that is not there) and checks the exit codes, the `HTTP <code>` they print, the old value `05` and `06` print and the command or body that puts it back (and runs that). Under `--mock` it passes: it used to fail there (see its docstring: `grep HTTP` read the mock's `Server: BaseHTTP` header, and the mock read a nested JSON Patch path as a top level field). |
+| `05.applications_scripts.py` | **yes** | The real `01` through `07` scripts in `Admin/API 2.0/bash/04.Applications`, acting on `example_humansystem` (a flow application), `example_filepurge` (a File Maintenance application with no schedule, so it never runs) and, made by the check through the API, `example_archive` (an ArchiveMaint with a ONCE schedule, so that `03` to `07` run on an application that has one: the start date patch, and the body `06` prints that restores the schedule exactly). If this server already has an application of type `AccountFilePurge` under any name - only one is allowed per server, confirmed directly - `02` says so and creates the flow application only; nothing is run as a substituted copy any more. Compares the list of applications at the end. Skips under `--mock` (no `/applications`). |
+| `06.servers_scripts.py` | **yes** | The real `07` through `12` scripts in `Admin/API 2.0/bash/03.Connect` - server create, read, update, delete. Deliberately not `01`-`05` or `13`: those read or change a daemon (a singleton, not a disposable object) or start and stop real daemons and servers. |
+| `07.businessunits_scripts.py` | **yes** | The real `01.businessUnits_POST.sh`, verified and cleaned up through the API (`38` runs the folder's other examples). It passes a throwaway name and base folder to the real script (it takes them as arguments) instead of running a substituted copy. |
+| `08.transfersites_scripts.py` | **yes** | The real `01.sites_POST.sh`, the same way as business units. A site is addressed by a generated `id`, not by name - confirmed directly, and found via `GET /sites?name=...`. If a site named `HTTP` on account `john` already exists, this runs a name-substituted copy targeting `HTTP_test` on the same, unmodified `john` account instead of skipping. |
+| `09.connect_read.py` | no | `01.daemons_GET.sh`, `02.daemons_name_GET.sh` and `06.servers_GET.sh` for real, plus that every daemon status is one of the two documented values. The read-only counterpart to what `06.servers_scripts.py` deliberately excludes. |
+| `10.configurations_read.py` | no | The shape of a Server Configuration Option response, and that a made up option returns 404. Deliberately never runs either PATCH script in `13.Configurations` - a Configuration Option is a real, persistent server setting, not a disposable object. |
+| `11.enduser_scripts.py` | **yes** | The full `EndUser/API 2.0/bash` cycle for real: login, list, upload, download, bulk upload and download, logout. Needs no separate end user account configured ahead of time - it creates its own throwaway one through the admin API and deletes it afterward, the same pattern `04.accounts_scripts.py` uses for `john`. Found and fixed a real bug in the process: both download scripts were writing the HTTP status code onto the end of every downloaded file. |
+| `12.myself_and_version_scripts.py` | no | The real scripts in `Admin/API 2.0/bash/01.Authentication` and `02.Introduction`: login with and without a cookie jar, `/version`, `/myself`, and logout. No object is created, so this needs no `--write`. Verifies session reuse and logout independently by reusing the cookie jar a script wrote, in a fresh request the script itself never checks the result of. Deliberately excludes `02.Introduction/04.myself_PATCH.sh`, covered separately below. |
+| `13.myself_patch_scripts.py` | **yes** | The real `02.Introduction/04.myself_PATCH.sh` - the one script `12` excludes, because it changes the currently authenticated user's own password. Run instead against a throwaway administrator this check creates through `/administrators` (a different resource from `/accounts`, confirmed directly) and deletes afterward - the real file runs completely unmodified, since it is not parameterised by account name at all. The new password comes from `ST_NEW_PASSWORD`: the script exits 2 and sends nothing without it (proved first: the old password still works), exits 1 on a refusal (a wrong current password, 401), and the change and its reversal are checked by logging in. |
+| `14.daemon_write_scripts.py` | **yes** | The real `03.daemons_name_PUT.sh` and `04.daemons_name_PATCH.sh` against the one daemon `/daemons/{name}` will ever address - `ssh` - since no other name is valid regardless of what exists on the server; the scripts take the daemon and the values as arguments. Reads the daemon's real settings first, runs both scripts, verifies each change, then restores the original settings and verifies the restore. It also runs 03, 04 and 05 with no arguments (and 05 with a stop but no or a wrong confirmation word): exit 2, nothing sent, the status of every daemon compared. It never runs 05 with a daemon, an operation and the confirmation word: that stops the daemon (`23`). See "What is not covered yet" for the reasoning; this needed an explicit, informed decision before it was added. |
+| `15.python_read_scripts.py` | no | The real `stGetAccountsAfterDate.py` and `stConfigScan.py` (both modes) from `Admin/API 2.0/python/python3`. No object is created, so this needs no `--write`, just the venv above. `stConfigScan.py` runs as a name-substituted copy, retargeting its hardcoded `/home/axway/stConfig.baseline` at `tests/local` - that path only exists on a real ST host. |
+| `16.python_build_delete_accounts.py` | **yes** | The real `stDeleteTestAccounts.py`, and a count-and-name-substituted copy of `stBuildTestAccounts.py` (3 accounts and 1 process instead of 100 and 3, and its unconditional business unit renamed to a throwaway `ZZTEST_` name) - the pairing the scripts' own naming convention (`ZZ` + index, matched by `stDeleteTestAccounts.py`'s hardcoded substring filter) already anticipates. |
+| `17.python_login_restriction.py` | **yes** | The real, completely unmodified `stAddLoginRestrictionRule.py`, against a throwaway login restriction policy this check creates and deletes - the script takes the policy name as a real argument, so no substitution is needed at all. |
+| `18.python_replace_sites.py` | **yes** | The real, completely unmodified `stReplaceSites.py`, against every real SSH-protocol site on the server - there is no disposable stand-in, since the script has no name or prefix filter at all. Reads every site's full object first, runs the script, verifies each site's `keyExchangeAlgorithms`, then restores every site to its original object and verifies the restore, including that each site's already-encrypted password field survives unchanged. This needed an explicit, informed decision before it was added - this server had real-looking partner sites in scope. See "What is not covered yet". |
+| `19.bash_expression_language.py` | **yes** | The real, unmodified Expression Language exercises in `Admin/API 2.0/bash/14.ExpressionLanguage` (8 scripts) - a login restriction rule, an EL route condition, a route step's GLOB and REGEXP file filters, the nested EL-plus-JSON backslash doubling case, a rename expression, and a transfer site's `downloadPattern` and dynamic-property fields. Each script is self-contained (creates, shows, deletes its own throwaway objects); this check verifies each script's own printed output shows the exact expression text expected, then independently confirms nothing named `ZZTEST_EL_*` is left in routes, sites or loginRestrictionPolicies. |
+| `20.python_expression_language.py` | **yes** | The same eight exercises, run through their python3 twins in `Admin/API 2.0/python/python3/14.ExpressionLanguage`. Same verification approach as `19`. |
+| `21.configurations_write_scripts.py` | **yes** | The real `01.configurations_PATCH.sh` and `02.configurations_PATCH_UsageReporting.sh` in `13.Configurations`. A Server Configuration Option is a real, server-wide setting, so this reads every option's value first, proves both scripts send nothing when run bare (exit 2, every option unchanged), runs `01` with the value the option already has and with a harmless change to the days of the report, and `02` with ten `ST_USAGE_*` variables of its own, verifies each new value and the old values the scripts print, then restores every option and verifies the restore. Found that an option GET reports as `readOnly` can still be patched. |
+| `22.routetemplates_compositeroutes_scripts.py` | **yes** | `08.RouteTemplates/02.routes_POST.sh`, trimmed from its 163 template names to 3 (keeping `RouteFromAccountant`, which the next script needs), and `03.routes_DELETE_all.sh` the same way (a trimmed copy: the real one would delete all 163 names, only those, only among templates), then the real, unmodified `09.CompositeRoutes/02.routes_POST.sh`. Refuses to run if any of the names it creates already exist, and deletes every route it made. |
+| `23.connect_operations_scripts.py` | **yes** | The real `05.daemons_operations_POST.sh` and `13.servers_operations_POST.sh` in `03.Connect`, which stop and start real daemons and servers. `05` is given its daemon, its operation and the confirmation word of a stop (`http stop stop-the-http-daemon false`, then `ssh stop stop-the-ssh-daemon true 600`); run bare it exits 2 and sends nothing. Records every daemon and server state first, runs both, verifies the stop and the start, then restores AS2 to stopped and waits for every daemon and server to match its original state. `13` is run as `--all-stopped start-all-stopped-servers`, which starts only what is not running, and a bare run exits 2 and sends nothing; on this lab it exits 1 by design, because the as2 server and daemon cannot start, and the check accepts exit 1 only when every `successful: false` line is about as2. Needed an explicit decision before it was added: run it only on a lab you can restart. |
+| `24.python_read_reports.py` | no | The real `stUsersPerSharedFolder.py` and `stCertificateExpiry.py`. Both only read, so this needs no `--write`, just the venv above. Each count they report is checked against an independent GET. |
+| `25.python_update_route_with_put.py` | **yes** | The real `stUpdateRouteWithPut.py` in its default `insert` mode, on a throwaway route it creates: reads the route, inserts a step at offset 0, PUTs the whole object back. Runs as a copy with `dryRun` off; verifies the step landed, then deletes the route. |
+| `26.python_get_private_cert.py` | **yes** | The real `stGetPrivateCert.py`, exporting a private certificate this check generates for a throwaway account through `POST /certificates`. Needs this server's CA password in `st_ca_password`, and skips itself when that is blank. Verifies a real private key was exported, then removes the certificate, the account and the files written. |
+| `27.python_update_all_routes.py` | **yes** | The real `stUpdateAllRoutes.py` (its first example) over every SIMPLE route on the server, plus a throwaway one built to match its condition. Verifies only the throwaway route is patched and the real ones are left alone - confirmed beforehand that no real route matches. |
+| `28.python_build_full_test_account.py` | **yes** | The real `stBuildFullTestAccount.py` end to end: account, an imported SSH key, a folder-monitor site, an SFTP site using that key, a subscription and two routes. Creates `ZZTEST_` stand-ins for the template and application the script expects, generates the key with `ssh-keygen`, and needs `st_ca_password`. Verifies all seven objects, then deletes them. Found and fixed two hardcoded account names in the script. |
+| `29.python_update_all_subscriptions.py` | **yes** | The real `stUpdateAllSubscriptions.py` over every real subscription on the server - the one check approved to change objects it does not own. Captures the four fields it patches on every subscription first, runs the script, then restores each field to its exact original value and verifies the restore. |
+| `30.lookups_and_transfer_logs_read.py` | no | The query filters the newer examples look objects up with - `/sites?account=&name=`, `/subscriptions?account=`, `/routes?type=` and `?name=`, `/logs/transfers?status=Failed` - each checked against every object it returns, using objects already on the server. That `/logs/transfers` carries `totalCount` while `returnCount` is capped by `limit`. Then the real `16.TransferLogs` scripts and `stBillableTransfers.py` (with the venv), each printed count compared with the API's own count for the same account and day. The billable parts need 5.5-20260924 or later. |
+| `31.subscriptions_routes_transfers_scripts.py` | **yes** | The newer examples as one Advanced Routing flow, on a throwaway `ZZTEST_chain` account: the EndUser folder and upload scripts, the SSH sites, both subscriptions, the Compress and Decompress routes, the composite route linked to the subscription, a pull, the transfer log, and then the clean-up examples in reverse. Each step is checked through the API, and the flow is proved end to end by the uploaded file arriving, pulled, compressed and pushed, in the account's `/delivered` folder. The Admin examples run as name-substituted copies (`john` and every fixed name made throwaway, which `test_integration_helpers.py` checks offline); the EndUser examples run unmodified. The trigger-file subscription and the billable count need 5.5-20260924 or later. Set `st_ssh_host`, `st_ssh_port` and `st_enduser_port` if the defaults do not fit your server.  The account and the SSH port the examples use now come in through the environment (`ST_EXAMPLE_ACCOUNT`, `ST_SSH_PORT`, set with `env=` on the run), not by substituting text in a copy; `hardcoded_settings()` in `test_integration_helpers.py` fails when a script hard-codes `john` or 8022 again. |
+| `32.pesit_acknowledgment_loop_scripts.py` | **yes** | A PeSIT loop between two throwaway accounts on the one server (each with a PeSIT site named after the other, and a transfer profile), and the real `Acknowledgment.sh` and `IteratePesitInbounds.sh` run on the transfers it makes: a NACK for a file nothing forwards, an ACK for one a subscription and route push on under the same `coreId`, and the iterator ACKing the forwarded one while leaving the other for later. The iterator acts on every unacknowledged PeSIT inbound on the server in its window, so it only runs when all of them belong to throwaway accounts. Set `st_pesit_host` and `st_pesit_port` if your PeSIT listener is not `st_server`:17617. |
+| `62.enduser_usecase_authentication.py` | **yes** | `EndUser/UseCases/01-authentication` for real, as a throwaway end user: Basic authentication, the 401 without credentials, the login, the cookie and csrfToken calls, an expired session and the new login, the logout and the refused old cookie, then `00.run_all.sh` and `99.cleanup_DELETE.sh`, with no jar left behind. |
+| `65.enduser_secret_questions.py` | **yes** | The secret question scripts for real, as a throwaway end user: it switches `Users.SecretQuestion.Enabled` on (false on the lab, which leaves every call a 503), runs the list, check and pick scripts, the account with no question (503 for that too, exit 4), setting one, reading it back, a refused unlisted question, then switches it off to see the exit 3 branch, and restores the option and asserts it is back. |
+| `64.admin_usecases_scripts.py` | **yes** | `Admin/UseCases` 01 and 02 for real, as the configured administrator: each `00.run_all.sh` and `99.cleanup_DELETE.sh` (twice), no jar or token left behind, the release and server count they print against what the check reads, and the administrator's own `preferredFileTrackingColumns` unchanged after the one PATCH. |
+| `63.enduser_usecases_scripts.py` | **yes** | `EndUser/UseCases` 02 to 05 for real, as a throwaway end user: each `00.run_all.sh` and `99.cleanup_DELETE.sh` (twice), nothing named `example_*` left in the home folder, the file story read back through the API, and the refusal of a folder with a file in it. |
+| `33.enduser_api_scripts.py` | **yes** | The EndUser examples added from the API reference, run as a throwaway end user with a throwaway partner: the account, a password change and back, the secret questions (or a clean "service not enabled"), the address book; an upload with `Content-MD5`, metadata, listing parameters, rename by PUT and PATCH, share and unshare; MD5Calc, a chunked and a multipart upload, a cancel; a pull and its summary, a push and a folder monitor run through SSH sites the admin API gives the user; the transfer log; the server time. Each effect is checked through the API. Not run: the password reset pair (needs a real email) and `verifymdn` (needs AS2). Puts back your own `myCookie.jar` and `set_variables.local.sh`. |
+| `34.access_policies_scripts.py` | **yes** | The real `17.AccessPolicies` examples: adds a `reject` rule for a database and user that do not exist, after the server's own rules; checks, reads and replaces it, adds a second copy, deletes both, and checks the server's rules are exactly as they were. Rule ids are positions that move up after a delete, so the delete example re-lists before each one. Only for a server on the embedded PostgreSQL database. |
+| `35.account_setup_scripts.py` | **yes** | The real `18.AccountSetup` examples on a throwaway `example_setup` account: the account and an SSH site in one call, a second site added to the existing account (which is skipped, not refused), the whole setup read back, and the delete, checked to take the sites with it. |
+| `36.address_book_scripts.py` | **yes** | The real `19.AddressBook` examples on the server's LDAP source, which has no POST or DELETE: changes its page size with PATCH and back with PUT, and checks the source is exactly as it was. Skips when there is no LDAP source. |
+| `37.administrators_scripts.py` | **yes** | The real `20.AdministrativeRoles` and `21.Administrators` examples: a throwaway role and an administrator that holds it; read, lock, unlock, replace and patch; an API key, a call made with the key alone, its revoke and the 401 that follows; deleting the role with its administrator moved to another role. Also lists your own administrator under your own role, a name with a space. |
+| `38.business_units_scripts.py` | **yes** | The real `12.BusinessUnits` examples 02 to 07 on a throwaway unit and a nested one whose name has a space, with one account in it: list, check, read and count the account, PUT and PATCH, the delete refused while a nested unit or an account remains, then the deletes. |
+| `39.certificates_scripts.py` | **yes** | The real `11.Certificates` examples: generates `example_cert` with the server's CA, checks the 40 and 20 day expiry searches, reads and patches it, exports it as pem, crt and pkcs12, imports the pem as a throwaway account's partner certificate; then a signing request generated, listed and read, signed by a throwaway CA made with openssl, and completed, and a second one deleted. Needs `st_ca_password`; the signing needs openssl. Removes the files the examples write into their folder. |
+| `40.configurations_scripts.py` | **yes** | The real `13.Configurations` examples 03 to 47: the read-only ones as they are; two options, the file archiving and the node threshold settings changed and put back exactly; the database connection test with a wrong password; the login settings with a PATCH to the value they have; and, against stand-ins on this machine (see below), Sentinel sending its heartbeat to a TCP sink, an external store logging in to a fake HashiCorp Vault and reading a secret, and an S3 storage profile reaching a fake bucket. Not run: maintenance mode and the keystore password. Needs `st_callback_host` for the stand-ins. Every setting it touches is compared with its value before, at the end. |
+| `41.denied_users_scripts.py` | **yes** | The real `22.DeniedUsers` examples: blocks a login name for good and one with a space for two hours, lists with each filter (permanent, temporary, since a date), shows a duplicate, a blank name and a 0 or negative number of hours refused, and unblocks them; a name differing only in case is blocked through the API to show that removing one leaves the other. Then two throwaway end user accounts: both log in through the EndUser API, one is blocked with the real script and is refused (401 "Login failed") while the other still gets in, and it logs in again once unblocked. Ends by comparing the entries that stay (a temporary block, which is also what a lockout of somebody else is, comes and goes by itself) with those it started with, and checking both accounts are gone. The two accounts get a new name and user id each run. |
+| `42.events_scripts.py` | **yes** | The real `23.Events` examples against a live event. An event exists only while a file is processed, so it builds a flow that holds one: an end user account, an Advanced Routing application, a subscription, a route that sends to an SSH partner, and that partner, a silent TcpSink on this machine. A file is uploaded with the real EndUser example; the event is listed with each filter (a status in capitals finds nothing), read, and deleted together with an id that does not exist. Needs `st_callback_host`. Removes everything, and never an event of another account. |
+| `43.icap_servers_scripts.py` | **yes** | The real `24.IcapServers` examples, in two parts. First all seven against disabled servers pointing nowhere (add, list and filter, check, read, replace, change, delete; a name with a space; a PUT that does not rename; a delete that succeeds although a business unit lists the server). Then what a server is for: a FakeIcap on this machine plays the antivirus, a throwaway business unit lists the server and has a throwaway end user account in it, and files are uploaded with the real EndUser example. A clean file is let through and one with the marker text is blocked (transfer Failed, file removed); with the ICAP server gone a file passes when denyOnConnectionError is false and is refused when it is true; disabled, nothing is scanned. Needs `st_callback_host` for the second part. Every state it needs is waited for, not a fixed time (a scanned file is Processed within seconds on the lab; the check took 120 s with the old fixed pauses and 38 s now). |
+| `44.ldap_domains_scripts.py` | **yes** | The real `25.LdapDomains` examples: add, list and filter, check, read, replace (the bind password's ciphertext kept, the name not changed), change and delete throwaway domains, a name with a space among them, and every refused argument. Then the connection test against a silent TcpSink on this machine: a domain gets two servers, one with the sink behind it and one with nothing listening; each server's number gives "Successful Connection." (and the sink sees ST connect, with nothing sent) or "Connection failed.", and the first fails too once the sink is gone. Needs `st_callback_host` for that second part. Never turns LDAP login on. |
+| `45.login_restriction_policies_scripts.py` | **yes** | The real `26.LoginRestrictionPolicies` examples against throwaway policies and a throwaway business unit, each effect checked through the API: create (a name with a space among them), list and filter, check, read, replace (rules, their ids and the business units kept), add a rule (a replacement when the name exists, an address checked, a condition not), enable, disable and remove a rule, assign and take away a business unit, delete, and every refused argument. It makes no claim about what a policy does to a login, and never makes a policy the default. |
+| `46.login_restriction_enforcement.py` | **yes** | **Fails by design on the lab the examples were written against, until policy enforcement works there.** SFTP and HTTP (the EndUser API) are the core protocols and FTP is an additional, labelled legacy part ("FTP (legacy): ..."). Two throwaway end user accounts, one in a throwaway business unit and one in none, both log in over each protocol (SFTP: the system `sftp` client with `SSH_ASKPASS`, a login proved by answering `pwd`; the shared helper is `lib/protocol_logins.py`). The real `26` examples then create a policy that denies every address and assign it to the unit; the account in the unit must be refused and the other must still get in, over each protocol, and with the unit taken away the first logs in again. The wait for a refusal is capped at 20 seconds per protocol. Measured on the lab: **no protocol enforces**. The account of the unit keeps logging in over SFTP (8 tries over 21 s), HTTP (8 over 20 s) and FTP (9 to 10 over 21 s), so exactly three checks fail ("SFTP: THE POLICY ENFORCES ...", "HTTP: ..." and "FTP (legacy): ...") and everything else passes (21 passed, 3 failed). It turns green by itself once enforcement works, and whatever switches it on belongs in its set up. Everything is removed in a finally block, whatever it found. |
+| `47.logs_scripts.py` | **yes** | The real log examples (`16.TransferLogs` 03 to 05, `27.AuditLogs`, `28.ServerLogs`), in three independent parts, each making something happen and finding it in the log. The audit trail: a throwaway business unit is created, changed and deleted, and the examples find its three entries by the exact name with the user and the address the server saw, the CSV export holds them, and an edit of an entry's description is answered 204 and changes nothing. The server log, run for SFTP and HTTP (the EndUser API) as the core protocols and FTP as the labelled legacy part: a throwaway account (a fresh name and uid each run) logs in and fails once over each, and the examples find the login and the failure by message, component, level and date, read one by id, and export them as CSV (the `accountName=` filter is shown to be ignored). They differ: SFTP writes `sshd` INFO "login success" and INFO (not WARN) "login failed"; HTTP writes `httpd` INFO "login success" but a failed login names no account (INFO "Denying access to unknown user from address"); FTP writes `ftpd` INFO "logged in" and WARN "Failed login". The transfer log: an upload and a pull from ST's own SSH server; the pull summary counts the file, the pull is read by its id, and each operation answers as documented (resubmit works; cancel, verify, ack and nack are refused for a finished HTTP transfer). Cancelling is the job of check 48. The log entries of the throwaway objects stay; the objects are removed. The legacy FTP part needs the FTP daemon; SFTP needs the SSH daemon and an `sftp` client. |
+| `48.cancel_transfer.py` | **yes** | The real `16.TransferLogs/04` and `03` examples against cancelling. Part A: three running 10 MB transfers (an FTP upload with a throttled client, an EndUser API upload with curl limited to 250 KB a second, a pull over SSH from ST's own SSH server through a `SlowProxy`) are In Progress in the log, the server says they are not cancelable, and a cancel is refused ("not eligible for cancellation") while they carry on. Part B: a PeSIT pull of a file that does not exist fails and waits for a retry; the server calls it cancelable, the cancel is accepted (HTTP 200), the pull summary moves it from "to retry" to "failed", and a second cancel is refused. Objects are removed, log entries stay. The FTP part needs the FTP daemon, the SSH pull needs `st_callback_host`, part B needs the PeSIT port. Measured on the lab: the log shows a transfer In Progress after 2 to 4 s, it says "not cancelable" at once (the 4 s pause it used to take is gone), and an accepted cancel shows in the pull summary at once, so that a refused cancel changes nothing is watched for 2 s, not 3, and a cancel that took effect would end the watch at once. |
+| `49.mail_templates_scripts.py` | **yes** | The real `29.MailTemplates` examples against throwaway templates (`example_mail.xhtml`, the same name in capitals, and one with a space), each effect read back through the API, content compared with the file uploaded. Shows: a file not named `.xhtml` goes up under the template's name; a name with a `/` is refused by the script (the server would accept it and then the entry could never be addressed or deleted); an empty and a given description; a PUT keeps the description, a PUT on a missing name is refused by the script, and the raw PUT is made once to show it creates the template (204) and clears a missing description. The server's own templates are listed and read, never changed, and checked unchanged at the end. No stand-in server is needed: nothing here sends an e-mail. |
+| `50.routes_scripts.py` | **yes** | The real `09.CompositeRoutes` examples 08 (HEAD), 09 (PUT) and 10 (PATCH) against throwaway routes: a simple route with a Compress and a Rename step, two templates, and a composite route on a throwaway account and subscription that runs the simple route. HEAD finds a route of every type by its exact name, and refuses a name that matches nothing, a wildcard, or two routes (two simple routes may share a name). A PUT sent back whole keeps the steps with their ids, the subscription and the template and changes only the description, on a simple, a composite and a template route; the raw PUT of a fragment is made once to show it answers 204 and silently removes every step. A PATCH changes a step by its position, on a simple and a composite route; the raw calls show that a step id is not an address (400), a position past the end is 400, `type` is read only, a composite route's template cannot be changed, an add at `/steps/1` inserts in the middle and the `precedingStep` links follow, a route that another route runs cannot be deleted, and deleting the route that runs it deletes it. Nothing is run, so no stand-in server is needed. |
+| `51.route_steps_metadata_scripts.py` | **yes** | The real `30.RouteStepsMetadata/01` example against `/routeStepsMetadata`, a read only resource: the plain array of 12-key entries, the listing and the one-type view of the script, and what the Notes claim (`fields=` keeps the keys named, `stepType=` and `limit=` are ignored, XML is 406, HEAD is 200, POST, PUT and DELETE are 405, no read of a single type). Then, for every listed `stepType`, the smallest step the example prints with `01 <type> minimal` is created in a throwaway route (201), read back with `GET /routes/{id}` (the type and every field as sent) and deleted, and leaving out any one of its fields is 400; none of the 17 needs an account, site or key that exists, so none is checked only with an incomplete step. An incomplete `Compress` step names `compressionType`, and an unlisted type is 400 "Route Step type is undefined.". any `example_meta_*` route is removed in a `finally`. |
+| `52.route_steps_charsets_scripts.py` | **yes** | The real `31.RouteStepsCharsets/01` example against `/routeStepsCharsets`, a read only resource: one object `{"charsets": [...]}` of unique names sorted ignoring case; the listing, the exact lookup (a name that differs only in case is reported with the listed spelling) and `step FILE`, which checks the `inputCharset` and `outputCharset` of a step, a list of steps or a route. Every charset in the 17 minimal steps `30.RouteStepsMetadata/01 <type> minimal` prints is in the list. Throwaway routes (`example_charset_*`) show the server's own rule: a charset Java does not know and an empty one are 400 on all six step types that have a charset, while `utf-8`, `UTF8` and `ASCII`, which are not in the list, are accepted (201) and stored as written, so the list is a safe set, not the whole accepted set. No filter works, HEAD is 200, POST, PUT, PATCH and DELETE are 405, XML and CSV are 406. Routes are removed in a `finally`. |
+| `53.sessions_scripts.py` | **yes** | The real `32.Sessions` examples against live sessions of two throwaway accounts: the target holds an FTP session (ftplib, idle), an HTTP one (an EndUser API login kept open) and an SSH one (the system `sftp` client with `SSH_ASKPASS`; left out when `sftp` is missing), the bystander an FTP one, all through `lib/protocol_logins.py`. 01 lists them (by protocol and by user; the server ignores `type=`), 02 reads one, 03 ends them one by one and the check looks at the effect on the client: the FTP client finds the connection closed, the EndUser API answers 401, the ssh process exits. It proves 03 kills only what it names: a wrong user given refuses and ends nothing, the bystander's FTP session answers throughout, the target's other sessions stay listed, and the sessions open before the check are the same afterwards. 05 is compared with the API's own counts (by how much they grew against the sessions of this check, and the printed line against the numbers read just before and just after: see "A busy server"), 04 is read (empty on the lab). Needs the FTP daemon; skips under `--mock`. |
+| `54.sites_scripts.py` | **yes** | The real `06.TransferSites` examples 05 to 11 against throwaway sites of two throwaway accounts that log in to the lab's own SSH, FTP and EndUser HTTPS servers: HEAD and GET (a site named in capitals, a longer name and the same name on another account are told apart; the name filter ignores case), PUT (the whole site sent back keeps the encrypted password and moves nothing else; a raw PUT of a fragment resets what it leaves out), PATCH, the connection test of a saved site (by id, with no login in the request) and of one not saved, over SSH, FTP and HTTP, and the remote folder listing (files and folders, a limit, a missing folder). Failures are shown against a wrong saved password, a wrong password in the environment, a closed port and a `JunkServer` partner (needs `st_callback_host`); a wrong SSH password counts as two failed logins and a second one locks the account (shown on the second account). Shows that leaving `folderToList` out lists the upload folder. A script whose lookup finds no site is run again, and every API read waits for the answer it expects. Removes the sites, the uploaded files and both accounts. |
+| `55.statistics_summary_scripts.py` | **yes** | The real `33.StatisticsSummary` examples against what they report. A throwaway account (`example_stat_user`) uploads one 1-byte file to itself over the EndUser API and downloads it twice; after each step today's entry of the report is read until it settles, and `01`'s own line is compared with the API's. Shows what the numbers count: the upload moves `ST.TransfersIn` and `ST.Transfers` by one, the first download `ST.TransfersOut` by one and `ST.Transfers` by none (the first outbound is free), the second download both by one, and deleting the file nothing. Also the date rules (dd/MM/yyyy only, the end day included, a start after the end, tomorrow and a day that does not exist are 400), a period against the sum of its days, and `02`: the account is not listed as logged in before it logs in, then found with the time the API gives, by a part of its name (case sensitive, no wildcard) and by date. `03` is run only against a `FakeToken` stand-in on this machine (the real platform is never contacted): the server posts the client credentials it was given, a refusal and a 500 are relayed with the platform's own status, a network zone is a 406 that sends nothing; the token address option is put back and compared. The transfer log keeps four entries and the active users list keeps the account's name, and neither can be removed. The report counts the whole server, so the exact counts assume that nobody else transfers meanwhile (see "A busy server"): when one differs, the failure says whether the transfer log gained other accounts' transfers, and the check says after each step how long the report took to show it. `03` needs `st_callback_host`. |
+| `56.subscriptions_scripts.py` | **yes** | The real `07.Subscriptions` examples 05 to 13 against throwaway subscriptions of one throwaway account (a new random name and user id on every run) that logs in to the lab's own SSH server: HEAD and GET (the account and application filters are exact; the folder tells two subscriptions of one application apart), PUT (the whole subscription sent back keeps the pull site, its id and the flow attributes; a raw PUT of a fragment drops them), PATCH (a flow attribute, added then overwritten), the Pull operation (a file really arrives in the folder and stays on the partner; with a pull history a file already pulled is not fetched again), ClearPullHistory (the next pull fetches it again), Purge (the whole folder goes, the subscription stays), the subscriptions of four other types with their rules and subscriber ID and their deletion with `purge=true`. A script whose lookup finds nothing is run again, and every API read waits for the answer it expects. Nothing is waited for by a timer: the Pull is followed to its end in the transfer log's pull summary (the file is in the folder 2.5 s after the pull is asked for and the summary says so 0.3 to 1.3 s later, and a file deleted at that moment was never pulled again, 8 times of 8), ClearPullHistory is effective at once (a pull right after it fetched the file 8 times of 8), and "a file already pulled is not pulled again", which cannot be seen to end, is watched for 6 s, more than twice the time a pull needs. Removes the subscriptions, applications, the site and the account. |
+| `57.transaction_manager_scripts.py` | no, changes nothing | The real `34.TransactionManager` examples, as far as they can run safely. `01` runs for real and its status line is compared with the API's; the other methods and accept types of both paths are checked (HEAD 200, PUT, PATCH and DELETE 405, `/operations` GET 405, xml and csv 406, `fields=` ignored). **The stop is never sent**, not even with a wrong value: `02` runs only down its refusal path (no argument, a wrong word, the right word with a bad second or third argument) with a FAKE curl first on PATH that records any call it gets, and each run must exit 2, say nothing was sent and leave that log empty; the fake curl is shown to record when `01` runs under it. The status is read before and after, and is the same. Skips itself on the bundled mock. |
+| `58.transfer_profiles_scripts.py` | **yes** | The real `35.TransferProfiles` examples against throwaway PeSIT accounts (short alphanumeric names and a user id new on every run), in two levels: CORE with the profile's `advancedSettings` (02 creates binary, ascii and ebcdic profiles and the server fills in the read-only parts; 04 prints the sending and receiving sides; 05 changes the receiving line ending and nothing else, and refuses a binary receiving side; 06 changes the record length of the receiving or the sending side; a side's type cannot be patched, a field its type lacks is a silent 204) and ADDITIONAL with the plain fields (02 `basic`, 05 `-` and a send mapping, 06 `basic`). Also the refusals (a second profile of a name, an account with no PeSIT site or none at all), the exact name among a name filter that ignores case, a raw PUT of a fragment that resets the rest, the list and the one default per account, and 07 deleting one profile only. Then what a profile does to a real pull: the receiver pulls from the sender over the lab's own PeSIT server three times (two advanced profiles and a basic one; the received file gets the name the receive mapping gives, a pull naming no profile uses the default): three small sets of transfer log entries that cannot be removed. Removes the profiles, sites, files and accounts; skips under `--mock`. |
+| `59.transfer_profile_content.py` | **yes** | What a transfer profile does to the CONTENT of a file, on 116 real PeSIT pulls (one transfer log entry each, about 350 checks, about 14 minutes on three workers (October 2026; about an hour when `st_callback_host` is not an address the server can reach, and then the limit stops it), each with its own two accounts; every account, site, profile and file is removed). Per case four stages: generated (the file uploaded to the sender, read back before and after), sent and received (the bytes on the wire, captured by a `CapturingProxy` that the receiver's site points at and read by `lib/pesit_wire.py`: in a pull they are the same link; the receiver's own conversion shows only in the stored file), and stored (the receiver's file downloaded and compared byte for byte with bytes written out in the case). Each case asserts the change a setting makes or that nothing changed. CORE cases use every option of `advancedSettings` (callerTranscoding and receiverTranscoding of the types binary, ascii, ascii_predefined, ebcdic, ebcdic_predefined, predefined; outputRecordFormat and Length, paddingCharacter, lineEndingFormat, source and output encoding schemes, networkDataCode, `enabled`); ADDITIONAL cases the plain `transferMode`, `recordFormat`, `recordLength` and `paddingStripEnabled`. Names read `<level>/<side>: <file type>: <setting> -> <the stage and the change or unchanged>`. Needs `st_callback_host` for the capture (without it the sent stage is skipped); `python3 59... --write "text LF"` runs only the cases whose name contains the words. The connection is cut after every pull: a PeSIT connection kept open carries the last transfer's record format (see st-api-gotchas). Not covered: custom transcoding tables, `receiverMessage`, `sendingAcknowledgmentEnabled`, `multiSelect` (see the check's docstring). A Ctrl-C or the runner's SIGTERM stops it: each worker finishes the case it is in, and everything is removed (the stop used to be said only after the workers had run through every queued case, so it did not stop for an hour). |
+| `60.user_classes_scripts.py` | **yes** | The real `36.UserClasses` examples against throwaway user classes and two throwaway accounts (a new name and user id on every run) that log in over SFTP, HTTP (EndUser API) and, as the legacy part, FTP after every change, the whole sequence repeated per protocol with checks named `<protocol>: ...` (no protocol differed from the others on the lab; logins only, no transfer log entries): the class of THAT login is read from the `userClass` of its session. 01 lists in the order the classes are tried (the server's list is not in that order); 02 creates a disabled class that goes first (VirtClass and RealClass move down) and refuses an enabled class for every user name; 05 and 06 switch it on and off, change the expression, user name, type and order, name, and each time the MATCH account's next login is in the class or not and the OTHER account's never is; of two classes that fit the lower order wins; 07 deletes one (never VirtClass or RealClass): a session open in it keeps the name, a template account naming it keeps the name, the next login is in the next class that fits. Also the raw API: a PUT of the five required fields resets expression and enabled, the expression is checked when saved, unknown ids are 404 for GET and HEAD and 400 for PUT, PATCH and DELETE. Ends by comparing the whole class list (ids, order) with the one saved first; skips under `--mock`. Not covered: membership by an LDAP attribute. |
+| `61.zones_scripts.py` | **yes** | The real `37.Zones` examples against throwaway network zones, business units and accounts (a new name and user id on every run). 01 lists and filters by an exact, case sensitive name; 02 creates (a duplicate is 400, names differing in case coexist, a name with a space, an edge with an address and a disabled SSH protocol, bad arguments refused before anything is sent); 03 and 04 check and read, 04 listing the business units that name the zone; 05 and 06 change the description and nothing else (a zone with an edge, a protocol and a proxy password is read back identical); the raw API: a PUT resets what it leaves out but keeps the edges when there is no `edges` key, a name that differs from the path is 400, there is only one default zone; 07 deletes, refused with a 500 while a business unit names the zone. What naming a zone changes: an account of a unit whose `dmz` is a zone with an edge logs in over SFTP and HTTP (and, as the legacy part, FTP) exactly as before; a default zone is not copied into new units. Ends by comparing the whole zone list, `Private` included, with the one saved first; skips under `--mock`. Not covered: a zone's effect behind a real edge, proxies' use, `isAutoDiscoverable`. |
+
+Where a server is more permissive than expected — for example if it accepts a
+call with no `Referer`, or tolerates `replace` on an unset field — the check
+reports it as information rather than failing. That difference is worth knowing
+about, but it is not a broken example.
+
+## Substituted-copy fallbacks
+
+Three objects these checks depend on - the account `john` (`06` and the
+`_with_file` twin used to act on it), the business unit `Finance` and the site
+`HTTP` on `john` - are not created by the folders being tested and are not
+guaranteed to be disposable. Where a check cannot avoid one of them, it falls
+back instead of skipping outright: it creates a throwaway, similarly-named
+object (`Finance_test`, `HTTP_test`) and runs a name-substituted copy of the
+affected script against that (`script_runner.substituted_copy`) - never the
+real object.
+
+`04.accounts_scripts.py` and `05.applications_scripts.py` no longer need this.
+The `05.Accounts` and `04.Applications` scripts now act on `example_*` objects
+by default and take the name as an argument, so the real files run, with no
+copy, against objects of their own, and the checks only compare the rest of the
+server (the list of accounts, the whole of `john`, the list of applications)
+before and after. The one limit that remains is the one the server sets: only
+one application of a given maintenance type is allowed per server, and a
+different maintenance type does not accept the same fields (confirmed directly -
+an `AccountTTL` application rejects the `AccountFilePurge`-shaped body, with a
+400), so on a server that already has an `AccountFilePurge` application `02`
+says so and creates only the flow application, and `03` to `06` are run on that
+and on an `ArchiveMaint` application the check makes itself.
+
+**A substituted copy is not the same as running the real file.** It proves the
+same request bodies and the same PATCH/PUT/jq logic behave correctly under a
+different name; it does not prove the literal shipped script runs without
+modification. Every check that takes this path says so plainly in its own
+output, labeling each assertion it makes this way, rather than reporting it as
+if the unmodified file had been exercised.
+
+Where a check needs an endpoint the bundled mock does not implement -
+`/applications`, `/servers`, `/businessUnits`, `/sites`, `/configurations`,
+`/daemons`, or the EndUser API's separate port - it detects the mock via
+`st_client.is_mock()` and skips cleanly with an explanation, rather than fail
+with a confusing 404. Only `01` through `04` are meaningfully exercised by
+`--mock`.
+
+## What the checks share
+
+`lib/harness.py` holds what a dozen checks used to carry a copy of each. The copies had drifted apart (one
+wait loop crashed when the lab restarted a daemon, another did not), so each is there once and
+`tests/offline/checks/test_harness.py` tests it offline, and fails when a check grows its own again.
+
+| Helper | What it does |
+| ------ | ------------ |
+| `require_writes(config, what)` | The gate every check that writes starts with: a skip (exit 0) unless there is a config, `--write` was given and `st_allow_writes` allows it. |
+| `connect(config, c, mock="why not")` | Logs in. On the bundled mock, a check that says why it cannot run there ends as a skip, with that reason. |
+| `ports(config, admin)` | The EndUser, SSH, FTP and PeSIT ports as text: the config's (`st_enduser_port`, `st_ssh_port`, `st_pesit_port`; blank counts as not named), else the ports of the running servers `GET /servers` lists, else the default (the admin port minus one, 8022, 17617, and no FTP port at all). |
+| `run_script(c, folder, name, args, expect_rc, timeout, env=...)`, `bind_script(...)` | Runs a shipped example from its own folder, checks its exit code under the name `<name> <args> exits <rc>`, returns the output (which also has `.returncode`). `env` is for that run only. `retry_text` runs it again when a lookup that must find an object it knows is there found none (the lists are not always complete at the first read). |
+| `wait_until(predicate, timeout, interval)`, `settled(read, condition, ...)` | Polls. A call that is refused or not answered (`st_client.STError`) is one more "not yet", so a server restarting its daemons does not crash the check; the last value comes back, to show in the failure. |
+| `throwaway_account(admin, c, config, ...)` | A user account with a name and a user id nobody used (a home folder outlives its account and keeps its first owner's uid: see st-api-gotchas), removed with what is in its home folder when the block ends, whatever happened inside it. |
+| `scratch(prefix)` | A temporary folder removed when the check ends, however it ends (also on the runner's SIGTERM). |
+| `protocol_logins.Logins` | SFTP, HTTP (the EndUser API) and FTP logins, tried or kept open; used by 46, 47, 53, 60 and 61. |
+
+Left as they are, on purpose: the accounts of 11, 31, 32, 33 and 55 have a fixed name and a fixed user id (the same
+each run, so the home folder never disagrees with it; 55 needs the one name, because the server keeps every name
+that ever logged in for its active users report), and `04` and `08` act on `john`.
+
+## A busy server
+
+The lab is shared, and a check can only count what is its own where the API lets it. Where it cannot, it says so:
+
+- `41` compares the entries that stay (permanent ones) with those it started with, never the length of the list: another
+  user's lockout is a temporary entry the server adds and ends by itself.
+- `53` compares the counts of `sessions/statistics/userClass` by how much they grew against the number of its own
+  sessions, and the lines of `01` and `05` against the server's numbers read just before and just after. A session of
+  somebody else that opens or ends between those reads, or ends during the check, still fails it: run it again.
+- `55` reads the report of the whole server, so a transfer of another account landing during a step moves the numbers it
+  expects exactly. It reads the transfer log's count of other accounts before and after each step and names that in the failure
+  ("the transfer log gained N transfers of other accounts"); it cannot avoid it. Run it again.
+- `54`, `56` and `58` end by comparing the count of sites, subscriptions and profiles of the whole server with the start.
+
+## Stand-ins for outside systems
+
+Some configurations only show they work when the server reaches something
+outside: a secret vault, an S3 bucket, an Axway Sentinel. `lib/dummy_servers.py`
+has throwaway stand-ins a check starts on this machine for the time it runs,
+each in a thread, on a port the system picks:
+
+- `FakeVault` - a HashiCorp Vault: an AppRole login, then KV version 2 reads.
+- `FakeS3` - an S3 service, path style, any credentials, objects in memory.
+- `TcpSink` - accepts connections and keeps what arrives, for Sentinel.
+- `SlowProxy` - a TCP proxy that passes bytes at a limited rate in both directions, so a transfer through it lasts; `close()` cuts it.
+- `JunkServer` - sends one line no SSH, FTP or HTTP server would send and closes the connection: a partner that is not what its site says, so a connection test fails at once (a `TcpSink` keeps the test waiting for over 30 seconds).
+- `CapturingProxy` - a TCP proxy that passes the bytes through unchanged and keeps a copy of each direction of each connection (`to_target_all()`, `to_client_all()`, `reset()`, `wait_idle()`, `drop_connections()`); `lib/pesit_wire.py` reads a PeSIT transfer out of such a capture.
+- `FakeIcap` - an ICAP server (OPTIONS, then REQMOD with a preview): lets a file through with 204, or blocks one that holds the marker text with a 403, and records each scan.
+
+The server must be able to connect back to this machine: set `st_callback_host`
+in integration.conf to this machine's address as the server sees it (through a
+VPN, the address the VPN gives it). Without it, the parts that need a stand-in
+are skipped. `tests/offline/checks/test_dummy_servers.py` checks the stand-ins
+themselves, offline. To keep one up by hand while trying an example:
+`python3 tests/common/dummy_servers.py vault|s3|sink|junk|icap [PORT]`.
+
+## Adding a check
+
+Drop a numbered file into `checks/`. It should:
+
+- call `st_client.load_config()`, then `harness.require_writes(config, "run ... for real")` for anything that writes
+  (it skips when there is no config, no `--write` or no `st_allow_writes`; `st_client.skip(...)` for a read only check)
+- call `harness.connect(config, checker, mock="why it cannot run on the mock")` so an unreachable server fails in one
+  line and the bundled mock is a skip
+- take the ports from `harness.ports(config, admin)`, run examples with `harness.bind_script`, wait for the server with
+  `harness.wait_until` or `harness.settled` (never a fixed `time.sleep` to prove a result; a polling loop of your own fails
+  `tests/offline/checks/test_harness.py`), make accounts with `harness.throwaway_account`, temporary folders with
+  `harness.scratch`
+- use the prefix, and tear down in a `finally`; leave nothing behind and compare a list of what is there before and after
+- count only what is yours; where the API cannot, say so in the docstring and in "A busy server" above
+
+## What is not covered yet
+
+`01` through `52` cover: the admin API's session and read behaviour (both as
+a harness client and as the real Authentication/Introduction scripts,
+including the one PATCH script that changes its own caller's password), the
+full account lifecycle, applications, server CRUD, business units, transfer
+sites, the full daemon read/write cycle, the full Connect daemon and server
+*operations* cycle (start and stop, for real), route templates and composite
+routes, both Configurations PATCH scripts, configurations read-only, the full
+EndUser cycle (including `DELETE /files/{path}`), thirteen of the Admin API
+2.0 python3 examples - including one that mutates every real SSH site on the
+server and restores them afterward, one that PUTs a real route back with an
+inserted step, one that generates a real private certificate to export, one
+that scans every real `SIMPLE` route on the server and safely patches only a
+throwaway one, one that builds a full onboarding chain (account, imported
+SSH key, two sites, a subscription, two routes) end to end, and one that
+patches and restores every real subscription on the server, by explicit
+decision - all eight Expression Language exercises, in both bash and
+python3 - and the sites, subscriptions, routes, pull and transfer log
+examples as one working flow, with the lookups they rely on (`30`, `31`), and
+both acknowledgment scripts on a PeSIT loop of their own (`32`), the
+EndUser examples for every resource of its API reference (`33`), and the Admin
+examples added resource by resource from its reference (`34` to `52`).
+`manual.graceful_scripts.py` covers a fourteenth python3 example, by hand, for
+reasons of its own documented below.
+Real bugs in the shipped examples were found and fixed getting here - a
+mismatched Applications cleanup target, both EndUser download scripts
+corrupting every file they wrote, a PATCH that added a contact at a fixed
+array index that only worked by accident, two python3 scripts missing
+`import base64` entirely, two whose worker functions relied on module globals
+that do not exist under macOS/Windows multiprocessing, four that crashed
+on any non-Linux POSIX system calling a Linux-only `os` function, a missing
+csrfToken in `stGetPrivateCert.py`'s session, and two hardcoded account
+names in `stBuildFullTestAccount.py` that should have been the script's own
+configured variable - see the gotchas skill for all of these.
+
+`26.python_get_private_cert.py`, `27.python_update_all_routes.py` and
+`28.python_build_full_test_account.py` all depend on a real
+`st_ca_password` in integration.conf (see integration.conf.example) - this
+server's certificate authority password, needed to *generate* or *import*
+a certificate through `POST /certificates` (a different thing from the CA
+password an earlier version of this file said made `stGetPrivateCert.py`
+uncoverable - see the gotchas skill, "A certificate's caPassword is one
+real secret, shared by generation, import and nothing else"). All three
+skip themselves, rather than fail, when that is blank.
+
+`29.python_update_all_subscriptions.py` runs `stUpdateAllSubscriptions.py`
+with no type filter - its own documented default - against every real
+subscription on the server, by explicit, informed decision: the four
+fields it patches only make sense on `Basic`/`AdvancedRouting`
+subscriptions, and this shared lab's only ones of those types already
+belong to real accounts (`john`'s, `mcp-test-acme`'s) this project did not
+create - there is no type filter that both matches the field shape and
+excludes them. This check captures every one of the four fields on every
+real subscription first, and restores every one of them afterward,
+verifying the restore independently - confirmed directly, exact
+restoration, byte for byte. Also confirmed directly while building it: two
+of the five real subscriptions are type `Basic`, which has no
+`postProcessingActions` object at all - the script's own first PATCH
+operation, a `replace` into that object, fails outright for those two
+(`"Missing field \"postProcessingActions\""`), and JSON Patch here is
+all-or-nothing, so they are left completely untouched by the script's own
+logic. Only the three `AdvancedRouting` ones actually get patched (and
+restored).
+
+**Python3 scripts still not covered, and why:**
+
+- **`stUpdateAllAccounts.py`** scans *every* account of type `template` and
+  PATCHes a field on each, with no filter - safe right now only because this
+  server happens to have zero template accounts. It authenticates with a TLS
+  client certificate rather than Basic Auth (`sessionMgt.cert = ...`, no
+  `Authorization` header at all), which nothing else in this harness sets
+  up. Confirmed directly while trying: the TLS handshake already accepts an
+  optional client certificate, and an administrator's `certificateDN` field
+  can be set to match one - but the Admin API still returns 401 until the
+  system-wide `Admin.ClientCertificateAuthentication` option (default
+  `none`) is set to `optional` or `required`. Given explicit approval to
+  make that change temporarily, setting up a throwaway administrator to
+  test against ran into a second, separate wall: this session's own
+  permission classifier refuses both creating an administrator with an
+  elevated role and even reading the existing `/administrators` collection,
+  as a privilege-grant risk - and, per how that classifier is meant to
+  work, this project does not attempt to route around it (a different
+  tool, a smaller request, anything else that reaches the same place). See
+  the gotchas skill for the two separate blockers this hit, and Admin's own
+  Authentication → Login Settings page for the policy this still needs a
+  human decision on, from inside the admin UI rather than this harness.
+`14.daemon_write_scripts.py` deserves a specific note: `03.daemons_name_PUT.sh`
+and `04.daemons_name_PATCH.sh` change a live daemon's real configuration -
+`maxConnections`, `banner`, `preferBouncyCastleProvider` - and take the daemon
+and the values as arguments (they used to default to `ssh` and fixed values,
+and changed it when run bare). Confirmed directly,
+`/daemons/{name}` rejects every protocol name except `"ssh"` with a 400
+(`"Invalid value for parameter name, expected (ssh)"`), regardless of which
+daemons exist or are running on the server - unlike the Applications
+maintenance-type case, there is no alternate "test daemon" to redirect this
+at even in principle. This check reads the real SSH daemon's settings first,
+runs both scripts unmodified, verifies each change independently, then
+restores the original settings and verifies the restore. It was deliberately
+excluded until explicitly requested, understanding that it briefly changes a
+live, shared daemon rather than a disposable object.
+
+`23.connect_operations_scripts.py` corrects a mischaracterisation from this
+project's own earlier history: `13.servers_operations_POST.sh` was originally
+grouped with `05.daemons_operations_POST.sh` as "disruptive - starts and
+stops real daemons and servers". Confirmed directly, `13` never stops
+anything at all - it only starts a server or daemon already found not
+running, and is a safe no-op against a server where everything is already
+up. `05` is the one that actually stops anything (the live http daemon
+forcefully, the live ssh daemon gracefully); it now does so only for a daemon
+and an operation given as arguments and, for a stop, the word
+`stop-the-<daemon>-daemon`. This check runs both for real,
+restores every daemon and server to its original state, and additionally
+found (and restores) a side effect: `13` also *attempts* to start this
+server's AS2 daemon, which cannot succeed because the AS2 listener is
+disabled at the server's persistent configuration - a different, more
+durable setting than the running/stopped toggle start/stop affects. See the
+gotchas skill for both findings.
+
+`24.python_read_reports.py` covers two more read-only python3 scripts,
+`stUsersPerSharedFolder.py` and `stCertificateExpiry.py`, the same way `15`
+already does for `stGetAccountsAfterDate.py` and `stConfigScan.py` - no
+`--write` needed, since neither one changes anything.
+
+`25.python_update_route_with_put.py` runs `stUpdateRouteWithPut.py` in its
+default `insert` mode against a throwaway `SIMPLE` route: a substituted copy
+flips the script's own hardcoded `dryRun = True` to `False` (its `mode` and
+`dryRun` live in the script's configuration section, not on the command
+line, the same situation `15` already handles for `stConfigScan.py`'s
+hardcoded baseline path), then this check verifies the one configured step
+landed at the route and cleans up. The other two modes (`link`,
+`subscription`) both need a second, already-meaningful real object rather
+than a disposable one, and are left uncovered on the same basis
+`16.python_build_delete_accounts.py` already documents for count-trimming
+rather than fabricating one from scratch.
+
+`26.python_get_private_cert.py` generates a real, brand new private
+certificate for a throwaway account through the plain-JSON generate path
+`POST /certificates` (`caPassword`, `keySize`, `subject`, `type`, `usage`,
+`validityPeriod` - no multipart, no external key file), then runs the real,
+unmodified `stGetPrivateCert.py` against it and checks the exported file is
+a non-trivial, DER-encoded PKCS#12 blob. This is the one python3 example
+this project spent the longest completely unable to test - see the gotchas
+skill entry on `caPassword` for the full account of what unblocked it, and
+why an earlier version of this file's own claim that there was "nothing
+this check can safely create to read back" was wrong.
+
+`27.python_update_all_routes.py` exercises `stUpdateAllRoutes.py`'s example
+1 (`updateFailureEmail`) for real: a substituted copy also flips
+`updateStepFields` to `False`, since example 2's own trigger step type,
+`CustomStepTracking`, is not a real, creatable step type on this server at
+all (confirmed directly, `POST /routes` rejects it, `"Route Step type is
+undefined"` - it is illustrative filler in the example, not something this
+API implements). Scanning every real `SIMPLE` route sounds like the same
+server-wide risk `stUpdateAllSubscriptions.py` has below, but confirmed
+directly it is not: this script's own match condition (an exact
+`oldteam@example.com` substring in `failureEmailName`) does not hit any of
+this lab's three real `SIMPLE` routes, none of which have that field set
+at all - so a throwaway route built to match it is the only one this
+script's own logic ever touches here.
+
+`28.python_build_full_test_account.py` runs `stBuildFullTestAccount.py`'s
+entire onboarding chain for real - account, imported SSH key, a
+folder-monitor site, an SFTP site authenticating with that key, a
+subscription, a simple route and a composite route - creating disposable
+`ZZTEST_`-prefixed stand-ins for the two objects it assumes already exist
+(a route template named `Empty`, an application named `AdvRouting`) and
+generating a real, disposable SSH keypair with `ssh-keygen` for the
+`testsshkey` file it also assumes. Found and fixed two real bugs getting
+this to run for the first time: `stImportKey` and `stGetKeyId` both
+hardcoded the literal account name `"TestAccount1"` instead of the script's
+own configured `accName` variable, which every other function in the file
+already used correctly - see the gotchas skill for the confusing 403 this
+produced.
+
+`22.routetemplates_compositeroutes_scripts.py` runs a count-trimmed copy of
+`08.RouteTemplates/02.routes_POST.sh` (3 of its 163 hardcoded names, computed
+from the real file's own array at run time, not a second hardcoded copy of
+it) followed by the real, unmodified `09.CompositeRoutes/02.routes_POST.sh`,
+which depends on one of those three names existing. Every iteration of the
+original loop does the identical POST with only the name different, so the
+trim exercises the same mechanics just as validly - the same reasoning
+`16.python_build_delete_accounts.py` already applies to
+`stBuildTestAccounts.py` (100 accounts trimmed to 3).
+
+`21.configurations_write_scripts.py` reads every option
+`13.Configurations`'s two PATCH scripts touch, runs both scripts for real,
+verifies each option's new value, then restores every one of them and
+verifies the restore - the same round-trip pattern `14` already uses for the
+SSH daemon. Confirmed directly while building it, and corrected in the
+gotchas skill: the `"readOnly"` flag `GET /configurations/options/...`
+returns does **not** mean the API itself refuses a `PATCH` - a real, working
+`PATCH` against an option reporting `readOnly: true` was the direct evidence.
+Also confirmed: `StatisticsSummaryReport.ClientSecret` auto-encrypts a
+plaintext value on write, the same behaviour already confirmed for a
+transfer site's password field.
+
+**`stGraceful.py` needed a bigger conversation than the others, including a
+real incident.** It gracefully stops FolderMonitor and Scheduler cluster
+services, every protocol daemon on a core and an edge server, and the
+Transaction Manager itself. Confirmed directly, without ever stopping the TM
+to find out: `POST /transactionManager/operations?operation=start` is
+rejected outright - this endpoint only ever implements stopping the TM, with
+no symmetric start operation anywhere in the API - so any check that touches
+it runs a copy with the TM-stopping code removed entirely, never the
+unmodified script.
+
+An earlier, numbered version of that check (once run, with the TM stop
+already removed) caused a real several-minutes outage of every protocol
+daemon and server on the server it ran against - undetected until a later,
+unrelated command happened to reconnect. Root cause, as best reconstructed:
+the check's own subprocess timeout killed the real script mid-operation,
+and its restoration logic never captured or restored *server* `isActive`
+state at all (only daemons and cluster services) - and a "graceful stop
+with a timeout" appears to keep running server-side on its own clock even
+after the client that triggered it is killed, so the restart raced against
+a still-pending stop that landed anyway, later. The server was fully
+recovered by hand and independently re-verified against its original state
+before anything else was written.
+
+The rewritten check - `tests/online/checks/manual.graceful_scripts.py` -
+is not part of `run_online.sh --write` on purpose: it has no leading
+number, so this project's own check-discovery (`find checks -maxdepth 1
+-name '[0-9]*.py'`) never finds it, and it additionally requires a third command line
+flag beyond `--write`/`st_allow_writes` before it does anything. Read its
+own docstring - the full incident account above lives there - before ever
+running it by hand.
+
+**`Features/pesit-end-to-end-acknowledgment` needs live PeSIT transfers**, and
+`32.pesit_acknowledgment_loop_scripts.py` makes its own: two throwaway
+accounts, each with a PeSIT site named after the other, pointing at this
+server's own PeSIT listener. An earlier manual check borrowed two real accounts
+already wired that way on the lab, reset one's password to clean up, and only
+reached the NACK branch. It was removed once `32` covered both branches, and
+`IteratePesitInbounds.sh`, without touching a real account.
+
+Deliberately still not covered, and why:
+
+- **`.bat` scripts** cannot be executed from this harness at all - there is no
+  Windows runner. They are still syntax checked by `tests/checks`, nothing
+  more.
+
+## These are not part of `run_all.sh`
+
+`tests/offline/run_all.sh` stays offline and green on any clone. Integration is a
+separate command on purpose: it needs a server, and in `--write` mode it changes
+one. Run it before a release, or after a SecureTransport upgrade, which is when
+the assumptions in this repository are most likely to have moved.

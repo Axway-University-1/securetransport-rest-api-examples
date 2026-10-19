@@ -26,6 +26,6 @@ reporting, certificates and administrators.
 
 A folder named after the use case, numbered in the order to read it, a `README.md`, scripts numbered in the order they run, a
 `00.run_all` that runs them all, a `99.cleanup_DELETE` that removes what they created (by exact `example_*` name), and
-a test in `tests/checks/` and `tests/integration/checks/`. Every script says in its header which example of
+a test in `tests/offline/checks/` and `tests/online/checks/`. Every script says in its header which example of
 `Admin/API 2.0/bash` it was copied from. The connection settings are those of `Admin/API 2.0/bash`
 (`set_variables.local.sh`, which git ignores). `session.sh` is the one helper they share.

@@ -26,7 +26,7 @@ REM   connectionStatus and authenticationStatus say what worked, and message and
 REM   solution what did not. The secret's values come back masked, ****.
 REM - In a certificate or a site, ${fetch(externalStore, ...)} reads a secret at
 REM   run time; see the option descriptions that mention it.
-REM - tests/integration/lib/dummy_servers.py has a FakeVault that can stand in for
+REM - tests/common/dummy_servers.py has a FakeVault that can stand in for
 REM   a HashiCorp Vault to try these examples against.
 REM - PowerShell is used to URL-encode the name, build the body and print the outcome, in place of jq.
 REM - The name is URL-encoded into the path (a name with a space works); one with a / is refused with exit 2 (nothing is sent),

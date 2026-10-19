@@ -33,7 +33,7 @@ REM - Confirmed directly: saving the profile tests the connection: a bucket the
 REM   server cannot reach answers 400 "Connection to S3 storage using supplied
 REM   setting failed" and nothing is saved.
 REM - 47.configurations_storageProfiles_options_PUT_unregister.bat removes it.
-REM - tests/integration/lib/dummy_servers.py has a FakeS3 that can stand in for an
+REM - tests/common/dummy_servers.py has a FakeS3 that can stand in for an
 REM   S3 bucket to try these examples against.
 REM - PowerShell is used to read the registry and build the bodies, in place of jq.
 REM - The registry is read first, and the script stops (exit 1) when it cannot be read: sending a registry made of this one profile alone would drop the

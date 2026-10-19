@@ -25,7 +25,7 @@ REM   "Successful Connection." or "Connection failed." This script exits 1 for a
 REM - Confirmed directly: it only opens a connection to the host and port, and sends
 REM   nothing: it does not bind or search. A directory that accepts connections but would
 REM   refuse the bind account still reads as successful.
-REM - tests/integration/lib/dummy_servers.py has a TcpSink that can be the "directory".
+REM - tests/common/dummy_servers.py has a TcpSink that can be the "directory".
 REM - PowerShell is used to look the server up and print the message, in place of jq.
 REM ==============================================================================
 

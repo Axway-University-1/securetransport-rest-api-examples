@@ -8,18 +8,18 @@ things. This is the ledger. Delete it when the open list is empty.
 
 | Area | What | Where |
 | ---- | ---- | ----- |
-| Harness | Never writes over your `set_variables.local.sh` or `integration.conf`: temporary files named by `ST_ADMIN_LOCAL_VARIABLES`, `ST_ENDUSER_LOCAL_VARIABLES`, `ST_INTEGRATION_CONF`; the python config is kept on disk and restored on exit, SIGTERM, and by the next run after a SIGKILL | `tests/integration/lib/script_runner.py`, `run_integration.sh` |
-| Harness | A check that asserts nothing is a skip, not a pass; output streams; timings; a name filter; number order past 99 | `run_integration.sh`, `st_client.py` |
-| Harness | The mock no longer leaves its key in the temp folder, and passes check 12 and 04 | `tests/integration/mock/mock_st.py` |
+| Harness | Never writes over your `set_variables.local.sh` or `integration.conf`: temporary files named by `ST_ADMIN_LOCAL_VARIABLES`, `ST_ENDUSER_LOCAL_VARIABLES`, `ST_INTEGRATION_CONF`; the python config is kept on disk and restored on exit, SIGTERM, and by the next run after a SIGKILL | `tests/common/script_runner.py`, `run_online.sh` |
+| Harness | A check that asserts nothing is a skip, not a pass; output streams; timings; a name filter; number order past 99 | `run_online.sh`, `st_client.py` |
+| Harness | The mock no longer leaves its key in the temp folder, and passes check 12 and 04 | `tests/common/mock_st.py` |
 | Harness | Checks that compare days wait out midnight | `st_client.avoid_midnight` |
 | Secrets | Hardcoded passwords out of `stBuildFullTestAccount.py`; the credential scan covers python | `check_hygiene.sh` |
-| Python | Every example: CSRF token on every write, every failure exits non-zero, every status checked, bounded waits, `daemon=` (not `serverName=`) to stop a daemon, dry run by default where it deletes, a Risk line, optional `st_verify` | `Admin/API 2.0/python`, `test_python_*.py`, `tests/lib/fake_requests` |
+| Python | Every example: CSRF token on every write, every failure exits non-zero, every status checked, bounded waits, `daemon=` (not `serverName=`) to stop a daemon, dry run by default where it deletes, a Risk line, optional `st_verify` | `Admin/API 2.0/python`, `test_python_*.py`, `tests/offline/lib/fake_requests` |
 | Admin bash and bat | 19 scripts that changed real or server wide things when run bare, and 35 write scripts that could not fail: arguments or `example_*` defaults, `HTTP <code>`, exit 1 and 2, jq, encoded names | `test_bash_admin_api.sh`, `test_bash_admin_sweep_a.sh`, `_b.sh` |
 | Admin bash | `14.ExpressionLanguage` tested and made refuse to touch what exists | `test_bash_expression_language.sh` |
 | Acknowledgment | Exit codes, paging past 100 transfers, the bat twins | `Features/pesit-end-to-end-acknowledgment`, `test_bash_pesit_ack.sh` |
 | EndUser | Logout ended the wrong session, bash 3.2, exit 0 on failure, the tracked `test.txt`, base64 wrapping | `EndUser/API 2.0/bash`, `test_bash_enduser_api.sh` |
 | Admin bash and bat | About 58 read scripts that never looked at the HTTP status (a 401 printed nothing and exited 0), the `change_me` passwords of `18.AccountSetup`, `01.myself_POST` made the login its name says | `test_bash_admin_sweep_c.sh` |
-| Harness | One helper module for the lab checks (631 lines fewer), polling instead of fixed sleeps, a time limit per check, a private output folder per run, no temp folder left behind | `tests/integration/lib/harness.py`, `run_check.py` |
+| Harness | One helper module for the lab checks (631 lines fewer), polling instead of fixed sleeps, a time limit per check, a private output folder per run, no temp folder left behind | `tests/common/harness.py`, `run_check.py` |
 | Admin bash and bat | The account `john` and the SSH port 8022 as optional settings `ST_EXAMPLE_ACCOUNT` and `ST_SSH_PORT`, defaults unchanged | `test_bash_example_settings.sh` |
 | Features | A refused call stops the run in both; the trigger feature heals a stale home folder like the billable one; clean-ups exit 1 and keep their state file; paths are encoded; shared code in `Features/lib` (`home_folder`, `admin_calls`) | `test_feature_*.sh`, `test_feature_bat_twins.py` |
 | Python | `stLinkSimpleRoute` adds its `ExecuteRoute` step after a composite's existing steps instead of replacing them all (the link mode itself was not run on the lab; the insert mode, which shares its PUT, was) | `test_python_logic.py` |

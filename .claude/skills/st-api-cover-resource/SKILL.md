@@ -33,7 +33,7 @@ Notes as `Confirmed directly: ...`.
 | `authoring.py` | `write_sh(...)`, then `write_bat(...)`: the house header, set up and MAIN_URL, for both twins |
 | `sync_docs.py` | After adding files: recount the README table, the docs check and the pack totals. `--check` changes nothing |
 
-`lab.py` needs `tests/local/integration.conf` (copy `tests/integration/integration.conf.example`).
+`lab.py` needs `tests/local/integration.conf` (copy `tests/online/integration.conf.example`).
 
 **Scratch files** (the ids of throwaway lab objects, a saved password) go in the
 project's own `tmp/` folder, gitignored, never in the system `/tmp`:
@@ -125,7 +125,7 @@ next free folder number (look at `ls "Admin/API 2.0/bash"`; 10 is free).
 Some resources only show something while the server is doing something (events,
 sessions, transfers in flight). Build the situation with a throwaway account,
 subscription and route, and a stand-in that keeps the server waiting; see
-`tests/integration/checks/42.events_scripts.py`.
+`tests/online/checks/42.events_scripts.py`.
 
 Write a throwaway script in your scratchpad, never in the repository:
 
@@ -155,9 +155,9 @@ what a name with a space does. Rules:
   certificates of the server itself). Write the example, test it offline, and
   say in its Notes that it was not run.
 - **Outside systems** (LDAP, ICAP, SMTP, Vault, S3, Sentinel...): use or extend
-  the stand-ins in `tests/integration/lib/dummy_servers.py` rather than pointing
+  the stand-ins in `tests/common/dummy_servers.py` rather than pointing
   the lab at a real one. A new stand-in needs a test in
-  `tests/checks/test_dummy_servers.py`, and must work on Linux (CI) as well as
+  `tests/offline/checks/test_dummy_servers.py`, and must work on Linux (CI) as well as
   macOS.
 - **Processes:** stop only what you started, by PID, after checking its command
   and working folder. Never `pkill -f`.
@@ -216,12 +216,12 @@ twin of the bash file you imitated. Hard-won rules:
 
 ### 5. Offline tests
 
-Add a section to `tests/checks/test_bash_admin_api.sh`, in reference order,
+Add a section to `tests/offline/checks/test_bash_admin_api.sh`, in reference order,
 before the final summary. The helpers at its top: `run FOLDER/SCRIPT ARGS`
 with `GET_BODY`, `SEQUENCE`, `POST_BODY`, `LOCATION`, `STATUS`, `STATUS_GET`
 setting the stub's answers; `calls` (METHOD URL per line), `payload N` (the Nth
 body sent), `has_header`, `body NAME JSON`, `sequence NAME JSON...`, `expect`,
-`has`. The stub (`tests/lib/stub_curl`) records `-F` fields as `FORM:` lines.
+`has`. The stub (`tests/offline/lib/stub_curl`) records `-F` fields as `FORM:` lines.
 
 Test for each script: the exact calls and URLs; the body it sends, as jq
 values; what it prints from a canned answer; and that bad arguments send
@@ -230,7 +230,7 @@ Fixtures are synthetic; never paste lab data into a test.
 
 ### 6. Integration check
 
-`tests/integration/checks/NN.<resource>_scripts.py`, the next free number.
+`tests/online/checks/NN.<resource>_scripts.py`, the next free number.
 Imitate `38.business_units_scripts.py` (objects) or `40.configurations_scripts.py`
 (settings, stand-ins). It runs the **real, unmodified** scripts with
 `script_runner.run` inside `runner.real_credentials(...)`, checks each effect
@@ -239,16 +239,16 @@ cleans up in `finally`, and ends by checking nothing is left. Writes need
 `--write` and `st_allow_writes`. Run it on the lab until it passes:
 
 ```bash
-python3 tests/integration/checks/41.denied_users_scripts.py --write
+python3 tests/online/checks/41.denied_users_scripts.py --write
 ```
 
-Add its row to the table in `tests/integration/README.md`.
+Add its row to the table in `tests/online/README.md`.
 
 ### 7. Docs and the suite
 
 ```bash
 python3 .claude/skills/st-api-cover-resource/scripts/sync_docs.py 22.DeniedUsers "22. Denied Users" "\`/deniedUsers\`, ..."
-./tests/run_all.sh
+./tests/offline/run_all.sh
 ```
 
 Also: a row in the task index of **st-api-orientation**; the table of covered

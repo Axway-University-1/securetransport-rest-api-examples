@@ -1,0 +1,316 @@
+#!/usr/bin/env python3
+"""
+Check the dummy servers the integration checks point SecureTransport at
+(tests/common/dummy_servers.py): each answers the calls ST makes, the
+way the real service does, and records them. Talks to them on this machine
+only, and stops them again.
+
+Runs offline. Exit code 0 means clean.
+"""
+import json
+import os
+import socket
+import sys
+import time
+import urllib.error
+import urllib.request
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, "..", "..", "common"))
+import dummy_servers  # noqa: E402
+
+failed = 0
+
+
+def check(label, ok, got=None):
+    global failed
+    print(("  PASS  " if ok else "  FAIL  ") + label + ("" if ok or got is None else "  got: %r" % (got,)))
+    failed += 0 if ok else 1
+
+
+def call(method, url, body=None, headers=None):
+    request = urllib.request.Request(url, data=body, method=method, headers=headers or {})
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status, response.read(), dict(response.headers)
+    except urllib.error.HTTPError as e:
+        return e.code, e.read(), dict(e.headers)
+
+
+print("=== FakeVault ===")
+with dummy_servers.FakeVault() as vault:
+    base = "http://127.0.0.1:%d" % vault.port
+    status, body, _ = call("POST", base + "/v1/auth/approle/login", b'{"role_id":"r","secret_id":"s"}',
+                           {"Content-Type": "application/json"})
+    token = json.loads(body)["auth"]["client_token"] if status == 200 else None
+    check("an AppRole login answers a client token at $.auth.client_token", token == dummy_servers.FakeVault.TOKEN, status)
+    status, body, _ = call("GET", base + "/v1/secret/data/example/db", headers={"X-Vault-Token": token or ""})
+    check("a KV v2 read answers the secret at $.data.data",
+          status == 200 and json.loads(body)["data"]["data"]["username"] == "example_user", (status, body))
+    status, _, _ = call("GET", base + "/v1/secret/data/example/db", headers={"X-Vault-Token": "wrong"})
+    check("a wrong token answers 403", status == 403, status)
+    status, _, _ = call("GET", base + "/v1/secret/data/example/none", headers={"X-Vault-Token": token or ""})
+    check("an unknown secret answers 404", status == 404, status)
+    check("it records the requests, with the login body",
+          [r["method"] for r in vault.requests] == ["POST", "GET", "GET", "GET"]
+          and b'"role_id"' in vault.requests[0]["body"], [r["path"] for r in vault.requests])
+
+print("=== FakeToken ===")
+with dummy_servers.FakeToken() as token_server:
+    base = "http://127.0.0.1:%d/token" % token_server.port
+    form = b"grant_type=client_credentials&client_id=example_id&client_secret=example_secret"
+    status, body, _ = call("POST", base, form, {"Content-Type": "application/x-www-form-urlencoded"})
+    check("by default a token request is refused: 401 and an invalid_client error", status == 401
+          and json.loads(body)["error"] == "invalid_client", (status, body))
+    check("the form it received is read back", token_server.form() == {
+        "grant_type": "client_credentials", "client_id": "example_id", "client_secret": "example_secret"}, token_server.requests[-1]["body"])
+    token_server.status, token_server.answer = 200, {"access_token": "example", "token_type": "Bearer"}
+    status, body, _ = call("POST", base, form)
+    check("with a status and answer set, that is what comes back", status == 200 and json.loads(body)["access_token"] == "example", (status, body))
+    check("a GET is 404, and every request is recorded", call("GET", base)[0] == 404 and [r["method"] for r in token_server.requests] == ["POST", "POST", "GET"],
+          [r["method"] for r in token_server.requests])
+
+print("=== FakeS3 ===")
+with dummy_servers.FakeS3() as s3:
+    base = "http://127.0.0.1:%d" % s3.port
+    check("HEAD on the bucket answers 200", call("HEAD", base + "/example-bucket")[0] == 200)
+    check("HEAD on another bucket answers 404", call("HEAD", base + "/no-such-bucket")[0] == 404)
+    status, _, headers = call("PUT", base + "/example-bucket/a/file.txt", b"hello", {"Authorization": "AWS4-HMAC-SHA256 any"})
+    check("PUT stores an object, with an ETag, whatever the credentials", status == 200 and "ETag" in headers, status)
+    check("GET reads it back", call("GET", base + "/example-bucket/a/file.txt")[1] == b"hello")
+    status, body, _ = call("GET", base + "/example-bucket?list-type=2")
+    check("listing the bucket shows it", status == 200 and b"<Key>a/file.txt</Key>" in body, body)
+    check("DELETE removes it", call("DELETE", base + "/example-bucket/a/file.txt")[0] == 204
+          and call("HEAD", base + "/example-bucket/a/file.txt")[0] == 404)
+
+print("=== TcpSink ===")
+with dummy_servers.TcpSink() as sink:
+    with socket.create_connection(("127.0.0.1", sink.port), timeout=10) as conn:
+        conn.sendall(b"<TrkDescriptor>HEARTBEAT</TrkDescriptor>")
+    check("it keeps what a client sends", sink.wait_for(b"HEARTBEAT", 5), sink.received())
+    check("it records the connection", len(sink.connections) == 1 and sink.connections[0]["client"] == "127.0.0.1")
+    check("wait_for gives up on what never comes", not sink.wait_for(b"NEVER", 1))
+
+print("=== JunkServer ===")
+with dummy_servers.JunkServer() as junk:
+    for _ in range(2):
+        with socket.create_connection(("127.0.0.1", junk.port), timeout=10) as conn:
+            conn.settimeout(10)
+            first = conn.recv(100)
+            rest = conn.recv(100)
+        check("it sends its line, then closes the connection", first == b"this is not a partner\r\n" and rest == b"", (first, rest))
+    check("it counts the connections", junk.connections == 2, junk.connections)
+stopped = False
+try:
+    socket.create_connection(("127.0.0.1", junk.port), timeout=2).close()
+except OSError:
+    stopped = True
+check("it stops listening when the with block ends", stopped)
+with dummy_servers.JunkServer(line=b"220 hello\r\n") as junk2:
+    with socket.create_connection(("127.0.0.1", junk2.port), timeout=10) as conn:
+        conn.settimeout(10)
+        check("the line can be chosen", conn.recv(100) == b"220 hello\r\n")
+
+print("=== SlowProxy ===")
+with dummy_servers.TcpSink() as target:
+    with dummy_servers.SlowProxy("127.0.0.1", target.port, rate=100 * 1024) as proxy:
+        data = b"x" * (200 * 1024)
+        started = time.time()
+        with socket.create_connection(("127.0.0.1", proxy.port), timeout=10) as conn:
+            conn.sendall(data)
+            deadline = time.time() + 15
+            while len(target.received()) < len(data) and time.time() < deadline:
+                time.sleep(0.1)
+        elapsed = time.time() - started
+        check("every byte reaches the target", target.received() == data, len(target.received()))
+        check("at about the rate asked for: 200 KB at 100 KB a second takes about two seconds", 1.3 < elapsed < 6, elapsed)
+        check("it counts the connections", proxy.connections == 1, proxy.connections)
+    stopped = False
+    try:
+        socket.create_connection(("127.0.0.1", proxy.port), timeout=2).close()
+    except OSError:
+        stopped = True
+    check("it stops listening when the with block ends", stopped)
+with dummy_servers.TcpSink() as target2:
+    proxy2 = dummy_servers.SlowProxy("127.0.0.1", target2.port, rate=50 * 1024)
+    proxy2.thread.start()
+    conn = socket.create_connection(("127.0.0.1", proxy2.port), timeout=10)
+    conn.sendall(b"y" * (500 * 1024))
+    time.sleep(1)
+    proxy2.close()
+    conn.settimeout(5)
+    try:
+        cut = conn.recv(1) == b""
+    except OSError:
+        cut = True
+    time.sleep(0.5)
+    check("close() cuts a connection in the middle of a transfer", cut and len(target2.received()) < 500 * 1024, len(target2.received()))
+    conn.close()
+
+print("=== FakeIcap ===")
+HTTP_HEAD = b"POST /f.txt HTTP/1.1\r\nHost: sthost\r\n\r\n"
+
+
+def icap_head(preview=None):
+    extra = "Preview: %d\r\n" % preview if preview is not None else ""
+    return ("REQMOD icap://127.0.0.1/AVSCAN ICAP/1.0\r\nHost: 127.0.0.1\r\nAllow: 204\r\n%sEncapsulated: req-hdr=0, req-body=%d\r\n\r\n"
+            % (extra, len(HTTP_HEAD))).encode() + HTTP_HEAD
+
+
+def read_icap(conn, until=b"\r\n\r\n"):
+    data = b""
+    while until not in data:
+        chunk = conn.recv(65536)
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
+with dummy_servers.FakeIcap() as icap:
+    with socket.create_connection(("127.0.0.1", icap.port), timeout=10) as conn:
+        conn.sendall(b"OPTIONS icap://127.0.0.1/AVSCAN ICAP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+        answer = read_icap(conn)
+        check("OPTIONS answers 200 with the methods, a preview size and Allow: 204",
+              answer.startswith(b"ICAP/1.0 200 OK") and b"Methods: REQMOD, RESPMOD" in answer and b"Preview: 1024" in answer
+              and b"Allow: 204" in answer, answer)
+        conn.sendall(icap_head(preview=10) + b"4\r\nabcd\r\n0; ieof\r\n\r\n")
+        answer = read_icap(conn)
+        check("a clean file whose whole body is in the preview (ieof) is let through with 204", answer.startswith(b"ICAP/1.0 204"), answer)
+        marked = b"some text EICAR-ICAP-TEST in it...."
+        conn.sendall(icap_head(preview=40) + b"%x\r\n" % len(marked) + marked + b"\r\n0; ieof\r\n\r\n")
+        answer = read_icap(conn, b"0\r\n\r\n")
+        check("a file with the marker is blocked: 200 with an encapsulated HTTP 403",
+              answer.startswith(b"ICAP/1.0 200 OK") and b"HTTP/1.1 403 Forbidden" in answer, answer)
+        conn.sendall(icap_head(preview=4) + b"4\r\nabcd\r\n0\r\n\r\n")
+        answer = read_icap(conn)
+        check("a preview that is not the whole file is answered 100 Continue", answer.startswith(b"ICAP/1.0 100 Continue"), answer)
+        conn.sendall(b"6\r\nefghij\r\n0\r\n\r\n")
+        answer = read_icap(conn)
+        check("and once the rest has been sent, with 204", answer.startswith(b"ICAP/1.0 204"), answer)
+    deadline = time.time() + 5
+    while len(icap.requests) < 3 and time.time() < deadline:
+        time.sleep(0.1)
+    check("it records each scan: the body, whether it was blocked, and the ICAP headers",
+          [(r["body"], r["blocked"]) for r in icap.requests] == [(b"abcd", False), (b"some text EICAR-ICAP-TEST in it....", True), (b"abcdefghij", False)]
+          and icap.requests[0]["icap_headers"].get("allow") == "204" and len(icap.options) == 1, [(r["body"], r["blocked"]) for r in icap.requests])
+icap_port = icap.port
+try:
+    socket.create_connection(("127.0.0.1", icap_port), timeout=2).close()
+    icap_stopped = False
+except OSError:
+    icap_stopped = True
+check("it stops listening when the with block ends", icap_stopped)
+
+port = sink.port
+try:
+    socket.create_connection(("127.0.0.1", port), timeout=2).close()
+    stopped = False
+except OSError:
+    stopped = True
+check("the sink stops listening when the with block ends", stopped)
+
+print("=== CapturingProxy ===")
+
+
+def echo_target():
+    """A TcpSink answers nothing; this one answers every chunk with the same bytes upper cased, in a thread."""
+    import threading
+    server = socket.socket()
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+
+    def serve():
+        while True:
+            try:
+                conn, _ = server.accept()
+            except OSError:
+                return
+            threading.Thread(target=answer, args=(conn,), daemon=True).start()
+
+    def answer(conn):
+        try:
+            while True:
+                data = conn.recv(65536)
+                if not data:
+                    break
+                conn.sendall(data.upper())
+        except OSError:
+            pass
+        conn.close()
+    threading.Thread(target=serve, daemon=True).start()
+    return server
+
+
+target_server = echo_target()
+with dummy_servers.CapturingProxy("127.0.0.1", target_server.getsockname()[1]) as capture:
+    with socket.create_connection(("127.0.0.1", capture.port), timeout=10) as conn:
+        conn.settimeout(10)
+        conn.sendall(b"hello \x00\xff bytes")
+        got = b""
+        while len(got) < 14:
+            got += conn.recv(100)
+        check("what the client sent reaches the target and the answer comes back unchanged", got == b"HELLO \x00\xff BYTES", got)
+        check("it kept both directions of the connection",
+              capture.to_target_all() == b"hello \x00\xff bytes" and capture.to_client_all() == b"HELLO \x00\xff BYTES",
+              (capture.to_target_all(), capture.to_client_all()))
+        check("one connection, one record", len(capture.connections) == 1, len(capture.connections))
+        check("it goes quiet once nothing moves", capture.wait_idle(0.5, 10))
+        capture.reset()
+        check("reset() forgets what was captured", capture.to_target_all() == b"" and capture.to_client_all() == b"")
+        conn.sendall(b"again")
+        got = b""
+        while len(got) < 5:
+            got += conn.recv(100)
+        check("a connection that stays open goes on being captured after a reset",
+              capture.to_target_all() == b"again" and capture.to_client_all() == b"AGAIN", (capture.to_target_all(), capture.to_client_all()))
+    with socket.create_connection(("127.0.0.1", capture.port), timeout=10) as conn2:
+        conn2.sendall(b"two")
+        conn2.settimeout(10)
+        conn2.recv(10)
+    deadline = time.time() + 5
+    while len(capture.connections) < 2 and time.time() < deadline:
+        time.sleep(0.1)
+    check("a second connection makes a second record", len(capture.connections) == 2 and capture.connections[1]["to_target"] == b"two", len(capture.connections))
+capture_port = capture.port
+try:
+    socket.create_connection(("127.0.0.1", capture_port), timeout=2).close()
+    capture_stopped = False
+except OSError:
+    capture_stopped = True
+check("it stops listening when the with block ends", capture_stopped)
+target_server.close()
+
+print("=== pesit_wire: reading a captured PeSIT transfer ===")
+import pesit_wire  # noqa: E402
+
+
+def fpdu(phase, kind, params=b"", dst=1, src=2):
+    body = bytes([phase, kind, dst, src]) + params
+    size = len(body) + 2
+    return size.to_bytes(2, "big") + size.to_bytes(2, "big") + body
+
+
+select_ack = fpdu(0xC0, 0x31, b"\x02\x03\x00\x00\x00" + b"\x10\x01\x01" + b"\x1e\x08\x1f\x01\x80\x20\x02\x08\x00")
+capture_bytes = (b"\x00\x04\xc1\xc3\xd2\xf0" + fpdu(0x40, 0x21, b"\x06\x01\x02") + select_ack
+                 + fpdu(0x00, 0x00, b"\x00\x05alpha\x00\x04beta") + fpdu(0x00, 0x00, b"\x00\x05gamma") + fpdu(0xC0, 0x04))
+frames = pesit_wire.fpdus(capture_bytes)
+check("it skips the pre-connection message and reads each FPDU: phase, type, parameters",
+      [(f[0], f[1]) for f in frames] == [(0x40, 0x21), (0xC0, 0x31), (0, 0), (0, 0), (0xC0, 0x04)] and frames[0][4] == b"\x06\x01\x02", frames)
+check("data() joins the bodies of the data FPDUs only", pesit_wire.data(capture_bytes) == b"\x00\x05alpha\x00\x04beta\x00\x05gamma", pesit_wire.data(capture_bytes))
+check("records() cuts articles: 2 byte length, then the bytes", pesit_wire.records(pesit_wire.data(capture_bytes)) == [b"alpha", b"beta", b"gamma"])
+check("records() says None for a stream that is not made of records", pesit_wire.records(b"alpha\nbeta\n") is None and pesit_wire.records(b"\x00\x09abc") is None)
+check("records() of nothing is no records", pesit_wire.records(b"") == [])
+check("frame_records() builds what records() reads", pesit_wire.records(pesit_wire.frame_records([b"a", b"", b"xyz"])) == [b"a", b"", b"xyz"])
+check("the DTFDA, DTFMA and DTFFA types are data too",
+      pesit_wire.data(fpdu(0, 0x40, b"ab") + fpdu(0, 0x41, b"cd") + fpdu(0, 0x42, b"ef") + fpdu(0, 0x43, b"zz")) == b"abcdef")
+check("PI 16, the data coding, is read from the answer to the select, even inside a group",
+      pesit_wire.network_data_code(capture_bytes) == b"\x01" and pesit_wire.parameter(b"\x1e\x08\x1f\x01\x80\x20\x02\x08\x00", 32) == b"\x08\x00")
+check("a parameter that is not there is None", pesit_wire.parameter(b"\x10\x01\x01", 99) is None and pesit_wire.network_data_code(b"") is None)
+check("a capture cut in the middle of a frame gives the whole frames before it",
+      len(pesit_wire.fpdus(capture_bytes[:-3])) == 4, len(pesit_wire.fpdus(capture_bytes[:-3])))
+
+print()
+print("test_dummy_servers: %s" % ("PASS" if not failed else "FAIL"))
+sys.exit(1 if failed else 0)

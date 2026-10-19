@@ -10,4 +10,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run the offline checks
-        run: ./tests/run_all.sh
+        run: ./tests/offline/run_all.sh

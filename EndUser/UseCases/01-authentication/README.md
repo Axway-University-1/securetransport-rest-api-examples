@@ -53,6 +53,6 @@ It does not touch `myCookie.jar` of the reference examples.
 
 ## Tests
 
-`tests/checks/test_bash_enduser_usecases.sh` runs every script against a stub `curl`.
-`tests/integration/checks/62.enduser_usecase_authentication.py` runs them on a real
+`tests/offline/checks/test_bash_enduser_usecases.sh` runs every script against a stub `curl`.
+`tests/online/checks/62.enduser_usecase_authentication.py` runs them on a real
 server, as a throwaway end user account it creates and removes.

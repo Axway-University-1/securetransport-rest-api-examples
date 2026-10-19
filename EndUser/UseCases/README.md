@@ -30,5 +30,5 @@ Follow the conventions of [Features](../../Features/README.md): a folder named a
 use case in lower case with hyphens, a `README.md` that says what it does and in which
 order to run the scripts, scripts numbered in the order they run, a `00.run_all` that runs
 them all, a `99.cleanup_DELETE` that removes every object they created, and a test for
-each script in `tests/checks/`. The connection settings are the ones of
+each script in `tests/offline/checks/`. The connection settings are the ones of
 `EndUser/API 2.0/bash` (`set_variables.local.sh`, which git ignores).

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Bring the docs in line with the Admin folders on disk: the per-folder counts in
-the README table, the folder list in tests/checks/check_docs_match_repo.py, and
+the README table, the folder list in tests/offline/checks/check_docs_match_repo.py, and
 the totals the knowledge pack cites.
 
     sync_docs.py                                       recount every row
@@ -66,7 +66,7 @@ def main(argv):
         if not check:
             open(readme_path, "w").write("\n".join(lines))
 
-    chk_path = os.path.join(REPO, "tests/checks/check_docs_match_repo.py")
+    chk_path = os.path.join(REPO, "tests/offline/checks/check_docs_match_repo.py")
     chk = open(chk_path).read()
     if new:
         entry = '("%s", "%s")' % (new[1], new[0])

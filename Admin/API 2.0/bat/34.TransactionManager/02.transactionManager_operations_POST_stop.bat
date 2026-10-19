@@ -32,7 +32,7 @@ REM - PowerShell is used to read the answer, in place of jq.
 REM - THIS WAS NOT RUN AGAINST A SERVER. It stops the Transaction Manager of the whole server, and there is no operation to start it
 REM   again through the API (see below), so no lab was stopped to see the answer. It was written from the reference and from
 REM   `python/python3/stGraceful.py`, which makes the same call (`operation=stop&graceful=true&timeout=N`, no body), and is tested
-REM   offline with a stub `curl` that never reaches a server (tests/checks/test_bash_admin_api.bat).
+REM   offline with a stub `curl` that never reaches a server (tests/offline/checks/test_bash_admin_api.bat).
 REM - Run it only on a server you can restart, to see the answer. What brings the Transaction Manager back is a restart of the
 REM   server's own services, outside this API. Check it afterwards with 01.transactionManager_GET.bat.
 REM - Nothing is sent unless the first argument is exactly `stop-the-transaction-manager`. There is no default and no environment variable

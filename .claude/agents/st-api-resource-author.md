@@ -15,7 +15,7 @@ You add examples for one Admin API 2.0 resource to this repository.
    `Confirmed directly: ...`.
 3. Open the example files the skill names and imitate them. Do not write from
    memory.
-4. Finish only when `./tests/run_all.sh` passes and the new integration check
+4. Finish only when `./tests/offline/run_all.sh` passes and the new integration check
    passes on the lab with `--write`.
 5. Do not commit or push. Do not stop processes you did not start.
 

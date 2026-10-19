@@ -25,7 +25,7 @@
 # - Confirmed directly: it only opens a connection to the host and port, and sends
 #   nothing: it does not bind or search. A directory that accepts connections but would
 #   refuse the bind account still reads as successful.
-# - tests/integration/lib/dummy_servers.py has a TcpSink that can be the "directory".
+# - tests/common/dummy_servers.py has a TcpSink that can be the "directory".
 # - Requires `jq`, which looks the server up and prints the message.
 # ==============================================================================
 

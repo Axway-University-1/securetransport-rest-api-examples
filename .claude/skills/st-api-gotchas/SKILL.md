@@ -49,7 +49,7 @@ This silently made the billable report, `16.TransferLogs` and
 `stBillableTransfers.py` count the whole server until it was found. Do not
 confuse it with the `accountName` field in the body of
 `POST /transfers/operations?operation=pull`, which is correct there.
-`tests/integration/checks/30.lookups_and_transfer_logs_read.py` checks that
+`tests/online/checks/30.lookups_and_transfer_logs_read.py` checks that
 `account=` really filters, and reports whether `accountName=` is ignored.
 
 ## Billing: "the first outbound of a file" means of a transfer chain
@@ -79,11 +79,11 @@ it is on:
 
 Every python example that keeps a session does this: the token is read from the
 login's response header and sent on every later call, the logout included. This
-was **not** true of all of them until `tests/checks/test_python_scripts_run.py`
+was **not** true of all of them until `tests/offline/checks/test_python_scripts_run.py`
 was written: `stGraceful.py`, `stAddLoginRestrictionRule.py`, `stUpdateAllAccounts.py`
 and the logout of `stGetAccountsAfterDate.py` sent no token, and nothing showed
 it, because the lab accepts a cookie-based write without one (see below). That
-test runs each script against a fake server (`tests/lib/fake_requests`) that
+test runs each script against a fake server (`tests/offline/lib/fake_requests`) that
 refuses a write with no valid `csrfToken`, a call with no `Referer` or another
 one than the login's, and a call with no timeout. Any script written before the
 20230525 release will fail against a current server until it is updated. This is
@@ -101,7 +101,7 @@ the single most common reason an old script stops working.
   (`csrfToken: nope`, confirmed 2026-10-15 with a PATCH of `/myself` to its own value), on the Admin API and on
   the EndUser API. The lab is therefore more lenient than the documented contract, and
   a script that omits the token works there and fails on a server that enforces it. The
-  bundled mock and `tests/lib/fake_requests` are strict, which is what finds the omission.
+  bundled mock and `tests/offline/lib/fake_requests` are strict, which is what finds the omission.
 - The examples that keep a session send the token anyway, captured once from the login
   (`curl -D headerfile`, then read back out), never rotated, the python ones as in
   `stUpdateAllRoutes.py`: the two bash examples that keep a cookie jar
@@ -280,7 +280,7 @@ server links to, filters nothing. **Enforcement was not observed**: on the lab a
 EndUser API (HTTP) or FTP: each kept getting in on every try for 20 seconds (check 46, 2026-10-08, 5.5-20260924), and for FTP and
 HTTP also two minutes later, with either type. Do not make a policy the
 default to try it: that applies it to every account that has none.
-`tests/integration/checks/46.login_restriction_enforcement.py` asserts the refusal for SFTP and HTTP (the core
+`tests/online/checks/46.login_restriction_enforcement.py` asserts the refusal for SFTP and HTTP (the core
 protocols) and FTP (legacy), and that an account outside the unit still gets in, and fails on that lab (exactly the three "THE POLICY
 ENFORCES" checks) until enforcement works.
 
@@ -424,7 +424,7 @@ names, report which one was found, and print the available fields if none match.
 One field confirmed this way: on `GET /myself` (a 5.5-20260827 server), the
 current administrator's login name is the top-level `loginName` field - not
 `name`, and not nested under a `user` or `administrator` object the way an
-account's own record is. `tests/integration/checks/01.connect.py` does not
+account's own record is. `tests/online/checks/01.connect.py` does not
 hardcode this; it searches the whole response and reports where the value was
 found, which is the safer pattern until a field has actually been confirmed
 against the version you are targeting.
@@ -524,7 +524,7 @@ request body is a safe stand-in for another's.
 ## The EndUser API, against its own reference
 
 Confirmed directly on 5.5-20260924, while adding an example for every
-resource of the EndUser API reference (`tests/integration/checks/33.enduser_api_scripts.py`):
+resource of the EndUser API reference (`tests/online/checks/33.enduser_api_scripts.py`):
 
 - **No csrfToken is needed.** The login answers with one, but a POST, PUT,
   PATCH or DELETE without it succeeds. The session cookie is enough.
@@ -569,7 +569,7 @@ resource of the EndUser API reference (`tests/integration/checks/33.enduser_api_
 ## The Admin API, against its own reference
 
 Confirmed directly on 5.5-20260924, while adding examples resource by resource
-from the Admin API reference (`tests/integration/checks/34` onwards):
+from the Admin API reference (`tests/online/checks/34` onwards):
 
 ### By resource, in the order of the reference
 
@@ -819,7 +819,7 @@ pulls with one index. Transfer operations: `resubmit` works on a finished transf
 calls it `isCancellable`). Finished transfers and running ones (a 10 MB FTP upload, EndUser API
 upload, SSH pull, a route's send) are never cancelable: "not eligible for cancellation".
 What is cancelable is a failed PeSIT pull waiting for a retry: cancel answers 200 and the
-pull's summary moves it from "to retry" to "failed". `tests/integration/checks/48.cancel_transfer.py`
+pull's summary moves it from "to retry" to "failed". `tests/online/checks/48.cancel_transfer.py`
 covers both. `GET /logs/transfers` has NO default order: pass `sortByStartTime=descending`
 (newest first; `ascending` oldest first; any value sorts descending) or "latest" is a guess. `verify` needs an AS2 receipt; `ack` and
 `nack` need a PeSIT transfer; any other operation is 403 with an unhelpful message. Logs are
@@ -903,7 +903,7 @@ string. **Creating a route does not look up what a step names**: an account, a t
 (`<site>#!#CVD#!#`), a PGP key alias, a Fusion integration or a script path that does not exist is 201, so
 every type can be created on a bare lab with placeholders. The per-type table is in the Notes of
 `30.RouteStepsMetadata/01` (`01 <type> minimal` prints the step), and
-`tests/integration/checks/51.route_steps_metadata_scripts.py` creates, reads back and deletes each one
+`tests/online/checks/51.route_steps_metadata_scripts.py` creates, reads back and deletes each one
 and shows that leaving out any field is 400.
 
 #### Route steps charsets
@@ -919,7 +919,7 @@ does not know (400 "The charset specified by inputCharset is not supported.", or
 not in the list, and store them as written. A name in the list is always accepted; one outside it may be. Every
 charset in the 17 minimal steps of `30.RouteStepsMetadata` (UTF-8, and UTF-16 as the output of
 EncodingConversion) is in the list. `01 step FILE` checks a step, a list of steps or a route against it;
-`tests/integration/checks/52.route_steps_charsets_scripts.py` covers it.
+`tests/online/checks/52.route_steps_charsets_scripts.py` covers it.
 
 #### Servers
 
@@ -1070,7 +1070,7 @@ pulled is not pulled again, even if it was deleted from the folder, until `Clear
 A second pull started at once, as soon as the file had arrived, fetched it again; with 5 seconds in between it did not (the
 history seems to be written a moment after the file arrives). `Purge` is
 204 and removes the whole folder, not only its files; the subscription stays and a later pull makes the folder again.
-`tests/integration/checks/56.subscriptions_scripts.py` covers all of it.
+`tests/online/checks/56.subscriptions_scripts.py` covers all of it.
 
 #### Transaction Manager
 
@@ -1123,7 +1123,7 @@ table, and is 400 "does not exist or is empty" when there is none; `ascii_custom
 option, but **a transfer through them fails**: "Failure in opening file" (check 59).
 
 **What a transfer profile does to the bytes of a file** (check 59, 116 real PeSIT pulls, the wire read through a
-`CapturingProxy` and `tests/integration/lib/pesit_wire.py`). In a pull the SENDER's default profile `callerTranscoding` ("sending")
+`CapturingProxy` and `tests/common/pesit_wire.py`). In a pull the SENDER's default profile `callerTranscoding` ("sending")
 decides what goes on the wire and the RECEIVER's `receiverTranscoding` what is stored; the sender announces the data coding in PI 16
 (0 ASCII, 1 EBCDIC, 2 binary) and the receiver decides by it. The connection is `LEN2 + FPDU` (FPDU: length, phase, type, two
 ids, parameters); the data is in DTF FPDUs (phase 0, type 0), as the file's bytes or as records, each a 2 byte length (not counting
@@ -1448,7 +1448,7 @@ and cluster services (all of which accept both `start` and `stop` on their
 own `/operations` endpoints), this endpoint only ever implements stopping
 the TM. There is no confirmed way to bring it back up through this API at
 all. Any script or check that stops the TM has no way back - which is why
-`tests/integration/checks/manual.graceful_scripts.py` runs a copy of
+`tests/online/checks/manual.graceful_scripts.py` runs a copy of
 `stGraceful.py` with its TM-stop call removed entirely, rather than
 round-tripping it the way every other operation in that check is
 round-tripped.
@@ -1509,7 +1509,7 @@ after the last request, so wait for the state to match, then compare.
 
 This is the most safety-critical finding of this whole project, from a real
 incident during development - see
-`tests/integration/checks/manual.graceful_scripts.py`'s own docstring for
+`tests/online/checks/manual.graceful_scripts.py`'s own docstring for
 the full account. Short version: `stopDaemon`-style operations that take
 `graceful=true` and a `timeout` in seconds appear to keep executing on the
 server's own clock, **independent of the client that triggered them** -
@@ -1807,7 +1807,7 @@ the globals in the worker with `globals()['name'] = value`, which works but hide
 the dependency; a name that is both a global and a parameter cannot be declared
 `global`, which is why that was the shape of the trap. Three more things went wrong
 in those scripts, all found by running them for real in `spawn` mode
-(`tests/checks/test_python_safety.py` does, on every platform, with
+(`tests/offline/checks/test_python_safety.py` does, on every platform, with
 `FAKE_ST_START_METHOD=spawn`):
 
 - `queue.get(block=False, timeout=...)` ignores the timeout and raises `queue.Empty`

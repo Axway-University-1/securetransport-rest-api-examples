@@ -33,7 +33,7 @@ REM   trusted certificate and name it in tls.caAliases. Confirmed directly: an
 REM   untrusted one fails the test with "TLS Error code 46: Certificate is
 REM   unknown or untrusted!"
 REM - 42.configurations_externalStores_name_operations_POST_test.bat tries it.
-REM - tests/integration/lib/dummy_servers.py has a FakeVault that can stand in for
+REM - tests/common/dummy_servers.py has a FakeVault that can stand in for
 REM   a HashiCorp Vault to try these examples against.
 REM - PowerShell is used to build the body, in place of jq.
 REM ==============================================================================

@@ -23,7 +23,7 @@ REM - Ensure that set_variables.bat is correctly configured and called.
 REM - Confirmed directly: a working profile answers 204; the server asks for the
 REM   bucket (HEAD /<bucket>). An unknown profile answers 404 "Storage profile
 REM   ... not found."
-REM - tests/integration/lib/dummy_servers.py has a FakeS3 that can stand in for an
+REM - tests/common/dummy_servers.py has a FakeS3 that can stand in for an
 REM   S3 bucket to try these examples against.
 REM - Requires `jq`, which URL-encodes the profile name into the path (a name with a space works; one with a / is refused, exit 2, nothing sent:
 REM   the web server answers 400 to an encoded slash).

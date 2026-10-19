@@ -66,7 +66,7 @@
 # - A daemon is stopped with the daemon=<protocol> of the reference. An earlier version
 #   sent serverName=, which the reference does not give that endpoint.
 # - Not run on the lab by the people who made it safe: a stop cannot be taken back (see
-#   tests/integration/checks/manual.graceful_scripts.py for the outage an earlier run
+#   tests/online/checks/manual.graceful_scripts.py for the outage an earlier run
 #   caused). It is tested offline, against a fake server, in tests/checks.
 # - Confirmed directly, a read: GET /servers?fields=isActive answers
 #   {"protocol": ..., "isActive": ...} for each server. The protocol comes back

@@ -9,10 +9,10 @@ Copy this directory to `tests/local`, which git ignores:
 The integration tests read `tests/local/integration.conf`, which names a real
 server and the credentials for it:
 
-    cp tests/integration/integration.conf.example tests/local/integration.conf
+    cp tests/online/integration.conf.example tests/local/integration.conf
 
 Without it the integration tests skip, so this is the one file here that
-actually enables something. See tests/integration/README.md.
+actually enables something. See tests/online/README.md.
 
 ## Everything else
 
@@ -24,11 +24,11 @@ Put here anything that must not reach the repository:
 - an exported `systemConfiguration.xml`
 - logs and output from a run against a live server
 
-Nothing here is required. `tests/run_all.sh` passes on a clean clone without it.
+Nothing here is required. `tests/offline/run_all.sh` passes on a clean clone without it.
 
 ## Using a captured response as a fixture
 
-The fake ST in `tests/lib/fake_st.py` will serve any JSON you give it, so a real
+The fake ST in `tests/offline/lib/fake_st.py` will serve any JSON you give it, so a real
 response can drive the tests:
 
 ```python
@@ -38,7 +38,7 @@ session = fake_st.FakeSession({"routes": routes})
 ```
 
 That is the most realistic test available, because the shapes are real. Keep the
-file in `tests/local/`. **Only move it to `tests/fixtures/` after scrubbing every
+file in `tests/local/`. **Only move it to `tests/offline/fixtures/` after scrubbing every
 hostname, account name and identifier** — fixtures are committed.
 
 ## Pointing a script at a real server

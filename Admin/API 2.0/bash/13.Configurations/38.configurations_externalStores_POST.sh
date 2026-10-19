@@ -33,7 +33,7 @@
 #   untrusted one fails the test with "TLS Error code 46: Certificate is
 #   unknown or untrusted!"
 # - 42.configurations_externalStores_name_operations_POST_test.sh tries it.
-# - tests/integration/lib/dummy_servers.py has a FakeVault that can stand in for
+# - tests/common/dummy_servers.py has a FakeVault that can stand in for
 #   a HashiCorp Vault to try these examples against.
 # - Requires `jq`, which builds the body.
 # ==============================================================================

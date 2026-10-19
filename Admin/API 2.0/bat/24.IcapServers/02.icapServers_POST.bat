@@ -31,7 +31,7 @@ REM - Confirmed directly: the server does not check the URL: http://x is accepte
 REM   script requires icap://, so a typo is caught here.
 REM - Confirmed directly: with scanning on, SecureTransport asks the server OPTIONS, then
 REM   sends each file as a REQMOD request, with a preview of previewSize KB first.
-REM   tests/integration/lib/dummy_servers.py has a FakeIcap that can stand in for one.
+REM   tests/common/dummy_servers.py has a FakeIcap that can stand in for one.
 REM - 03.icapServers_name_HEAD.bat to 07.icapServers_name_DELETE.bat check, read, change,
 REM   switch on and remove it.
 REM - PowerShell is used to build the body, in place of jq.

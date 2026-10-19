@@ -1,0 +1,610 @@
+#!/bin/bash
+# ==============================================================================
+# Run the EndUser API examples against a stub curl, and check the calls they
+# make: 01.Authenticate, 02.Files, 03.Myself, 04.FileOperations,
+# 05.Transfers and 06.ServerTime.
+#
+# For each one: the method, the URL with its query, the body, the headers that
+# matter (Content-MD5, Content-Range), the answers it acts on, and its exit
+# code. The stub answers different URLs differently (STUB_CURL_GET_RULES), and
+# a no-op sleep keeps the scripts that poll fast.
+#
+# Runs offline. Exit code 0 means clean.
+# ==============================================================================
+cd "$(dirname "$0")/.." || exit 1
+TESTS_DIR="$(pwd)"
+REPO="$(cd ../.. && pwd)"
+EU_TREE="${REPO}/EndUser/API 2.0/bash"
+
+WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/bash_enduser_api"
+rm -rf "${WORK}"
+mkdir -p "${WORK}/bin" "${WORK}/eu" "${WORK}/files"
+
+FAILED=0
+pass() { printf "  PASS  %s\n" "$1"; }
+fail() { printf "  FAIL  %s\n" "$1"; FAILED=1; }
+expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1  (expected '$3', got '$2')"; fi; }
+hasnt() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then fail "$1  ('$2' is in the output)"; else pass "$1"; fi; }
+has() { if printf '%s\n' "${OUT}" | grep -qF -- "$2"; then pass "$1"; else fail "$1  (no '$2' in the output)"; fi; }
+
+# the stub, behind the wrapper that answers each method with its own status (STUB_STATUS_POST_SEQ and so on)
+cp "${TESTS_DIR}/lib/stub_curl" "${WORK}/bin/stub_curl_real" && chmod +x "${WORK}/bin/stub_curl_real"
+cp "${TESTS_DIR}/lib/stub_curl_by_method" "${WORK}/bin/curl" && chmod +x "${WORK}/bin/curl"
+printf '#!/bin/bash\necho "SLEEP: $*" >&2\nexit 0\n' > "${WORK}/bin/sleep" && chmod +x "${WORK}/bin/sleep"
+
+# The test values as the settings file, and a cookie jar, as 01.Authenticate/01.myself_POST.sh leaves it
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/eu/set_variables.local.sh"
+cp "${EU_TREE}/ensure_session.sh" "${WORK}/eu/ensure_session.sh"
+for folder in 01.Authenticate 02.Files 03.Myself 04.FileOperations 05.Transfers 06.ServerTime 07.SecretQuestions; do
+    cp -R "${EU_TREE}/${folder}" "${WORK}/eu/"
+done
+touch "${WORK}/eu/myCookie.jar"
+BASE="https://st.example.com:8444/api/v2.0"
+
+# body NAME JSON: a canned answer, in a file
+body() { printf '%s\n' "$2" > "${WORK}/$1.json"; echo "${WORK}/$1.json"; }
+# rules TEXT FILE [TEXT FILE...]: a STUB_CURL_GET_RULES file
+rules() {
+    local out="${WORK}/rules_$((++RULE_N)).tsv"
+    : > "${out}"
+    while [ "$#" -gt 1 ]; do printf '%s\t%s\n' "$1" "$2" >> "${out}"; shift 2; done
+    echo "${out}"
+}
+# run SCRIPT ARGS...: GET_BODY, RULES, POST_BODY, STATUS and STATUS_GET set the answers
+run() {
+    local rel="$1"; shift
+    # the stub never writes a cookie jar, and a login deletes the old one: a test that is not about
+    # having none starts with one, as after 01.myself_POST.sh (KEEP_NO_JAR=1 leaves it as it is)
+    [ -n "${KEEP_NO_JAR:-}" ] || touch "${WORK}/eu/myCookie.jar"
+    OUT=$(cd "${WORK}/eu/$(dirname "${rel}")" && PATH="${WORK}/bin:${PATH}" \
+          STUB_CURL_GET_BODY="${GET_BODY:-}" STUB_CURL_GET_RULES="${RULES:-}" \
+          STUB_CURL_POST_BODY="${POST_BODY:-}" STUB_CURL_STATUS="${STATUS:-200}" \
+          STUB_CURL_STATUS_GET="${STATUS_GET:-}" STUB_CURL_PRINT_CODE=1 \
+          bash "./$(basename "${rel}")" "$@" 2>&1)
+    RC=$?
+}
+# Every call, METHOD URL. raw_calls has them all; calls leaves out the check for an active session that
+# every example starts with (a GET of /myself, first), so that each test reads what the example itself sends
+raw_calls() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); print m " " $0}'; }
+calls() { raw_calls | awk 'NR==1 && /^GET .*\/myself$/ {next} {print}'; }
+payload() { printf '%s\n' "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | sed -n "${1}p" | base64 -d; }
+headers() { printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p'; }
+
+echo "=== Every example that needs a session checks for one first, and logs in when there is none ==="
+NEEDS_SESSION="03.Myself/01.myself_GET.sh 03.Myself/08.myself_addressBook_GET.sh 02.Files/09.files_GET_query.sh 04.FileOperations/05.fileOperations_id_DELETE.sh 05.Transfers/01.transfers_GET.sh 06.ServerTime/01.serverTime_GET.sh 02.Files/01.files_GET.sh"
+for rel in ${NEEDS_SESSION}; do
+    rm -f "${WORK}/eu/myCookie.jar"
+    KEEP_NO_JAR=1 run "${rel}"
+    expect "${rel}: with no cookie jar it logs in first (POST /myself), then goes on with its own call" \
+      "$(raw_calls | head -1):$([ "$(raw_calls | wc -l | tr -d ' ')" -ge 2 ] && echo goes-on)" "POST ${BASE}/myself:goes-on"
+    has "${rel}: and says there is no session" "There is no session (no myCookie.jar). Logging in first, with 01.Authenticate/01.myself_POST.sh"
+done
+rm -f "${WORK}/eu/myCookie.jar"
+STATUS=401 KEEP_NO_JAR=1 run 06.ServerTime/01.serverTime_GET.sh
+expect "no cookie jar and the login refused: it stops after the login, exit 1, nothing else sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "1:1"
+has "and says why" "The login failed, so this example cannot continue."
+touch "${WORK}/eu/myCookie.jar"
+
+STATUS_GET=401 run 06.ServerTime/01.serverTime_GET.sh
+expect "a cookie jar whose session the server refuses (401): check, login, then its own call" \
+  "$(raw_calls | cut -d' ' -f1 | tr '\n' ' ')" "GET POST GET "
+has "and says the session is no longer active" "The session in myCookie.jar is no longer active (HTTP 401)"
+STATUS_GET=403 run 06.ServerTime/01.serverTime_GET.sh
+has "a 403 is a lost session too" "no longer active (HTTP 403)"
+run 06.ServerTime/01.serverTime_GET.sh
+expect "an active session: one check, no login" "$(raw_calls | cut -d' ' -f1 | tr '\n' ' ')" "GET GET "
+STATUS_GET=500 run 06.ServerTime/01.serverTime_GET.sh
+expect "any other answer to the check (a 500) is not taken for a lost session: no login, the example goes on and reports" \
+  "$(raw_calls | grep -c '^POST')" "0"
+run 03.Myself/06.myself_secretQuestion_GET.sh a-token
+expect "03.Myself/07 with a token needs no session: it makes no check" "$(raw_calls | wc -l | tr -d ' '):$(raw_calls | grep -c '/myself$')" "1:0"
+
+# a new example must not forget the check: every one that uses the cookie jar sources the helper, bar the ones that log in themselves
+NO_CHECK="01.Authenticate/01.myself_POST.sh 01.Authenticate/02.myself_DELETE.sh 03.Myself/04.myself_password_POST_requestLink.sh 03.Myself/05.myself_password_POST_reset.sh"
+MISSING=""
+for f in $(cd "${EU_TREE}" && ls */*.sh); do
+    case " ${NO_CHECK} " in *" ${f} "*) continue ;; esac
+    grep -q "st_ensure_session" "${EU_TREE}/${f}" || MISSING="${MISSING} ${f}"
+done
+expect "every EndUser example that needs a session calls st_ensure_session (the four that log in, log out or need none are listed)" "${MISSING}" ""
+
+echo
+echo "=== 03.Myself ==="
+GET_BODY=$(body myself '{"name":"john","type":"user","contact":{"email":"john@example.com"},"sharingAllowed":true,"transfersWebServiceAllowed":true,"addressBookSettings":{"enabled":true},"messageOfTheDay":"Hello"}')
+run 03.Myself/01.myself_GET.sh
+expect "01 myself: GET /myself" "$(calls)" "GET ${BASE}/myself"
+has "01 myself: prints the account in short" "account           john (user)"
+has "01 myself: and whether sharing is allowed" "sharing allowed   true"
+
+GET_BODY=$(body expired_no '{"message":"...","changePasswordURL":"https://x/api/v2.0/myself/password?operation=change","expired":false}')
+run 03.Myself/02.myself_passwordExpired_GET.sh
+expect "02 passwordExpired: not expired, exit 0" "${RC}:$(calls)" "0:GET ${BASE}/myself/passwordExpired"
+GET_BODY=$(body expired_yes '{"message":"...","changePasswordURL":"https://x/api/v2.0/myself/password?operation=change","expired":true}')
+run 03.Myself/02.myself_passwordExpired_GET.sh
+expect "02 passwordExpired: expired, exit 2" "${RC}" "2"
+has "02 passwordExpired: names the URL to change it at" "Change it at https://x/api/v2.0/myself/password?operation=change"
+GET_BODY=
+
+run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss' --keep
+expect "03 change --keep: POSTs the change, then logs in again, and stops" "$(calls)" "POST ${BASE}/myself/password?operation=change
+POST ${BASE}/myself"
+expect "03 change: the operation is in the body too, with the old and new passwords" \
+  "$(payload 1 | jq -c '[.operation, .oldPassword, .newPassword]')" '["change","s3cret","N3w p@ss"]'
+has "03 change: logs in again with the new password" "BASIC_AUTH: apiadmin:N3w p@ss"
+has "03 change --keep: says to put the new password in the settings" "Put the new password in set_variables.local.sh"
+run 03.Myself/03.myself_password_POST_change.sh --keep 'N3w p@ss'
+expect "03 change: the flag may come first" "${RC}" "0"
+run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
+expect "03 change: by default it changes, logs in, changes back, and logs in with the original" "$(calls)" "POST ${BASE}/myself/password?operation=change
+POST ${BASE}/myself
+POST ${BASE}/myself/password?operation=change
+POST ${BASE}/myself"
+expect "03 change: the change back carries the new password as the old one and the original as the new" \
+  "$(payload 2 | jq -c '[.oldPassword, .newPassword]')" '["N3w p@ss","s3cret"]'
+has "03 change: the last login is with the original password" "BASIC_AUTH: apiadmin:s3cret"
+has "03 change: and it says so" "Back on the original password, and logged in."
+expect "03 change: default exit 0" "${RC}" "0"
+run 03.Myself/03.myself_password_POST_change.sh
+expect "03 change: with no NEW_PASSWORD a random one is used, and put back" "${RC}:$(calls | wc -l | tr -d ' ')" "0:4"
+has "03 change: and says it made one" "using a random one"
+expect "03 change: the random password is 20 characters or more, and not the original" \
+  "$(payload 1 | jq -r '.newPassword | length >= 20 and . != "s3cret"')" "true"
+# the stub echoes every call it is given (BASIC_AUTH, HEADER, PAYLOAD_B64...): only what the script itself prints counts
+if printf '%s\n' "${OUT}" | grep -v '^\(BASIC_AUTH\|HEADER\|PAYLOAD_B64\|METHOD\|URL\|COOKIE\|COOKIE_JAR_WRITE\|HTTP \)' | grep -qF -- "$(payload 1 | jq -r .newPassword)"; then
+    fail "03 change: the random password is shown although the account was put back"
+else pass "03 change: the random password is not printed when the account is put back"; fi
+STATUS=400 run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
+expect "03 change: refused, no new login, exit 1" "${RC}:$(calls | grep -c '/myself$')" "1:0"
+STUB_STATUS_POST_SEQ="200 200 400" STUB_COUNTER="${WORK}/ctr_pw" run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
+rm -f "${WORK}"/ctr_pw.*
+expect "03 change: a change back that is refused exits 1" "${RC}" "1"
+has "03 change: and prints the password the account is on" "The password of apiadmin is now: N3w p@ss"
+run 03.Myself/03.myself_password_POST_change.sh s3cret
+expect "03 change: the password it already has is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run 03.Myself/03.myself_password_POST_change.sh a b
+expect "03 change: two passwords is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run 03.Myself/03.myself_password_POST_change.sh --nope
+expect "03 change: an unknown option is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+
+run 03.Myself/04.myself_password_POST_requestLink.sh john@example.com
+expect "04 requestLink: POST with the operation in the query" "$(calls)" "POST ${BASE}/myself/password?operation=requestLink"
+expect "04 requestLink: and in the body, with the email and username" \
+  "$(payload 1 | jq -c '[.operation, .email, .username]')" '["requestLink","john@example.com","apiadmin"]'
+expect "04 requestLink: sends no credentials and no session" "$(printf '%s\n' "${OUT}" | grep -c '^BASIC_AUTH:')" "0"
+
+run 03.Myself/05.myself_password_POST_reset.sh tok-1 'N3w p@ss'
+expect "05 reset: POST with the operation in the query" "$(calls)" "POST ${BASE}/myself/password?operation=reset"
+expect "05 reset: token, new password, username; no secret answer when none is given" \
+  "$(payload 1 | jq -c '[.operation, .token, .newPassword, .username, has("secretAnswer")]')" '["reset","tok-1","N3w p@ss","apiadmin",false]'
+run 03.Myself/05.myself_password_POST_reset.sh tok-1 'N3w p@ss' 'blue' john
+expect "05 reset: the secret answer and username, when given" "$(payload 1 | jq -c '[.secretAnswer, .username]')" '["blue","john"]'
+
+echo "=== 07.SecretQuestions ==="
+GET_BODY=$(body questions '["Your first pet?","Your first school?"]')
+run 07.SecretQuestions/01.secretQuestions_GET.sh
+expect "01 secretQuestions: GET /secretQuestions" "$(calls)" "GET ${BASE}/secretQuestions"
+has "01 secretQuestions: one question per line" "  Your first school?"
+STATUS_GET=503 run 07.SecretQuestions/01.secretQuestions_GET.sh
+expect "01 secretQuestions: service disabled (503), exit 3" "${RC}" "3"
+has "01 secretQuestions: says so" "not enabled on this server"
+STATUS_GET=500 run 07.SecretQuestions/01.secretQuestions_GET.sh
+expect "01 secretQuestions: any other refusal is exit 1" "${RC}" "1"
+
+run 07.SecretQuestions/02.secretQuestions_GET_check.sh "Your first school?"
+expect "02 check: GET /secretQuestions, and nothing else" "$(calls)" "GET ${BASE}/secretQuestions"
+has "02 check: a question on the list is said to be" "On the list: Your first school?"
+expect "02 check: on the list, exit 0" "${RC}" "0"
+run 07.SecretQuestions/02.secretQuestions_GET_check.sh "your first school"
+has "02 check: the match is exact (case and punctuation)" "Not on the list: your first school"
+expect "02 check: not on the list, exit 1" "${RC}" "1"
+run 07.SecretQuestions/02.secretQuestions_GET_check.sh
+expect "02 check: no question is exit 2, and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+STATUS_GET=503 run 07.SecretQuestions/02.secretQuestions_GET_check.sh "Your first pet?"
+expect "02 check: service disabled, exit 3" "${RC}" "3"
+STATUS_GET=500 run 07.SecretQuestions/02.secretQuestions_GET_check.sh "Your first pet?"
+expect "02 check: any other refusal is exit 1" "${RC}" "1"
+
+run 07.SecretQuestions/03.secretQuestions_GET_pick.sh
+expect "03 pick: GET /secretQuestions" "$(calls)" "GET ${BASE}/secretQuestions"
+has "03 pick: the first question by default" "Your first pet?"
+run 07.SecretQuestions/03.secretQuestions_GET_pick.sh 2
+has "03 pick: the Nth" "Your first school?"
+expect "03 pick: exit 0" "${RC}" "0"
+# only the question on standard output (the stub and the session message go to standard error), so $(...) can use it
+touch "${WORK}/eu/myCookie.jar"
+PICKED=$(cd "${WORK}/eu/07.SecretQuestions" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${GET_BODY}" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./03.secretQuestions_GET_pick.sh 2 2>/dev/null)
+expect "03 pick: standard output is the question and nothing else" "${PICKED}" "Your first school?"
+rm -f "${WORK}/eu/myCookie.jar"
+PICKED=$(cd "${WORK}/eu/07.SecretQuestions" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${GET_BODY}" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./03.secretQuestions_GET_pick.sh 1 2>/dev/null)
+expect "03 pick: even when it has to log in first" "${PICKED}" "Your first pet?"
+run 07.SecretQuestions/03.secretQuestions_GET_pick.sh 3
+expect "03 pick: past the end of the list is exit 1" "${RC}" "1"
+has "03 pick: and says how long the list is" "the list has 2"
+for bad in 0 abc -1; do
+    run 07.SecretQuestions/03.secretQuestions_GET_pick.sh "${bad}"
+    expect "03 pick: '${bad}' is exit 2, and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS_GET=503 run 07.SecretQuestions/03.secretQuestions_GET_pick.sh
+expect "03 pick: service disabled, exit 3" "${RC}" "3"
+GET_BODY=
+
+echo "=== 03.Myself: the secret question ==="
+GET_BODY=$(body question '{"secretQuestion":"Your first pet?"}')
+run 03.Myself/06.myself_secretQuestion_GET.sh
+expect "06 secretQuestion: the user's own, with the session" "$(calls)" "GET ${BASE}/myself/secretQuestion"
+has "06 secretQuestion: prints it" "The secret question: Your first pet?"
+run 03.Myself/06.myself_secretQuestion_GET.sh 'a b+c'
+expect "06 secretQuestion: with a reset token instead" "$(calls)" "GET ${BASE}/myself/secretQuestion?token=a b+c"
+STATUS_GET=503 run 03.Myself/06.myself_secretQuestion_GET.sh
+expect "06 secretQuestion: service disabled, exit 3" "${RC}" "3"
+expect "06 secretQuestion: it asks the list too, to tell that from an account with no question" \
+  "$(calls | tr '\n' ' ')" "GET ${BASE}/myself/secretQuestion GET ${BASE}/secretQuestions "
+has "06 secretQuestion: and says the service is not enabled" "not enabled on this server"
+# the session check, then 503 for the question, then 200 for the list: the service is on, the account has none
+STUB_STATUS_GET_SEQ="200 503 200" STUB_COUNTER="${WORK}/ctr_sq" run 03.Myself/06.myself_secretQuestion_GET.sh
+rm -f "${WORK}"/ctr_sq.*
+expect "06 secretQuestion: enabled but none set is exit 4" "${RC}" "4"
+has "06 secretQuestion: and says so, and how to set one" "has no secret question yet"
+has "06 secretQuestion: pointing at the PUT script" "07.myself_secretQuestion_PUT.sh"
+run 03.Myself/06.myself_secretQuestion_GET.sh a-token
+expect "06 secretQuestion: with a token, a 503 is exit 3 with no list call (there is no session to ask with)" "${RC}:$(calls | wc -l | tr -d ' ')" "0:1"
+STATUS_GET=503 run 03.Myself/06.myself_secretQuestion_GET.sh a-token
+expect "06 secretQuestion: with a token, a 503 is exit 3" "${RC}:$(calls | wc -l | tr -d ' ')" "3:1"
+has "06 secretQuestion: and says it is one or the other" "or the account has no question set"
+GET_BODY=
+
+STATUS=204 run 03.Myself/07.myself_secretQuestion_PUT.sh "Your first pet?" "Rex"
+expect "07 secretQuestion PUT: PUT /myself/secretQuestion, 204, exit 0" "${RC}:$(calls)" "0:PUT ${BASE}/myself/secretQuestion"
+expect "07 secretQuestion PUT: the password, the question and the answer" \
+  "$(payload 1 | jq -c '[.password, .secretQuestion, .secretAnswer]')" '["s3cret","Your first pet?","Rex"]'
+STATUS=503 run 03.Myself/07.myself_secretQuestion_PUT.sh "Q" "A"
+expect "07 secretQuestion PUT: service disabled, exit 3" "${RC}" "3"
+
+GET_BODY=$(body book '[{"id":"u1:g1","displayName":"Jo","mail":"jo@example.com","parentGroup":"","type":"USER"}]')
+run 03.Myself/08.myself_addressBook_GET.sh 'jo*' 5
+expect "08 addressBook: searches users by email order, a page at a time" "$(calls)" \
+  "GET ${BASE}/myself/addressBook?searchFor=jo*&type=USER&orderBy=email&limit=5&offset=0"
+has "08 addressBook: one entry per line" "  u1:g1  USER  Jo  jo@example.com"
+run 03.Myself/08.myself_addressBook_GET.sh
+expect "08 addressBook: no searchFor when there is nothing to search for" "$(calls | grep -c searchFor)" "0"
+
+run 03.Myself/09.myself_addressBook_id_GET.sh 'u1:g1'
+expect "09 addressBook id: the id URL-encoded in the path" "$(calls)" "GET ${BASE}/myself/addressBook/u1%3Ag1"
+run 03.Myself/09.myself_addressBook_id_GET.sh
+expect "09 addressBook id: without one, reads the first entry's" "$(calls)" "GET ${BASE}/myself/addressBook?limit=1
+GET ${BASE}/myself/addressBook/u1%3Ag1"
+GET_BODY=
+
+echo
+echo "=== 02.Files 09 to 15 ==="
+GET_BODY=$(body listing '{"files":[{"fileName":"a.txt","size":5,"isDirectory":false}],"self":{"fileName":"my dir","permissions":"750","isShared":false}}')
+run 02.Files/09.files_GET_query.sh "my dir" '*.txt'
+expect "09 query: sort and page, without hidden files; by name, next page; metadata; glob" "$(calls)" \
+"GET ${BASE}/files/my%20dir?sortBy=size&order=DESC&limit=5&offset=0&showdots=false
+GET ${BASE}/files/my%20dir?sortBy=fileName&order=ASC&limit=5&offset=5
+GET ${BASE}/files/my%20dir?metadata=true
+GET ${BASE}/files/my%20dir/*.txt"
+has "09 query: one line per entry" "  f  5  a.txt"
+run 02.Files/09.files_GET_query.sh
+expect "09 query: the home folder is /files" "$(calls | head -n 1)" "GET ${BASE}/files?sortBy=size&order=DESC&limit=5&offset=0&showdots=false"
+
+GET_BODY=$(body meta '{"self":{"fileName":"a b.txt","size":5,"permissions":"640","owner":"1050","group":"1050","lastModifiedTime":1791278929000,"transferStatus":"Done"},"parent":{"fileName":"in"}}')
+run 02.Files/10.files_filepath_GET_metadata.sh "/in/a b.txt"
+expect "10 metadata: metadata=true, the path encoded part by part" "$(calls)" "GET ${BASE}/files/in/a%20b.txt?metadata=true"
+has "10 metadata: prints it in short" "  size         5 bytes"
+GET_BODY=
+
+printf 'hello md5\n' > "${WORK}/files/up.txt"
+LOCAL_MD5=$(openssl dgst -md5 -binary "${WORK}/files/up.txt" | openssl base64)
+STATUS=201 run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt" inbox
+expect "11 md5: a multipart POST into the folder, with the transfer mode" "${RC}:$(calls)" "0:POST ${BASE}/files/inbox?transferMode=BINARY"
+expect "11 md5: Content-MD5 is the file's MD5, base64" "$(headers | grep '^Content-MD5:')" "Content-MD5: ${LOCAL_MD5}"
+STATUS=500 run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt"
+expect "11 md5: a wrong checksum's 500 is a failure; the home folder is /files" "${RC}:$(calls)" "1:POST ${BASE}/files?transferMode=BINARY"
+
+STATUS=204 run 02.Files/12.files_filepath_PUT_rename.sh "in/a b.txt" "out/c.txt"
+expect "12 PUT rename: PUT on the old path" "${RC}:$(calls)" "0:PUT ${BASE}/files/in/a%20b.txt"
+expect "12 PUT rename: fileName and newFilePath" "$(payload 1 | jq -c .)" '{"fileName":"a b.txt","newFilePath":"out/c.txt"}'
+
+STATUS=204 run 02.Files/13.files_filepath_PATCH_rename.sh "a.txt" "b.txt"
+expect "13 PATCH rename: PATCH on the old path" "${RC}:$(calls)" "0:PATCH ${BASE}/files/a.txt"
+expect "13 PATCH rename: one JSON Patch operation" "$(payload 1 | jq -c .)" '[{"op":"add","path":"/newFilePath","value":"b.txt"}]'
+STATUS=404 run 02.Files/13.files_filepath_PATCH_rename.sh "a.txt" "b.txt"
+expect "13 PATCH rename: anything but 204 is a failure" "${RC}" "1"
+
+STATUS=204 run 02.Files/14.files_filepath_PATCH_share.sh shared "a@example.com, b@example.com" 3
+expect "14 share: PATCH on the folder" "${RC}:$(calls)" "0:PATCH ${BASE}/files/shared"
+expect "14 share: adds sharedDirectoryProperties, with each collaborator and the rights" \
+  "$(payload 1 | jq -c '.[0] | [.op, .path, .value.collaborators, .value.shareRights, .value.isOwner]')" \
+  '["add","/sharedDirectoryProperties",["a@example.com","b@example.com"],3,true]'
+run 02.Files/14.files_filepath_PATCH_share.sh shared a@example.com 2
+expect "14 share: rights other than 1, 3, 7 are refused before any call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+
+STATUS=204 run 02.Files/15.files_filepath_PATCH_unshare.sh shared
+expect "15 unshare: removes sharedDirectoryProperties" "${RC}:$(payload 1 | jq -c .)" '0:[{"op":"remove","path":"/sharedDirectoryProperties"}]'
+
+echo
+echo "=== 04.FileOperations ==="
+POST_BODY=$(body op_new '{"id":"op-1","status":"IN_PROGRESS","operation":"MD5Calc","result":{"fileSize":10}}')
+# Built on its own: inside a nested $(...), the JSON's braces would be expanded
+OP_DONE=$(jq -n --arg md5 "${LOCAL_MD5}" '{id: "op-1", status: "DONE", operation: "MD5Calc", filePath: "/up.txt", result: {md5Checksum: $md5, fileSize: 10}}')
+RULES=$(rules "fileOperations/op-1" "$(body op_done "${OP_DONE}")")
+run 04.FileOperations/01.fileOperations_POST_md5calc.sh up.txt "${WORK}/files/up.txt"
+expect "01 md5calc: submits, then follows the operation" "$(calls)" "POST ${BASE}/fileOperations
+GET ${BASE}/fileOperations/op-1"
+expect "01 md5calc: the operation and the path" "$(payload 1 | jq -c .)" '{"operation":"MD5Calc","filePath":"/up.txt"}'
+expect "01 md5calc: the server's checksum matches the local copy" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'It matches')" "0:1"
+printf 'other\n' > "${WORK}/files/other.txt"
+run 04.FileOperations/01.fileOperations_POST_md5calc.sh up.txt "${WORK}/files/other.txt"
+expect "01 md5calc: a different local file does not match, exit 1" "${RC}" "1"
+run 04.FileOperations/01.fileOperations_POST_md5calc.sh up.txt "${WORK}/files/nosuch.txt"
+expect "01 md5calc: a LOCAL_COPY that is not on this machine is exit 2, and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+has "01 md5calc: and it explains the two paths" "FILE is the one on the server"
+run 04.FileOperations/01.fileOperations_POST_md5calc.sh
+expect "01 md5calc: no FILE is exit 2, with the usage that says where each path is" "${RC}" "2"
+has "01 md5calc: FILE is on the server" "the path of the file on the server"
+
+GET_BODY="${WORK}/op_done.json"; RULES=
+run 04.FileOperations/02.fileOperations_id_GET.sh op-1
+expect "02 operation: GET /fileOperations/{id}" "$(calls)" "GET ${BASE}/fileOperations/op-1"
+has "02 operation: prints its status" "MD5Calc of /up.txt: DONE"
+GET_BODY=
+
+printf '0123456789abcdefghijKLMNO' > "${WORK}/files/chunks.bin"
+POST_BODY=$(body op_up '{"id":"op-2","status":"IN_PROGRESS","operation":"Upload"}')
+run 04.FileOperations/03.fileOperations_id_PUT_chunked.sh "${WORK}/files/chunks.bin" inbox 10
+expect "03 chunked: declares the upload, then three PUTs" "$(calls)" "POST ${BASE}/fileOperations
+PUT ${BASE}/fileOperations/op-2
+PUT ${BASE}/fileOperations/op-2
+PUT ${BASE}/fileOperations/op-2"
+expect "03 chunked: the path in the folder" "$(payload 1 | jq -r .filePath)" "/inbox/chunks.bin"
+expect "03 chunked: Content-Range of each chunk, the last one shorter" "$(headers | grep '^Content-Range:' | tr '\n' '|')" \
+  "Content-Range: bytes 0-9/25|Content-Range: bytes 10-19/25|Content-Range: bytes 20-24/25|"
+expect "03 chunked: the chunks together are the file" "$(payload 2)$(payload 3)$(payload 4)" "0123456789abcdefghijKLMNO"
+CH="04.FileOperations/03.fileOperations_id_PUT_chunked.sh"
+puts() { calls | grep -c '^PUT'; }
+STATUS=400 run ${CH} "${WORK}/files/chunks.bin" "" 10 --wait 0
+expect "03 chunked: a chunk that keeps failing is tried 1 + 3 times, then the script stops (exit 1)" "${RC}:$(puts)" "1:4"
+has "03 chunked: it says which chunk failed" "Chunk 1 of 3 failed (bytes 0-9 of 25), after 4 attempt(s)."
+has "03 chunked: and gives the command to carry on from it" "--resume op-2 1"
+has "03 chunked: with the same file and chunk size" "chunks.bin '' 10 --resume op-2 1"
+STATUS=400 run ${CH} "${WORK}/files/chunks.bin" "" 10 --retries 0
+expect "03 chunked: --retries 0 is one attempt" "${RC}:$(puts)" "1:1"
+STATUS=400 run ${CH} "${WORK}/files/chunks.bin" "" 10 --retries 1 --wait 0
+expect "03 chunked: --retries 1 is two attempts" "${RC}:$(puts)" "1:2"
+STATUS=404 run ${CH} "${WORK}/files/chunks.bin" "" 10
+expect "03 chunked: a 404 is not retried (nothing a second try can fix)" "${RC}:$(puts)" "1:1"
+STUB_STATUS_PUT=401 run ${CH} "${WORK}/files/chunks.bin" "" 10
+expect "03 chunked: a 401 on a chunk is not retried either" "${RC}:$(puts)" "1:1"
+STUB_STATUS_PUT_SEQ="500 500 200" STUB_COUNTER="${WORK}/ctr_ch1" run ${CH} "${WORK}/files/chunks.bin" "" 10 --wait 0
+rm -f "${WORK}"/ctr_ch1.*
+expect "03 chunked: a chunk that fails twice and then works goes on to the rest (5 PUTs, exit 0)" "${RC}:$(puts)" "0:5"
+has "03 chunked: it says it is trying again" "Waiting 0 second(s) before trying chunk 1 again..."
+expect "03 chunked: the retried chunk is the same bytes each time" "$(payload 2)|$(payload 3)|$(payload 4)" "0123456789|0123456789|0123456789"
+STUB_STATUS_PUT_SEQ="200 500 500 500" STUB_COUNTER="${WORK}/ctr_ch2" run ${CH} "${WORK}/files/chunks.bin" inbox 10 --retries 2 --wait 0
+rm -f "${WORK}"/ctr_ch2.*
+expect "03 chunked: chunk 1 works, chunk 2 fails 3 times: 4 PUTs and exit 1" "${RC}:$(puts)" "1:4"
+has "03 chunked: it names chunk 2 and its bytes" "Chunk 2 of 3 failed (bytes 10-19 of 25), after 3 attempt(s)."
+has "03 chunked: and says chunk 1 is on the server" "Chunks 1 to 1 are on the server."
+has "03 chunked: and the line to continue from chunk 2" "chunks.bin inbox 10 --resume op-2 2"
+run ${CH} "${WORK}/files/chunks.bin" inbox 10 --resume op-2 2
+expect "03 chunked --resume: no new upload is declared, chunks 2 and 3 are sent to the operation" "$(calls | tr '\n' ' ')" \
+  "PUT ${BASE}/fileOperations/op-2 PUT ${BASE}/fileOperations/op-2 "
+expect "03 chunked --resume: from the bytes of chunk 2" "$(headers | grep '^Content-Range:' | tr '\n' '|')" "Content-Range: bytes 10-19/25|Content-Range: bytes 20-24/25|"
+expect "03 chunked --resume: the chunks are the rest of the file" "$(payload 1)$(payload 2)" "abcdefghijKLMNO"
+has "03 chunked --resume: says so" "Continuing operation op-2 with chunk 2 of 3."
+run ${CH} "${WORK}/files/chunks.bin" inbox 10 --resume op-2 4
+expect "03 chunked --resume: a chunk past the end is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+for bad in "--resume op-2" "--resume op-2 0" "--resume op-2 x" "--retries x" "--retries -1" "--wait x" "--nope"; do
+    run ${CH} "${WORK}/files/chunks.bin" inbox 10 ${bad}
+    expect "03 chunked: '${bad}' is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+: > "${WORK}/files/empty.bin"
+run ${CH} "${WORK}/files/empty.bin"
+expect "03 chunked: an empty file is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run ${CH} "${WORK}/files/no_such.bin"
+expect "03 chunked: a file that is not there is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+
+STATUS=200 run 04.FileOperations/04.fileOperations_id_POST_multipart.sh "${WORK}/files/up.txt" inbox
+expect "04 multipart: declares, then POSTs the content to the operation" "${RC}:$(calls)" "0:POST ${BASE}/fileOperations
+POST ${BASE}/fileOperations/op-2"
+
+POST_BODY=$(body op_cancel '{"id":"op-3","status":"IN_PROGRESS","operation":"Upload"}')
+STATUS_GET=404 run 04.FileOperations/05.fileOperations_id_DELETE.sh
+expect "05 cancel: declares an upload, cancels it, confirms it is gone" "${RC}:$(calls)" "0:POST ${BASE}/fileOperations
+DELETE ${BASE}/fileOperations/op-3
+GET ${BASE}/fileOperations/op-3"
+STATUS_GET=200 run 04.FileOperations/05.fileOperations_id_DELETE.sh op-9
+expect "05 cancel: an operation still there afterwards is a failure" "${RC}:$(calls | head -n 1)" "1:DELETE ${BASE}/fileOperations/op-9"
+POST_BODY=
+
+echo
+echo "=== 05.Transfers ==="
+GET_BODY=$(body transfers '[{"transferId":"VFgx","startTime":"Tue, 06 Oct 2026 12:00:00 +0300","direction":"Incoming","status":"Processed","protocol":"ssh","filename":"a.txt"}]')
+run 05.Transfers/01.transfers_GET.sh 3
+expect "01 transfers: the latest, a page at a time" "$(calls | sed -n 1p)" "GET ${BASE}/transfers?limit=3&offset=0"
+calls | sed -n 2p | grep -qE "^GET ${BASE}/transfers\?status=Failed&status=Aborted&startTimeAfter=[A-Z][a-z]{2}, [0-9]{2} [A-Z][a-z]{2} [0-9]{4} 00:00:00 [+-][0-9]{4}&limit=3$" \
+    && pass "01 transfers: today's failed and aborted, status repeated, from midnight in RFC 2822" || fail "01 transfers: $(calls | sed -n 2p)"
+expect "01 transfers: the outgoing ones the server started, over SSH" "$(calls | sed -n 3p)" \
+  "GET ${BASE}/transfers?direction=Outgoing&actionBy=Server&protocol=ssh&limit=3"
+has "01 transfers: one line per transfer" "Incoming  Processed  ssh  a.txt"
+
+RULES=$(rules "transfers?limit=1" "${GET_BODY}" "transfers/VFgx" "$(body detail '{"transferType":"User upload","file":"a.txt","size":5,"status":"Processed","transferSite":"(none)","protocol":"http","mode":"BINARY","realFile":"/home/x/a.txt"}')")
+run 05.Transfers/02.transfers_id_GET.sh
+expect "02 transfer: without an id, the latest one's" "$(calls)" "GET ${BASE}/transfers?limit=1
+GET ${BASE}/transfers/VFgx"
+has "02 transfer: prints it in short" "  User upload of a.txt, 5 bytes, Processed"
+RULES=; GET_BODY=
+
+POST_BODY=$(body pull '{"message":"Transfer pull event has been successfully submitted","link":"https://x/api/v2.0/transfers?operationIndex=idx-1&expectedFilesCount=2"}')
+GET_BODY=$(body summary '{"totalCount":2,"successful":2,"failed":0,"inRetry":0,"inProgress":0,"onHold":0}')
+run 05.Transfers/03.transfers_operations_POST_pull.sh mysite landing idx-1
+expect "03 pull: POST the operation, then the pull summary" "${RC}:$(calls)" "0:POST ${BASE}/transfers/operations
+GET ${BASE}/transfers/pullSummary/idx-1"
+expect "03 pull: the site, the folder, the operationIndex, awaitResult" \
+  "$(payload 1 | jq -c '[.operation, .data.site, .data.destinationDirectory, .data.operationIndex, .data.awaitResult]')" \
+  '["pull","mysite","/landing","idx-1",true]'
+has "03 pull: reads expectedFilesCount from the link" "Files expected: 2"
+
+run 05.Transfers/04.transfers_pullSummary_GET.sh idx-1
+expect "04 pull summary: all done, exit 0" "${RC}:$(calls)" "0:GET ${BASE}/transfers/pullSummary/idx-1"
+has "04 pull summary: prints the counts" "2 file(s): 2 successful, 0 failed"
+GET_BODY=$(body summary_retry '{"totalCount":2,"successful":1,"failed":0,"inRetry":1,"inProgress":0,"onHold":0}')
+run 05.Transfers/04.transfers_pullSummary_GET.sh idx-1
+expect "04 pull summary: still in retry, exit 3" "${RC}" "3"
+GET_BODY=$(body summary_failed '{"totalCount":2,"successful":1,"failed":1,"inRetry":0,"inProgress":0,"onHold":0}')
+run 05.Transfers/04.transfers_pullSummary_GET.sh idx-1
+expect "04 pull summary: a failure, exit 1" "${RC}" "1"
+
+GET_BODY="${WORK}/transfers.json"
+POST_BODY=$(body push '{"message":"Transfer push event has been successfully submitted","link":"https://x"}')
+run 05.Transfers/05.transfers_operations_POST_push.sh mysite out/a.txt
+expect "05 push: synchronous by default" "$(payload 1 | jq -c '[.operation, .data.file, .data.site, .data.asynchronousCall]')" '["push","/out/a.txt","mysite",false]'
+calls | sed -n 2p | grep -qE "^GET ${BASE}/transfers\?operationIndex=eu-push-[0-9]+$" \
+    && [ "$(payload 1 | jq -r .data.operationIndex)" = "$(calls | sed -n 2p | sed 's/.*operationIndex=//')" ] \
+    && pass "05 push: finds the transfer in the log by the operationIndex it sent" || fail "05 push: $(calls)"
+STATUS=202 run 05.Transfers/05.transfers_operations_POST_push.sh mysite out/a.txt async
+expect "05 push: async asks for an asynchronous call, and 202 is a success" "${RC}:$(payload 1 | jq -c .data.asynchronousCall)" "0:true"
+
+run 05.Transfers/06.transfers_operations_POST_folderMonitor.sh fm_from fm_to '*.txt'
+expect "06 folder monitor: the folders, the pattern and its type" \
+  "$(payload 1 | jq -c '[.operation, .data.downloadFolder, .data.uploadFolder, .data.filePattern, .data.filePatternType, .data.subFolderMaxDepth]')" \
+  '["folderMonitor","/fm_from","/fm_to","*.txt","glob",1]'
+expect "06 folder monitor: every field the reference requires" \
+  "$(payload 1 | jq -c '.data | [has("fileCaseSensitive"), has("subFolderPattern"), has("subFolderPatternType"), has("subFolderCaseSensitive")] | unique')" '[true]'
+GET_BODY=
+
+POST_BODY=$(body mdn '{"fileIntegrityResult":"OK","signatureResult":"VALID"}')
+run 05.Transfers/07.transfers_id_operations_POST_verifymdn.sh VFgx
+expect "07 verifymdn: POST on the transfer, the operation in the query" "${RC}:$(calls)" "0:POST ${BASE}/transfers/VFgx/operations?operation=verifymdn"
+has "07 verifymdn: prints both results" "Signature:      VALID"
+POST_BODY=
+
+echo
+echo "=== 06.ServerTime ==="
+GET_BODY=$(body time '{"requestArrivalTime":"2026-10-06T12:28:47.787+0300","responseDepartureTime":"2026-10-06T12:28:47.792+0300"}')
+run 06.ServerTime/01.serverTime_GET.sh
+expect "01 serverTime: GET /serverTime" "${RC}:$(calls)" "0:GET ${BASE}/serverTime"
+has "01 serverTime: compares the clocks, reading the +0300 offset" "second(s) from this machine's."
+GET_BODY=
+
+echo
+echo "=== 01.Authenticate: login and logout ==="
+rm -f "${WORK}/eu/myCookie.jar"
+POST_BODY=$(body login '{"loginName":"apiadmin","type":"admin"}')
+STATUS=200 run 01.Authenticate/01.myself_POST.sh
+expect "01 login: POST /myself, exit 0" "${RC}:$(calls)" "0:POST ${BASE}/myself"
+has "01 login: sends Basic authentication (curl -u, the user and password of the settings)" "BASIC_AUTH: apiadmin:s3cret"
+has "01 login: asks curl to write the cookie jar" "COOKIE_JAR_WRITE: "
+has "01 login: prints the response body, without the status code appended" '"loginName":"apiadmin"'
+expect "01 login: no shell error (bash 3.2 has no negative substring length)" "$(printf '%s\n' "${OUT}" | grep -c 'substring expression')" "0"
+STATUS=401 run 01.Authenticate/01.myself_POST.sh
+expect "01 login: refused, exit 1" "${RC}" "1"
+
+touch "${WORK}/eu/myCookie.jar"
+STATUS=200 run 01.Authenticate/02.myself_DELETE.sh
+expect "02 logout: DELETE /myself, exit 0" "${RC}:$(calls)" "0:DELETE ${BASE}/myself"
+expect "02 logout: sends the session cookie of the jar" "$(printf '%s\n' "${OUT}" | grep -c 'COOKIE: .*/myCookie.jar$')" "1"
+expect "02 logout: no Basic authentication, which would end a new session and leave the stored one open" \
+  "$(printf '%s\n' "${OUT}" | grep -c 'Authorization')" "0"
+expect "02 logout: and no cookie jar written over the stored one" "$(printf '%s\n' "${OUT}" | grep -c 'COOKIE_JAR_WRITE')" "0"
+has "02 logout: no shell error, the body is printed" "Successfully Logged out"
+expect "02 logout: the jar is removed once the session has ended" "$([ -f "${WORK}/eu/myCookie.jar" ] && echo there || echo gone)" "gone"
+touch "${WORK}/eu/myCookie.jar"
+STATUS=401 run 01.Authenticate/02.myself_DELETE.sh
+expect "02 logout: refused, exit 1, the jar is kept" "${RC}:$([ -f "${WORK}/eu/myCookie.jar" ] && echo there || echo gone)" "1:there"
+rm -f "${WORK}/eu/myCookie.jar"
+KEEP_NO_JAR=1 run 01.Authenticate/02.myself_DELETE.sh
+expect "02 logout: no session, exit 1, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "1:0"
+touch "${WORK}/eu/myCookie.jar"
+POST_BODY=
+
+echo
+echo "=== 02.Files: list, upload, download, delete ==="
+GET_BODY=$(body files '{"files":[{"fileName":"test.txt"}]}')
+STATUS_GET=200 run 02.Files/01.files_GET.sh
+expect "01 list: GET /files, exit 0" "${RC}:$(calls)" "0:GET ${BASE}/files"
+has "01 list: prints the listing" '"fileName":"test.txt"'
+STATUS_GET=403 run 02.Files/01.files_GET.sh
+expect "01 list: refused, exit 1, and it does not say it listed the files" "${RC}:$(printf '%s\n' "${OUT}" | grep -c 'successfully listed')" "1:0"
+
+GET_BODY=$(body download 'the content of the file')
+rm -rf "${WORK}/eu/02.Files/downloaded_files"
+STATUS_GET=200 run 02.Files/03.files_filepath_GET.sh
+expect "03 download: GET /files/test.txt by default, the file 04 uploads" "${RC}:$(calls)" "0:GET ${BASE}/files/test.txt"
+expect "03 download: saved in downloaded_files, byte for byte, with no status code appended" \
+  "$(cat "${WORK}/eu/02.Files/downloaded_files/test.txt")" "the content of the file"
+expect "03 download: the file of the repository is not overwritten" \
+  "$(cmp -s "${WORK}/eu/02.Files/test.txt" "${EU_TREE}/02.Files/test.txt" && echo same || echo changed)" "same"
+STATUS_GET=200 run 02.Files/03.files_filepath_GET.sh "my file.txt"
+expect "03 download: another name, encoded in the URL" "$(calls)" "GET ${BASE}/files/my%20file.txt"
+expect "03 download: saved under that name" "$([ -f "${WORK}/eu/02.Files/downloaded_files/my file.txt" ] && echo there || echo missing)" "there"
+STATUS_GET=404 run 02.Files/03.files_filepath_GET.sh nosuch.txt
+expect "03 download: refused, exit 1, and no file left" \
+  "${RC}:$([ -f "${WORK}/eu/02.Files/downloaded_files/nosuch.txt" ] && echo there || echo gone)" "1:gone"
+GET_BODY=
+
+STATUS=201 run 02.Files/04.files_filepath_POST.sh
+expect "04 upload: POST /files, exit 0" "${RC}:$(calls)" "0:POST ${BASE}/files"
+has "04 upload: sent under the name of the file" ";filename=test.txt"
+expect "04 upload: the file of the repository is not changed" \
+  "$(cmp -s "${WORK}/eu/02.Files/test.txt" "${EU_TREE}/02.Files/test.txt" && echo same || echo changed)" "same"
+run 02.Files/04.files_filepath_POST.sh nosuch.txt
+expect "04 upload: a file that is not there, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+run 02.Files/04.files_filepath_POST.sh ../ensure_session.sh
+expect "04 upload: a path outside the folder, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+STATUS=500 run 02.Files/04.files_filepath_POST.sh
+expect "04 upload: refused, exit 1" "${RC}" "1"
+
+for bad in abc 0 -1 ""; do
+    run 02.Files/05.files_filepath_POST_v2.sh "${bad}"
+    expect "05 upload many: '${bad}' is not a number of files, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+    run 02.Files/06.files_filepath_GET_v2.sh "${bad}"
+    expect "06 download many: '${bad}' is not a number of files, exit 2, no call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+done
+STATUS=201 run 02.Files/05.files_filepath_POST_v2.sh 3
+expect "05 upload many: three POSTs, exit 0" "${RC}:$(calls | wc -l | tr -d ' ')" "0:3"
+expect "05 upload many: no copy is left next to the script" "$(ls "${WORK}/eu/02.Files" | grep -c '^test.txt_')" "0"
+STATUS=500 run 02.Files/05.files_filepath_POST_v2.sh 3
+expect "05 upload many: stops at the first refusal, exit 1, and no copy is left" \
+  "${RC}:$(calls | wc -l | tr -d ' '):$(ls "${WORK}/eu/02.Files" | grep -c '^test.txt_')" "1:1:0"
+GET_BODY=$(body many 'x')
+STATUS_GET=200 run 02.Files/06.files_filepath_GET_v2.sh 2
+expect "06 download many: two GETs, exit 0" "${RC}:$(calls)" "0:GET ${BASE}/files/test.txt_1
+GET ${BASE}/files/test.txt_2"
+STATUS_GET=404 run 02.Files/06.files_filepath_GET_v2.sh 2
+expect "06 download many: stops at the first refusal, exit 1" "${RC}:$(calls | wc -l | tr -d ' ')" "1:1"
+GET_BODY=
+
+STATUS=204 run 02.Files/07.files_filepath_DELETE.sh
+expect "07 delete: DELETE /files/test.txt, exit 0" "${RC}:$(calls)" "0:DELETE ${BASE}/files/test.txt"
+STATUS=404 run 02.Files/07.files_filepath_DELETE.sh
+expect "07 delete: refused, exit 1" "${RC}" "1"
+
+echo
+echo "=== The settings file: set_variables.local.sh is the one file, and a script stops without it ==="
+# A copy of the folder with no settings file at all: every script says what to do and sends nothing
+mkdir -p "${WORK}/nosettings"
+cp -R "${WORK}/eu/03.Myself" "${WORK}/nosettings/"
+cp "${EU_TREE}/ensure_session.sh" "${WORK}/nosettings/"
+OUT=$(cd "${WORK}/nosettings/03.Myself" && PATH="${WORK}/bin:${PATH}" STUB_CURL_PRINT_CODE=1 bash ./01.myself_GET.sh 2>&1); RC=$?
+expect "no set_variables.local.sh: exit 1 and nothing is sent" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^METHOD:')" "1:0"
+has "no set_variables.local.sh: it says to copy the example" "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."
+expect "the repository has no set_variables.sh in the EndUser folder" "$([ -e "${EU_TREE}/set_variables.sh" ] && echo present || echo absent)" "absent"
+# ST_ENDUSER_LOCAL_VARIABLES names another file (the integration checks use it)
+cp "${TESTS_DIR}/fixtures/set_variables.test.sh" "${WORK}/other_settings.sh"
+printf 'export ST_SERVER=other.example.com\nexport ST_PORT=9443\n' >> "${WORK}/other_settings.sh"
+OUT=$(cd "${WORK}/eu/03.Myself" && PATH="${WORK}/bin:${PATH}" ST_ENDUSER_LOCAL_VARIABLES="${WORK}/other_settings.sh" STUB_CURL_GET_BODY="${WORK}/me.json" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./01.myself_GET.sh 2>&1)
+has "ST_ENDUSER_LOCAL_VARIABLES: the file it names is the one read, ST_URL built from it" "URL: https://other.example.com:9443/api/v2.0/myself"
+# ST_URL set in the settings file wins over the one built from host and port
+printf 'export ST_URL=https://proxy.example.com/api/v2.0\n' >> "${WORK}/other_settings.sh"
+OUT=$(cd "${WORK}/eu/03.Myself" && PATH="${WORK}/bin:${PATH}" ST_ENDUSER_LOCAL_VARIABLES="${WORK}/other_settings.sh" STUB_CURL_GET_BODY="${WORK}/me.json" STUB_CURL_STATUS=200 STUB_CURL_PRINT_CODE=1 bash ./01.myself_GET.sh 2>&1)
+has "an ST_URL in the settings file is used as it is" "URL: https://proxy.example.com/api/v2.0/myself"
+
+echo
+if [ "${FAILED}" -eq 0 ]; then
+    echo "test_bash_enduser_api: PASS"
+else
+    echo "test_bash_enduser_api: FAIL"
+fi
+exit "${FAILED}"

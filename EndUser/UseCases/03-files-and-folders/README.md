@@ -43,6 +43,6 @@ ignores), and the names it works with.
 
 ## Tests
 
-`tests/checks/test_bash_enduser_usecases.sh` runs every script against a stub `curl`.
-`tests/integration/checks/63.enduser_usecases_scripts.py` runs them on a real server, as a
+`tests/offline/checks/test_bash_enduser_usecases.sh` runs every script against a stub `curl`.
+`tests/online/checks/63.enduser_usecases_scripts.py` runs them on a real server, as a
 throwaway end user account it creates and removes, and checks that nothing is left behind.

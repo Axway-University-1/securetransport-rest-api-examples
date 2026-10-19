@@ -104,6 +104,6 @@ them from its own `AR_`/`BT_` ones. So the test account is read under several na
    introduced the feature.
 5. Add the feature to the list in this file, under its release. Create a new
    release heading above the existing ones if needed.
-6. Add tests: a `tests/checks/test_feature_<name>.sh` for the scripts (stub curl), the
+6. Add tests: a `tests/offline/checks/test_feature_<name>.sh` for the scripts (stub curl), the
    feature's bat twins in `test_feature_bat_twins.py`, and its version check in
    `test_feature_version_check.sh`. See [tests/README.md](../tests/README.md).

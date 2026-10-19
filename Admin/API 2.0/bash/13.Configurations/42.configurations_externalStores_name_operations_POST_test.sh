@@ -26,7 +26,7 @@
 #   solution what did not. The secret's values come back masked, ****.
 # - In a certificate or a site, ${fetch(externalStore, ...)} reads a secret at
 #   run time; see the option descriptions that mention it.
-# - tests/integration/lib/dummy_servers.py has a FakeVault that can stand in for
+# - tests/common/dummy_servers.py has a FakeVault that can stand in for
 #   a HashiCorp Vault to try these examples against.
 # - Requires `jq`, which URL-encodes the name, builds the body and prints the outcome.
 # - The name is URL-encoded into the path (a name with a space works); one with a / is refused with exit 2 (nothing is sent),

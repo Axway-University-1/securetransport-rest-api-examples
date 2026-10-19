@@ -23,7 +23,7 @@
 # - Confirmed directly: a working profile answers 204; the server asks for the
 #   bucket (HEAD /<bucket>). An unknown profile answers 404 "Storage profile
 #   ... not found."
-# - tests/integration/lib/dummy_servers.py has a FakeS3 that can stand in for an
+# - tests/common/dummy_servers.py has a FakeS3 that can stand in for an
 #   S3 bucket to try these examples against.
 # - Requires `jq`, which URL-encodes the profile name into the path (a name with a space works; one with a / is refused, exit 2, nothing sent:
 #   the web server answers 400 to an encoded slash).

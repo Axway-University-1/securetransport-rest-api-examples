@@ -26,7 +26,7 @@ REM - Confirmed directly: turning reporting on needs overflowFilePath, a file on
 REM   the ST server; without it, 400 "overflowFilePath must not be null or
 REM   empty."
 REM - Confirmed directly: the server connects at once and sends XML events, a
-REM   HEARTBEAT every heartbeatDelay seconds. tests/integration/lib/dummy_servers.py
+REM   HEARTBEAT every heartbeatDelay seconds. tests/common/dummy_servers.py
 REM   has a TcpSink that can stand in for Sentinel.
 REM - Confirmed directly: once a host is set, the endpoint refuses an empty one,
 REM   "host must not be null or empty", even with reporting off, and then any

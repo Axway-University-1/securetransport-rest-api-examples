@@ -22,7 +22,7 @@ by a partner), and then answer the partner through the transfer log:
 Each is a `.sh` for bash and a `.bat` for Windows, side by side. Unlike the other
 features they create nothing, so there is no `00.run_all` and no `99.cleanup`: they
 read the transfer log and send acknowledgments for transfers that already exist.
-They need a real PeSIT transfer to work on (`tests/integration/checks/32.pesit_acknowledgment_loop_scripts.py`
+They need a real PeSIT transfer to work on (`tests/online/checks/32.pesit_acknowledgment_loop_scripts.py`
 builds a loop of two accounts on one server to make some).
 
 | Script | What it does |
@@ -56,7 +56,7 @@ The log folder defaults to `/var/tmp` (`C:\Temp` for the bat files).
 
 ## Tests
 
-`tests/checks/test_bash_pesit_ack.sh` runs both scripts against a stub `curl`
+`tests/offline/checks/test_bash_pesit_ack.sh` runs both scripts against a stub `curl`
 (the ACK, the NACK, the retry exit, paging past 100 transfers, a failed attempt).
-`tests/integration/checks/32.pesit_acknowledgment_loop_scripts.py` runs them on a real
+`tests/online/checks/32.pesit_acknowledgment_loop_scripts.py` runs them on a real
 server, on a PeSIT loop it builds and removes.
