@@ -483,9 +483,10 @@ request body is a safe stand-in for another's.
 - **A folder that already exists is answered 409, with the message of a failed create.** Confirmed directly
   (5.5-20260924): `POST /files/new-folder` for a folder that is there is 409 "Error occurred while creating
   file: null", the same words as the 403 of a stale home folder, so the message cannot tell them apart; look
-  with `GET /files/<path>?metadata=true` (200 or 404) first, as `02.Files/02` does. A folder created a moment
-  ago may be missing from the first page of `GET /files` (100 entries, in no fixed order), though a GET of it is
-  200. `GET /files/<name>` for a file that is not there is 404 "Error occurred while getting file size and
+  with `GET /files/<path>?metadata=true` (200 or 404) first, as `02.Files/02` does. `GET /files` has no default
+  limit: re-tested 2026-10-19, it returns every entry (565 in a lab home folder), in the same order twice, with only
+  `files` and `self` in the answer (no count); an earlier note of a 100 entry first page that could miss a new folder
+  came from a call that passed `limit=100` itself and was not reproduced. `GET /files/<name>` for a file that is not there is 404 "Error occurred while getting file size and
   type.", so `03.Files` needs `04` to have uploaded `test.txt` first.
 - **Every EndUser example that needs a session checks for one first** (`ensure_session.sh`, sourced by 34 of the 40):
   `GET /myself` with the cookie jar; a missing jar or a 401 or 403 means no active session, and the example says so

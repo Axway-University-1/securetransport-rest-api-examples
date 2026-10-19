@@ -146,3 +146,8 @@ testsshkey.pub
 
 # Name substituted copies of an example that the integration checks run (script_runner.substituted_copy)
 .zztest_*
+
+# ------------------------------------------------------------------------------
+# Internal notes for the product team. Never commit or push this file.
+# ------------------------------------------------------------------------------
+KNOWN_ISSUES_RD.md

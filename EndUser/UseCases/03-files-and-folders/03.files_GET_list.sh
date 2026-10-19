@@ -15,7 +15,8 @@
 #
 # Notes:
 # - Copied from EndUser/API 2.0/bash/02.Files/09.files_GET_query.sh.
-# - A list is limited to 100 entries and has no fixed order unless sortBy is given.
+# - GET /files has no default limit: the whole folder comes back (565 entries in one lab home folder), in an
+#   order that is the same twice but not one you asked for. Ask for a page with limit and offset, and for an order with sortBy.
 # - curl -G with --data-urlencode builds the query, and encodes the values.
 # ==============================================================================
 
