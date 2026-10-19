@@ -37,7 +37,8 @@ expect() {
     local name="$1" required="$2" body="$3" want_exit="$4" want_ran="$5" want_text="$6"
     printf '%s' "${body}" > "${WORK}/body.json"
     local out rc
-    out=$(PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/body.json" \
+    # the settings file the check loads: the test values, not the developer's set_variables.local.sh (a clean checkout has none)
+    out=$(PATH="${WORK}/bin:${PATH}" ST_ADMIN_LOCAL_VARIABLES="${TESTS_DIR}/fixtures/set_variables.test.sh" STUB_CURL_GET_BODY="${WORK}/body.json" \
           bash "${WORK}/example.sh" "${required}" 2>/dev/null)
     rc=$?
     local ran=no
