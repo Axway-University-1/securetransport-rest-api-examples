@@ -24,6 +24,26 @@ Then [scripting traps](#part-2-scripting-traps).
 
 # Part 1: the API
 
+## The internal list of product defects
+
+`KNOWN_ISSUES_RD.md` at the repository root is the list of product behaviours that look like defects, kept for whoever takes them to the product team.
+**Git ignores it on purpose: never commit it, never push it, and never copy what it says into a tracked file** (this skill records how the API behaves, in
+neutral words; that list says what should be fixed).
+
+When a probe, a check or a script run shows something that looks wrong (a status code that the HTTP standard says otherwise, a refusal that gives the wrong
+reason, data that lands somewhere other than asked, a protection that does not hold, a feature that does not do what its own description says):
+
+1. Look again on the lab, with throwaway `example_*` names, and read the answer. Do not write it from memory.
+2. Add it as the next `RD-nn`: a row in the index table (ID, severity, API, one line), then its section: **What happens**, **Expected**, **Reproduce**. Say which
+   build it was seen on and the date.
+3. **Reproduce** is copy-paste commands that use the helpers of the file's "Set up once" block (`eu`, `adm`, `$EU`, `$ADM`, `$DIR_BODY`), throwaway
+   `example_rd_*` names, the expected answers as comments, and lines at the end that remove everything it made.
+4. **Run the block exactly as written** before you finish, and check it shows what the text claims and leaves nothing behind. A reproduction that was not run is
+   not in the file. If it cannot be run safely (it locks an account, changes a server wide setting for good), put "not re-verified" in the title and say how to
+   confirm it, and do not run it without asking.
+5. An entry that turns out wrong, or that a release fixes, is changed or moved to the "Not issues" list at the end, not left standing.
+6. Say in your answer which RD ids you added or changed.
+
 ## The Referer header
 
 Send a `Referer` header on every call, with the same value throughout a session

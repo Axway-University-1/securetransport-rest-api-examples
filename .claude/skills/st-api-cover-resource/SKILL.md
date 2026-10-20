@@ -127,6 +127,9 @@ sessions, transfers in flight). Build the situation with a throwaway account,
 subscription and route, and a stand-in that keeps the server waiting; see
 `tests/online/checks/42.events_scripts.py`.
 
+Whatever the probe shows that looks like a defect (a wrong status code, a refusal with the wrong reason, a setting that does nothing) goes in
+`KNOWN_ISSUES_RD.md`, which git ignores, with a reproduction you have run: see "The internal list of product defects" in the gotchas skill.
+
 Write a throwaway script in your scratchpad, never in the repository:
 
 ```python

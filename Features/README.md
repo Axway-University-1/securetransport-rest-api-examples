@@ -58,6 +58,12 @@ Copy `settings.local.example.sh` to `settings.local.sh` in the feature's folder
 `trigger-route-after-completed-pull`. `settings.local.sh` and `state.local.sh`
 (what a run has created, so that a clean-up can remove it) are git ignored.
 
+There are two settings files in a feature folder, and unlike the connection settings of the Admin and EndUser examples (one file, copied
+from its example) they are not duplicates. `settings.sh` is committed and is the feature's configuration: its defaults, the names it derives from
+the account name (so two runs never collide), the values a command line argument overrides, and the shared helpers it loads. About a hundred lines you
+should not have to read or copy. `settings.local.sh` holds only what is yours: the password, and any default you want to change. Merging them would
+mean copying all that logic into a file git ignores, and keeping it in step with every release.
+
 ```
 cd Features/<feature-folder>
 ./00.run_all.sh                # the whole scenario, in order

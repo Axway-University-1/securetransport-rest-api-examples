@@ -251,6 +251,8 @@ arguments, ends the queue with one `None` per worker, and counts with
 - [ ] temporary files removed by the script, and gitignored as a backstop
 - [ ] a test covers the new or changed script (`tests/offline/checks/`, see CLAUDE.md)
       and `./tests/offline/run_all.sh` passes
+- [ ] anything the example showed that looks like a product defect is in `KNOWN_ISSUES_RD.md` (git ignores it), with a reproduction you ran:
+      see "The internal list of product defects" in the gotchas skill
 - [ ] the README coverage table updated — the per-topic counts in it are meant
       to match a live count of the directories
 
