@@ -412,6 +412,66 @@ expect "00: with an account that may not share it stops at 01, and still cleans 
 has "00: says which step failed" "01.sharing_GET_myself failed."
 has "00: and cleans up" "Cleaned up."
 
+echo "=== 07-secret-questions ==="
+SQ="../07-secret-questions"
+uc 07-secret-questions
+QL=$(body qlist '["First question?","Second question?"]')
+GET_BODY="${QL}" urun ${SQ}/01.secretQuestions_GET.sh
+expect "01: GET /secretQuestions" "$(ucalls)" "GET ${BASE}/secretQuestions"
+has "01: the questions, numbered" "  2  Second question?"
+expect "01: exit 0" "${RC}" "0"
+STATUS_GET=503 urun ${SQ}/01.secretQuestions_GET.sh
+expect "01: a disabled service is exit 3, with the option to switch" "${RC}" "3"
+has "01: names the option" "Users.SecretQuestion.Enabled"
+STUB_STATUS_GET=500 urun ${SQ}/01.secretQuestions_GET.sh
+expect "01: any other refusal is exit 1" "${RC}" "1"
+GET_BODY="$(body mine '{"secretQuestion":"First question?"}')" urun ${SQ}/02.secretQuestion_GET_mine.sh
+expect "02: GET /myself/secretQuestion" "$(ucalls)" "GET ${BASE}/myself/secretQuestion"
+has "02: prints it" "The secret question of apiadmin: First question?"
+STATUS_GET=503 urun ${SQ}/02.secretQuestion_GET_mine.sh
+expect "02: a 503 with the list refused too is a disabled service: exit 3" "${RC}" "3"
+SEQ7="${WORK}/seq07"; rm -rf "${SEQ7}"; mkdir -p "${SEQ7}"; cp "${WORK}/me.json" "${SEQ7}/1.json"; echo '{}' > "${SEQ7}/2.json"; cp "${QL}" "${SEQ7}/3.json"
+STUB_CURL_GET_SEQUENCE="${SEQ7}" STUB_STATUS_GET_SEQ="200 503 200" STUB_COUNTER="${WORK}/ctr07" urun ${SQ}/02.secretQuestion_GET_mine.sh
+rm -f "${WORK}"/ctr07.*
+expect "02: a 503 for the question and a 200 for the list is a service that is on with no question: exit 4, and the list was asked" "${RC}:$(ucalls | tr '\n' ' ')" "4:GET ${BASE}/myself/secretQuestion GET ${BASE}/secretQuestions "
+has "02: says so" "has no secret question yet"
+urun ${SQ}/03.secretQuestion_PUT.sh
+expect "03: without an answer it changes nothing: exit 2, no call" "${RC}:$(ncalls)" "2:0"
+has "03: and warns that it cannot be undone" "cannot be cleared once it is set"
+ST_SECRET_ANSWER=Rex ST_SECRET_QUESTION_NUMBER=0 urun ${SQ}/03.secretQuestion_PUT.sh
+expect "03: a number that is not a number above 0 is exit 2, no call" "${RC}:$(ncalls)" "2:0"
+ST_SECRET_ANSWER=Rex GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/03.secretQuestion_PUT.sh
+expect "03: lists the questions, then PUTs the first" "$(ucalls | tr '\n' ' ')" "GET ${BASE}/secretQuestions PUT ${BASE}/myself/secretQuestion "
+expect "03: the body has the password, the question picked from the list and the answer" "$(payload 1 | jq -c '[.password,.secretQuestion,.secretAnswer]')" '["s3cret","First question?","Rex"]'
+expect "03: exit 0" "${RC}" "0"
+ST_SECRET_ANSWER=Rex ST_SECRET_QUESTION_NUMBER=2 GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/03.secretQuestion_PUT.sh
+expect "03: the number picks the question" "$(payload 1 | jq -r .secretQuestion)" "Second question?"
+ST_SECRET_ANSWER=Rex ST_SECRET_QUESTION_NUMBER=3 GET_BODY="${QL}" urun ${SQ}/03.secretQuestion_PUT.sh
+expect "03: a number past the list is exit 2, and nothing is PUT" "${RC}:$(calls | grep -c PUT)" "2:0"
+ST_SECRET_ANSWER=Rex GET_BODY="${QL}" STUB_STATUS_PUT=400 urun ${SQ}/03.secretQuestion_PUT.sh
+expect "03: a refused change is exit 1" "${RC}" "1"
+SEQ7B="${WORK}/seq07b"; rm -rf "${SEQ7B}"; mkdir -p "${SEQ7B}"; cp "${WORK}/me.json" "${SEQ7B}/1.json"; cp "${QL}" "${SEQ7B}/2.json"; echo '{"secretQuestion":"First question?"}' > "${SEQ7B}/3.json"
+STUB_CURL_GET_SEQUENCE="${SEQ7B}" urun ${SQ}/04.secretQuestion_GET_back.sh
+expect "04: reads the list and the account's question" "$(ucalls | tr '\n' ' ')" "GET ${BASE}/secretQuestions GET ${BASE}/myself/secretQuestion "
+has "04: and says it is the one picked" "It is question number 1 of the list."
+expect "04: exit 0" "${RC}" "0"
+ST_SECRET_QUESTION_NUMBER=2 STUB_CURL_GET_SEQUENCE="${SEQ7B}" urun ${SQ}/04.secretQuestion_GET_back.sh
+expect "04: another question than the one wanted is exit 1" "${RC}" "1"
+ERR=$(body sq_err '{"errors":[{"code":"error.secretQuestion.notFound","detail":"Secret question not valid."}]}')
+GET_BODY="${QL}" STUB_STATUS_PUT=400 STUB_BODY_OTHER="${ERR}" urun ${SQ}/05.secretQuestion_PUT_refused.sh
+expect "05: the list, then three PUTs" "$(ucalls | tr '\n' ' ')" "GET ${BASE}/secretQuestions PUT ${BASE}/myself/secretQuestion PUT ${BASE}/myself/secretQuestion PUT ${BASE}/myself/secretQuestion "
+expect "05: an unlisted question, a wrong password, an empty answer" "$(payload 1 | jq -r .secretQuestion):$(payload 2 | jq -r .password):$(payload 3 | jq -r '.secretAnswer|length')" "Is this question on the list?:not-the-password:0"
+has "05: shows the error code of the server" "error.secretQuestion.notFound"
+expect "05: all three refused: exit 0" "${RC}" "0"
+GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/05.secretQuestion_PUT_refused.sh
+expect "05: an attempt that is accepted is a failure (exit 1)" "${RC}" "1"
+urun ${SQ}/99.cleanup_DELETE.sh
+expect "99: only the logout" "$(calls | tr '\n' ' ')" "DELETE ${BASE}/myself "
+GET_BODY="${QL}" urun ${SQ}/00.run_all.sh
+has "00: without an answer it stops at 03, before changing anything" "03.secretQuestion_PUT failed."
+has "00: and cleans up" "Cleaned up."
+expect "00: exit 1, and nothing was PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+
 echo "=== The scripts say where they were copied from ==="
 for s in "${UC_ROOT}"/*/[0-9][0-9].*.sh; do
     case "$(basename "${s}")" in 99.*|00.*) continue ;; esac
