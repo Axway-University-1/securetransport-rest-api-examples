@@ -23,6 +23,7 @@ They are meant to be read in this order, each building on what the one before ta
 | [03-files-and-folders](03-files-and-folders/README.md) | One story: create a folder, upload, list, read, details, update, rename, delete the file and the folder. |
 | [04-larger-files](04-larger-files/README.md) | Trust a transfer: Content-MD5 on the way in, an MD5 asked for afterwards, uploads in pieces, by operation, and in bulk. |
 | [05-checking-transfers](05-checking-transfers/README.md) | What became of the files: the transfer list, filters, one transfer, a summary. |
+| [06-sharing-a-folder](06-sharing-a-folder/README.md) | Let another user work in a folder: share it, see how, change their rights (1, 3, 7), stop sharing. Needs an account with an e-mail address and a user to share with. |
 
 ## How a use case is organised
 

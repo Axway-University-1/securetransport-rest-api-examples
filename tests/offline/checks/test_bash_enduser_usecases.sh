@@ -348,6 +348,70 @@ has "04: and by direction" "  Outgoing: 1"
 urun ../05-checking-transfers/99.cleanup_DELETE.sh
 expect "99: only the logout" "$(calls | tr '\n' ' ')" "DELETE ${BASE}/myself "
 
+echo "=== 06-sharing-a-folder ==="
+F="${BASE_FILES}/example_uc_shared"
+uc 06-sharing-a-folder
+ALLOWED=$(body sharing_yes '{"sharingAllowed":true,"contact":{"email":"owner@example.com"}}')
+DENIED=$(body sharing_no '{"sharingAllowed":false,"contact":{"email":""}}')
+GET_BODY="${ALLOWED}" urun ../06-sharing-a-folder/01.sharing_GET_myself.sh
+expect "01: GET /myself, and nothing else" "$(ucalls)" "GET ${BASE}/myself"
+has "01: says sharing is allowed, with the address" "sharingAllowed: true; e-mail address of the account: owner@example.com"
+expect "01: exit 0" "${RC}" "0"
+GET_BODY="${DENIED}" urun ../06-sharing-a-folder/01.sharing_GET_myself.sh
+expect "01: an account with no e-mail may not share: exit 3" "${RC}" "3"
+has "01: and it says why" "it has no e-mail address"
+STUB_STATUS_GET=404 STUB_STATUS_POST=201 urun ../06-sharing-a-folder/02.folder_POST.sh
+expect "02: looks for the folder, creates it, uploads the file" "$(ucalls | tr '\n' ' ')" "GET ${F}?metadata=true POST ${F} POST ${F} "
+has "02: the file is named notes.txt" "filename=notes.txt"
+STUB_STATUS_POST=201 urun ../06-sharing-a-folder/02.folder_POST.sh
+expect "02: a folder that is there is used as it is: only the upload" "$(ucalls | tr '\n' ' ')" "GET ${F}?metadata=true POST ${F} "
+urun ../06-sharing-a-folder/03.folder_PATCH_share.sh
+expect "03: with nobody to share with it says so, exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "03: and names the variable" "export ST_SHARE_WITH="
+ST_SHARE_WITH=guest@example.com STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh
+expect "03: PATCH of the folder" "$(ucalls)" "PATCH ${F}"
+expect "03: adds the sharing, read only, with the user, no e-mail sent" "$(payload 1 | jq -c '[.[0].op, .[0].path, .[0].value.collaborators, .[0].value.shareRights, .[0].value.enableNotifications, .[0].value.enableOwnerNotifications]')" \
+  '["add","/sharedDirectoryProperties",["guest@example.com"],1,false,false]'
+expect "03: exit 0" "${RC}" "0"
+ST_SHARE_WITH=guest@example.com STUB_STATUS_PATCH=400 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh
+expect "03: a 400 is exit 1, with the two likely reasons" "${RC}" "1"
+has "03: the hint" "an account with no e-mail address (see 01), or an address the server does not know"
+SHARED=$(body shared_meta '{"self":{"isShared":true,"sharedDirectoryProperties":{"ownerName":"owner","ownerEmail":"owner@example.com","collaborators":["guest@example.com"],"shareRights":3}}}')
+GET_BODY="${SHARED}" urun ../06-sharing-a-folder/04.folder_GET_sharing.sh
+expect "04: GET of the folder with metadata=true" "$(ucalls)" "GET ${F}?metadata=true"
+has "04: who it is shared with" "shared with:   guest@example.com"
+has "04: the rights, in words" "rights:        3 (read and upload)"
+GET_BODY="$(body unshared_meta '{"self":{"isShared":false}}')" urun ../06-sharing-a-folder/04.folder_GET_sharing.sh
+has "04: a folder that is not shared says so" "shared:        false"
+SEQ="${WORK}/seq06"; rm -rf "${SEQ}"; mkdir -p "${SEQ}"
+cp "${WORK}/me.json" "${SEQ}/1.json"
+echo '{"self":{"sharedDirectoryProperties":{"shareRights":3}}}' > "${SEQ}/2.json"
+echo '{"self":{"sharedDirectoryProperties":{"shareRights":7}}}' > "${SEQ}/3.json"
+STUB_CURL_GET_SEQUENCE="${SEQ}" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh
+expect "05: sets 3, reads it back, sets 7, reads it back" "$(ucalls | tr '\n' ' ')" "PATCH ${F} GET ${F}?metadata=true PATCH ${F} GET ${F}?metadata=true "
+expect "05: replaces the rights, first 3 then 7" "$(payload 1 | jq -c '[.[0].op,.[0].path,.[0].value]'):$(payload 2 | jq -c '.[0].value')" '["replace","/sharedDirectoryProperties/shareRights",3]:7'
+expect "05: exit 0" "${RC}" "0"
+GET_BODY="${SHARED}" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh
+expect "05: rights that read back as something else are exit 1" "${RC}" "1"
+STUB_STATUS_PATCH=403 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh
+expect "05: a refused change is exit 1" "${RC}" "1"
+GET_BODY="$(body unshared_after '{"self":{"isShared":false}}')" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/06.folder_PATCH_unshare.sh
+expect "06: PATCH to remove the sharing, then a read" "$(ucalls | tr '\n' ' ')" "PATCH ${F} GET ${F}?metadata=true "
+expect "06: the patch removes /sharedDirectoryProperties" "$(payload 1 | jq -c '[.[0].op, .[0].path]')" '["remove","/sharedDirectoryProperties"]'
+expect "06: exit 0" "${RC}" "0"
+GET_BODY="${SHARED}" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/06.folder_PATCH_unshare.sh
+expect "06: a folder that is still shared afterwards is exit 1" "${RC}" "1"
+STUB_STATUS_DELETE=204 urun ../06-sharing-a-folder/07.folder_DELETE.sh
+expect "07: deletes the file, then the folder" "$(ucalls | tr '\n' ' ')" "DELETE ${F}/notes.txt DELETE ${F} "
+STUB_STATUS_DELETE=403 urun ../06-sharing-a-folder/07.folder_DELETE.sh
+expect "07: a refusal stops it after the first (exit 1)" "${RC}:$(ucalls | grep -c DELETE)" "1:1"
+urun ../06-sharing-a-folder/99.cleanup_DELETE.sh
+expect "99: unshares, deletes the file and the folder by name, then logs out" "$(calls | tr '\n' ' ')" "PATCH ${F} DELETE ${F}/notes.txt DELETE ${F} DELETE ${BASE}/myself "
+urun ../06-sharing-a-folder/00.run_all.sh
+expect "00: with an account that may not share it stops at 01, and still cleans up" "${RC}" "1"
+has "00: says which step failed" "01.sharing_GET_myself failed."
+has "00: and cleans up" "Cleaned up."
+
 echo "=== The scripts say where they were copied from ==="
 for s in "${UC_ROOT}"/*/[0-9][0-9].*.sh; do
     case "$(basename "${s}")" in 99.*|00.*) continue ;; esac

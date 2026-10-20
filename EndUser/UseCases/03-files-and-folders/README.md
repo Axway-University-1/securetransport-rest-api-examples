@@ -39,7 +39,7 @@ ignores), and the names it works with.
 - There is no update call for a file's content: uploading under the same name replaces it.
 - A folder with anything in it cannot be deleted (403): delete bottom up, by exact name.
 - `curl -G` with `--data-urlencode` builds a query and encodes the values; a glob goes in the path.
-- Sharing a folder (`PATCH` of `sharedDirectoryProperties`, `02.Files/14` and `15`) is not part of this story: it needs the server's shared folders feature, which is switched off on many servers (400, "Shared folders functionality is disabled").
+- Sharing a folder (`PATCH` of `sharedDirectoryProperties`, `02.Files/14` and `15`) has its own use case, [06-sharing-a-folder](../06-sharing-a-folder/README.md): it needs an account with an e-mail address, which `john` on the lab does not have (400, "Shared folders functionality is disabled").
 
 ## Tests
 

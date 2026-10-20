@@ -502,7 +502,12 @@ request body is a safe stand-in for another's.
     it is 403 on delete ("directory is not empty").
   - A wrong `Content-MD5` is refused with a 500. A multipart upload to a `/fileOperations/<id>` stores the file under
     the name of the local file unless the form says `filename=`.
-  - Sharing a folder answers 400 "Shared folders functionality is disabled" when the server has it off.
+  - Sharing a folder answers 400 "Shared folders functionality is disabled" for an owner whose account has **no e-mail address**, not because the server has
+    it off (corrected 2026-10-20): `GET /myself` shows `sharingAllowed: false` for such an account and `true` once it has an address. The share is
+    `PATCH /files/<folder>` adding `/sharedDirectoryProperties`; `shareRights` 1 is read, 3 read and upload, 7 read, upload and delete (a collaborator
+    with 3 cannot delete their own upload); the collaborator sees the folder in their root as `<folder> (<owner e-mail>)`; changing the rights is a
+    `replace` of `/sharedDirectoryProperties/shareRights`, stopping is a `remove` of `/sharedDirectoryProperties`; a list read straight after an upload
+    by the collaborator can lag a moment. Use case `EndUser/UseCases/06-sharing-a-folder`, check 66.
   - `GET /transfers` is 403 for an account without `transfersWebServiceAllowed` (set it when creating the account).
     `startTimeAfter` wants RFC 2822 (`date -R`), a plain date is 400. A single transfer (`/transfers/<id>`) says
     `file` and `transferType` where the list says `filename` and `direction`; the id is base64, so encode it in the URL.
