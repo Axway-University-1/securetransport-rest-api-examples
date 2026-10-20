@@ -76,17 +76,8 @@ script = harness.bind_script(c, FOLDER, timeout=90)
 
 
 def login_until(account, proto, wanted, seconds=WAIT_SECONDS):
-    """(the outcome, the tries made, the seconds spent): the login is tried again every 2 seconds until its outcome
-    starts with `wanted` ('ok' or 'refused') or `seconds` have passed (the cap per protocol)."""
-    start = time.time()
-    tries, last = [0], [None]
-
-    def attempt():
-        last[0] = logins.try_login(proto, account)
-        tries[0] += 1
-        return last[0].startswith(wanted)
-    harness.wait_until(attempt, seconds, 2)
-    return last[0], tries[0], int(time.time() - start)
+    """The login is tried again every 2 seconds until its outcome starts with `wanted`: see protocol_logins.Logins.login_until."""
+    return logins.login_until(proto, account, wanted, seconds)
 
 
 admin = harness.connect(config, c, mock="the bundled mock does not implement /loginRestrictionPolicies or the protocol servers")

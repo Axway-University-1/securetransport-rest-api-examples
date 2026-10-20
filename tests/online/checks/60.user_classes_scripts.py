@@ -98,8 +98,7 @@ def names_by_order():
 
 
 def sessions():
-    response = admin.get("sessions")
-    return response.json() if response.status == 200 and isinstance(response.json(), list) else []
+    return admin.sessions()
 
 
 PROTOCOLS = protocol_logins.PROTOCOLS               # SFTP, HTTP, then FTP, the legacy one, as a labelled additional part

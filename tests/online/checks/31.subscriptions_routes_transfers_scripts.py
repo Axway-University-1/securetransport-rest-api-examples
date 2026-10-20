@@ -133,7 +133,7 @@ def enduser_script(name, args=None):
 
 
 def results(path, params=None):
-    return (client.get(path, params=params).json() or {}).get("result", [])
+    return client.results(path, params)
 
 
 def sites():

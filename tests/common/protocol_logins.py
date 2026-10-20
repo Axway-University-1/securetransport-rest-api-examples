@@ -20,6 +20,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 
 import st_client
 
@@ -114,6 +115,18 @@ class Logins:
             except subprocess.TimeoutExpired:
                 return True
         return Holder(alive, close)
+
+    def login_until(self, proto, account, wanted, seconds=20, interval=2):
+        """(the outcome, the tries made, the seconds spent): the login is tried again every `interval` seconds until its
+        outcome starts with `wanted` ('ok' or 'refused') or `seconds` have passed."""
+        start = time.time()
+        tries = 0
+        while True:
+            outcome = self.try_login(proto, account)
+            tries += 1
+            if outcome.startswith(wanted) or time.time() - start >= seconds:
+                return outcome, tries, int(time.time() - start)
+            time.sleep(interval)
 
     def try_login(self, proto, account, password=None):
         """'ok' when the login was accepted, 'refused (...)' when it was not, 'error (...)' when it could not be tried.

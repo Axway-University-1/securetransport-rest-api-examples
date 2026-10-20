@@ -100,13 +100,6 @@ def ssh_site(name, account=ACCOUNT, password=PASSWORD, port=None, host=None, **m
     return body
 
 
-def upload(client, folder, filename, content):
-    boundary = "----example_sites"
-    body = ("--%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\n\r\n" % (boundary, filename)).encode() \
-        + content + ("\r\n--%s--\r\n" % boundary).encode()
-    return client._request("POST", "files/" + folder, headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, data=body)
-
-
 def raw_test(body, params=None):
     response = admin.post("sites/operations", body, params=dict({"operation": "testConnection"}, **(params or {})))
     return response, (response.json() if response.status == 200 else {})
@@ -145,7 +138,7 @@ try:
             return made[0].status == 201
         c.check("set up: the folder /" + folder, harness.wait_until(create, 15), (made[0].status, made[0].text[:200]))
     for folder, name, content in (("in", "i1.txt", b"one"), ("in", "i2.dat", b"twotwo"), ("out", "o1.txt", b"o")):
-        status = upload(eu, folder, name, content).status
+        status = eu.upload_to(folder, name, content).status
         c.check("set up: the file /%s/%s" % (folder, name), status == 201, status)
         uploaded.append("%s/%s" % (folder, name))
 

@@ -59,8 +59,7 @@ script = harness.bind_script(c, FOLDER, timeout=60)
 
 
 def sessions():
-    response = admin.get("sessions")
-    return response.json() if response.status == 200 and isinstance(response.json(), list) else []
+    return admin.sessions()
 
 
 def mine(protocol=None, user=None):

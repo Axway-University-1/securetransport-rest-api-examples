@@ -76,10 +76,7 @@ BASIC_LANDED = "landed_by_prfx_%d.txt" % N
 BINARY_ADV = {"enabled": True, "callerTranscoding": {"type": "binary"}, "receiverTranscoding": {"type": "binary"}}
 SENT_FILE = "tp_probe_%d.txt" % N
 FIXED_NAME = "landed_by_prfb_%d.txt" % N
-PESIT_SITE_DEFAULTS = {"dmz": "none", "pesitId": "", "ptcpConnections": 1, "socketSendReceiveBuffersize": 65536,
-                       "receiveMessage": "", "sendMessage": "", "useServerPasswordExpr": False,
-                       "usePartnerPasswordExpr": False, "usePreconnectionServerPasswordExpr": False,
-                       "usePreconnectionPartnerPasswordExpr": False}
+PESIT_SITE_DEFAULTS = harness.PESIT_SITE_DEFAULTS
 
 
 # The list of profiles is not always complete: when the lookup found none for a profile that is known to exist

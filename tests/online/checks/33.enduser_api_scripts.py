@@ -76,15 +76,6 @@ def eu(account=USER, password=PASSWORD):
     return st_client.EndUserClient(config["st_server"], ENDUSER_PORT, account, password)
 
 
-def upload_into(client, folder, name, data):
-    """A multipart upload into a folder: POST /files/{folder}."""
-    boundary = "----zztest"
-    body = (("--%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\n\r\n" % (boundary, name)).encode()
-            + data + ("\r\n--%s--\r\n" % boundary).encode())
-    return client._request("POST", "files/" + folder,
-                           headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, data=body)
-
-
 def metadata(client, path):
     return (client._request("GET", "files/%s?metadata=true" % path).json() or {}).get("self", {})
 
@@ -124,11 +115,11 @@ try:
     with eu(PARTNER) as partner:
         partner.create_folder("out")
         partner.create_folder("in")
-        c.check("the partner has a file to pull", upload_into(partner, "out", "to_pull.txt", b"pull me\n").status == 201)
+        c.check("the partner has a file to pull", partner.upload_to("out", "to_pull.txt", b"pull me\n").status == 201)
     with eu() as user:
         for folder in ("dir1", "landing", "fm_from", "fm_to"):
             user.create_folder(folder)
-        upload_into(user, "fm_from", "fm.txt", b"folder monitor\n")
+        user.upload_to("fm_from", "fm.txt", b"folder monitor\n")
         user.upload("/to_push.txt", b"push me\n", "to_push.txt")
 
     local_file = os.path.join(work, "sample.txt")

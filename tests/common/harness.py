@@ -43,6 +43,18 @@ import time
 import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# What a PeSIT transfer site needs besides its own fields, for the Admin API to accept it (used by checks 32, 48, 58 and 59)
+PESIT_SITE_DEFAULTS = {
+    "dmz": "none", "pesitId": "", "ptcpConnections": 1, "socketSendReceiveBuffersize": 65536,
+    "receiveMessage": "", "sendMessage": "", "useServerPasswordExpr": False, "usePartnerPasswordExpr": False,
+    "usePreconnectionServerPasswordExpr": False, "usePreconnectionPartnerPasswordExpr": False,
+}
+
+
+def location_id(response):
+    """The id at the end of the Location header of a 201."""
+    return response.headers.get("Location", "").rsplit("/", 1)[-1]
 import st_client  # noqa: E402
 import script_runner as runner  # noqa: E402
 

@@ -114,15 +114,11 @@ PESIT_PORT, SSH_PORT = PORTS.pesit, PORTS.ssh
 # Set explicitly: a PeSIT site created through the API, unlike one created in
 # the admin UI, otherwise leaves these empty, and the transfer never connects
 # (confirmed directly, comparing with a working site field by field)
-PESIT_SITE_DEFAULTS = {
-    "dmz": "none", "pesitId": "", "ptcpConnections": 1, "socketSendReceiveBuffersize": 65536,
-    "receiveMessage": "", "sendMessage": "", "useServerPasswordExpr": False, "usePartnerPasswordExpr": False,
-    "usePreconnectionServerPasswordExpr": False, "usePreconnectionPartnerPasswordExpr": False,
-}
+PESIT_SITE_DEFAULTS = harness.PESIT_SITE_DEFAULTS
 
 
 def results(path, params=None):
-    return (client.get(path, params=params).json() or {}).get("result", [])
+    return client.results(path, params)
 
 
 def created(label, response):

@@ -83,10 +83,7 @@ HOST = config["st_server"]
 PESIT_HOST = config.get("st_pesit_host") or HOST
 ENDUSER_PORT = harness.ports(config).enduser
 CALLBACK = config.get("st_callback_host", "")
-PESIT_SITE_DEFAULTS = {"dmz": "none", "pesitId": "", "ptcpConnections": 1, "socketSendReceiveBuffersize": 65536,
-                       "receiveMessage": "", "sendMessage": "", "useServerPasswordExpr": False,
-                       "usePartnerPasswordExpr": False, "usePreconnectionServerPasswordExpr": False,
-                       "usePreconnectionPartnerPasswordExpr": False}
+PESIT_SITE_DEFAULTS = harness.PESIT_SITE_DEFAULTS
 
 # --------------------------------------------------------------------------------------------
 # helpers for the expectations

@@ -654,6 +654,91 @@ check("the last day of a month and of a year are no different",
 check("the two checks that compare days call it",
       all("avoid_midnight" in open(os.path.join(REPO, "tests", "online", "checks", f)).read()
           for f in ("30.lookups_and_transfer_logs_read.py", "55.statistics_summary_scripts.py")))
+
+print()
+print("=== the helpers the online checks share, instead of a copy in each ===")
+import harness as _harness  # noqa: E402
+import protocol_logins as _pl  # noqa: E402
+
+
+class _Reply:
+    def __init__(self, status=200, body=None, headers=None):
+        self.status, self._body, self.headers = status, body, headers or {}
+
+    def json(self):
+        return self._body
+
+
+class _AdminStub(st_client.STClient):
+    """An STClient that answers from a table instead of a server."""
+    def __init__(self, answers):
+        self.answers = answers
+
+    def get(self, path, params=None):
+        return self.answers.get(path, _Reply(404, None))
+
+
+admin_stub = _AdminStub({"accounts": _Reply(200, {"resultSet": {}, "result": [{"name": "a"}, {"name": "b"}]}),
+                         "empty": _Reply(200, {"resultSet": {}}), "sessions": _Reply(200, [{"userName": "u"}]),
+                         "broken": _Reply(500, None)})
+check("STClient.results is the result list", [r["name"] for r in admin_stub.results("accounts")] == ["a", "b"])
+check("and an empty list when there is none, or the call has no such answer", admin_stub.results("empty") == [] and admin_stub.results("absent") == [])
+check("STClient.sessions is the plain list GET /sessions answers", admin_stub.sessions() == [{"userName": "u"}])
+admin_stub.answers["sessions"] = _Reply(500, None)
+check("and an empty one when the call fails", admin_stub.sessions() == [])
+admin_stub.answers["sessions"] = _Reply(200, {"not": "a list"})
+check("or answers something that is not a list", admin_stub.sessions() == [])
+
+check("location_id is what follows the last slash of Location", _harness.location_id(_Reply(201, None, {"Location": "https://h/api/v2.0/accounts/abc123"})) == "abc123")
+check("and empty when there is no Location", _harness.location_id(_Reply(201)) == "")
+check("PESIT_SITE_DEFAULTS has the ten fields a PeSIT site needs, each online check using the same one",
+      len(_harness.PESIT_SITE_DEFAULTS) == 10 and _harness.PESIT_SITE_DEFAULTS["socketSendReceiveBuffersize"] == 65536
+      and all(os.path.basename(p) and "PESIT_SITE_DEFAULTS = harness.PESIT_SITE_DEFAULTS\n" in open(p).read()
+              for p in [os.path.join(REPO, "tests", "online", "checks", n) for n in
+                        ("32.pesit_acknowledgment_loop_scripts.py", "48.cancel_transfer.py", "58.transfer_profiles_scripts.py", "59.transfer_profile_content.py")]))
+
+
+class _EndUserStub(st_client.EndUserClient):
+    def __init__(self):
+        self.seen = []
+
+    def _request(self, method, path, headers=None, data=None):
+        self.seen.append((method, path, headers, data))
+        return _Reply(201)
+
+
+eu_stub = _EndUserStub()
+eu_stub.upload_to("/reports/my folder/", "a b.txt", b"DATA")
+method, path, headers, data = eu_stub.seen[0]
+check("upload_to is a POST of /files/<folder>, each part of the path encoded", (method, path) == ("POST", "files/reports/my%20folder"), (method, path))
+check("as a multipart form with the file under its filename", headers["Content-Type"].startswith("multipart/form-data; boundary=")
+      and b'filename="a b.txt"' in data and b"DATA" in data, headers)
+
+
+class _LoginStub(_pl.Logins):
+    def __init__(self, outcomes):
+        self.outcomes = list(outcomes)
+        self.tries = 0
+
+    def try_login(self, proto, account, password=None):
+        self.tries += 1
+        return self.outcomes.pop(0) if len(self.outcomes) > 1 else self.outcomes[0]
+
+
+import time as _time  # noqa: E402
+_slept = []
+_real_sleep, _time.sleep = _time.sleep, lambda s: _slept.append(s)
+try:
+    stub = _LoginStub(["refused (x)", "refused (x)", "ok"])
+    outcome, tries, spent = stub.login_until("SFTP", "u", "ok", seconds=60, interval=2)
+    check("login_until tries again until the outcome is the wanted one", (outcome, tries) == ("ok", 3), (outcome, tries))
+    check("and waits the interval between the tries, not after the last", _slept == [2, 2], _slept)
+    stub = _LoginStub(["refused (x)"])
+    outcome, tries, spent = stub.login_until("SFTP", "u", "ok", seconds=0)
+    check("with no time left it gives the last outcome after one try", (outcome, tries) == ("refused (x)", 1), (outcome, tries))
+finally:
+    _time.sleep = _real_sleep
+
 print()
 if failed:
     print("test_integration_helpers: FAIL (%d)" % failed)

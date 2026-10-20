@@ -68,9 +68,7 @@ NUMBER = random.randint(1000, 9999)
 SENDER, RECEIVER, PROFILE = "EXCS%d" % NUMBER, "EXCR%d" % NUMBER, "EXCTP%d" % NUMBER
 PESIT_HOST = config.get("st_pesit_host") or config["st_server"]
 # A PeSIT site made through the API leaves these empty, and then never connects
-PESIT_SITE_DEFAULTS = {"dmz": "none", "pesitId": "", "ptcpConnections": 1, "socketSendReceiveBuffersize": 65536, "receiveMessage": "", "sendMessage": "",
-                       "useServerPasswordExpr": False, "usePartnerPasswordExpr": False, "usePreconnectionServerPasswordExpr": False,
-                       "usePreconnectionPartnerPasswordExpr": False}
+PESIT_SITE_DEFAULTS = harness.PESIT_SITE_DEFAULTS
 
 
 def unique(prefix):

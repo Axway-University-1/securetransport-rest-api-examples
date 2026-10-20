@@ -76,8 +76,7 @@ def by_name(path, name):
     return (admin.get(path, params={"name": name, "fields": "id"}).json() or {}).get("result", [])
 
 
-def location_id(response):
-    return response.headers.get("Location", "").rsplit("/", 1)[-1]
+location_id = harness.location_id
 
 
 admin = harness.connect(config, c, mock="the bundled mock does not implement /events or the flow it needs")

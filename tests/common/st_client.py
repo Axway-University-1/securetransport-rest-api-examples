@@ -192,6 +192,16 @@ class STClient:
         return self._request("DELETE", path, params=params)
 
     # -- helpers ----------------------------------------------------------
+    def results(self, path, params=None):
+        """The `result` list of a GET that answers {resultSet, result}; an empty list when there is none."""
+        return (self.get(path, params=params).json() or {}).get("result", [])
+
+    def sessions(self):
+        """GET /sessions: a plain list of the open sessions, or an empty one when the call fails."""
+        response = self.get("sessions")
+        body = response.json() if response.status == 200 else None
+        return body if isinstance(body, list) else []
+
     def exists(self, path):
         """True when the object is there. Uses HEAD, the cheap check."""
         return self.head(path).status == 200
@@ -476,6 +486,19 @@ class EndUserClient:
         )
         headers = {"Content-Type": "multipart/form-data; boundary=" + boundary}
         return self._request("POST", "files", headers=headers, data=body)
+
+    def upload_to(self, folder, filename, content):
+        """
+        A multipart upload of one file into a folder of the home folder: POST /files/{folder}. The folder goes in the
+        URL (a filename with a folder in it is cut to its last part by the server), each part of its path encoded.
+        """
+        boundary = "----STIntegrationBoundary"
+        body = (("--%s\r\n" % boundary).encode()
+                + ('Content-Disposition: form-data; name="file"; filename="%s"\r\n\r\n' % filename).encode()
+                + content
+                + ("\r\n--%s--\r\n" % boundary).encode())
+        return self._request("POST", "files/" + urllib.parse.quote(folder.strip("/")),
+                             headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, data=body)
 
     def __enter__(self):
         self.login()

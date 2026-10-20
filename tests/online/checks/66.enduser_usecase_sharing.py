@@ -62,14 +62,6 @@ def client(name):
     return st_client.EndUserClient(config["st_server"], ENDUSER_PORT, name, PASSWORDS[name])
 
 
-def put_file(user, folder, filename, content):
-    boundary = "----STSharingBoundary"
-    body = (("--%s\r\n" % boundary).encode()
-            + ('Content-Disposition: form-data; name="file"; filename="%s"\r\n\r\n' % filename).encode()
-            + content + ("\r\n--%s--\r\n" % boundary).encode())
-    return user._request("POST", "files/" + urllib.parse.quote(folder), headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, data=body)
-
-
 def root_names(user):
     response = user.list_files({"showdots": "true"})
     return [f.get("fileName") for f in (response.json() or {}).get("files", [])] if response.status == 200 else None
@@ -122,7 +114,7 @@ try:
     c.check('the collaborator sees "%s" in their root' % SHARED_NAME, names is not None and SHARED_NAME in names, names)
     path = urllib.parse.quote(SHARED_NAME)
     c.check("and can read the file in it", guest._request("GET", "files/%s/notes.txt" % path).status == 200)
-    c.check("rights 1: an upload is refused (403)", put_file(guest, SHARED_NAME, "g1.txt", b"x\n").status == 403)
+    c.check("rights 1: an upload is refused (403)", guest.upload_to(SHARED_NAME, "g1.txt", b"x\n").status == 403)
     c.check("rights 1: a delete is refused (403)", guest._request("DELETE", "files/%s/notes.txt" % path).status == 403)
     r = run("04.folder_GET_sharing.sh", OWNER)
     c.check("04 shows the collaborator and the rights", EMAIL[GUEST] in r.stdout and "rights:        1 (read)" in r.stdout, r.stdout[-300:])
@@ -130,14 +122,14 @@ try:
     r = run("05.folder_PATCH_rights.sh", OWNER)
     c.check("05 sets 3 and 7, reading each back", r.returncode == 0, (r.stdout + r.stderr)[-300:])
     # 05 ends on 7: with 7 an upload and a delete both work; go back to 3 by hand to see its in-between behaviour
-    c.check("rights 7: an upload works", put_file(guest, SHARED_NAME, "g7.txt", b"x\n").status == 201)
+    c.check("rights 7: an upload works", guest.upload_to(SHARED_NAME, "g7.txt", b"x\n").status == 201)
     c.check("rights 7: and so does deleting it", guest._request("DELETE", "files/%s/g7.txt" % path).status == 204)
     owner = client(OWNER)
     owner.login()
     patch3 = owner._request("PATCH", "files/" + FOLDER, {"Content-Type": "application/json"},
                             b'[{"op":"replace","path":"/sharedDirectoryProperties/shareRights","value":3}]')
     c.check("the owner sets the rights to 3 again (204)", patch3.status == 204, patch3.status)
-    c.check("rights 3: an upload works", put_file(guest, SHARED_NAME, "g3.txt", b"x\n").status == 201)
+    c.check("rights 3: an upload works", guest.upload_to(SHARED_NAME, "g3.txt", b"x\n").status == 201)
     c.check("rights 3: a delete of their file is refused (403)", guest._request("DELETE", "files/%s/g3.txt" % path).status == 403)
     owner._request("PATCH", "files/" + FOLDER, {"Content-Type": "application/json"},
                    b'[{"op":"replace","path":"/sharedDirectoryProperties/shareRights","value":7}]')

@@ -158,10 +158,7 @@ try:
     c.check("set up: the folder /in", harness.wait_until(create_in, 20), (made[0].status, made[0].text[:200]))
 
     def upload(name, content=b"pulled by a subscription"):
-        boundary = "----example_subs"
-        body = ("--%s\r\nContent-Disposition: form-data; name=\"file\"; filename=\"%s\"\r\n\r\n" % (boundary, name)).encode() \
-            + content + ("\r\n--%s--\r\n" % boundary).encode()
-        return eu._request("POST", "files/in", headers={"Content-Type": "multipart/form-data; boundary=" + boundary}, data=body).status
+        return eu.upload_to("in", name, content).status
     c.check("set up: the file /in/a.txt", upload("a.txt") == 201)
 
     pull_site = [{"tag": "PARTNER-IN", "outbound": False, "site": SITE}]

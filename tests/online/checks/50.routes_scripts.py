@@ -45,8 +45,7 @@ PASSWORD = harness.new_password()
 script = harness.bind_script(c, FOLDER, timeout=90)
 
 
-def location_id(response):
-    return response.headers.get("Location", "").rsplit("/", 1)[-1]
+location_id = harness.location_id
 
 
 def by_name(name):
