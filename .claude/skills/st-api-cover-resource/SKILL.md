@@ -33,7 +33,7 @@ Notes as `Confirmed directly: ...`.
 | `authoring.py` | `write_sh(...)`, then `write_bat(...)`: the house header, set up and MAIN_URL, for both twins |
 | `sync_docs.py` | After adding files: recount the README table, the docs check and the pack totals. `--check` changes nothing |
 
-`lab.py` needs `tests/local/integration.conf` (copy `tests/online/integration.conf.example`).
+`lab.py` needs `tests/local/integration.conf` (copy `tests/local.example/integration.conf`).
 
 **Scratch files** (the ids of throwaway lab objects, a saved password) go in the
 project's own `tmp/` folder, gitignored, never in the system `/tmp`:

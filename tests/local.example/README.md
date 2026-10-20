@@ -1,30 +1,51 @@
-# tests/local — your private workspace
+# tests/local: your private workspace
 
-Copy this directory to `tests/local`, which git ignores:
+`tests/local/` is where everything goes that must not reach the repository. Git ignores it. This folder,
+`tests/local.example/`, is the committed starting point: **copy what you need, then edit the copy.**
 
-    cp -r tests/local.example tests/local
+```
+mkdir -p tests/local
+cp -n tests/local.example/* tests/local/      # -n: never overwrites a file you already have
+```
 
-## integration.conf
+`cp -n` says "not overwritten" (and may exit 1) for a file you already have: that is what `-n` is for. Do not use
+`cp -r tests/local.example tests/local` when `tests/local` exists: it makes `tests/local/local.example`.
 
-The integration tests read `tests/local/integration.conf`, which names a real
-server and the credentials for it:
+## What is here
 
-    cp tests/online/integration.conf.example tests/local/integration.conf
+| File | Copy it to | What it is |
+| ---- | ---------- | ---------- |
+| `integration.conf` | `tests/local/integration.conf` | The server the **online** checks talk to, and the safety switches. **This is the one that enables something**: without it `tests/online/run_online.sh` skips (it says so and exits 0). Edit `st_server`, `st_port`, `st_user`, `st_password`, then `st_confirm_lab="yes"` (your statement that the server is a lab, not production) and, for the checks that write, `st_allow_writes="yes"`. Every other setting is optional and explained in the file. |
+| `blocked_terms.txt` | `tests/local/blocked_terms.txt` | A list of names (a customer, an internal host) that the hygiene check must never find in a tracked file. One regular expression per line. It lives in `tests/local` so the list itself never reaches the repository. Optional: with nothing in it only the built-in terms are checked. |
 
-Without it the integration tests skip, so this is the one file here that
-actually enables something. See tests/online/README.md.
+The values in `integration.conf` are placeholders (`st_confirm_lab="no"`), so a copy you have not edited cannot
+reach any server. See [tests/online/README.md](../online/README.md) for what the checks do and how to run them.
 
-## Everything else
+## One more thing the online checks may need: a Python venv
 
-Put here anything that must not reach the repository:
+Online checks 15 to 18 and 20 run the python examples, which import `requests`. The harness itself does not need it.
+Create the venv once (it is a folder, not a file, so there is nothing to copy):
 
-- responses captured from a real server (`curl ... > tests/local/accounts.json`),
-  which carry hostnames, account names, certificate subjects and business units
-- a `config` or `set_variables.local.sh` pointing at a real system
+```
+python3 -m venv tests/local/pyvenv
+tests/local/pyvenv/bin/pip install requests
+```
+
+Those checks skip, with a message, when it is not there.
+
+## Everything else you may keep here
+
+- responses captured from a real server (`curl ... > tests/local/accounts.json`), which carry hostnames, account names,
+  certificate subjects and business units
+- the API descriptions fetched from a server: `tests/local/admin20-spec/`, `tests/local/enduser-spec/`
+  (`.claude/skills/st-api-cover-resource/scripts/fetch_spec.sh` fills the first one)
 - an exported `systemConfiguration.xml`
 - logs and output from a run against a live server
 
-Nothing here is required. `tests/offline/run_all.sh` passes on a clean clone without it.
+`tests/local/harness_backups/` is written by the harness itself (a copy of a config it temporarily replaces, so that a
+killed run cannot lose it). Leave it alone.
+
+Nothing here is required: `tests/offline/run_all.sh` passes on a clean clone without any of it.
 
 ## Using a captured response as a fixture
 
@@ -37,11 +58,12 @@ routes = json.load(open("tests/local/real_routes.json"))["result"]
 session = fake_st.FakeSession({"routes": routes})
 ```
 
-That is the most realistic test available, because the shapes are real. Keep the
-file in `tests/local/`. **Only move it to `tests/offline/fixtures/` after scrubbing every
-hostname, account name and identifier** — fixtures are committed.
+That is the most realistic test available, because the shapes are real. Keep the file in `tests/local/`.
+**Only move it to `tests/offline/fixtures/` after scrubbing every hostname, account name and identifier**:
+fixtures are committed.
 
 ## Pointing a script at a real server
 
-Configure the example trees as normal; those config files are already gitignored.
-This directory is for the data you collect, not for the credentials themselves.
+The example trees have their own settings file, `set_variables.local.sh` next to each example folder (copied from its
+`set_variables.local.example.sh`; git ignores it). This folder is for the data you collect and for the test
+configuration, not for the settings of the examples.

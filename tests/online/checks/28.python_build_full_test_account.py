@@ -51,7 +51,7 @@ harness.require_writes(config, "run stBuildFullTestAccount.py for real")
 ca_password = config.get("st_ca_password", "")
 if not ca_password:
     st_client.skip("st_ca_password is not set in integration.conf - see "
-                   "integration.conf.example for what it is and why this "
+                   "tests/local.example/integration.conf for what it is and why this "
                    "check cannot proceed without it")
 
 if not runner.python_available():

@@ -24,7 +24,7 @@ import script_runner as runner  # noqa: E402
 
 config = st_client.load_config()
 if not config:
-    sys.exit("No tests/local/integration.conf: copy tests/online/integration.conf.example and fill it in.")
+    sys.exit("No tests/local/integration.conf: copy tests/local.example/integration.conf and fill it in.")
 admin = st_client.client_from_config(config)
 admin.login()
 

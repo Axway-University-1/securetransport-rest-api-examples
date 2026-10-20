@@ -17,7 +17,7 @@ in capitals finds nothing, deletes it with 03.events_operations_POST_delete.sh
 (together with an id that does not exist) and confirms it is gone.
 
 Needs --write, st_allow_writes="yes", and st_callback_host in integration.conf:
-this machine's address as the server sees it (see integration.conf.example).
+this machine's address as the server sees it (see tests/local.example/integration.conf).
 Refuses to start when any of its example_events_* objects exist. Everything is
 removed in a finally block, events first, and it never deletes an event of
 another account.

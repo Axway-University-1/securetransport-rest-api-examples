@@ -19,7 +19,7 @@ An LDAP domain only authenticates users when the server's login settings turn
 LDAP on, which is a server-wide change this check never makes.
 
 Part 2 needs st_callback_host in integration.conf: this machine's address as the
-server sees it (see integration.conf.example); without it only part 1 runs.
+server sees it (see tests/local.example/integration.conf); without it only part 1 runs.
 Needs --write and st_allow_writes="yes". Refuses to start when its example_ldap*
 domains exist, and removes everything in a finally block.
 """

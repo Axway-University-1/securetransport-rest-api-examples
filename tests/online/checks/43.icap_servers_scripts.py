@@ -22,7 +22,7 @@ parts.
    the server is scanned.
 
 Part 2 needs st_callback_host in integration.conf: this machine's address as the
-server sees it (see integration.conf.example); without it only part 1 runs.
+server sees it (see tests/local.example/integration.conf); without it only part 1 runs.
 Needs --write and st_allow_writes="yes". Refuses to start when its example_icap*
 objects exist, and removes everything in a finally block.
 """

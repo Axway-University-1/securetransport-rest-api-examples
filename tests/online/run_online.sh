@@ -102,7 +102,7 @@ if [ ! -f "${CONF}" ]; then
     echo
     echo "To run these against your own SecureTransport:"
     echo "  mkdir -p tests/local"
-    echo "  cp tests/online/integration.conf.example tests/local/integration.conf"
+    echo "  cp tests/local.example/integration.conf tests/local/integration.conf"
     echo "  \$EDITOR tests/local/integration.conf"
     echo
     echo "To try them with no server at all:"

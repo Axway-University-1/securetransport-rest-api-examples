@@ -1,15 +1,59 @@
 # Tests
 
-Checks that keep the examples in this repository correct. **Everything in the
-Quick Start runs offline** (the `offline/` folder): no SecureTransport server, no credentials, no
-network. The checks that do need a server are in `online/`, and are opt-in.
+Checks that keep the examples in this repository correct. There are two kinds, in two folders,
+plus what they share:
+
+| Folder | Needs | What it does |
+| ------ | ----- | ------------ |
+| [`offline/`](offline/) | Nothing: no server, no credentials, no network | Checks the **scripts themselves**: their structure, their format, and what is specific to bash and to python. Run by `./tests/offline/run_all.sh`, and by CI on every push. |
+| [`online/`](online/README.md) | A real SecureTransport **lab** server (or the bundled mock) | Checks that the **server still behaves the way the scripts assume**: it runs the real scripts and API calls and looks at what happened. Opt-in. |
+| `common/` | | Python that both sides use (the API clients, the harness, the mock server). The online checks are written with it, and the offline checks test it. |
+| `local/`, `local.example/` | | Yours: the lab config and anything captured from a real server. Git ignores `local/`. `local.example/` is the committed starting point: copy it. |
+
+## What the offline tests check
+
+The offline tests never see a server. They run the scripts against a stand-in (a fake `curl` that records what it
+was asked to send, a fake `requests` with an in-memory server) and read the scripts as text. They answer:
+
+- **Structure.** Every example has the house header (`Script Name`, `Risk`, usage, notes), is named and numbered as the
+  folders say, has its bash and bat twin, and is covered by a test. The numbers in the README, the skills and the
+  folder lists are the numbers in the repository (`check_docs_match_repo.py`, `check_risk_headers.py`).
+- **Format.** Line endings (LF for bash and python, CRLF for bat), lower case extensions, no spaces in file names, numbers
+  with a dot, no secrets, IP addresses, host names or identifying terms in a tracked file, no local configuration tracked
+  (`check_hygiene.sh`), and the same header text in a bat file as in its bash twin.
+- **What each script sends.** For every example: the method, the URL and query, the body, the headers, the answers it
+  acts on (a 404, a 401, a refused delete), and its exit code (`test_bash_*.sh`, `test_python_*.py`, `test_feature_*.sh`).
+  Arguments are checked before anything is sent, and a script that is refused stops with the right exit code.
+- **Bash specifics.** It works with macOS bash 3.2 and with Linux (no `sed -i`, no negative substring length), builds JSON
+  with `jq` rather than by pasting strings (so a quote in a name cannot corrupt a body), keeps the HTTP status apart from the
+  body, quotes `curl -u` credentials, and finds its settings from its own folder, not the working directory.
+- **Windows batch specifics.** Every bash example has its `.bat` twin, `curl -w` is written `%%{http_code}`, no `%VAR: =%%20%`
+  substitution, and the RFC 2822 dates are in the form the server wants.
+- **Python specifics.** Every name used is defined, an `except ... as x` does not use another handler's variable, every write
+  carries the `csrfToken` and every call a timeout, and the examples run against a fake server that refuses what a real
+  one would refuse: a write with no token, a call with no timeout (`test_python_*.py`).
+- **The test tools themselves.** The mock server, the harness, the dummy servers, the runner and its time limit, the review
+  list, the authoring generators (`test_mock_st.py`, `test_harness.py`, `test_integration_helpers.py`, ...), so that a
+  failing online check means the server, not the tooling.
+
+A change to a script is not finished until an offline check covers it (see [Adding a check](#adding-a-check)).
+
+## What the online tests check
+
+The online checks (`online/`) run against a lab SecureTransport you name in `tests/local/integration.conf`, and
+prove what a stand-in cannot: that the CSRF handshake, paging, status codes, `PATCH` semantics, file operations, transfers and
+the examples' real effect on the server are what the scripts expect. They create throwaway objects with a
+distinctive prefix, remove them again, and refuse to run unless the config says the server is a lab and (for anything that
+writes) allows writes. See [online/README.md](online/README.md).
+
+The rest of this file is about the offline tests.
 
 ## Quick Start
 
 You need `bash`, `python3` and `jq`. On macOS: `brew install jq`. On Debian or
 Ubuntu: `sudo apt install jq`.
 
-**1. Run the tests** (about three minutes), from the repository root:
+**1. Run the offline tests** (about three minutes), from the repository root:
 
 ```
 ./tests/offline/run_all.sh
@@ -88,6 +132,7 @@ server](#against-a-real-server).
 | `offline/checks/test_python_safety.py` | What each python example does with what it can destroy, the secrets it handles and the files it writes: a delete by prefix, not by substring, that is a dry run unless `--apply`; workers that start fresh (`spawn`); a private key written 0600 with its password out of the URL and the output; a JSON baseline compared in both directions; a cleanup that deletes only what the run created; every missing config, argument or bad value, exit 1 or 2 with nothing sent. |
 | `offline/checks/test_python_graceful.py` | `stGraceful.py`, which can never be run on the lab: it stops nothing without `--yes`, stops a daemon once by `daemon=`, waits for every daemon to be down (bounded, on a fake clock) before the Transaction Manager, and ends with exit 1, the Transaction Manager untouched, when one never goes down. |
 | `offline/checks/check_python_risk.py` | The python examples each having exactly one `Risk:` line with one of the four levels, a reason when it is not `read`, and a level that matches what the script is known to do. |
+| `offline/checks/test_local_example.py` | `tests/local.example` can be copied and used: the README's `cp -n` gives the three files and keeps one you have, the config has every key the online runner reads and says no to everything (the runner refuses an unedited copy, naming the line to change), `blocked_terms.txt` blocks nothing until a term is added, and no file points at the old place of the example. |
 | `offline/checks/test_integration_helpers.py` | The real-server check `31` acting on a real object: every Admin example it runs must have every real name (`john`, the application, the routes) substituted with a throwaway one. Also the release comparison that decides whether the 5.5-20260924 checks run, and that every example in the newer folders is run by a real-server check. Also the runner `integration/run_online.sh` (the order of the checks, a check that asserts nothing counting as a skip, the words that select checks) and what it does with a check that hangs: `ST_CHECK_TIMEOUT` stops it with SIGTERM so that it cleans up, then SIGKILL after `ST_CHECK_GRACE`, and it counts as FAILED with a message; and that `--write` reaches a check only when the config allows writing (`st_allow_writes`). |
 | `offline/checks/test_harness.py` | The shared helpers of the integration checks (`integration/lib/harness.py`), with no server: the wait (an unanswered call is "not yet", the last value comes back, the time is bounded), the ports (the config, then the servers the Admin API lists, then the default), the run of an example (the exit code checked and named, the environment only for that run, a lookup that came back empty run again), the gate for `--write`, the throwaway account (a fresh name and user id, its files then itself deleted whatever happened inside the block), the temporary folder that is removed however a check ends. Also that no check carries its own copy of any of them again, or polls in a loop of its own. |
 | `offline/checks/test_output_folders.py` | Two test runs at once deleting each other's files: no bash check names `tests/offline/output` without `ST_TEST_OUTPUT`; the same check started twice at once with a root each passes both times; `run_all.sh` gives each run a folder of its own (`tests/offline/output/run.XXXXXX`), removes it when everything passed, and keeps it, naming it in the last lines, when something failed. |
@@ -125,7 +170,6 @@ tests/
     online/             Needs a REAL SecureTransport (a lab, never production), or the bundled mock. Opt-in.
         run_online.sh   runs everything in checks/ against the server named in local/integration.conf
         checks/         the numbered checks (01.connect.py, 33.enduser_api_scripts.py, ...)
-        integration.conf.example   the shape of the config you put in local/
         README.md       how to set up and run it, and a table of what each check does
     common/             Python that both sides use: the online checks are written with it, and the offline
                         checks test it (so that a mistake in a helper does not show up as a failing lab check).
@@ -134,7 +178,8 @@ tests/
                         time limit), dummy_servers.py and pesit_wire.py and protocol_logins.py (stand-ins
                         and protocol helpers for what a check needs the lab to reach), mock_st.py (the mock)
     local/              YOUR data. Git ignores this. See below.
-    local.example/      the shape of local/, committed
+    local.example/      a starting point for local/, committed: copy it. integration.conf (the server the online checks use,
+                        inert until you edit it), blocked_terms.txt (a template), and a README
 ```
 
 The rule of thumb: if it can run on a laptop with no network, it is in `offline/`. If it logs in to a server, it is in
@@ -192,10 +237,12 @@ that must not reach the repository:
 Nothing in `tests/local/` is needed for `run_all.sh` to pass. It is a private
 workspace, not a dependency.
 
-`local.example/` shows the shape and is committed. Copy it:
+`local.example/` is the committed starting point (the lab config `integration.conf`, a `blocked_terms.txt`
+template and a README). Copy what you need, without overwriting anything you have:
 
 ```
-cp -r tests/local.example tests/local
+mkdir -p tests/local
+cp -n tests/local.example/* tests/local/
 ```
 
 **Before you put a captured response in `fixtures/` instead, scrub it.** Fixtures

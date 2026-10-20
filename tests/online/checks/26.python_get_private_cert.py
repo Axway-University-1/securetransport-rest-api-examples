@@ -33,7 +33,7 @@ password and hold the private key (checked with openssl, when it is on this mach
 
 Needs --write, st_allow_writes="yes", AND a real st_ca_password set in
 integration.conf - this check skips itself, rather than fail, when that is
-blank. See integration.conf.example for what it is and why this project
+blank. See tests/local.example/integration.conf for what it is and why this project
 cannot ship a working default for it.
 """
 import email
@@ -74,7 +74,7 @@ harness.require_writes(config, "run stGetPrivateCert.py for real")
 ca_password = config.get("st_ca_password", "")
 if not ca_password:
     st_client.skip("st_ca_password is not set in integration.conf - see "
-                   "integration.conf.example for what it is and why this "
+                   "tests/local.example/integration.conf for what it is and why this "
                    "check cannot proceed without it")
 
 if not runner.python_available():

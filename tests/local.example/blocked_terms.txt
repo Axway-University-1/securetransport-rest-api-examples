@@ -1,0 +1,14 @@
+# Identifying terms that must never appear in a tracked file of this repository.
+#
+# Copy this file to tests/local/blocked_terms.txt (git ignores tests/local, so the
+# list of names never reaches the repository either) and put one regular
+# expression per line, matched case-insensitively. The hygiene check
+# (tests/offline/checks/check_hygiene.sh) fails when a tracked file contains one.
+#
+# Lines that start with # and empty lines are ignored. With nothing below, only the
+# terms built into the check are looked for.
+#
+# For example, a customer name, an internal host name, a project code name:
+#
+# acme\.corp
+# internal-lab-[0-9]+

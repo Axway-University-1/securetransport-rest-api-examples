@@ -52,7 +52,7 @@ when a step fails, including the files left in the account's home folder.
 
 Needs --write and st_allow_writes="yes". Optional settings in
 integration.conf: st_enduser_port, st_ssh_host, st_ssh_port and
-st_chain_wait_seconds, see integration.conf.example.
+st_chain_wait_seconds, see tests/local.example/integration.conf.
 """
 import os
 import re

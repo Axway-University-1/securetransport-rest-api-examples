@@ -69,7 +69,7 @@ query. Everything passes against the mock, with and without `--write`.
 
 ```
 mkdir -p tests/local
-cp tests/online/integration.conf.example tests/local/integration.conf
+cp tests/local.example/integration.conf tests/local/integration.conf
 $EDITOR tests/local/integration.conf
 ```
 
@@ -327,7 +327,7 @@ configured variable - see the gotchas skill for all of these.
 
 `26.python_get_private_cert.py`, `27.python_update_all_routes.py` and
 `28.python_build_full_test_account.py` all depend on a real
-`st_ca_password` in integration.conf (see integration.conf.example) - this
+`st_ca_password` in integration.conf (see tests/local.example/integration.conf) - this
 server's certificate authority password, needed to *generate* or *import*
 a certificate through `POST /certificates` (a different thing from the CA
 password an earlier version of this file said made `stGetPrivateCert.py`
