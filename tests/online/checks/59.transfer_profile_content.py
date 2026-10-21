@@ -575,12 +575,17 @@ class Worker:
             except (st_client.STError, RuntimeError) as e:
                 outcome["exception"] = str(e)
             wire_ok = case.sent is None or not self.proxy or outcome.get("wire") == case.sent
-            ok = (not case.fail and outcome.get("status") == "Processed" and outcome.get("stored") is not None and wire_ok) or \
+            # The data coding the sender announces (PI 16) is part of a good pull too. An empty file sends no bytes, so its wire is
+            # the same whatever the profile says: a profile that had not yet taken effect (the pull before it used another one)
+            # shows only here, and only a second pull sees the new one.
+            net_ok = case.net is None or case.sent is None or not self.proxy or outcome.get("net") == case.net
+            ok = (not case.fail and outcome.get("status") == "Processed" and outcome.get("stored") is not None and wire_ok and net_ok) or \
                  (case.fail and outcome.get("status") == "Failed" and case.fail in (outcome.get("error") or ""))
             if ok:
                 break
             tried.append("attempt %d: %s" % (attempt + 1, outcome.get("exception") or outcome.get("error") or "status %s, wire %d bytes in %d part(s)" % (
-                outcome.get("status"), len(outcome.get("wire") or b""), len(outcome.get("wire_parts") or []))))
+                outcome.get("status"), len(outcome.get("wire") or b""), len(outcome.get("wire_parts") or [])) + (
+                "" if net_ok else ", the data coding announced was %r, not %r" % (outcome.get("net"), case.net))))
         outcome["tried"] = tried
         return outcome
 
