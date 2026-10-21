@@ -25,7 +25,7 @@
 # - The match is exact, case and punctuation included: "What is your dog's name?" is on the
 #   default list and "what is your dog's name" is not.
 # - Exit codes: 0 when the question is on the list, 1 when it is not (or the call failed),
-#   2 when no question was given (nothing sent), 3 when the service is not enabled.
+#   2 when no question was given (nothing sent), 3 when the service is switched off (an administrator must switch it on).
 # - Requires `jq`, which does the comparison.
 # ==============================================================================
 
@@ -65,7 +65,7 @@ case "${HTTP_CODE}" in
         fi
         ;;
     503)
-        printf "The secret question service is not enabled on this server:\n%s\n" "${BODY}"
+        printf "The secret question service is switched off on this server (HTTP 503). An administrator must switch it on: the server option Users.SecretQuestion.Enabled has to be true.\n%s\n" "${BODY}"
         exit 3
         ;;
     *)

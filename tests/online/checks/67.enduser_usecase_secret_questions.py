@@ -46,10 +46,13 @@ def set_option(values):
     return admin.put("configurations/options", [{"name": OPTION, "values": values}]).status
 
 
-def run(script, **env):
+def run(script, args=None, tree="enduser"):
+    if tree == "admin":
+        with runner.real_credentials(runner.path("Admin", "API 2.0", "bash"), config):
+            return runner.run(os.path.join(runner.path("Admin", "API 2.0", "bash", "05.Accounts"), script), args or [], timeout=120)
     cfg = dict(config, st_port=ENDUSER_PORT, st_user=ACCOUNT, st_password=PASSWORD)
     with runner.real_credentials(ENDUSER_TREE, cfg):
-        return runner.run(os.path.join(UC, script), env=env, timeout=300)
+        return runner.run(os.path.join(UC, script), args or [], timeout=300)
 
 
 def clear_local():
@@ -94,23 +97,35 @@ try:
     r = run("02.secretQuestion_GET_mine.sh")
     c.check("02 with the service on and no question: exit 4, not 3", r.returncode == 4 and "has no secret question yet" in r.stdout, (r.returncode, r.stdout[-300:]))
 
+    r = run("03.secretQuestion_PUT.sh")
+    c.check("03 with no parameters prints its usage (exit 2) and changes nothing", r.returncode == 2 and "Usage: ./03.secretQuestion_PUT.sh ANSWER [QUESTION_NUMBER]" in r.stdout, (r.returncode, r.stdout[-300:]))
     r = run("00.run_all.sh")
     c.check("00.run_all.sh without an answer stops at 03 (exit 1)", r.returncode == 1 and "03.secretQuestion_PUT failed." in r.stdout, (r.returncode, r.stdout[-300:]))
     c.check("and changed nothing: the account still has no question", question_of_account()[0] == 503, question_of_account())
 
-    r = run("00.run_all.sh", ST_SECRET_ANSWER="zztest answer", ST_SECRET_QUESTION_NUMBER="2")
+    r = run("00.run_all.sh", ["zztest answer", "2"])
     c.check("00.run_all.sh with an answer exits 0", r.returncode == 0, (r.stdout + r.stderr)[-500:])
     c.check("it ended with the cleanup", "Cleaned up." in r.stdout, r.stdout[-200:])
     status, question = question_of_account()
     c.check("the account's question is question 2 of the list (read through the API)", status == 200 and question == (questions[1] if len(questions) > 1 else None),
             (status, question, questions[:2]))
+    # an administrator asks for a new question: the question stays on the account, but the user is asked to choose again
+    r = run("06.accounts_name_PATCH_secretQuestion.sh", [ACCOUNT], tree="admin")
+    c.check("the Admin example asks the user for a new question (exit 0, the flag reads back true)", r.returncode == 0 and '"forceSecretQuestionChange":true' in r.stdout, (r.returncode, r.stdout[-300:]))
+    r = run("02.secretQuestion_GET_mine.sh")
+    c.check("02 then says an administrator has asked for a new question (exit 5)", r.returncode == 5 and "An administrator has asked" in r.stdout, (r.returncode, r.stdout[-300:]))
+    r = run("03.secretQuestion_PUT.sh", ["a new answer", "1"])
+    c.check("03 chooses one again (exit 0)", r.returncode == 0, (r.stdout + r.stderr)[-300:])
+    r = run("02.secretQuestion_GET_mine.sh")
+    c.check("and 02 reads the question again (exit 0)", r.returncode == 0, (r.returncode, r.stdout[-300:]))
+    status, question = question_of_account()
     r = run("05.secretQuestion_PUT_refused.sh")
     c.check("05 again: three refusals, exit 0", r.returncode == 0 and r.stdout.count("HTTP 400") == 3, r.stdout[-400:])
     c.check("and the question is still the same", question_of_account() == (200, question))
 
     c.check("switched the service off", set_option(["false"]) == 204)
     r = run("01.secretQuestions_GET.sh")
-    c.check("01 with the service off exits 3", r.returncode == 3, (r.returncode, r.stdout[-200:]))
+    c.check("01 with the service off exits 3, and says an administrator must switch it on", r.returncode == 3 and "An administrator must switch it on" in r.stdout, (r.returncode, r.stdout[-200:]))
     r = run("02.secretQuestion_GET_mine.sh")
     c.check("02 with the service off exits 3 (an account that has a question, and the service off)", r.returncode == 3, (r.returncode, r.stdout[-200:]))
 finally:

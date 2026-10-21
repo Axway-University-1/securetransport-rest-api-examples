@@ -523,7 +523,7 @@ request body is a safe stand-in for another's.
   - A wrong `Content-MD5` is refused with a 500. A multipart upload to a `/fileOperations/<id>` stores the file under
     the name of the local file unless the form says `filename=`.
   - Sharing a folder answers 400 "Shared folders functionality is disabled" for an owner whose account has **no e-mail address**, not because the server has
-    it off (corrected 2026-10-20): `GET /myself` shows `sharingAllowed: false` for such an account and `true` once it has an address. The share is
+    it off (corrected 2026-10-20): `GET /myself` shows `sharingAllowed: false` for such an account and `true` once it has an address. **The session keeps the value it had at login** (confirmed 2026-10-21): after an administrator sets the address (`PATCH /accounts/{name}`, `replace` `/contact/email`) the open session still says false and still gets the 400; only a new login sees it. **A share or an unshare of a folder that does not exist answers 204** and does nothing: make the folder first. The share is
     `PATCH /files/<folder>` adding `/sharedDirectoryProperties`; `shareRights` 1 is read, 3 read and upload, 7 read, upload and delete (a collaborator
     with 3 cannot delete their own upload); the collaborator sees the folder in their root as `<folder> (<owner e-mail>)`; changing the rights is a
     `replace` of `/sharedDirectoryProperties/shareRights`, stopping is a `remove` of `/sharedDirectoryProperties`; a list read straight after an upload
@@ -591,6 +591,12 @@ resource of the EndUser API reference (`tests/online/checks/33.enduser_api_scrip
     `error.secretQuestion.notFound`; a wrong password is 400, `error.password.invalid`. The match is exact.
   - The admin API shows it as `user.secretQuestion` with `secretAnswerGuessFailures` (the answer is not returned).
   - A password reset link is sent once an hour per user: a second `requestLink` is 400 "A reset email was recently sent".
+  - **Nothing removes a secret question** (checked 2026-10-21): end user `DELETE /myself/secretQuestion` is 405, an empty or null question or answer is 400, and the
+    administrator's `PATCH` `remove` or `replace` by null of `/user/secretQuestion` (or of its `secretQuestion`) and a `PUT` of the account without it all answer
+    **204 and change nothing**. The one field that takes is `/user/secretQuestion/forceSecretQuestionChange` (`PATCH`, `replace`, true or false; a full `PUT` of the
+    account resets it to false). While it is true the account's login (`POST /myself`) and nearly every call, `GET /myself` and `/files` included, answer **403
+    `error.secretQuestion.required`**; `GET /secretQuestions`, `DELETE /myself` and the `PUT /myself/secretQuestion` that sets a new question still answer, with Basic
+    authentication and no session, and that `PUT` lifts the block. Admin example: `05.Accounts/06.accounts_name_PATCH_secretQuestion.sh`.
 
 ## The Admin API, against its own reference
 

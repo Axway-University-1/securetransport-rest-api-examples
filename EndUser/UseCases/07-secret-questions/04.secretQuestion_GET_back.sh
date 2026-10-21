@@ -9,16 +9,23 @@
 # Reads the question back, and checks it is the one that was picked. The answer is not returned by any call.
 #
 # Usage:
-# ./04.secretQuestion_GET_back.sh
+# ./04.secretQuestion_GET_back.sh [QUESTION_NUMBER]
 #
 # Risk: read
 #
 # Notes:
 # - Copied from EndUser/API 2.0/bash/03.Myself/06.myself_secretQuestion_GET.sh.
-# - It compares with question number ST_SECRET_QUESTION_NUMBER of the list, the one 03 picked.
+# - QUESTION_NUMBER is the number of the question 03 picked (default 1): it is compared with that one of the list.
 # ==============================================================================
 
 source "$(dirname "$(realpath "$0")")/lib.sh"
+
+QUESTION_NUMBER="${1:-1}"
+if ! [[ "${QUESTION_NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
+    printf "Usage: ./04.secretQuestion_GET_back.sh [QUESTION_NUMBER]\n"
+    printf "  QUESTION_NUMBER  the number of the question 03 picked, in the list 01.secretQuestions_GET.sh prints (default 1)\n"
+    exit 2
+fi
 st_session
 
 st_list_questions || exit $?

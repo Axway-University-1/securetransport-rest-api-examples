@@ -55,7 +55,7 @@ case "${HTTP_CODE}" in
         printf '%s' "${BODY}" | jq -r '.[] | "  " + .'
         ;;
     503)
-        printf "The secret question service is not enabled on this server:\n%s\n" "${BODY}"
+        printf "The secret question service is switched off on this server (HTTP 503). An administrator must switch it on: the server option Users.SecretQuestion.Enabled has to be true.\n%s\n" "${BODY}"
         exit 3
         ;;
     *)

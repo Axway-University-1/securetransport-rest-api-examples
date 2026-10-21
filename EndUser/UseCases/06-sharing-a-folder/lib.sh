@@ -22,15 +22,23 @@ source "${UC_DIR}/../session.sh"
 FOLDER="example_uc_shared"
 FILE_NAME="notes.txt"
 
-# The user to share with: the e-mail address of a user the server knows (02-knowing-yourself/05 lists them)
-SHARE_WITH="${ST_SHARE_WITH:-}"
+# st_rights VALUE: the number of a type of share, from the number or the word: 1 or read, 3 or write (read and
+# upload), 7 or full (read, upload and delete). Prints nothing for anything else.
+st_rights() {
+    case "$1" in
+        1|read) echo 1 ;;
+        3|write) echo 3 ;;
+        7|full) echo 7 ;;
+    esac
+}
 
-# st_need_collaborator: stop with a hint when no one is named
-st_need_collaborator() {
-    if [ -z "${SHARE_WITH}" ]; then
-        echo "Name the user to share with: export ST_SHARE_WITH=their.address@example.com"
-        echo "It must be the e-mail address of a user the server knows: a folder cannot be shared with anyone else."
-        echo "(02-knowing-yourself/05.myself_addressBook_GET.sh lists the users and their addresses.)"
-        exit 2
-    fi
+# st_rights_usage: what RIGHTS can be, for a usage message
+st_rights_usage() {
+    echo "  RIGHTS  what the other user may do: read (1), write (3: read and upload) or full (7: read, upload and delete)"
+}
+
+# st_session_note: said when the account has no e-mail address, or an administrator has just given it one
+st_session_note() {
+    echo "If an administrator has only just set the e-mail address, the session you are in does not know it yet: end the session with ./99.cleanup_DELETE.sh"
+    echo "(it also removes what this use case made) and run this again, which logs in anew."
 }

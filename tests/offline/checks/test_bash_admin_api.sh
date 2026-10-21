@@ -293,6 +293,32 @@ expect "06 PATCH with file: an account that cannot be read, exit 1, nothing patc
 unset STUB_CURL_GET_RULES
 GET_BODY=
 
+SQ_OFF='{"type":"user","user":{"secretQuestion":{"secretQuestion":"Q?","secretAnswerGuessFailures":0,"forceSecretQuestionChange":false}}}'
+SQ_ON='{"type":"user","user":{"secretQuestion":{"secretQuestion":"Q?","secretAnswerGuessFailures":0,"forceSecretQuestionChange":true}}}'
+SQSEQ="${WORK}/sq_seq"; rm -rf "${SQSEQ}"; mkdir -p "${SQSEQ}"; echo "${SQ_OFF}" > "${SQSEQ}/1.json"; echo "${SQ_ON}" > "${SQSEQ}/2.json"
+SQ=06.accounts_name_PATCH_secretQuestion.sh
+SEQUENCE="${SQSEQ}" STATUS=204 STATUS_GET=200 run "${F}/${SQ}"
+expect "06 PATCH secretQuestion: reads the account, patches it, reads it again, on example_user" "${RC}:$(calls | tr '\n' ' ')" "0:GET ${U}/example_user PATCH ${U}/example_user GET ${U}/example_user "
+expect "06 PATCH secretQuestion: sets forceSecretQuestionChange to true" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/user/secretQuestion/forceSecretQuestionChange","value":true}]'
+has "06 PATCH secretQuestion: says what it found and what it read back" "Read back: {\"secretQuestion\":\"Q?\",\"secretAnswerGuessFailures\":0,\"forceSecretQuestionChange\":true}"
+rm -f "${SQSEQ}"/*.json; echo "${SQ_ON}" > "${SQSEQ}/1.json"; echo "${SQ_OFF}" > "${SQSEQ}/2.json"
+SEQUENCE="${SQSEQ}" STATUS=204 STATUS_GET=200 run "${F}/${SQ}" other false
+expect "06 PATCH secretQuestion: false takes the requirement away, on the account given" "${RC}:$(calls | sed -n 2p):$(payload 1 | jq -c '.[0].value')" "0:PATCH ${U}/other:false"
+GET_BODY=$(body sq_off "${SQ_OFF}") SEQUENCE= STATUS=204 STATUS_GET=200 run "${F}/${SQ}"
+expect "06 PATCH secretQuestion: a flag that does not read back as set is exit 1" "${RC}" "1"
+has "06 PATCH secretQuestion: and says so" "The flag did not take."
+GET_BODY=$(body sq_none '{"type":"user","user":{"name":"example_user"}}') STATUS=204 STATUS_GET=200 run "${F}/${SQ}"
+expect "06 PATCH secretQuestion: an account with no question is left alone: exit 0, nothing patched" "${RC}:$(calls | grep -c PATCH)" "0:0"
+has "06 PATCH secretQuestion: and says there is nothing to force" "has no secret question"
+GET_BODY=$(body sq_off "${SQ_OFF}") STATUS=204 STATUS_GET=200 run "${F}/${SQ}" example_user maybe
+expect "06 PATCH secretQuestion: a second argument that is not true or false is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
+GET_BODY=$(body sq_off "${SQ_OFF}") STATUS=204 STATUS_GET=404 run "${F}/${SQ}"
+expect "06 PATCH secretQuestion: an account that cannot be read, exit 1, nothing patched" "${RC}:$(calls | grep -c PATCH)" "1:0"
+GET_BODY=$(body sq_off "${SQ_OFF}") STATUS=400 STATUS_GET=200 run "${F}/${SQ}"
+expect "06 PATCH secretQuestion: a refused patch is exit 1" "${RC}" "1"
+SEQUENCE= GET_BODY=
+
+
 GET_BODY=$(body acct_small '{"type":"user","homeFolder":"/home/example_user","uid":"41733"}')
 STATUS=204 STATUS_GET=200 run "${F}/07.accounts_name_DELETE.sh"
 expect "07 DELETE: the three example accounts, each read first" "${RC}:$(calls)" "0:GET ${U}/example_user?fields=type,homeFolder,uid

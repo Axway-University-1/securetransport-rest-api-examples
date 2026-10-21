@@ -25,13 +25,13 @@
 # - Without a token it needs a session: it checks for an active one first and, if there
 #   is none, logs in with 01.Authenticate/01.myself_POST.sh.
 # - Confirmed directly: the answer is 503, error.secretQuestion.serviceDisabled, "Service
-#   not available.", both when the service is not enabled AND when the service is on but the
+#   not available.", both when the service is switched off AND when the service is on but the
 #   account has no question set yet. With a session, this script tells them apart by asking
 #   07.SecretQuestions/01.secretQuestions_GET.sh's endpoint (/secretQuestions): 200 means the
 #   service is on, so the account simply has none, and the script exits 4. With a token it
 #   has no session to ask with, and says it is one or the other.
 # - Exit codes: 0 when a question is read (or none is shown as set), 1 on an error,
-#   3 when the service is not enabled, 4 when it is enabled and the account has no question.
+#   3 when the service is switched off (an administrator must switch it on), 4 when it is enabled and the account has no question.
 # - Requires `jq`.
 # ==============================================================================
 
@@ -67,7 +67,7 @@ case "${HTTP_CODE}" in
         ;;
     503)
         if [ -n "${TOKEN}" ]; then
-            printf "Service not available: the secret question service is not enabled, or the account has no question set:\n%s\n" "${BODY}"
+            printf "Service not available: the secret question service is switched off (an administrator must switch it on), or the account has no question set:\n%s\n" "${BODY}"
             exit 3
         fi
         # The same 503 comes for a service that is off and for an account with no question: ask the list
@@ -78,7 +78,7 @@ case "${HTTP_CODE}" in
             printf "Set one with 07.myself_secretQuestion_PUT.sh.\n"
             exit 4
         fi
-        printf "The secret question service is not enabled on this server:\n%s\n" "${BODY}"
+        printf "The secret question service is switched off on this server (HTTP 503). An administrator must switch it on: the server option Users.SecretQuestion.Enabled has to be true.\n%s\n" "${BODY}"
         exit 3
         ;;
     *)

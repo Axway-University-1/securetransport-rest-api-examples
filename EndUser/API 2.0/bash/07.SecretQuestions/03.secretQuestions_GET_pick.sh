@@ -27,7 +27,7 @@
 # - The order is the server's, from the option Users.SecretQuestions: an administrator
 #   can change it, so a number is only as steady as that list.
 # - Exit codes: 0 when printed, 1 when N is past the end of the list (or the call failed),
-#   2 when N is not a whole number above 0 (nothing sent), 3 when the service is not enabled.
+#   2 when N is not a whole number above 0 (nothing sent), 3 when the service is switched off (an administrator must switch it on).
 # - Requires `jq`, which picks the question.
 # ==============================================================================
 
@@ -66,7 +66,7 @@ case "${HTTP_CODE}" in
         printf '%s\n' "${QUESTION}"
         ;;
     503)
-        printf "The secret question service is not enabled on this server:\n%s\n" "${BODY}" >&2
+        printf "The secret question service is switched off on this server (HTTP 503). An administrator must switch it on: the server option Users.SecretQuestion.Enabled has to be true.\n%s\n" "${BODY}" >&2
         exit 3
         ;;
     *)

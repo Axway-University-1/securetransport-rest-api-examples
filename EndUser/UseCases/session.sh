@@ -27,7 +27,7 @@ CSRF_FILE="${UC_DIR}/state.local.csrf"
 REFERER="THIS_IS_A_RANDOM_TEXT"   # the server wants a Referer header, any text will do
 
 st_session() {
-    local code="" headers
+    local code="" headers answer
     if [ -f "${JAR}" ]; then
         code=$(curl -k -s -o /dev/null -w "%{http_code}" -b "${JAR}" -X GET "${ST_URL}/myself" \
                -H "accept: application/json" -H "Referer: ${REFERER}")
@@ -40,16 +40,26 @@ st_session() {
     fi
     rm -f "${JAR}" "${CSRF_FILE}"
     headers=$(mktemp)
-    code=$(curl -k -s -o /dev/null -w "%{http_code}" -D "${headers}" --cookie-jar "${JAR}" \
+    answer=$(mktemp)
+    code=$(curl -k -s -o "${answer}" -w "%{http_code}" -D "${headers}" --cookie-jar "${JAR}" \
            -u "${ST_USER}:${ST_PASSWORD}" -X POST "${ST_URL}/myself" \
            -H "accept: application/json" -H "Referer: ${REFERER}")
     tr -d '\r' < "${headers}" | sed -n 's/^[Cc][Ss][Rr][Ff][Tt]oken: *//p' > "${CSRF_FILE}"
     rm -f "${headers}"
     if [[ "${code}" != 200 ]]; then
         echo "Login failure: HTTP ${code}"
-        rm -f "${JAR}" "${CSRF_FILE}"
+        # An administrator can ask an account to choose a new secret question: until it does, the server refuses its
+        # login and nearly every other call with this answer. Say so, with the way out.
+        if [ "$(jq -r '.errors[0].code // empty' "${answer}" 2>/dev/null)" = "error.secretQuestion.required" ]; then
+            echo "An administrator has asked ${ST_USER} to choose a new secret question, and the server refuses everything else until it does."
+            echo "Choose one with 07-secret-questions/03.secretQuestion_PUT.sh ANSWER [QUESTION_NUMBER]: it needs no session."
+            rm -f "${answer}" "${JAR}" "${CSRF_FILE}"
+            exit 5
+        fi
+        rm -f "${answer}" "${JAR}" "${CSRF_FILE}"
         exit 1
     fi
+    rm -f "${answer}"
 }
 
 st_enc() { printf '%s' "$1" | jq -Rr 'split("/") | map(@uri) | join("/")'; }

@@ -16,7 +16,7 @@
 # Notes:
 # - Copied from EndUser/API 2.0/bash/07.SecretQuestions/01.secretQuestions_GET.sh.
 # - The list is the server option Users.SecretQuestions, which an administrator can change.
-# - Exit 3 when the service is not enabled (HTTP 503): the server option Users.SecretQuestion.Enabled is false by default.
+# - Exit 3 when the service is switched off (HTTP 503): an administrator must set the server option Users.SecretQuestion.Enabled to true; it is false by default.
 # ==============================================================================
 
 source "$(dirname "$(realpath "$0")")/lib.sh"

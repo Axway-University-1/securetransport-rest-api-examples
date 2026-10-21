@@ -360,22 +360,31 @@ expect "01: exit 0" "${RC}" "0"
 GET_BODY="${DENIED}" urun ../06-sharing-a-folder/01.sharing_GET_myself.sh
 expect "01: an account with no e-mail may not share: exit 3" "${RC}" "3"
 has "01: and it says why" "it has no e-mail address"
+has "01: and that a session that is already open does not see a new address, and how to start a new one" "end the session with ./99.cleanup_DELETE.sh"
 STUB_STATUS_GET=404 STUB_STATUS_POST=201 urun ../06-sharing-a-folder/02.folder_POST.sh
 expect "02: looks for the folder, creates it, uploads the file" "$(ucalls | tr '\n' ' ')" "GET ${F}?metadata=true POST ${F} POST ${F} "
 has "02: the file is named notes.txt" "filename=notes.txt"
 STUB_STATUS_POST=201 urun ../06-sharing-a-folder/02.folder_POST.sh
 expect "02: a folder that is there is used as it is: only the upload" "$(ucalls | tr '\n' ' ')" "GET ${F}?metadata=true POST ${F} "
 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh
-expect "03: with nobody to share with it says so, exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
-has "03: and names the variable" "export ST_SHARE_WITH="
-ST_SHARE_WITH=guest@example.com STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh
+expect "03: with no e-mail address it prints the usage, exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "03: the usage names the parameters" "Usage: ./03.folder_PATCH_share.sh EMAIL [RIGHTS]"
+has "03: and what RIGHTS can be" "read (1), write (3: read and upload) or full (7: read, upload and delete)"
+urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com bogus
+expect "03: RIGHTS that is not one of them is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com
 expect "03: PATCH of the folder" "$(ucalls)" "PATCH ${F}"
-expect "03: adds the sharing, read only, with the user, no e-mail sent" "$(payload 1 | jq -c '[.[0].op, .[0].path, .[0].value.collaborators, .[0].value.shareRights, .[0].value.enableNotifications, .[0].value.enableOwnerNotifications]')" \
+expect "03: adds the sharing, read only by default, with the user, no e-mail sent" "$(payload 1 | jq -c '[.[0].op, .[0].path, .[0].value.collaborators, .[0].value.shareRights, .[0].value.enableNotifications, .[0].value.enableOwnerNotifications]')" \
   '["add","/sharedDirectoryProperties",["guest@example.com"],1,false,false]'
 expect "03: exit 0" "${RC}" "0"
-ST_SHARE_WITH=guest@example.com STUB_STATUS_PATCH=400 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh
+for pair in "read:1" "write:3" "full:7" "1:1" "3:3" "7:7"; do
+    STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com "${pair%%:*}"
+    expect "03: RIGHTS ${pair%%:*} is shareRights ${pair##*:}" "$(payload 1 | jq -r '.[0].value.shareRights')" "${pair##*:}"
+done
+STUB_STATUS_PATCH=400 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com
 expect "03: a 400 is exit 1, with the two likely reasons" "${RC}" "1"
 has "03: the hint" "an account with no e-mail address (see 01), or an address the server does not know"
+has "03: and the note about the session" "end the session with ./99.cleanup_DELETE.sh"
 SHARED=$(body shared_meta '{"self":{"isShared":true,"sharedDirectoryProperties":{"ownerName":"owner","ownerEmail":"owner@example.com","collaborators":["guest@example.com"],"shareRights":3}}}')
 GET_BODY="${SHARED}" urun ../06-sharing-a-folder/04.folder_GET_sharing.sh
 expect "04: GET of the folder with metadata=true" "$(ucalls)" "GET ${F}?metadata=true"
@@ -383,18 +392,23 @@ has "04: who it is shared with" "shared with:   guest@example.com"
 has "04: the rights, in words" "rights:        3 (read and upload)"
 GET_BODY="$(body unshared_meta '{"self":{"isShared":false}}')" urun ../06-sharing-a-folder/04.folder_GET_sharing.sh
 has "04: a folder that is not shared says so" "shared:        false"
+urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh
+expect "05: with no RIGHTS it prints the usage, exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "05: the usage" "Usage: ./05.folder_PATCH_rights.sh RIGHTS"
+urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh nope
+expect "05: RIGHTS that is not one of them is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
 SEQ="${WORK}/seq06"; rm -rf "${SEQ}"; mkdir -p "${SEQ}"
 cp "${WORK}/me.json" "${SEQ}/1.json"
 echo '{"self":{"sharedDirectoryProperties":{"shareRights":3}}}' > "${SEQ}/2.json"
-echo '{"self":{"sharedDirectoryProperties":{"shareRights":7}}}' > "${SEQ}/3.json"
-STUB_CURL_GET_SEQUENCE="${SEQ}" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh
-expect "05: sets 3, reads it back, sets 7, reads it back" "$(ucalls | tr '\n' ' ')" "PATCH ${F} GET ${F}?metadata=true PATCH ${F} GET ${F}?metadata=true "
-expect "05: replaces the rights, first 3 then 7" "$(payload 1 | jq -c '[.[0].op,.[0].path,.[0].value]'):$(payload 2 | jq -c '.[0].value')" '["replace","/sharedDirectoryProperties/shareRights",3]:7'
+STUB_CURL_GET_SEQUENCE="${SEQ}" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh write
+expect "05: replaces the rights, then reads them back" "$(ucalls | tr '\n' ' ')" "PATCH ${F} GET ${F}?metadata=true "
+expect "05: the patch" "$(payload 1 | jq -c '[.[0].op,.[0].path,.[0].value]')" '["replace","/sharedDirectoryProperties/shareRights",3]'
 expect "05: exit 0" "${RC}" "0"
-GET_BODY="${SHARED}" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh
+GET_BODY="${SHARED}" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh full
 expect "05: rights that read back as something else are exit 1" "${RC}" "1"
-STUB_STATUS_PATCH=403 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh
+STUB_STATUS_PATCH=403 urun ../06-sharing-a-folder/05.folder_PATCH_rights.sh read
 expect "05: a refused change is exit 1" "${RC}" "1"
+has "05: and says to share the folder first" "Run 03.folder_PATCH_share.sh first"
 GET_BODY="$(body unshared_after '{"self":{"isShared":false}}')" STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/06.folder_PATCH_unshare.sh
 expect "06: PATCH to remove the sharing, then a read" "$(ucalls | tr '\n' ' ')" "PATCH ${F} GET ${F}?metadata=true "
 expect "06: the patch removes /sharedDirectoryProperties" "$(payload 1 | jq -c '[.[0].op, .[0].path]')" '["remove","/sharedDirectoryProperties"]'
@@ -407,10 +421,13 @@ STUB_STATUS_DELETE=403 urun ../06-sharing-a-folder/07.folder_DELETE.sh
 expect "07: a refusal stops it after the first (exit 1)" "${RC}:$(ucalls | grep -c DELETE)" "1:1"
 urun ../06-sharing-a-folder/99.cleanup_DELETE.sh
 expect "99: unshares, deletes the file and the folder by name, then logs out" "$(calls | tr '\n' ' ')" "PATCH ${F} DELETE ${F}/notes.txt DELETE ${F} DELETE ${BASE}/myself "
-urun ../06-sharing-a-folder/00.run_all.sh
+urun ../06-sharing-a-folder/00.run_all.sh guest@example.com write
 expect "00: with an account that may not share it stops at 01, and still cleans up" "${RC}" "1"
 has "00: says which step failed" "01.sharing_GET_myself failed."
 has "00: and cleans up" "Cleaned up."
+GET_BODY="${ALLOWED}" STUB_STATUS_POST=201 STUB_STATUS_PATCH=204 STUB_STATUS_DELETE=204 urun ../06-sharing-a-folder/00.run_all.sh guest@example.com full
+has "00: shows each step with its arguments: the share with the e-mail and the rights asked for" "=== 03.folder_PATCH_share guest@example.com full ==="
+has "00: and goes on to try the type of share write" "=== 05.folder_PATCH_rights write ===" 
 
 echo "=== 07-secret-questions ==="
 SQ="../07-secret-questions"
@@ -421,42 +438,61 @@ expect "01: GET /secretQuestions" "$(ucalls)" "GET ${BASE}/secretQuestions"
 has "01: the questions, numbered" "  2  Second question?"
 expect "01: exit 0" "${RC}" "0"
 STATUS_GET=503 urun ${SQ}/01.secretQuestions_GET.sh
-expect "01: a disabled service is exit 3, with the option to switch" "${RC}" "3"
-has "01: names the option" "Users.SecretQuestion.Enabled"
+expect "01: a service that is switched off (503) is exit 3" "${RC}" "3"
+has "01: and it says who must switch it on, and what" "An administrator must switch it on: the server option Users.SecretQuestion.Enabled has to be true."
 STUB_STATUS_GET=500 urun ${SQ}/01.secretQuestions_GET.sh
 expect "01: any other refusal is exit 1" "${RC}" "1"
 GET_BODY="$(body mine '{"secretQuestion":"First question?"}')" urun ${SQ}/02.secretQuestion_GET_mine.sh
 expect "02: GET /myself/secretQuestion" "$(ucalls)" "GET ${BASE}/myself/secretQuestion"
 has "02: prints it" "The secret question of apiadmin: First question?"
 STATUS_GET=503 urun ${SQ}/02.secretQuestion_GET_mine.sh
-expect "02: a 503 with the list refused too is a disabled service: exit 3" "${RC}" "3"
+expect "02: a 503 with the list refused too is a service that is switched off: exit 3" "${RC}" "3"
 SEQ7="${WORK}/seq07"; rm -rf "${SEQ7}"; mkdir -p "${SEQ7}"; cp "${WORK}/me.json" "${SEQ7}/1.json"; echo '{}' > "${SEQ7}/2.json"; cp "${QL}" "${SEQ7}/3.json"
 STUB_CURL_GET_SEQUENCE="${SEQ7}" STUB_STATUS_GET_SEQ="200 503 200" STUB_COUNTER="${WORK}/ctr07" urun ${SQ}/02.secretQuestion_GET_mine.sh
 rm -f "${WORK}"/ctr07.*
 expect "02: a 503 for the question and a 200 for the list is a service that is on with no question: exit 4, and the list was asked" "${RC}:$(ucalls | tr '\n' ' ')" "4:GET ${BASE}/myself/secretQuestion GET ${BASE}/secretQuestions "
 has "02: says so" "has no secret question yet"
+FORCED=$(body forced '{"errors":[{"code":"error.secretQuestion.required","detail":"You have to set a new secret question."}]}')
+rm -f "${UC}/session.cookie.jar"
+STUB_STATUS_POST=403 STUB_CURL_POST_BODY="${FORCED}" run ${SQ}/02.secretQuestion_GET_mine.sh
+expect "02: a login the server refuses because a new question was asked for is exit 5, with the way out, and no jar is left" "${RC}:$([ -e "${UC}/session.cookie.jar" ] && echo jar || echo none)" "5:none"
+has "02: the message says who asked, and that everything else is refused until then" "An administrator has asked apiadmin to choose a new secret question, and the server refuses everything else until it does."
+has "02: and names the script that needs no session" "07-secret-questions/03.secretQuestion_PUT.sh ANSWER [QUESTION_NUMBER]"
+STUB_STATUS_POST=403 run ${SQ}/02.secretQuestion_GET_mine.sh
+expect "02: any other refused login is exit 1" "${RC}" "1"
+GET_BODY="${FORCED}" STUB_STATUS_GET=403 urun ${SQ}/02.secretQuestion_GET_mine.sh
+expect "02: when an administrator asked for a new question it is exit 5" "${RC}" "5"
+has "02: and says to choose one with 03" "Choose one with ./03.secretQuestion_PUT.sh ANSWER [QUESTION_NUMBER]"
 urun ${SQ}/03.secretQuestion_PUT.sh
-expect "03: without an answer it changes nothing: exit 2, no call" "${RC}:$(ncalls)" "2:0"
-has "03: and warns that it cannot be undone" "cannot be cleared once it is set"
-ST_SECRET_ANSWER=Rex ST_SECRET_QUESTION_NUMBER=0 urun ${SQ}/03.secretQuestion_PUT.sh
+expect "03: with no ANSWER it prints the usage like the other scripts: exit 2, no call" "${RC}:$(ncalls)" "2:0"
+has "03: the usage" "Usage: ./03.secretQuestion_PUT.sh ANSWER [QUESTION_NUMBER]"
+has "03: what each parameter is" "ANSWER           the answer to the secret question"
+has "03: and that it changes the account and can only be replaced" "a secret question cannot be cleared once it is set: it can only be replaced"
+urun ${SQ}/03.secretQuestion_PUT.sh Rex 0
 expect "03: a number that is not a number above 0 is exit 2, no call" "${RC}:$(ncalls)" "2:0"
-ST_SECRET_ANSWER=Rex GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/03.secretQuestion_PUT.sh
-expect "03: lists the questions, then PUTs the first" "$(ucalls | tr '\n' ' ')" "GET ${BASE}/secretQuestions PUT ${BASE}/myself/secretQuestion "
-expect "03: the body has the password, the question picked from the list and the answer" "$(payload 1 | jq -c '[.password,.secretQuestion,.secretAnswer]')" '["s3cret","First question?","Rex"]'
+GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/03.secretQuestion_PUT.sh Rex
+expect "03: lists the questions, then PUTs the first: no session, so no check of one" "$(calls | tr '\n' ' ')" "GET ${BASE}/secretQuestions PUT ${BASE}/myself/secretQuestion "
+has "03: and both calls carry the user and password (Basic), because a session cannot be had by an account that has to choose a new question" "BASIC_AUTH: apiadmin:s3cret"
+expect "03: neither sends the session cookie" "$(printf '%s\n' "${OUT}" | grep -c '^COOKIE:')" "0"
+expect "03: the body has the password, the question picked from the list and the answer given" "$(payload 1 | jq -c '[.password,.secretQuestion,.secretAnswer]')" '["s3cret","First question?","Rex"]'
 expect "03: exit 0" "${RC}" "0"
-ST_SECRET_ANSWER=Rex ST_SECRET_QUESTION_NUMBER=2 GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/03.secretQuestion_PUT.sh
-expect "03: the number picks the question" "$(payload 1 | jq -r .secretQuestion)" "Second question?"
-ST_SECRET_ANSWER=Rex ST_SECRET_QUESTION_NUMBER=3 GET_BODY="${QL}" urun ${SQ}/03.secretQuestion_PUT.sh
+GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/03.secretQuestion_PUT.sh "an answer with spaces" 2
+expect "03: the second parameter picks the question, and the answer may hold spaces" "$(payload 1 | jq -c '[.secretQuestion,.secretAnswer]')" '["Second question?","an answer with spaces"]'
+GET_BODY="${QL}" urun ${SQ}/03.secretQuestion_PUT.sh Rex 3
 expect "03: a number past the list is exit 2, and nothing is PUT" "${RC}:$(calls | grep -c PUT)" "2:0"
-ST_SECRET_ANSWER=Rex GET_BODY="${QL}" STUB_STATUS_PUT=400 urun ${SQ}/03.secretQuestion_PUT.sh
+GET_BODY="${QL}" STUB_STATUS_PUT=400 urun ${SQ}/03.secretQuestion_PUT.sh Rex
 expect "03: a refused change is exit 1" "${RC}" "1"
+STATUS_GET=503 urun ${SQ}/03.secretQuestion_PUT.sh Rex
+expect "03: a service that is switched off is exit 3" "${RC}" "3"
 SEQ7B="${WORK}/seq07b"; rm -rf "${SEQ7B}"; mkdir -p "${SEQ7B}"; cp "${WORK}/me.json" "${SEQ7B}/1.json"; cp "${QL}" "${SEQ7B}/2.json"; echo '{"secretQuestion":"First question?"}' > "${SEQ7B}/3.json"
 STUB_CURL_GET_SEQUENCE="${SEQ7B}" urun ${SQ}/04.secretQuestion_GET_back.sh
 expect "04: reads the list and the account's question" "$(ucalls | tr '\n' ' ')" "GET ${BASE}/secretQuestions GET ${BASE}/myself/secretQuestion "
-has "04: and says it is the one picked" "It is question number 1 of the list."
+has "04: and says it is the one picked (number 1 by default)" "It is question number 1 of the list."
 expect "04: exit 0" "${RC}" "0"
-ST_SECRET_QUESTION_NUMBER=2 STUB_CURL_GET_SEQUENCE="${SEQ7B}" urun ${SQ}/04.secretQuestion_GET_back.sh
-expect "04: another question than the one wanted is exit 1" "${RC}" "1"
+STUB_CURL_GET_SEQUENCE="${SEQ7B}" urun ${SQ}/04.secretQuestion_GET_back.sh 2
+expect "04: another question than the number given is exit 1" "${RC}" "1"
+urun ${SQ}/04.secretQuestion_GET_back.sh x
+expect "04: a number that is not a number is exit 2, with the usage, no call" "${RC}:$(ncalls)" "2:0"
 ERR=$(body sq_err '{"errors":[{"code":"error.secretQuestion.notFound","detail":"Secret question not valid."}]}')
 GET_BODY="${QL}" STUB_STATUS_PUT=400 STUB_BODY_OTHER="${ERR}" urun ${SQ}/05.secretQuestion_PUT_refused.sh
 expect "05: the list, then three PUTs" "$(ucalls | tr '\n' ' ')" "GET ${BASE}/secretQuestions PUT ${BASE}/myself/secretQuestion PUT ${BASE}/myself/secretQuestion PUT ${BASE}/myself/secretQuestion "
@@ -471,6 +507,9 @@ GET_BODY="${QL}" urun ${SQ}/00.run_all.sh
 has "00: without an answer it stops at 03, before changing anything" "03.secretQuestion_PUT failed."
 has "00: and cleans up" "Cleaned up."
 expect "00: exit 1, and nothing was PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/00.run_all.sh Rex 2
+has "00: with an answer and a number it passes them to 03" "=== 03.secretQuestion_PUT Rex 2 ==="
+has "00: and the number to 04" "=== 04.secretQuestion_GET_back 2 ==="
 
 echo "=== The scripts say where they were copied from ==="
 for s in "${UC_ROOT}"/*/[0-9][0-9].*.sh; do

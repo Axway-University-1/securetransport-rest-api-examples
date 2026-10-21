@@ -44,10 +44,10 @@ admin = harness.connect(config, c, mock=("the bundled mock does not implement th
 created = []
 
 
-def run(script, user, **env):
+def run(script, user, args=None):
     cfg = dict(config, st_port=ENDUSER_PORT, st_user=user, st_password=PASSWORDS[user])
     with runner.real_credentials(ENDUSER_TREE, cfg):
-        return runner.run(os.path.join(UC, script), env=env, timeout=300)
+        return runner.run(os.path.join(UC, script), args or [], timeout=300)
 COOKIE_JAR = os.path.join(ENDUSER_TREE, "myCookie.jar")
 
 
@@ -96,17 +96,32 @@ try:
     r = run("01.sharing_GET_myself.sh", NOMAIL)
     c.check("01 for an account with no e-mail: exit 3, and it says why",
             r.returncode == 3 and "no e-mail address" in r.stdout, (r.returncode, r.stdout[-300:]))
+    c.check("and says that a session already open does not see a new address", "end the session with ./99.cleanup_DELETE.sh" in r.stdout, r.stdout[-300:])
+    run("02.folder_POST.sh", NOMAIL)   # the folder has to be there: sharing a folder that is not answers 204, whoever asks
+    r = run("03.folder_PATCH_share.sh", NOMAIL, [EMAIL[GUEST]])
+    c.check("03 for it: refused with the 400, exit 1, and the hint", r.returncode == 1 and "Shared folders functionality is disabled" in r.stdout
+            and "an account with no e-mail address" in r.stdout, (r.returncode, r.stdout[-300:]))
+    # An administrator gives the account an address. The session of the use case is still open, and does not know it.
+    patch = admin.patch("accounts/" + NOMAIL, [{"op": "replace", "path": "/contact/email", "value": NOMAIL.lower() + "@example.com"}])
+    c.check("an administrator sets the e-mail address of the account (204)", patch.status == 204, patch.status)
+    r = run("01.sharing_GET_myself.sh", NOMAIL)
+    c.check("in the same session 01 still says no (exit 3): the session keeps what it started with", r.returncode == 3, (r.returncode, r.stdout[-200:]))
     run("99.cleanup_DELETE.sh", NOMAIL)
+    r = run("01.sharing_GET_myself.sh", NOMAIL)
+    c.check("after the session is ended and a new one begun, 01 says yes (exit 0)", r.returncode == 0 and "sharingAllowed: true" in r.stdout, (r.returncode, r.stdout[-200:]))
+    run("99.cleanup_DELETE.sh", NOMAIL)
+    r = run("03.folder_PATCH_share.sh", NOMAIL)
+    c.check("03 with no parameters prints its usage (exit 2)", r.returncode == 2 and "Usage: ./03.folder_PATCH_share.sh EMAIL [RIGHTS]" in r.stdout, (r.returncode, r.stdout[-200:]))
 
     # -- the whole use case ------------------------------------------------------------------------------
-    r = run("00.run_all.sh", OWNER, ST_SHARE_WITH=EMAIL[GUEST])
+    r = run("00.run_all.sh", OWNER, [EMAIL[GUEST], "read"])
     c.check("00.run_all.sh as the owner, sharing with the collaborator, exits 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
     c.check("it ended with the cleanup", "Cleaned up." in r.stdout, r.stdout[-200:])
     clear_local()
 
     # -- step by step, with the collaborator's own view ------------------------------------------------------
-    for script in ("01.sharing_GET_myself.sh", "02.folder_POST.sh", "03.folder_PATCH_share.sh"):
-        r = run(script, OWNER, ST_SHARE_WITH=EMAIL[GUEST])
+    for script, args in (("01.sharing_GET_myself.sh", []), ("02.folder_POST.sh", []), ("03.folder_PATCH_share.sh", [EMAIL[GUEST]])):
+        r = run(script, OWNER, args)
         c.check("%s exits 0" % script, r.returncode == 0, (r.stdout + r.stderr)[-300:])
     guest = client(GUEST)
     guest.login()
@@ -120,20 +135,21 @@ try:
     c.check("04 shows the collaborator and the rights", EMAIL[GUEST] in r.stdout and "rights:        1 (read)" in r.stdout, r.stdout[-300:])
 
     r = run("05.folder_PATCH_rights.sh", OWNER)
-    c.check("05 sets 3 and 7, reading each back", r.returncode == 0, (r.stdout + r.stderr)[-300:])
-    # 05 ends on 7: with 7 an upload and a delete both work; go back to 3 by hand to see its in-between behaviour
-    c.check("rights 7: an upload works", guest.upload_to(SHARED_NAME, "g7.txt", b"x\n").status == 201)
-    c.check("rights 7: and so does deleting it", guest._request("DELETE", "files/%s/g7.txt" % path).status == 204)
+    c.check("05 with no parameter prints its usage (exit 2)", r.returncode == 2 and "Usage: ./05.folder_PATCH_rights.sh RIGHTS" in r.stdout, (r.returncode, r.stdout[-200:]))
+    r = run("05.folder_PATCH_rights.sh", OWNER, ["write"])
+    c.check("05 write sets the rights to 3 and reads them back", r.returncode == 0 and "Read back: 3" in r.stdout, (r.stdout + r.stderr)[-300:])
+    c.check("rights write: an upload works", guest.upload_to(SHARED_NAME, "g3.txt", b"x\n").status == 201)
+    c.check("rights write: a delete of their file is refused (403)", guest._request("DELETE", "files/%s/g3.txt" % path).status == 403)
+    r = run("05.folder_PATCH_rights.sh", OWNER, ["full"])
+    c.check("05 full sets the rights to 7 and reads them back", r.returncode == 0 and "Read back: 7" in r.stdout, (r.stdout + r.stderr)[-300:])
+    c.check("rights full: the delete that was refused works now", guest._request("DELETE", "files/%s/g3.txt" % path).status == 204)
+    c.check("rights full: an upload works", guest.upload_to(SHARED_NAME, "g7.txt", b"x\n").status == 201)
+    c.check("rights full: and so does deleting it", guest._request("DELETE", "files/%s/g7.txt" % path).status == 204)
+    r = run("05.folder_PATCH_rights.sh", OWNER, ["1"])
+    c.check("05 1 takes it back to read only", r.returncode == 0 and "Read back: 1" in r.stdout, (r.stdout + r.stderr)[-300:])
+    c.check("rights read again: an upload is refused (403)", guest.upload_to(SHARED_NAME, "g1b.txt", b"x\n").status == 403)
     owner = client(OWNER)
     owner.login()
-    patch3 = owner._request("PATCH", "files/" + FOLDER, {"Content-Type": "application/json"},
-                            b'[{"op":"replace","path":"/sharedDirectoryProperties/shareRights","value":3}]')
-    c.check("the owner sets the rights to 3 again (204)", patch3.status == 204, patch3.status)
-    c.check("rights 3: an upload works", guest.upload_to(SHARED_NAME, "g3.txt", b"x\n").status == 201)
-    c.check("rights 3: a delete of their file is refused (403)", guest._request("DELETE", "files/%s/g3.txt" % path).status == 403)
-    owner._request("PATCH", "files/" + FOLDER, {"Content-Type": "application/json"},
-                   b'[{"op":"replace","path":"/sharedDirectoryProperties/shareRights","value":7}]')
-    guest._request("DELETE", "files/%s/g3.txt" % path)
 
     r = run("06.folder_PATCH_unshare.sh", OWNER)
     c.check("06 exits 0", r.returncode == 0, (r.stdout + r.stderr)[-300:])

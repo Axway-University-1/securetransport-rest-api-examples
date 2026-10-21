@@ -186,7 +186,7 @@ expect "01 secretQuestions: GET /secretQuestions" "$(calls)" "GET ${BASE}/secret
 has "01 secretQuestions: one question per line" "  Your first school?"
 STATUS_GET=503 run 07.SecretQuestions/01.secretQuestions_GET.sh
 expect "01 secretQuestions: service disabled (503), exit 3" "${RC}" "3"
-has "01 secretQuestions: says so" "not enabled on this server"
+has "01 secretQuestions: says so, and who must switch it on" "An administrator must switch it on"
 STATUS_GET=500 run 07.SecretQuestions/01.secretQuestions_GET.sh
 expect "01 secretQuestions: any other refusal is exit 1" "${RC}" "1"
 
@@ -239,7 +239,7 @@ STATUS_GET=503 run 03.Myself/06.myself_secretQuestion_GET.sh
 expect "06 secretQuestion: service disabled, exit 3" "${RC}" "3"
 expect "06 secretQuestion: it asks the list too, to tell that from an account with no question" \
   "$(calls | tr '\n' ' ')" "GET ${BASE}/myself/secretQuestion GET ${BASE}/secretQuestions "
-has "06 secretQuestion: and says the service is not enabled" "not enabled on this server"
+has "06 secretQuestion: and says the service is switched off, and who must switch it on" "An administrator must switch it on"
 # the session check, then 503 for the question, then 200 for the list: the service is on, the account has none
 STUB_STATUS_GET_SEQ="200 503 200" STUB_COUNTER="${WORK}/ctr_sq" run 03.Myself/06.myself_secretQuestion_GET.sh
 rm -f "${WORK}"/ctr_sq.*

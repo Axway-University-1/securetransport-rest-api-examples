@@ -6,25 +6,34 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Runs the whole use case in order (01 to 05), then 99. It stops at the first script that fails; the cleanup still runs. Without ST_SECRET_ANSWER it stops at 03, before changing the account.
+# Runs the whole use case in order (01 to 05), then 99. It stops at the first script that fails; the cleanup still runs. Without ANSWER it stops at 03, before changing the account.
 #
 # Usage:
-# [ST_SECRET_ANSWER='an answer'] ./00.run_all.sh
+# ./00.run_all.sh [ANSWER [QUESTION_NUMBER]]
 #
 # Risk: write
 #
 # Notes:
-# - Exit 3 from 01 means the secret question service is not enabled on the server.
+# - ANSWER and QUESTION_NUMBER are those of 03.secretQuestion_PUT.sh. Without an answer nothing is changed.
+# - Exit 3 from 01 means the secret question service is switched off: an administrator must switch it on.
 # ==============================================================================
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
+ANSWER="$1"
+NUMBER="${2:-1}"
 rc=0
-for step in 01.secretQuestions_GET 02.secretQuestion_GET_mine 03.secretQuestion_PUT 04.secretQuestion_GET_back 05.secretQuestion_PUT_refused; do
-    printf '\n=== %s ===\n' "${step}"
-    bash "${DIR}/${step}.sh"
+# each step: the script, then its arguments (03 takes the answer, which may be empty: then it says how to use it)
+for step in "01.secretQuestions_GET" "02.secretQuestion_GET_mine" "03.secretQuestion_PUT" "04.secretQuestion_GET_back" "05.secretQuestion_PUT_refused"; do
+    case "${step}" in
+        03*) args=("${ANSWER}" "${NUMBER}") ;;
+        04*) args=("${NUMBER}") ;;
+        *)   args=() ;;
+    esac
+    printf '\n=== %s %s ===\n' "${step}" "${args[*]}"
+    bash "${DIR}/${step}.sh" "${args[@]}"
     code=$?
-    # 02 answers 4 for an account with no question yet: that is the starting point, not a failure
-    if [ "${code}" -ne 0 ] && ! { [ "${step}" = "02.secretQuestion_GET_mine" ] && [ "${code}" -eq 4 ]; }; then
+    # 02 answers 4 for an account with no question yet, and 5 when an administrator asked for a new one: the starting points, not failures
+    if [ "${code}" -ne 0 ] && ! { [ "${step}" = "02.secretQuestion_GET_mine" ] && { [ "${code}" -eq 4 ] || [ "${code}" -eq 5 ]; }; }; then
         rc=1; echo "${step} failed."; break
     fi
 done
