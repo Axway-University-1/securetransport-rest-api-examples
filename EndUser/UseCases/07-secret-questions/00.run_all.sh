@@ -6,21 +6,28 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# Runs the whole use case in order (01 to 05), then 99. It stops at the first script that fails; the cleanup still runs. Without ANSWER it stops at 03, before changing the account.
+# Runs the whole use case in order (01 to 05), then 99. It stops at the first script that fails; the cleanup still runs. Without the answer and the number of the question it stops at once, before anything is done.
 #
 # Usage:
-# ./00.run_all.sh [ANSWER [QUESTION_NUMBER]]
+# ./00.run_all.sh ANSWER QUESTION_NUMBER
 #
 # Risk: write
 #
 # Notes:
-# - ANSWER and QUESTION_NUMBER are those of 03.secretQuestion_PUT.sh. Without an answer nothing is changed.
+# - ANSWER and QUESTION_NUMBER are those of 03.secretQuestion_PUT.sh, and both are required here (exit 2, nothing is run, not even the login): the run changes the account, and a secret question cannot be cleared.
 # - Exit 3 from 01 means the secret question service is switched off: an administrator must switch it on.
 # ==============================================================================
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
 ANSWER="$1"
-NUMBER="${2:-1}"
+NUMBER="$2"
+if [ -z "${ANSWER}" ] || ! [[ "${NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
+    printf "Usage: ./00.run_all.sh ANSWER QUESTION_NUMBER\n"
+    printf "  ANSWER           the answer to the secret question, in your own words\n"
+    printf "  QUESTION_NUMBER  the number of the question in the list 01.secretQuestions_GET.sh prints\n"
+    printf "Nothing was done: the whole run changes the account, and a secret question cannot be cleared once it is set, so both are asked for before anything starts.\n"
+    exit 2
+fi
 rc=0
 # each step: the script, then its arguments (03 takes the answer, which may be empty: then it says how to use it)
 for step in "01.secretQuestions_GET" "02.secretQuestion_GET_mine" "03.secretQuestion_PUT" "04.secretQuestion_GET_back" "05.secretQuestion_PUT_refused"; do

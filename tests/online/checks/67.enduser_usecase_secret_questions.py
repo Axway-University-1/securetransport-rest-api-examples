@@ -100,7 +100,10 @@ try:
     r = run("03.secretQuestion_PUT.sh")
     c.check("03 with no parameters prints its usage (exit 2) and changes nothing", r.returncode == 2 and "Usage: ./03.secretQuestion_PUT.sh ANSWER [QUESTION_NUMBER]" in r.stdout, (r.returncode, r.stdout[-300:]))
     r = run("00.run_all.sh")
-    c.check("00.run_all.sh without an answer stops at 03 (exit 1)", r.returncode == 1 and "03.secretQuestion_PUT failed." in r.stdout, (r.returncode, r.stdout[-300:]))
+    c.check("00.run_all.sh without the answer and the question stops at once (exit 2), with its usage",
+            r.returncode == 2 and "Usage: ./00.run_all.sh ANSWER QUESTION_NUMBER" in r.stdout, (r.returncode, r.stdout[-300:]))
+    r = run("00.run_all.sh", ["only an answer"])
+    c.check("and so does an answer without the number of a question (exit 2)", r.returncode == 2, (r.returncode, r.stdout[-300:]))
     c.check("and changed nothing: the account still has no question", question_of_account()[0] == 503, question_of_account())
 
     r = run("00.run_all.sh", ["zztest answer", "2"])

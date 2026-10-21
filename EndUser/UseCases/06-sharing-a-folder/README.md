@@ -26,7 +26,7 @@ then run the scripts again: the first one logs in anew. The messages of 01 and 0
 
 ## The examples
 
-Run them in order (`00.run_all.sh EMAIL` runs them all, and ends with `99.cleanup_DELETE.sh`). The scripts take their input as parameters, like the other examples.
+Run them in order (`00.run_all.sh EMAIL [RIGHTS]` runs them all, and ends with `99.cleanup_DELETE.sh`; **without EMAIL it stops at once** with its usage, exit 2, before anything is created). The scripts take their input as parameters, like the other examples.
 
 | Script | What it does | Copied from (`EndUser/API 2.0/bash`) |
 | ------ | ------------ | ------------------------------------ |

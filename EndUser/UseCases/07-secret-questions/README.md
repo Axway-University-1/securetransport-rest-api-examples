@@ -12,11 +12,11 @@
   *"An administrator must switch it on: the server option Users.SecretQuestion.Enabled has to be true"* (exit 3). `Users.SecretQuestions` is the list on offer, and
   `Users.SecretQuestion.Required` says whether a reset needs it.
 - **Step 03 changes the account, and nothing removes the question afterwards** (see below). Use a throwaway account on a lab. `03` needs the answer as its parameter, and prints its
-  usage without it; `00.run_all.sh` without an answer stops at 03 and changes nothing.
+  usage without it. `00.run_all.sh ANSWER QUESTION_NUMBER` needs both, and without them it stops at once with its usage (exit 2): nothing is run, not even the login.
 
 ## The examples
 
-Run them in order (`00.run_all.sh [ANSWER [QUESTION_NUMBER]]` runs them all, and ends with `99.cleanup_DELETE.sh`). The scripts take their input as parameters, like the other examples.
+Run them in order (`00.run_all.sh ANSWER QUESTION_NUMBER` runs them all, and ends with `99.cleanup_DELETE.sh`). The scripts take their input as parameters, like the other examples.
 
 | Script | What it does | Copied from (`EndUser/API 2.0/bash`) |
 | ------ | ------------ | ------------------------------------ |
@@ -31,7 +31,7 @@ Run them in order (`00.run_all.sh [ANSWER [QUESTION_NUMBER]]` runs them all, and
 ./01.secretQuestions_GET.sh                    # the questions, numbered
 ./03.secretQuestion_PUT.sh "Rex" 8             # question 8, "What is your dog's name?", answered "Rex"
 ./04.secretQuestion_GET_back.sh 8              # is that what the account has now?
-./00.run_all.sh "Rex" 8                        # the whole use case
+./00.run_all.sh "Rex" 8                        # the whole use case: both parameters are required
 ```
 
 ## Removing a question

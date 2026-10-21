@@ -421,6 +421,12 @@ STUB_STATUS_DELETE=403 urun ../06-sharing-a-folder/07.folder_DELETE.sh
 expect "07: a refusal stops it after the first (exit 1)" "${RC}:$(ucalls | grep -c DELETE)" "1:1"
 urun ../06-sharing-a-folder/99.cleanup_DELETE.sh
 expect "99: unshares, deletes the file and the folder by name, then logs out" "$(calls | tr '\n' ' ')" "PATCH ${F} DELETE ${F}/notes.txt DELETE ${F} DELETE ${BASE}/myself "
+urun ../06-sharing-a-folder/00.run_all.sh
+expect "00: with no e-mail address it stops at once: exit 2, no call at all (not even the login), no cleanup" "${RC}:$(ncalls)" "2:0"
+has "00: with the usage" "Usage: ./00.run_all.sh EMAIL [RIGHTS]"
+has "00: and the reason it asks first" "it is asked for before anything is created"
+urun ../06-sharing-a-folder/00.run_all.sh guest@example.com bogus
+expect "00: RIGHTS that is not valid stops it at once too (exit 2, no call)" "${RC}:$(ncalls)" "2:0"
 urun ../06-sharing-a-folder/00.run_all.sh guest@example.com write
 expect "00: with an account that may not share it stops at 01, and still cleans up" "${RC}" "1"
 has "00: says which step failed" "01.sharing_GET_myself failed."
@@ -503,10 +509,19 @@ GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/05.secretQuestion_PUT_refused.sh
 expect "05: an attempt that is accepted is a failure (exit 1)" "${RC}" "1"
 urun ${SQ}/99.cleanup_DELETE.sh
 expect "99: only the logout" "$(calls | tr '\n' ' ')" "DELETE ${BASE}/myself "
-GET_BODY="${QL}" urun ${SQ}/00.run_all.sh
-has "00: without an answer it stops at 03, before changing anything" "03.secretQuestion_PUT failed."
+urun ${SQ}/00.run_all.sh
+expect "00: with no answer and no question it stops at once: exit 2, no call at all (not even the login)" "${RC}:$(ncalls)" "2:0"
+has "00: with the usage" "Usage: ./00.run_all.sh ANSWER QUESTION_NUMBER"
+urun ${SQ}/00.run_all.sh Rex
+expect "00: the answer without the number of the question is exit 2 too, no call" "${RC}:$(ncalls)" "2:0"
+urun ${SQ}/00.run_all.sh "" 2
+expect "00: the number without the answer is exit 2 too, no call" "${RC}:$(ncalls)" "2:0"
+urun ${SQ}/00.run_all.sh Rex abc
+expect "00: a number that is not a number is exit 2, no call" "${RC}:$(ncalls)" "2:0"
+STATUS_GET=503 urun ${SQ}/00.run_all.sh Rex 1
+expect "00: with both, a run that fails (here a service that is switched off) stops at the step, and still cleans up" "${RC}" "1"
+has "00: says which step failed" "01.secretQuestions_GET failed."
 has "00: and cleans up" "Cleaned up."
-expect "00: exit 1, and nothing was PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
 GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/00.run_all.sh Rex 2
 has "00: with an answer and a number it passes them to 03" "=== 03.secretQuestion_PUT Rex 2 ==="
 has "00: and the number to 04" "=== 04.secretQuestion_GET_back 2 ==="

@@ -114,6 +114,10 @@ try:
     c.check("03 with no parameters prints its usage (exit 2)", r.returncode == 2 and "Usage: ./03.folder_PATCH_share.sh EMAIL [RIGHTS]" in r.stdout, (r.returncode, r.stdout[-200:]))
 
     # -- the whole use case ------------------------------------------------------------------------------
+    r = run("00.run_all.sh", OWNER)
+    c.check("00.run_all.sh without an e-mail address stops at once (exit 2), with its usage, and made nothing",
+            r.returncode == 2 and "Usage: ./00.run_all.sh EMAIL [RIGHTS]" in r.stdout and not os.path.exists(os.path.join(UC, "session.cookie.jar")),
+            (r.returncode, r.stdout[-300:]))
     r = run("00.run_all.sh", OWNER, [EMAIL[GUEST], "read"])
     c.check("00.run_all.sh as the owner, sharing with the collaborator, exits 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
     c.check("it ended with the cleanup", "Cleaned up." in r.stdout, r.stdout[-200:])
