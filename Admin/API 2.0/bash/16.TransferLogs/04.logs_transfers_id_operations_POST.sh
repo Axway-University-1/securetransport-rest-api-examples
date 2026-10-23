@@ -56,7 +56,8 @@ TRANSFER_ID="$1"
 OPERATION="$2"
 MESSAGE="$3"
 if [ -z "${TRANSFER_ID}" ] || ! [[ "${OPERATION}" =~ ^(cancel|resubmit|verify|ack|nack)$ ]]; then
-    printf "Usage: ./04.logs_transfers_id_operations_POST.sh ID cancel|resubmit|verify|ack|nack [MESSAGE]\n"
+    printf "Usage: ./04.logs_transfers_id_operations_POST.sh ID OPERATION [MESSAGE]\n"
+    printf "  OPERATION is one of cancel, resubmit, verify, ack, nack\n"
     exit 2
 fi
 

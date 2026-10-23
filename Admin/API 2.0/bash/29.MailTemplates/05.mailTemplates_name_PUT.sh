@@ -45,7 +45,8 @@ NAME="$1"
 FILE="$2"
 
 if [ -z "${NAME// /}" ] || [[ "${NAME}" == */* ]] || [[ "${NAME}" == *\\* ]]; then
-    printf "NAME must not be blank, and must not hold a / or a \\: %s\n" "${NAME}"
+    printf "Usage: ./05.mailTemplates_name_PUT.sh NAME FILE [DESCRIPTION]\n"
+    printf "NAME must not be blank, and must not hold a / or a \\: '%s'\n" "${NAME}"
     exit 2
 fi
 if [ ! -f "${FILE}" ]; then

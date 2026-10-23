@@ -101,6 +101,30 @@ see from the code: prerequisites ("run 08.RouteTemplates first"), things the
 script will destroy, required tools, and any API behaviour that will surprise
 them.
 
+## Parameters and messages (the owner's review rules)
+
+These were pointed out by hand, so `tests/offline/checks/check_script_conventions.py` now holds the first three; read
+the rest yourself, because a person will not.
+
+- **Usage notation**: every optional parameter has a bracket of its own, `[A] [B]`, never `[A [B]]`. That a second
+  one needs the first is obvious to a reader. When asked for a notation, do exactly that, in every tree, not a variant.
+- **The usage a script prints is the one in its header**, the same parameters in the same order. Values to choose
+  from go on a second line ("  OPERATION is one of ..."), not in place of the name.
+- **A missing required parameter** is exit 2 with the usage, before anything is sent. 1 is for "the server said no".
+- **A wrong parameter says what was wrong**: which parameter (by name and position), what was given, what is taken,
+  and what each parameter is, so the message makes sense without opening the script. See
+  `EndUser/API 2.0/bash/02.Files/11.files_filepath_POST_md5.sh`. Too many parameters is an error too, with the extra
+  ones named.
+- **Choices are parameters, not variables the user must export first.** The settings file is for server and
+  credentials only.
+- **A runner (`00.run_all.sh`) checks its inputs first and stops at once**, with its usage, before it logs in or
+  creates anything; what can only be checked against the server (a number of questions, a name) is checked right
+  after the login, and the session is dropped on a failure.
+- **What the server answers at random** (a 500 that works the next time) is said in the message, and goes in
+  `KNOWN_ISSUES_RD.md`.
+- **A behaviour the reader could be surprised by** (a session that keeps stale data, an operation that changes
+  nothing) is in the README and in the message, not only in the code.
+
 ## Loading the configuration
 
 Always this, never a bare relative `source`:

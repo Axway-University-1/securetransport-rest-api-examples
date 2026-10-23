@@ -50,7 +50,7 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/transferProfiles"
 ACCOUNT="$1"
 NAME="$2"
-[ -n "${ACCOUNT}" ] && [ -n "${NAME}" ] || { printf "Usage: ./05.transferProfiles_id_PUT.sh ACCOUNT NAME [SEND_MAPPING]\n"; exit 2; }
+[ -n "${ACCOUNT}" ] && [ -n "${NAME}" ] || { printf "Usage: ./05.transferProfiles_id_PUT.sh ACCOUNT NAME [LINE_ENDING] [SEND_MAPPING]\n"; exit 2; }
 LINE_ENDING="${3:-WINDOWS}"
 SEND_MAPPING="$4"
 case "${LINE_ENDING}" in

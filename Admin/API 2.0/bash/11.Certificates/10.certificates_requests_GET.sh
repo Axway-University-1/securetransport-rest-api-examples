@@ -44,7 +44,8 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/certificates/requests"
 USAGE="$1"
 # USAGE is one of two fixed words, so it is safe to put in the URL as it is
 if [ "$#" -gt 1 ] || { [ -n "${USAGE}" ] && [ "${USAGE}" != "local" ] && [ "${USAGE}" != "private" ]; }; then
-    printf "Usage: ./10.certificates_requests_GET.sh [local|private]\n"
+    printf "Usage: ./10.certificates_requests_GET.sh [USAGE]\n"
+    printf "  USAGE is local or private\n"
     exit 2
 fi
 QUERY="fields=id,subject,usage,account"
