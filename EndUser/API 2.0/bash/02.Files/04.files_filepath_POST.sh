@@ -64,6 +64,7 @@ http_status=${result##*$'\n'}
 printf '%s\n' "${result%$'\n'*}"
 if [[ $http_status -lt 200 || $http_status -ge 300 ]] ; then
     printf "Upload failure: %s\n" "${http_status}"
+    [[ $http_status -ge 500 ]] && printf "If it was a one-off, run it again: the server now and then answers 500 for an upload that works the next time.\n"
     exit 1
 fi
 printf "File %s uploaded (HTTP %s)\n" "${FILE_NAME}" "${http_status}"

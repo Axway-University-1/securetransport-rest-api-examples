@@ -301,6 +301,22 @@ expect "11 md5: a multipart POST into the folder, with the transfer mode" "${RC}
 expect "11 md5: Content-MD5 is the file's MD5, base64" "$(headers | grep '^Content-MD5:')" "Content-MD5: ${LOCAL_MD5}"
 STATUS=500 run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt"
 expect "11 md5: a wrong checksum's 500 is a failure; the home folder is /files" "${RC}:$(calls)" "1:POST ${BASE}/files?transferMode=BINARY"
+has "11 md5: a failed upload says to run it again, since the 500 is sometimes a one-off" "run it again: the server now and then answers 500"
+run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt" inbox ASCII extra
+expect "11 md5: too many parameters is exit 2 and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+has "11 md5: and says how many were given, which, and that one is extra" "4 parameters were given (${WORK}/files/up.txt inbox ASCII extra), and at most 3 are taken"
+has "11 md5: and then what each parameter is" "TRANSFER_MODE  BINARY (default) or ASCII. It can be given only after FOLDER"
+run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/no_such.txt" inbox
+expect "11 md5: a file that is not there is exit 2, nothing sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+has "11 md5: and the message names LOCAL_FILE, what it was, and where it was looked for" "LOCAL_FILE, the first parameter, is '${WORK}/files/no_such.txt', and there is no such file on this machine (looked in "
+run 02.Files/11.files_filepath_POST_md5.sh
+has "11 md5: no parameter at all says that LOCAL_FILE is missing" "LOCAL_FILE, the first parameter, is missing."
+run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt" inbox /test
+expect "11 md5: a TRANSFER_MODE that is a path (the parameters in the wrong order) is exit 2, nothing sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
+has "11 md5: and the message names TRANSFER_MODE, what it was, and that the second parameter is the FOLDER" "TRANSFER_MODE, the third parameter, is '/test': it must be BINARY or ASCII. (The second parameter is the FOLDER, 'inbox'.)"
+STATUS=201 run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt" "" ascii
+expect "11 md5: ascii in lower case is taken, as ASCII, for the home folder (\"\")" "${RC}:$(calls)" "0:POST ${BASE}/files?transferMode=ASCII"
+
 
 STATUS=204 run 02.Files/12.files_filepath_PUT_rename.sh "in/a b.txt" "out/c.txt"
 expect "12 PUT rename: PUT on the old path" "${RC}:$(calls)" "0:PUT ${BASE}/files/in/a%20b.txt"
@@ -582,6 +598,23 @@ STATUS=404 run 02.Files/07.files_filepath_DELETE.sh
 expect "07 delete: refused, exit 1" "${RC}" "1"
 
 echo
+echo "=== The usage lines: optional parameters nest, and the message is the header's ==="
+BRACKETS=""; DIFFERS=""
+for f in $(cd "${EU_TREE}" && ls */*.sh); do
+    hdr=$(awk '/^# Usage:/{getline; sub(/^# */,""); print; exit}' "${EU_TREE}/${f}")
+    # two optional parameters side by side in separate brackets mean either can be given alone: that is true of an option
+    # (--keep) and not of a positional parameter, which needs the one before it. [A [B]] says so.
+    if printf '%s' "${hdr}" | grep -qE '\] \[[A-Z_]+'; then BRACKETS="${BRACKETS} ${f}"; fi
+    printed=$(grep -o 'Usage: \./[^\\"]*' "${EU_TREE}/${f}" | head -1 | sed 's/^Usage: //; s/  *$//')
+    if [ -n "${printed}" ] && [ -n "${hdr}" ] && [ "${printed#"${hdr}"}" = "${printed}" ] && [ "${hdr#"${printed}"}" = "${hdr}" ]; then
+        DIFFERS="${DIFFERS} ${f}"
+    fi
+done
+expect "no usage line has a positional optional parameter in brackets of its own after another (it must nest: [A [B]])" "${BRACKETS}" ""
+expect "the usage a script prints is the one of its header, parameter for parameter" "${DIFFERS}" ""
+OUT=$(cd "${WORK}/eu/03.Myself" && PATH="${WORK}/bin:${PATH}" bash ./05.myself_password_POST_reset.sh 2>&1)
+has "05 reset: the usage it prints nests the optional parameters" "TOKEN NEW_PASSWORD [SECRET_ANSWER [USERNAME]]"
+
 echo "=== The settings file: set_variables.local.sh is the one file, and a script stops without it ==="
 # A copy of the folder with no settings file at all: every script says what to do and sends nothing
 mkdir -p "${WORK}/nosettings"

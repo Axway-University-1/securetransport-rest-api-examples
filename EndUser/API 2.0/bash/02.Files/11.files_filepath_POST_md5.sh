@@ -31,6 +31,8 @@
 #   bare 500 "Error while uploading file", and File Tracking logs the upload
 #   as Failed.
 # - The checksum is computed with openssl, on macOS and Linux alike.
+# - A parameter that is wrong is named, with what it was and what it should be, before the usage is printed (exit 2, nothing is sent): too many parameters, a
+#   LOCAL_FILE that is not a file on this machine (it is looked for from the folder you run the script in), a TRANSFER_MODE that is not BINARY or ASCII (in any case).
 # - Requires `jq`, which URL-encodes the folder, and `openssl`.
 # ==============================================================================
 
@@ -47,14 +49,33 @@ COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
+# usage PROBLEM: says what is wrong with the parameters, then what they are, and stops (exit 2, nothing sent)
+usage() {
+    printf "Problem: %s\n\n" "$1"
+    printf "Usage: ./11.files_filepath_POST_md5.sh LOCAL_FILE [FOLDER [TRANSFER_MODE]]\n"
+    printf "  LOCAL_FILE     the file to upload: a path on this machine, absolute or relative to %s\n" "$(pwd)"
+    printf "  FOLDER         the folder to put it in, on the server, relative to the home folder (default: the home folder)\n"
+    printf "  TRANSFER_MODE  BINARY (default) or ASCII. It can be given only after FOLDER: use \"\" for the home folder\n"
+    printf "For example: ./11.files_filepath_POST_md5.sh report.txt reports ASCII\n"
+    exit 2
+}
+
+if [ "$#" -gt 3 ]; then
+    usage "$# parameters were given ($*), and at most 3 are taken: LOCAL_FILE, FOLDER and TRANSFER_MODE, in that order. Is one of them extra?"
+fi
 LOCAL_FILE="$1"
 FOLDER="${2:-}"
 FOLDER="${FOLDER#/}"
 FOLDER="${FOLDER%/}"
-TRANSFER_MODE="${3:-BINARY}"
-if [ -z "${LOCAL_FILE}" ] || [ ! -f "${LOCAL_FILE}" ]; then
-    printf "Usage: ./11.files_filepath_POST_md5.sh LOCAL_FILE [FOLDER [TRANSFER_MODE]]\n"
-    exit 2
+TRANSFER_MODE=$(printf '%s' "${3:-BINARY}" | tr '[:lower:]' '[:upper:]')
+if [ -z "${LOCAL_FILE}" ]; then
+    usage "LOCAL_FILE, the first parameter, is missing."
+fi
+if [ ! -f "${LOCAL_FILE}" ]; then
+    usage "LOCAL_FILE, the first parameter, is '${LOCAL_FILE}', and there is no such file on this machine (looked in $(pwd))."
+fi
+if [ "${TRANSFER_MODE}" != "BINARY" ] && [ "${TRANSFER_MODE}" != "ASCII" ]; then
+    usage "TRANSFER_MODE, the third parameter, is '${3}': it must be BINARY or ASCII. (The second parameter is the FOLDER, '${2:-}'.)"
 fi
 st_ensure_session
 
@@ -76,6 +97,7 @@ BODY="${RESPONSE%$'\n'*}"
 
 if [ "${HTTP_CODE}" != "201" ]; then
     printf "The upload failed (HTTP %s). A wrong checksum also answers 500:\n%s\n" "${HTTP_CODE}" "${BODY}"
+    printf "If the checksum is right, run it again: the server now and then answers 500 for an upload that works the next time.\n"
     exit 1
 fi
 printf "Uploaded, and the server's checksum matched.\n"
