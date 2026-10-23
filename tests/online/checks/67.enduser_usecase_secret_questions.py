@@ -102,6 +102,11 @@ try:
     r = run("00.run_all.sh")
     c.check("00.run_all.sh without the answer and the question stops at once (exit 2), with its usage",
             r.returncode == 2 and "Usage: ./00.run_all.sh ANSWER QUESTION_NUMBER" in r.stdout, (r.returncode, r.stdout[-300:]))
+    r = run("00.run_all.sh", ["an answer", str(len(questions) + 1)])
+    c.check("a number past the questions the server offers (%d) is refused (exit 2), with the count, and the session is dropped" % len(questions),
+            r.returncode == 2 and "There is no question number %d: the server offers %d" % (len(questions) + 1, len(questions)) in r.stdout
+            and not os.path.exists(os.path.join(UC, "session.cookie.jar")), (r.returncode, r.stdout[-300:]))
+    c.check("and it changed nothing: the account still has no question", question_of_account()[0] == 503, question_of_account())
     r = run("00.run_all.sh", ["only an answer"])
     c.check("and so does an answer without the number of a question (exit 2)", r.returncode == 2, (r.returncode, r.stdout[-300:]))
     c.check("and changed nothing: the account still has no question", question_of_account()[0] == 503, question_of_account())

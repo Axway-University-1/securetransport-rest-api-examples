@@ -12,7 +12,7 @@
   *"An administrator must switch it on: the server option Users.SecretQuestion.Enabled has to be true"* (exit 3). `Users.SecretQuestions` is the list on offer, and
   `Users.SecretQuestion.Required` says whether a reset needs it.
 - **Step 03 changes the account, and nothing removes the question afterwards** (see below). Use a throwaway account on a lab. `03` needs the answer as its parameter, and prints its
-  usage without it. `00.run_all.sh ANSWER QUESTION_NUMBER` needs both, and without them it stops at once with its usage (exit 2): nothing is run, not even the login.
+  usage without it. `00.run_all.sh ANSWER QUESTION_NUMBER` needs both, and without them it stops at once with its usage (exit 2): nothing is run, not even the login. It also checks the number against the questions the server really offers: it logs in once, counts them, and a number past the end (10 when there are 9) ends that session at once and stops, with the count in the message.
 
 ## The examples
 

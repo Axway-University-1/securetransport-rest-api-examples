@@ -519,9 +519,18 @@ expect "00: the number without the answer is exit 2 too, no call" "${RC}:$(ncall
 urun ${SQ}/00.run_all.sh Rex abc
 expect "00: a number that is not a number is exit 2, no call" "${RC}:$(ncalls)" "2:0"
 STATUS_GET=503 urun ${SQ}/00.run_all.sh Rex 1
-expect "00: with both, a run that fails (here a service that is switched off) stops at the step, and still cleans up" "${RC}" "1"
-has "00: says which step failed" "01.secretQuestions_GET failed."
-has "00: and cleans up" "Cleaned up."
+expect "00: with a service that is switched off it stops before any step (exit 3), says who must switch it on, and drops the session" "${RC}:$(calls | tail -1)" "3:DELETE ${BASE}/myself"
+has "00: the reason" "An administrator must switch it on"
+has "00: and the cleanup" "Cleaned up."
+GET_BODY="${QL}" urun ${SQ}/00.run_all.sh Rex 10
+expect "00: a number past the questions the server offers (10, it offers 2) is exit 2, before any step" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^=== 0[1-5]')" "2:0"
+has "00: says how many there are" "There is no question number 10: the server offers 2 (1 to 2)."
+expect "00: it asked for the list once, changed nothing, and ended the session at once" "$(calls | tr '\n' ' ')" "GET ${BASE}/myself GET ${BASE}/secretQuestions DELETE ${BASE}/myself "
+expect "00: the session is gone" "$([ -e "${UC}/session.cookie.jar" ] && echo jar || echo none)" "none"
+GET_BODY="${QL}" urun ${SQ}/00.run_all.sh Rex 3
+expect "00: one past the end (3 of 2) is refused too" "${RC}" "2"
+GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/00.run_all.sh Rex 2
+expect "00: the last question (2 of 2) is accepted: the steps run" "$(printf '%s\n' "${OUT}" | grep -c '^=== 03.secretQuestion_PUT Rex 2')" "1"
 GET_BODY="${QL}" STUB_STATUS_PUT=204 urun ${SQ}/00.run_all.sh Rex 2
 has "00: with an answer and a number it passes them to 03" "=== 03.secretQuestion_PUT Rex 2 ==="
 has "00: and the number to 04" "=== 04.secretQuestion_GET_back 2 ==="
