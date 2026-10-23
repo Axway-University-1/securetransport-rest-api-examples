@@ -12,7 +12,7 @@
 # - Duplicating an existing server by modifying its configuration
 #
 # Usage:
-# ./07.servers_POST.sh [NAME [NEW_NAME [NEW_PORT]]]
+# ./07.servers_POST.sh [NAME] [NEW_NAME] [NEW_PORT]
 #
 #   NAME      the minimal SSH server to create (default SSH_TEST_SERVER_1)
 #   NEW_NAME  the duplicate of it (default SSH_TEST_SERVER_2); not the same as NAME
@@ -50,7 +50,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/servers"
 NAME="${1:-SSH_TEST_SERVER_1}"
 NEW_NAME="${2:-SSH_TEST_SERVER_2}"
 NEW_PORT="${3:-8030}"
-USAGE="Usage: ./07.servers_POST.sh [NAME [NEW_NAME [NEW_PORT]]]"
+USAGE="Usage: ./07.servers_POST.sh [NAME] [NEW_NAME] [NEW_PORT]"
 
 if [ "$#" -gt 3 ] || [ -z "${NAME}" ] || [ -z "${NEW_NAME}" ]; then
     printf "%s\n" "${USAGE}"

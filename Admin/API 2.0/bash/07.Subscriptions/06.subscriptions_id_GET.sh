@@ -12,7 +12,7 @@
 # application and folder first.
 #
 # Usage:
-# ./06.subscriptions_id_GET.sh [ACCOUNT [APPLICATION [FOLDER]]]
+# ./06.subscriptions_id_GET.sh [ACCOUNT] [APPLICATION] [FOLDER]
 #
 #   ACCOUNT      the account that subscribes (default john, or ST_EXAMPLE_ACCOUNT)
 #   APPLICATION  the application it subscribes to (default AdvancedRoutingApplication)
@@ -57,7 +57,7 @@ ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 APPLICATION="${2:-AdvancedRoutingApplication}"
 FOLDER="${3:-/inbox}"
 if [ "$#" -gt 3 ]; then
-    printf "Usage: ./06.subscriptions_id_GET.sh [ACCOUNT [APPLICATION [FOLDER]]]\n"
+    printf "Usage: ./06.subscriptions_id_GET.sh [ACCOUNT] [APPLICATION] [FOLDER]\n"
     exit 2
 fi
 

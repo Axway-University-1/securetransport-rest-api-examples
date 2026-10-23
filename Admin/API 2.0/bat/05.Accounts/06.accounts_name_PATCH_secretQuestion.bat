@@ -12,7 +12,7 @@ REM GET /myself/secretQuestion answers `error.secretQuestion.required` ("You hav
 REM until they set one with PUT /myself/secretQuestion: the nearest an administrator gets to taking a question away.
 REM
 REM Usage:
-REM 06.accounts_name_PATCH_secretQuestion.bat [NAME [true|false]]
+REM 06.accounts_name_PATCH_secretQuestion.bat [NAME] [true|false]
 REM
 REM   NAME   the user account (default example_user, the one 02.accounts_POST.bat creates)
 REM   true|false  force the change (default true), or take the requirement away again
@@ -45,7 +45,7 @@ IF "%NAME%"=="" SET NAME=example_user
 SET FORCE=%~2
 IF "%FORCE%"=="" SET FORCE=true
 IF NOT "%FORCE%"=="true" IF NOT "%FORCE%"=="false" (
-    echo Usage: 06.accounts_name_PATCH_secretQuestion.bat [NAME [true^|false]]
+    echo Usage: 06.accounts_name_PATCH_secretQuestion.bat [NAME] [true^|false]
     EXIT /B 2
 )
 SET NAME_URI=

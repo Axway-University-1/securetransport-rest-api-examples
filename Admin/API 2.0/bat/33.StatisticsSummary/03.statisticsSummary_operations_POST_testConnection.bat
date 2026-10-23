@@ -14,7 +14,7 @@ REM - Testing the credentials saved on the server (the StatisticsSummaryReport o
 REM - Testing other credentials, the secret read from the environment
 REM
 REM Usage:
-REM 03.statisticsSummary_operations_POST_testConnection.bat [CLIENT_ID [NETWORK_ZONE [ENV_ID]]]
+REM 03.statisticsSummary_operations_POST_testConnection.bat [CLIENT_ID] [NETWORK_ZONE] [ENV_ID]
 REM
 REM   CLIENT_ID     test this client id (optional; the saved one is used when left out)
 REM   NETWORK_ZONE  go through this network zone (optional)
@@ -65,7 +65,7 @@ SET CLIENT_ID=%~1
 SET NETWORK_ZONE=%~2
 SET ENV_ID=%~3
 IF NOT "%~4"=="" (
-    echo Usage: 03.statisticsSummary_operations_POST_testConnection.bat [CLIENT_ID [NETWORK_ZONE [ENV_ID]]]
+    echo Usage: 03.statisticsSummary_operations_POST_testConnection.bat [CLIENT_ID] [NETWORK_ZONE] [ENV_ID]
     EXIT /B 2
 )
 SET BODY_FILE=%TEMP%\statsum_body_%RANDOM%.json

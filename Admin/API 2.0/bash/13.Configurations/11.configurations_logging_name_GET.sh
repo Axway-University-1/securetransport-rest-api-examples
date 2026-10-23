@@ -11,7 +11,7 @@
 # as XML, the log4j configuration itself, saved to a file.
 #
 # Usage:
-# ./11.configurations_logging_name_GET.sh [NAME [PROFILE_ID]]
+# ./11.configurations_logging_name_GET.sh [NAME] [PROFILE_ID]
 #
 #   NAME        the option (default Logging.Admin.config)
 #   PROFILE_ID  its profile (default: the one 09.configurations_logging_GET.sh

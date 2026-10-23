@@ -12,7 +12,7 @@ REM - A PATCH to update the port
 REM - A PATCH to remove RSA keys from the publicKeys field
 REM
 REM Usage:
-REM 11.servers_name_PATCH.bat [NAME [PORT]]
+REM 11.servers_name_PATCH.bat [NAME] [PORT]
 REM
 REM   NAME  the SSH server to change (default SSH_TEST_SERVER_1, the one 07.servers_POST.bat creates)
 REM   PORT  the new port, 1 to 65535 (default 8026)
@@ -48,7 +48,7 @@ SET "NAME=%~1"
 IF "%NAME%"=="" SET "NAME=SSH_TEST_SERVER_1"
 SET "NEW_PORT=%~2"
 IF "%NEW_PORT%"=="" SET "NEW_PORT=8026"
-SET "USAGE=Usage: 11.servers_name_PATCH.bat [NAME [PORT]]"
+SET "USAGE=Usage: 11.servers_name_PATCH.bat [NAME] [PORT]"
 IF NOT "%~3"=="" GOTO usage
 powershell -NoProfile -Command "if ($env:NEW_PORT -match '^[0-9]+$' -and $env:NEW_PORT.Length -le 5 -and [int]$env:NEW_PORT -ge 1 -and [int]$env:NEW_PORT -le 65535) { exit 0 } else { exit 1 }"
 IF ERRORLEVEL 1 (

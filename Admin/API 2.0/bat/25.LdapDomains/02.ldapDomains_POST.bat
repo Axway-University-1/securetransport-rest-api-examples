@@ -10,7 +10,7 @@ REM This script adds an LDAP domain using the `/ldapDomains` endpoint: a directo
 REM server, the account SecureTransport binds with, and where it searches for users.
 REM
 REM Usage:
-REM 02.ldapDomains_POST.bat [NAME [HOST [PORT]]]
+REM 02.ldapDomains_POST.bat [NAME] [HOST] [PORT]
 REM
 REM   NAME  the domain's name (default example_ldap)
 REM   HOST  the directory server (default: the SecureTransport server itself)

@@ -10,7 +10,7 @@
 # server, the account SecureTransport binds with, and where it searches for users.
 #
 # Usage:
-# ./02.ldapDomains_POST.sh [NAME [HOST [PORT]]]
+# ./02.ldapDomains_POST.sh [NAME] [HOST] [PORT]
 #
 #   NAME  the domain's name (default example_ldap)
 #   HOST  the directory server (default: the SecureTransport server itself)

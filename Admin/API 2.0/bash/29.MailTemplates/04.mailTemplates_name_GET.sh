@@ -10,7 +10,7 @@
 # description, and the XHTML file itself, saved to a local file.
 #
 # Usage:
-# ./04.mailTemplates_name_GET.sh [NAME [OUTPUT]]
+# ./04.mailTemplates_name_GET.sh [NAME] [OUTPUT]
 #
 #   NAME    the template (default example_mail.xhtml)
 #   OUTPUT  the file to write (default: NAME, in the current folder)

@@ -1,7 +1,7 @@
 # The patch bodies of 06.accounts_name_PATCH_with_file
 
 Each file is a JSON Patch: a list of operations, applied to one account by
-`06.accounts_name_PATCH_with_file.sh [NAME [PATCH_FILE]]` (the account is
+`06.accounts_name_PATCH_with_file.sh [NAME] [PATCH_FILE]` (the account is
 `example_user` by default, the file `stPatchAccount.json`). A JSON file cannot
 carry a comment, so what each one assumes is written here.
 

@@ -13,7 +13,7 @@
 # - Asking for only some of its fields, with `fields=`
 #
 # Usage:
-# ./06.sites_id_GET.sh [ACCOUNT [NAME]]
+# ./06.sites_id_GET.sh [ACCOUNT] [NAME]
 #
 #   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.sh creates)
@@ -50,7 +50,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/sites"
 ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 NAME="${2:-SSH_PULL}"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./06.sites_id_GET.sh [ACCOUNT [NAME]]\n"
+    printf "Usage: ./06.sites_id_GET.sh [ACCOUNT] [NAME]\n"
     exit 2
 fi
 

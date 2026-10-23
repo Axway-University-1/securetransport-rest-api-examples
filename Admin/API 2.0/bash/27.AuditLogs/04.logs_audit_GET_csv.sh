@@ -10,7 +10,7 @@
 # text/csv in place of JSON.
 #
 # Usage:
-# ./04.logs_audit_GET_csv.sh [OUTPUT [HOURS]]
+# ./04.logs_audit_GET_csv.sh [OUTPUT] [HOURS]
 #
 #   OUTPUT  the file to write (default audit_log.csv)
 #   HOURS   how far back, in whole hours (default 24)

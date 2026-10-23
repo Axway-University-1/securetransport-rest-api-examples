@@ -10,7 +10,7 @@ REM This script exports the server log as a CSV file using the `/logs/server` en
 REM text/csv in place of JSON.
 REM
 REM Usage:
-REM 03.logs_server_GET_csv.bat [OUTPUT [MINUTES [COMPONENT]]]
+REM 03.logs_server_GET_csv.bat [OUTPUT] [MINUTES] [COMPONENT]
 REM
 REM   OUTPUT     the file to write (default server_log.csv)
 REM   MINUTES    how far back, in whole minutes (default 60)

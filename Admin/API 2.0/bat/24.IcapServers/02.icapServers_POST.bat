@@ -11,7 +11,7 @@ REM and which transfers it scans. It is created disabled, so that nothing is sen
 REM until 06.icapServers_name_PATCH.bat enables it.
 REM
 REM Usage:
-REM 02.icapServers_POST.bat [NAME [URL [TYPE]]]
+REM 02.icapServers_POST.bat [NAME] [URL] [TYPE]
 REM
 REM   NAME  the server's name (default example_icap)
 REM   URL   icap://host:port/service (default icap://icap.example.com:1344/AVSCAN)

@@ -10,7 +10,7 @@
 # text/csv in place of JSON.
 #
 # Usage:
-# ./03.logs_server_GET_csv.sh [OUTPUT [MINUTES [COMPONENT]]]
+# ./03.logs_server_GET_csv.sh [OUTPUT] [MINUTES] [COMPONENT]
 #
 #   OUTPUT     the file to write (default server_log.csv)
 #   MINUTES    how far back, in whole minutes (default 60)

@@ -13,7 +13,7 @@ REM - The profiles of one account (or of every account), one line each
 REM - Only the default ones: an account has at most one default profile
 REM
 REM Usage:
-REM 01.transferProfiles_GET.bat [ACCOUNT [NAME]]
+REM 01.transferProfiles_GET.bat [ACCOUNT] [NAME]
 REM
 REM   ACCOUNT  list only the profiles of this account (default: every account)
 REM   NAME     only the profiles with this name; takes a * wildcard (default *)
@@ -96,5 +96,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.transferProfiles_GET.bat [ACCOUNT [NAME]]
+echo Usage: 01.transferProfiles_GET.bat [ACCOUNT] [NAME]
 EXIT /B 2

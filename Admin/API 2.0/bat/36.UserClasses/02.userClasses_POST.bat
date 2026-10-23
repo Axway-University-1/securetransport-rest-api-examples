@@ -13,7 +13,7 @@ REM - That it is created disabled unless you say so, so that it cannot catch a l
 REM - Reading the new class's address from the Location header
 REM
 REM Usage:
-REM 02.userClasses_POST.bat [NAME [USER_NAME [EXPRESSION [ENABLED [USER_TYPE]]]]]
+REM 02.userClasses_POST.bat [NAME] [USER_NAME] [EXPRESSION] [ENABLED] [USER_TYPE]
 REM
 REM   NAME        the class's name, no spaces (default example_userclass)
 REM   USER_NAME   the login names it matches; takes a * wildcard, is case sensitive (default example_nobody)

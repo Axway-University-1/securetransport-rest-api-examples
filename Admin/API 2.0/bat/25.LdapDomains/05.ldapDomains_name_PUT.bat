@@ -10,7 +10,7 @@ REM This script replaces an LDAP domain using the `/ldapDomains/{name}` endpoint
 REM reads the domain, changes its description, and sends the whole domain back.
 REM
 REM Usage:
-REM 05.ldapDomains_name_PUT.bat [NAME [DESCRIPTION]]
+REM 05.ldapDomains_name_PUT.bat [NAME] [DESCRIPTION]
 REM
 REM   NAME         the domain (default example_ldap)
 REM   DESCRIPTION  the new description (default "Replaced by 05.ldapDomains_name_PUT.bat")

@@ -11,7 +11,7 @@
 # It prints a short summary of the profile (with the advanced settings, when they are on), then only some fields of it.
 #
 # Usage:
-# ./04.transferProfiles_id_GET.sh [ACCOUNT [NAME]]
+# ./04.transferProfiles_id_GET.sh [ACCOUNT] [NAME]
 #
 #   ACCOUNT  the account the profile belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the profile (default TP)
@@ -45,7 +45,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/transferProfiles"
 ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 NAME="${2:-TP}"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./04.transferProfiles_id_GET.sh [ACCOUNT [NAME]]\n"
+    printf "Usage: ./04.transferProfiles_id_GET.sh [ACCOUNT] [NAME]\n"
     exit 2
 fi
 

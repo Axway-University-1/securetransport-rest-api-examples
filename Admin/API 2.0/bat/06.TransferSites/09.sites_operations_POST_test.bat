@@ -11,7 +11,7 @@ REM `/sites/operations` endpoint with operation=testConnection: the server opens
 REM connection to the partner and logs in, as a transfer would, and sends nothing.
 REM
 REM Usage:
-REM 09.sites_operations_POST_test.bat [ACCOUNT [NAME]]
+REM 09.sites_operations_POST_test.bat [ACCOUNT] [NAME]
 REM
 REM   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.bat creates)

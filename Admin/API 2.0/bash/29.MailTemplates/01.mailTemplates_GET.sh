@@ -14,7 +14,7 @@
 # - Searching by name, and by description (both exact)
 #
 # Usage:
-# ./01.mailTemplates_GET.sh [NAME [DESCRIPTION]]
+# ./01.mailTemplates_GET.sh [NAME] [DESCRIPTION]
 #
 #   NAME         a template's exact name, e.g. AdhocDefault.xhtml (optional)
 #   DESCRIPTION  an exact description (optional)
@@ -50,7 +50,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/mailTemplates"
 NAME="$1"
 DESCRIPTION="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.mailTemplates_GET.sh [NAME [DESCRIPTION]]\n"
+    printf "Usage: ./01.mailTemplates_GET.sh [NAME] [DESCRIPTION]\n"
     exit 2
 fi
 LINE='"  \(.name)  \(.description // "-")"'

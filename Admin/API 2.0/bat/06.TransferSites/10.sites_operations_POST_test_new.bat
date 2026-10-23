@@ -11,7 +11,7 @@ REM `/sites/operations` endpoint with operation=testConnection: the body carries
 REM partner's address and the login, and no site is created.
 REM
 REM Usage:
-REM 10.sites_operations_POST_test_new.bat [ACCOUNT [PROTOCOL [HOST [PORT [USER [SECURE]]]]]]
+REM 10.sites_operations_POST_test_new.bat [ACCOUNT] [PROTOCOL] [HOST] [PORT] [USER] [SECURE]
 REM
 REM   ACCOUNT   the account the site would belong to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   PROTOCOL  ssh, ftp or http (default ssh)

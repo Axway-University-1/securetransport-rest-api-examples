@@ -41,7 +41,7 @@ echo 'export AR_STEP_PAUSE_SECONDS=0' >> "${RUN}/settings.local.sh"
 SERVER_NEW="${WORK}/version_new.json"; echo '{"version":"5.5-20260924"}' > "${SERVER_NEW}"
 SERVER_OLD="${WORK}/version_old.json"; echo '{"version":"5.5-20260923"}' > "${SERVER_OLD}"
 
-# run SCRIPT VERSION_FILE [LOCATION_ID [STATUS]] -> sets OUT (stdout+stderr), RC.
+# run SCRIPT VERSION_FILE [LOCATION_ID] [STATUS] -> sets OUT (stdout+stderr), RC.
 # A HEAD (does the account exist?) answers HEAD_STATUS, 200 unless a test says otherwise,
 # whatever STATUS the other calls get.
 run() {

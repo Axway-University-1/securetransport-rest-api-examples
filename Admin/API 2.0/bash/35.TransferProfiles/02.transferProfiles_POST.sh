@@ -17,7 +17,7 @@
 # - Reading the new profile's address from the Location header
 #
 # Usage:
-# ./02.transferProfiles_POST.sh [ACCOUNT [NAME [SEND_MAPPING [RECEIVE_MAPPING [TRANSCODING]]]]]
+# ./02.transferProfiles_POST.sh [ACCOUNT] [NAME] [SEND_MAPPING] [RECEIVE_MAPPING] [TRANSCODING]
 #
 #   ACCOUNT          the account the profile is for (default john, or ST_EXAMPLE_ACCOUNT; it needs a PeSIT site)
 #   NAME             the profile's name (default example_profile)

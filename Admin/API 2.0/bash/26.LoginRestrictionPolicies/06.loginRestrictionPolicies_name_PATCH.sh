@@ -11,7 +11,7 @@
 # optionally only while an Expression Language condition is true.
 #
 # Usage:
-# ./06.loginRestrictionPolicies_name_PATCH.sh [NAME [RULE_NAME [TYPE [ADDRESS [CONDITION]]]]]
+# ./06.loginRestrictionPolicies_name_PATCH.sh [NAME] [RULE_NAME] [TYPE] [ADDRESS] [CONDITION]
 #
 #   NAME       the policy (default example_lrp)
 #   RULE_NAME  the rule's name (default "example rule")

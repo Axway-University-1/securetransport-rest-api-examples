@@ -12,7 +12,7 @@ REM There is no storage profile resource; a profile is Server Configuration
 REM Options, set here with the `/configurations/options` endpoint and PUT.
 REM
 REM Usage:
-REM 45.configurations_storageProfiles_options_PUT_register.bat BUCKET [REGION [ENDPOINT]]
+REM 45.configurations_storageProfiles_options_PUT_register.bat BUCKET [REGION] [ENDPOINT]
 REM
 REM   BUCKET    the bucket
 REM   REGION    its region (default us-east-1)
@@ -54,7 +54,7 @@ SET "ENDPOINT=%~3"
 SET PROFILE=example_s3
 SET REGISTRY_OPTION=StorageProfiles.S3.Registry
 IF "%BUCKET%"=="" (
-    echo Usage: 45.configurations_storageProfiles_options_PUT_register.bat BUCKET [REGION [ENDPOINT]]
+    echo Usage: 45.configurations_storageProfiles_options_PUT_register.bat BUCKET [REGION] [ENDPOINT]
     EXIT /B 2
 )
 SET RESPONSE_FILE=%TEMP%\conf_%RANDOM%.json

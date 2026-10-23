@@ -14,7 +14,7 @@
 # - The transferMode query parameter, BINARY or ASCII
 #
 # Usage:
-# ./11.files_filepath_POST_md5.sh LOCAL_FILE [FOLDER [TRANSFER_MODE]]
+# ./11.files_filepath_POST_md5.sh LOCAL_FILE [FOLDER] [TRANSFER_MODE]
 #
 #   LOCAL_FILE     the file to upload
 #   FOLDER         the folder to put it in, relative to the home folder (default:
@@ -52,7 +52,7 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 # usage PROBLEM: says what is wrong with the parameters, then what they are, and stops (exit 2, nothing sent)
 usage() {
     printf "Problem: %s\n\n" "$1"
-    printf "Usage: ./11.files_filepath_POST_md5.sh LOCAL_FILE [FOLDER [TRANSFER_MODE]]\n"
+    printf "Usage: ./11.files_filepath_POST_md5.sh LOCAL_FILE [FOLDER] [TRANSFER_MODE]\n"
     printf "  LOCAL_FILE     the file to upload: a path on this machine, absolute or relative to %s\n" "$(pwd)"
     printf "  FOLDER         the folder to put it in, on the server, relative to the home folder (default: the home folder)\n"
     printf "  TRANSFER_MODE  BINARY (default) or ASCII. It can be given only after FOLDER: use \"\" for the home folder\n"

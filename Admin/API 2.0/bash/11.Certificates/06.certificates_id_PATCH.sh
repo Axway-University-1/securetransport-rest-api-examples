@@ -11,7 +11,7 @@
 # (accessLevel PUBLIC) and tags it with an additional attribute.
 #
 # Usage:
-# ./06.certificates_id_PATCH.sh [NAME [ACCESS_LEVEL]]
+# ./06.certificates_id_PATCH.sh [NAME] [ACCESS_LEVEL]
 #
 #   NAME          the certificate's name (default example_cert)
 #   ACCESS_LEVEL  PRIVATE, PUBLIC or BUSINESS_UNIT (default PUBLIC)

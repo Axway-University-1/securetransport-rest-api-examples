@@ -9,7 +9,7 @@ REM Description:
 REM This script creates a business unit using the `/businessUnits` endpoint.
 REM
 REM Usage:
-REM 01.businessUnits_POST.bat [NAME [BASE_FOLDER]]
+REM 01.businessUnits_POST.bat [NAME] [BASE_FOLDER]
 REM
 REM   NAME         the business unit (default Finance)
 REM   BASE_FOLDER  its base folder, an absolute path (default /home/fin)
@@ -38,7 +38,7 @@ SETLOCAL
 CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
-SET USAGE=Usage: 01.businessUnits_POST.bat [NAME [BASE_FOLDER]]
+SET USAGE=Usage: 01.businessUnits_POST.bat [NAME] [BASE_FOLDER]
 SET "NAME=%~1"
 IF "%NAME%"=="" SET NAME=Finance
 SET "BASE_FOLDER=%~2"

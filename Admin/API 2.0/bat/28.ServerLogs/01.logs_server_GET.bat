@@ -12,7 +12,7 @@ REM - Counting the entries of the last minutes (fromDate=)
 REM - Searching the message, by component (FTPD, SSHD, HTTPD, ...) and by level
 REM
 REM Usage:
-REM 01.logs_server_GET.bat [MINUTES [MESSAGE [COMPONENTS [LEVELS]]]]
+REM 01.logs_server_GET.bat [MINUTES] [MESSAGE] [COMPONENTS] [LEVELS]
 REM
 REM   MINUTES     how far back to look (default 60)
 REM   MESSAGE     text the message must contain (optional)
@@ -109,5 +109,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.logs_server_GET.bat [MINUTES [MESSAGE [COMPONENTS [LEVELS]]]]
+echo Usage: 01.logs_server_GET.bat [MINUTES] [MESSAGE] [COMPONENTS] [LEVELS]
 EXIT /B 2

@@ -11,7 +11,7 @@
 # site's id, so the script looks the id up by account and name first.
 #
 # Usage:
-# ./05.sites_id_HEAD.sh [ACCOUNT [NAME]]
+# ./05.sites_id_HEAD.sh [ACCOUNT] [NAME]
 #
 #   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.sh creates)

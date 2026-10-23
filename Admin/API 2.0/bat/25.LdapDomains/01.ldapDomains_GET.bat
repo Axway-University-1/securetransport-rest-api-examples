@@ -13,7 +13,7 @@ REM - One domain by its name, with name=
 REM - Only the ones of one protocol version, with protocolVersion=
 REM
 REM Usage:
-REM 01.ldapDomains_GET.bat [NAME [PROTOCOL_VERSION]]
+REM 01.ldapDomains_GET.bat [NAME] [PROTOCOL_VERSION]
 REM
 REM   NAME              list the domain with exactly this name (optional)
 REM   PROTOCOL_VERSION  2 or 3: only the domains of this version (optional)
@@ -119,5 +119,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.ldapDomains_GET.bat [NAME [PROTOCOL_VERSION]]
+echo Usage: 01.ldapDomains_GET.bat [NAME] [PROTOCOL_VERSION]
 EXIT /B 2

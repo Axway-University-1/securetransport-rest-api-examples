@@ -19,7 +19,7 @@ REM   4. For each account, prints how many billable transfers this run added
 REM      today, next to what the rule predicts for it, and whether they match.
 REM
 REM Usage:
-REM 00.run_all.bat [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
+REM 00.run_all.bat [ACCOUNT] [INBOUND_ONLY] [IN_AND_OUT] [--cleanup]
 REM
 REM   ACCOUNT        the test account to create and use (default btTestAccount).
 REM                  Every other object name is derived from it.
@@ -82,7 +82,7 @@ SHIFT /1
 GOTO :parse_args
 :args_done
 IF DEFINED ARG_ERROR (
-    echo Usage: 00.run_all.bat [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
+    echo Usage: 00.run_all.bat [ACCOUNT] [INBOUND_ONLY] [IN_AND_OUT] [--cleanup]
     EXIT /B 2
 )
 

@@ -11,7 +11,7 @@
 # (crt), or PKCS#12 with its private key.
 #
 # Usage:
-# ./08.certificates_id_operations_POST_export.sh [NAME [FORMAT]]
+# ./08.certificates_id_operations_POST_export.sh [NAME] [FORMAT]
 #
 #   NAME    the certificate's name (default example_cert)
 #   FORMAT  pem, crt or pkcs12 (default pem)

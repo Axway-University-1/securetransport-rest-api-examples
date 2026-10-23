@@ -15,7 +15,7 @@ REM - Only the Advanced Routing ones, with processorType=
 REM - Only the ones with a heartbeat in the last hour, with lastHeartbeatAfter=
 REM
 REM Usage:
-REM 01.events_GET.bat [ACCOUNT_PATTERN [STATUS]]
+REM 01.events_GET.bat [ACCOUNT_PATTERN] [STATUS]
 REM
 REM   ACCOUNT_PATTERN  an account name, * matches anything (default *)
 REM   STATUS           only the events with this status, for example active (optional)
@@ -114,5 +114,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.events_GET.bat [ACCOUNT_PATTERN [STATUS]]
+echo Usage: 01.events_GET.bat [ACCOUNT_PATTERN] [STATUS]
 EXIT /B 2

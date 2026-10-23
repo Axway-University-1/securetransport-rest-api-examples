@@ -13,7 +13,7 @@ REM - The classes matching a name, in the order the server tries them, one line 
 REM - Only the enabled ones
 REM
 REM Usage:
-REM 01.userClasses_GET.bat [NAME [USER_TYPE]]
+REM 01.userClasses_GET.bat [NAME] [USER_TYPE]
 REM
 REM   NAME       list only the classes with this name; takes a * wildcard (default *)
 REM   USER_TYPE  any (default), real, virtual or * : only the classes of that type. The * is the type of a class that
@@ -103,5 +103,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.userClasses_GET.bat [NAME [USER_TYPE]]
+echo Usage: 01.userClasses_GET.bat [NAME] [USER_TYPE]
 EXIT /B 2

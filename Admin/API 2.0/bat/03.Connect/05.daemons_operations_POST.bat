@@ -16,7 +16,7 @@ REM - The HTTP code, and the result the server gives for each daemon
 REM
 REM Usage:
 REM 05.daemons_operations_POST.bat DAEMON start
-REM 05.daemons_operations_POST.bat DAEMON stop stop-the-DAEMON-daemon [GRACEFUL [TIMEOUT]]
+REM 05.daemons_operations_POST.bat DAEMON stop stop-the-DAEMON-daemon [GRACEFUL] [TIMEOUT]
 REM
 REM   DAEMON        ftp, http, ssh, as2 or pesit
 REM   stop-the-DAEMON-daemon
@@ -52,7 +52,7 @@ set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
 SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/daemons
 SET DAEMON=%~1
 SET OPERATION=%~2
-SET USAGE=Usage: 05.daemons_operations_POST.bat DAEMON start, or DAEMON stop stop-the-DAEMON-daemon [GRACEFUL [TIMEOUT]]
+SET USAGE=Usage: 05.daemons_operations_POST.bat DAEMON start, or DAEMON stop stop-the-DAEMON-daemon [GRACEFUL] [TIMEOUT]
 
 SET DAEMON_OK=
 FOR %%D IN (ftp http ssh as2 pesit) DO IF "%DAEMON%"=="%%D" SET DAEMON_OK=yes

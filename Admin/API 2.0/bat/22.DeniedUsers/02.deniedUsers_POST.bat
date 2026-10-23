@@ -10,7 +10,7 @@ REM This script adds a login name to the denied users using the `/deniedUsers`
 REM endpoint: the name can no longer log in, for good or for a number of hours.
 REM
 REM Usage:
-REM 02.deniedUsers_POST.bat [LOGIN_NAME [HOURS [NOTE]]]
+REM 02.deniedUsers_POST.bat [LOGIN_NAME] [HOURS] [NOTE]
 REM
 REM   LOGIN_NAME  the name to block (default example_denied)
 REM   HOURS       block for this many hours; leave out to block for good

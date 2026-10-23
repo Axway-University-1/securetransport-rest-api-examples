@@ -12,7 +12,7 @@
 # - Searching the message, by component (FTPD, SSHD, HTTPD, ...) and by level
 #
 # Usage:
-# ./01.logs_server_GET.sh [MINUTES [MESSAGE [COMPONENTS [LEVELS]]]]
+# ./01.logs_server_GET.sh [MINUTES] [MESSAGE] [COMPONENTS] [LEVELS]
 #
 #   MINUTES     how far back to look (default 60)
 #   MESSAGE     text the message must contain (optional)
@@ -62,7 +62,7 @@ MESSAGE="$2"
 COMPONENTS="$3"
 LEVELS="$4"
 if [ "$#" -gt 4 ]; then
-    printf "Usage: ./01.logs_server_GET.sh [MINUTES [MESSAGE [COMPONENTS [LEVELS]]]]\n"
+    printf "Usage: ./01.logs_server_GET.sh [MINUTES] [MESSAGE] [COMPONENTS] [LEVELS]\n"
     exit 2
 fi
 [[ "${MINUTES}" =~ ^[1-9][0-9]*$ ]] || { printf "MINUTES must be a whole number of 1 or more: %s\n" "${MINUTES}"; exit 2; }

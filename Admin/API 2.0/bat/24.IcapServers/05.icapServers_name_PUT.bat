@@ -11,7 +11,7 @@ REM it reads the server, changes the largest file it is sent (maxSize), and send
 REM whole server back.
 REM
 REM Usage:
-REM 05.icapServers_name_PUT.bat [NAME [MAX_MB]]
+REM 05.icapServers_name_PUT.bat [NAME] [MAX_MB]
 REM
 REM   NAME    the server (default example_icap)
 REM   MAX_MB  the largest file, in MB; 0 is unlimited (default 10)

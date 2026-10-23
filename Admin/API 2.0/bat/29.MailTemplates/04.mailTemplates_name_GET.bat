@@ -10,7 +10,7 @@ REM This script reads a mail template, using the `/mailTemplates/{name}` endpoin
 REM description, and the XHTML file itself, saved to a local file.
 REM
 REM Usage:
-REM 04.mailTemplates_name_GET.bat [NAME [OUTPUT]]
+REM 04.mailTemplates_name_GET.bat [NAME] [OUTPUT]
 REM
 REM   NAME    the template (default example_mail.xhtml)
 REM   OUTPUT  the file to write (default: NAME, in the current folder)

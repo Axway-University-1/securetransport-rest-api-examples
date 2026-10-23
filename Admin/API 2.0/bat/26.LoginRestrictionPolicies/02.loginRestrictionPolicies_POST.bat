@@ -10,7 +10,7 @@ REM This script creates a login restriction policy using the `/loginRestrictionP
 REM endpoint: its name and type, with no rules yet and no business unit.
 REM
 REM Usage:
-REM 02.loginRestrictionPolicies_POST.bat [NAME [TYPE [DESCRIPTION]]]
+REM 02.loginRestrictionPolicies_POST.bat [NAME] [TYPE] [DESCRIPTION]
 REM
 REM   NAME         the policy's name (default example_lrp)
 REM   TYPE         ALLOW_THEN_DENY or DENY_THEN_ALLOW (default ALLOW_THEN_DENY): which set of

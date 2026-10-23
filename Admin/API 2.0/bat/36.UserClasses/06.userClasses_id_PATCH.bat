@@ -11,7 +11,7 @@ REM endpoint with PATCH: a JSON Patch document that replaces one field. Unlike P
 REM (05.userClasses_id_PUT.bat), it sends only what changes.
 REM
 REM Usage:
-REM 06.userClasses_id_PATCH.bat [NAME [FIELD [VALUE]]]
+REM 06.userClasses_id_PATCH.bat [NAME] [FIELD] [VALUE]
 REM
 REM   NAME   the class (default example_userclass)
 REM   FIELD  enabled (default), expression, order, userName, group, address, userType or className

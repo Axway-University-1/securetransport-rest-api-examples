@@ -10,7 +10,7 @@
 # XHTML file as a multipart form, with a name and a description.
 #
 # Usage:
-# ./02.mailTemplates_POST.sh [NAME [FILE [DESCRIPTION]]]
+# ./02.mailTemplates_POST.sh [NAME] [FILE] [DESCRIPTION]
 #
 #   NAME         the template's name, ending in .xhtml (default example_mail.xhtml)
 #   FILE         the XHTML file to upload (default: a small one the script writes)

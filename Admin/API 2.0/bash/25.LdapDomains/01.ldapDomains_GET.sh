@@ -13,7 +13,7 @@
 # - Only the ones of one protocol version, with protocolVersion=
 #
 # Usage:
-# ./01.ldapDomains_GET.sh [NAME [PROTOCOL_VERSION]]
+# ./01.ldapDomains_GET.sh [NAME] [PROTOCOL_VERSION]
 #
 #   NAME              list the domain with exactly this name (optional)
 #   PROTOCOL_VERSION  2 or 3: only the domains of this version (optional)
@@ -48,7 +48,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/ldapDomains"
 NAME="$1"
 VERSION="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.ldapDomains_GET.sh [NAME [PROTOCOL_VERSION]]\n"
+    printf "Usage: ./01.ldapDomains_GET.sh [NAME] [PROTOCOL_VERSION]\n"
     exit 2
 fi
 if [ -n "${VERSION}" ] && ! [[ "${VERSION}" =~ ^[23]$ ]]; then

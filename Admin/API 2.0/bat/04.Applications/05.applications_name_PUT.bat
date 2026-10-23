@@ -13,7 +13,7 @@ REM - Modifying the notes field (by default with a timestamp)
 REM - Sending a PUT request to update the application
 REM
 REM Usage:
-REM 05.applications_name_PUT.bat [NAME [NOTES]]
+REM 05.applications_name_PUT.bat [NAME] [NOTES]
 REM
 REM   NAME   the application (default example_filepurge, one of the two 02.applications_POST.bat creates)
 REM   NOTES  the new notes (default "New note" and the time, in UTC); "" for none
@@ -39,7 +39,7 @@ SET MAIN_URL=https://%ST_SERVER%:%ST_PORT%/api/v2.0/applications
 SET NAME=%~1
 IF "%NAME%"=="" SET NAME=example_filepurge
 IF NOT "%~3"=="" (
-    echo Usage: 05.applications_name_PUT.bat [NAME [NOTES]]
+    echo Usage: 05.applications_name_PUT.bat [NAME] [NOTES]
     EXIT /B 2
 )
 SET "NEW_NOTES=%~2"

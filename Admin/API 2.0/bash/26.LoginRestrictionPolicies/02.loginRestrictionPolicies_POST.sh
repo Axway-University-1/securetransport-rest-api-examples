@@ -10,7 +10,7 @@
 # endpoint: its name and type, with no rules yet and no business unit.
 #
 # Usage:
-# ./02.loginRestrictionPolicies_POST.sh [NAME [TYPE [DESCRIPTION]]]
+# ./02.loginRestrictionPolicies_POST.sh [NAME] [TYPE] [DESCRIPTION]
 #
 #   NAME         the policy's name (default example_lrp)
 #   TYPE         ALLOW_THEN_DENY or DENY_THEN_ALLOW (default ALLOW_THEN_DENY): which set of

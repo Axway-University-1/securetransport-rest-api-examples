@@ -10,7 +10,7 @@
 # `/loginRestrictionPolicies/{name}` endpoint with PATCH.
 #
 # Usage:
-# ./08.loginRestrictionPolicies_name_PATCH_rule.sh [NAME [RULE_NAME [ACTION]]]
+# ./08.loginRestrictionPolicies_name_PATCH_rule.sh [NAME] [RULE_NAME] [ACTION]
 #
 #   NAME       the policy (default example_lrp)
 #   RULE_NAME  the rule (default "example rule")

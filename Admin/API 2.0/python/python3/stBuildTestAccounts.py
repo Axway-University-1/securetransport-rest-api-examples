@@ -35,7 +35,7 @@
 #             /businessUnits  GET, POST
 #             /accounts  POST
 #
-# Usage: python3 stBuildTestAccounts.py [--apply] [PREFIX [COUNT]]
+# Usage: python3 stBuildTestAccounts.py [--apply] [PREFIX] [COUNT]
 #
 #        PREFIX   the start of every account name. Default ZZ, at least 2 characters.
 #        COUNT    how many accounts. Default 100.
@@ -258,7 +258,7 @@ if __name__ == "__main__":
     # command line sets it to False.
     dryRun = True
 
-    usage = 'Usage: python3 stBuildTestAccounts.py [--apply] [PREFIX [COUNT]]'
+    usage = 'Usage: python3 stBuildTestAccounts.py [--apply] [PREFIX] [COUNT]'
     arguments = sys.argv[1:]
     if '--apply' in arguments:
         dryRun = False

@@ -11,7 +11,7 @@
 # partner's address and the login, and no site is created.
 #
 # Usage:
-# ./10.sites_operations_POST_test_new.sh [ACCOUNT [PROTOCOL [HOST [PORT [USER [SECURE]]]]]]
+# ./10.sites_operations_POST_test_new.sh [ACCOUNT] [PROTOCOL] [HOST] [PORT] [USER] [SECURE]
 #
 #   ACCOUNT   the account the site would belong to (default john, or ST_EXAMPLE_ACCOUNT)
 #   PROTOCOL  ssh, ftp or http (default ssh)

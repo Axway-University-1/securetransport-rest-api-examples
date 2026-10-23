@@ -13,7 +13,7 @@ REM - Reading the whole site, and printing a short summary of it
 REM - Asking for only some of its fields, with `fields=`
 REM
 REM Usage:
-REM 06.sites_id_GET.bat [ACCOUNT [NAME]]
+REM 06.sites_id_GET.bat [ACCOUNT] [NAME]
 REM
 REM   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.bat creates)
@@ -108,5 +108,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 06.sites_id_GET.bat [ACCOUNT [NAME]]
+echo Usage: 06.sites_id_GET.bat [ACCOUNT] [NAME]
 EXIT /B 2

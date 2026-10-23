@@ -15,7 +15,7 @@ REM - Only the permanent ones, and only the temporary ones (isPermanent=)
 REM - Only the ones blocked since a date (blockedAt.from=)
 REM
 REM Usage:
-REM 01.deniedUsers_GET.bat [PATTERN [SINCE]]
+REM 01.deniedUsers_GET.bat [PATTERN] [SINCE]
 REM
 REM   PATTERN  a login name, * matches anything (default *)
 REM   SINCE    only the ones blocked on or after this date, as yyyy-MM-dd (optional)
@@ -127,5 +127,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.deniedUsers_GET.bat [PATTERN [SINCE]]
+echo Usage: 01.deniedUsers_GET.bat [PATTERN] [SINCE]
 EXIT /B 2

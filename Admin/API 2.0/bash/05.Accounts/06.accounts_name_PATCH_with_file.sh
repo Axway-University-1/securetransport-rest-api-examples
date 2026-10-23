@@ -15,7 +15,7 @@
 # - Checking the HTTP response code instead of printing the whole response
 #
 # Usage:
-# ./06.accounts_name_PATCH_with_file.sh [NAME [PATCH_FILE]]
+# ./06.accounts_name_PATCH_with_file.sh [NAME] [PATCH_FILE]
 #
 #   NAME        the account (default example_user, the one 02.accounts_POST.sh creates)
 #   PATCH_FILE  a JSON Patch body: a list of operations (default 06.patch_body/stPatchAccount.json, next to the script)
@@ -51,7 +51,7 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts"
 NAME="${1:-example_user}"
 PATCH_FILE="${2:-${SCRIPT_DIR}/06.patch_body/stPatchAccount.json}"
-USAGE="Usage: 06.accounts_name_PATCH_with_file.sh [NAME [PATCH_FILE]]"
+USAGE="Usage: 06.accounts_name_PATCH_with_file.sh [NAME] [PATCH_FILE]"
 if [ "$#" -gt 2 ]; then
     printf "%s\n" "${USAGE}"
     exit 2

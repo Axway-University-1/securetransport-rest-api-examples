@@ -12,7 +12,7 @@
 # - Keeping to users only (type=USER), sorted by email, a page at a time
 #
 # Usage:
-# ./08.myself_addressBook_GET.sh [SEARCH [LIMIT]]
+# ./08.myself_addressBook_GET.sh [SEARCH] [LIMIT]
 #
 #   SEARCH  what to look for, for example jo* (default: everything)
 #   LIMIT   how many entries to return (default 20)

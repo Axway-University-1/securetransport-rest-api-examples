@@ -11,7 +11,7 @@ REM `/configurations/logging/{name}` endpoint: as JSON, its profile and status;
 REM as XML, the log4j configuration itself, saved to a file.
 REM
 REM Usage:
-REM 11.configurations_logging_name_GET.bat [NAME [PROFILE_ID]]
+REM 11.configurations_logging_name_GET.bat [NAME] [PROFILE_ID]
 REM
 REM   NAME        the option (default Logging.Admin.config)
 REM   PROFILE_ID  its profile (default: the one 09.configurations_logging_GET.bat

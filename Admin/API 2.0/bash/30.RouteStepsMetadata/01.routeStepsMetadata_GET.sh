@@ -15,7 +15,7 @@
 # - Printing the smallest step of a type that the server accepts, as JSON, to put in a route's `steps`
 #
 # Usage:
-# ./01.routeStepsMetadata_GET.sh [STEP_TYPE [minimal]]
+# ./01.routeStepsMetadata_GET.sh [STEP_TYPE] [minimal]
 #
 #   STEP_TYPE  a step type to show in full, e.g. Compress (optional, case sensitive)
 #   minimal    print only the smallest step of that type, as JSON (the placeholders such as

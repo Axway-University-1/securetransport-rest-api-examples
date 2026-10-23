@@ -11,7 +11,7 @@ REM endpoint with HEAD: 200 when it does, 404 when it does not. The path takes t
 REM so the script looks the id up by account and name first.
 REM
 REM Usage:
-REM 03.transferProfiles_id_HEAD.bat [ACCOUNT [NAME]]
+REM 03.transferProfiles_id_HEAD.bat [ACCOUNT] [NAME]
 REM
 REM   ACCOUNT  the account the profile belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the profile (default TP)

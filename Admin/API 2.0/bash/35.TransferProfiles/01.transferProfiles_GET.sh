@@ -13,7 +13,7 @@
 # - Only the default ones: an account has at most one default profile
 #
 # Usage:
-# ./01.transferProfiles_GET.sh [ACCOUNT [NAME]]
+# ./01.transferProfiles_GET.sh [ACCOUNT] [NAME]
 #
 #   ACCOUNT  list only the profiles of this account (default: every account)
 #   NAME     only the profiles with this name; takes a * wildcard (default *)
@@ -51,7 +51,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/transferProfiles"
 ACCOUNT="$1"
 PATTERN="${2:-*}"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.transferProfiles_GET.sh [ACCOUNT [NAME]]\n"
+    printf "Usage: ./01.transferProfiles_GET.sh [ACCOUNT] [NAME]\n"
     exit 2
 fi
 

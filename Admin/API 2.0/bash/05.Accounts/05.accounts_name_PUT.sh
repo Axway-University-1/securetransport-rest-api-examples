@@ -13,7 +13,7 @@
 # 3. PUT the whole object back
 #
 # Usage:
-# ./05.accounts_name_PUT.sh [NAME [NEW_UID]]
+# ./05.accounts_name_PUT.sh [NAME] [NEW_UID]
 #
 #   NAME     the account (default example_user, the one 02.accounts_POST.sh creates)
 #   NEW_UID  the new uid, a whole number (default 1111)
@@ -44,7 +44,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts"
 NAME="${1:-example_user}"
 NEW_UID="${2:-1111}"
 if [ "$#" -gt 2 ] || ! [[ "${NEW_UID}" =~ ^[0-9]{1,9}$ ]]; then
-    printf "Usage: 05.accounts_name_PUT.sh [NAME [NEW_UID]]   (NEW_UID is a whole number, 1111 when left out)\n"
+    printf "Usage: 05.accounts_name_PUT.sh [NAME] [NEW_UID]   (NEW_UID is a whole number, 1111 when left out)\n"
     exit 2
 fi
 NAME_URI=$(jq -rn --arg name "${NAME}" '$name | @uri')

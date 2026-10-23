@@ -14,7 +14,7 @@ REM - Reading one day, or a period, and printing one line per day and the totals
 REM - Asking for the active users count and the incoming file volume
 REM
 REM Usage:
-REM 01.statisticsSummary_generateReport_GET.bat [START [END [ACTIVE_USERS [VOLUME]]]]
+REM 01.statisticsSummary_generateReport_GET.bat [START] [END] [ACTIVE_USERS] [VOLUME]
 REM
 REM   START         first day, dd/MM/yyyy (default: today)
 REM   END           last day, dd/MM/yyyy, included (default: START)
@@ -78,7 +78,7 @@ powershell -NoProfile -Command "if ($env:START -match '^[0-9]{1,2}/[0-9]{1,2}/[0
 IF ERRORLEVEL 1 GOTO usage
 GOTO args_ok
 :usage
-echo Usage: 01.statisticsSummary_generateReport_GET.bat [START [END [ACTIVE_USERS [VOLUME]]]]   ^(dates are dd/MM/yyyy, the last two true or false^)
+echo Usage: 01.statisticsSummary_generateReport_GET.bat [START] [END] [ACTIVE_USERS] [VOLUME]   ^(dates are dd/MM/yyyy, the last two true or false^)
 EXIT /B 2
 :args_ok
 SET RESPONSE_FILE=%TEMP%\statsum_%RANDOM%.json

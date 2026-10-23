@@ -15,7 +15,7 @@
 # - The default policy, with isDefault=true
 #
 # Usage:
-# ./01.loginRestrictionPolicies_GET.sh [PATTERN [TYPE]]
+# ./01.loginRestrictionPolicies_GET.sh [PATTERN] [TYPE]
 #
 #   PATTERN  a policy name, * matches anything (default *)
 #   TYPE     ALLOW_THEN_DENY or DENY_THEN_ALLOW: only the policies of this type (optional)
@@ -48,7 +48,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/loginRestrictionPolicies"
 PATTERN="${1:-*}"
 TYPE="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.loginRestrictionPolicies_GET.sh [PATTERN [TYPE]]\n"
+    printf "Usage: ./01.loginRestrictionPolicies_GET.sh [PATTERN] [TYPE]\n"
     exit 2
 fi
 if [ -n "${TYPE}" ] && ! [[ "${TYPE}" =~ ^(ALLOW_THEN_DENY|DENY_THEN_ALLOW)$ ]]; then

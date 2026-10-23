@@ -13,7 +13,7 @@
 # - Keeping the users whose name holds some text, or the users who logged in after (or before) a time
 #
 # Usage:
-# ./02.statisticsSummary_activeUsers_GET.sh [NAME [FROM [TO]]]
+# ./02.statisticsSummary_activeUsers_GET.sh [NAME] [FROM] [TO]
 #
 #   NAME  a part of the login name, case sensitive, no `*` (optional; empty for every user)
 #   FROM  only users whose last login was after this: yyyy-MM-dd, an RFC 2822 date or a timestamp in milliseconds (optional)
@@ -59,7 +59,7 @@ NAME="$1"
 FROM="$2"
 TO="$3"
 if [ -n "$4" ]; then
-    printf "Usage: 02.statisticsSummary_activeUsers_GET.sh [NAME [FROM [TO]]]\n"
+    printf "Usage: 02.statisticsSummary_activeUsers_GET.sh [NAME] [FROM] [TO]\n"
     exit 2
 fi
 

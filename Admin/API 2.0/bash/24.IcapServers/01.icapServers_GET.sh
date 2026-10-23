@@ -15,7 +15,7 @@
 # - Only the ones of one type, with basicSettings.type=
 #
 # Usage:
-# ./01.icapServers_GET.sh [NAME [TYPE]]
+# ./01.icapServers_GET.sh [NAME] [TYPE]
 #
 #   NAME  list the server with exactly this name (optional)
 #   TYPE  only the servers of this type: INCOMING, OUTGOING or BOTH (optional)
@@ -49,7 +49,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/icapServers"
 NAME="$1"
 TYPE="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.icapServers_GET.sh [NAME [TYPE]]\n"
+    printf "Usage: ./01.icapServers_GET.sh [NAME] [TYPE]\n"
     exit 2
 fi
 if [ -n "${TYPE}" ] && ! [[ "${TYPE}" =~ ^(INCOMING|OUTGOING|BOTH)$ ]]; then

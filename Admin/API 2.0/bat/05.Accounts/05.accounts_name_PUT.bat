@@ -13,7 +13,7 @@ REM 2. edit the parts you want with jq
 REM 3. PUT the whole object back
 REM
 REM Usage:
-REM 05.accounts_name_PUT.bat [NAME [NEW_UID]]
+REM 05.accounts_name_PUT.bat [NAME] [NEW_UID]
 REM
 REM   NAME     the account (default example_user, the one 02.accounts_POST.bat creates)
 REM   NEW_UID  the new uid, a whole number (default 1111)
@@ -41,7 +41,7 @@ SET NAME=%~1
 IF "%NAME%"=="" SET NAME=example_user
 SET NEW_UID=%~2
 IF "%NEW_UID%"=="" SET NEW_UID=1111
-SET USAGE=Usage: 05.accounts_name_PUT.bat [NAME [NEW_UID]]   with NEW_UID a whole number, 1111 when left out
+SET USAGE=Usage: 05.accounts_name_PUT.bat [NAME] [NEW_UID]   with NEW_UID a whole number, 1111 when left out
 IF NOT "%~3"=="" GOTO usage
 powershell -NoProfile -Command "if ($env:NEW_UID -match '^[0-9]{1,9}$') { exit 0 } else { exit 1 }"
 IF ERRORLEVEL 1 GOTO usage

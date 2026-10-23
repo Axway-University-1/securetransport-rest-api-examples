@@ -12,7 +12,7 @@
 # Options, set here with the `/configurations/options` endpoint and PUT.
 #
 # Usage:
-# ./45.configurations_storageProfiles_options_PUT_register.sh BUCKET [REGION [ENDPOINT]]
+# ./45.configurations_storageProfiles_options_PUT_register.sh BUCKET [REGION] [ENDPOINT]
 #
 #   BUCKET    the bucket
 #   REGION    its region (default us-east-1)
@@ -55,7 +55,7 @@ BUCKET="$1"
 REGION="${2:-us-east-1}"
 ENDPOINT="$3"
 PROFILE="example_s3"
-[ -n "${BUCKET}" ] || { printf "Usage: ./45.configurations_storageProfiles_options_PUT_register.sh BUCKET [REGION [ENDPOINT]]\n"; exit 2; }
+[ -n "${BUCKET}" ] || { printf "Usage: ./45.configurations_storageProfiles_options_PUT_register.sh BUCKET [REGION] [ENDPOINT]\n"; exit 2; }
 
 # The profiles already registered, plus this one
 RESPONSE=$(curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X GET "${MAIN_URL}/options/StorageProfiles.S3.Registry" \

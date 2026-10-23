@@ -15,7 +15,7 @@ REM - Using the `stepType` as the `type` of a step in a route
 REM - Printing the smallest step of a type that the server accepts, as JSON, to put in a route's `steps`
 REM
 REM Usage:
-REM 01.routeStepsMetadata_GET.bat [STEP_TYPE [minimal]]
+REM 01.routeStepsMetadata_GET.bat [STEP_TYPE] [minimal]
 REM
 REM   STEP_TYPE  a step type to show in full, e.g. Compress (optional, case sensitive)
 REM   minimal    print only the smallest step of that type, as JSON (the placeholders such as

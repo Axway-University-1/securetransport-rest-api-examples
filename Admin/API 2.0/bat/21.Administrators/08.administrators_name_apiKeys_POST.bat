@@ -12,7 +12,7 @@ REM request on its own, in the SECURETRANSPORT-API-KEY header: no login, no
 REM session, no password - for scripts and integrations.
 REM
 REM Usage:
-REM 08.administrators_name_apiKeys_POST.bat [DAYS [PERMISSIONS]]
+REM 08.administrators_name_apiKeys_POST.bat [DAYS] [PERMISSIONS]
 REM
 REM   DAYS         how many days the key is valid (default 30)
 REM   PERMISSIONS  read, write and delete, comma separated (default read).

@@ -11,7 +11,7 @@ REM The path takes the profile's id, so the script looks the id up by account an
 REM It prints a short summary of the profile (with the advanced settings, when they are on), then only some fields of it.
 REM
 REM Usage:
-REM 04.transferProfiles_id_GET.bat [ACCOUNT [NAME]]
+REM 04.transferProfiles_id_GET.bat [ACCOUNT] [NAME]
 REM
 REM   ACCOUNT  the account the profile belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the profile (default TP)
@@ -105,5 +105,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 04.transferProfiles_id_GET.bat [ACCOUNT [NAME]]
+echo Usage: 04.transferProfiles_id_GET.bat [ACCOUNT] [NAME]
 EXIT /B 2

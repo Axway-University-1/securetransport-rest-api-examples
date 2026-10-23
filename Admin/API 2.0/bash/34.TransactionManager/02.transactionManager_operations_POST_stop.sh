@@ -15,7 +15,7 @@
 # - A guard: nothing is sent unless the first argument is the confirmation word
 #
 # Usage:
-# ./02.transactionManager_operations_POST_stop.sh stop-the-transaction-manager [GRACEFUL [TIMEOUT]]
+# ./02.transactionManager_operations_POST_stop.sh stop-the-transaction-manager [GRACEFUL] [TIMEOUT]
 #
 #   stop-the-transaction-manager
 #                 the confirmation: this exact word, required. Without it, or with any other
@@ -59,7 +59,7 @@ source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/transactionManager"
 CONFIRMATION="stop-the-transaction-manager"
-USAGE="Usage: 02.transactionManager_operations_POST_stop.sh ${CONFIRMATION} [GRACEFUL [TIMEOUT]]"
+USAGE="Usage: 02.transactionManager_operations_POST_stop.sh ${CONFIRMATION} [GRACEFUL] [TIMEOUT]"
 GRACEFUL="${2:-true}"
 TIMEOUT="$3"
 

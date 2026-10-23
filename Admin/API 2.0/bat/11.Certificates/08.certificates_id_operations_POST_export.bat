@@ -11,7 +11,7 @@ REM `/certificates/{id}/operations` endpoint with operation=export: PEM, DER
 REM (crt), or PKCS#12 with its private key.
 REM
 REM Usage:
-REM 08.certificates_id_operations_POST_export.bat [NAME [FORMAT]]
+REM 08.certificates_id_operations_POST_export.bat [NAME] [FORMAT]
 REM
 REM   NAME    the certificate's name (default example_cert)
 REM   FORMAT  pem, crt or pkcs12 (default pem)

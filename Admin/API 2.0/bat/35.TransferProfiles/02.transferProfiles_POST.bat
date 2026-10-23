@@ -17,7 +17,7 @@ REM   accepts: name, account, fileLabelOption and one mapping)
 REM - Reading the new profile's address from the Location header
 REM
 REM Usage:
-REM 02.transferProfiles_POST.bat [ACCOUNT [NAME [SEND_MAPPING [RECEIVE_MAPPING [TRANSCODING]]]]]
+REM 02.transferProfiles_POST.bat [ACCOUNT] [NAME] [SEND_MAPPING] [RECEIVE_MAPPING] [TRANSCODING]
 REM
 REM   ACCOUNT          the account the profile is for (default john, or ST_EXAMPLE_ACCOUNT; it needs a PeSIT site)
 REM   NAME             the profile's name (default example_profile)

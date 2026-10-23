@@ -15,7 +15,7 @@ REM - Only the ones of one type, with type=
 REM - The default policy, with isDefault=true
 REM
 REM Usage:
-REM 01.loginRestrictionPolicies_GET.bat [PATTERN [TYPE]]
+REM 01.loginRestrictionPolicies_GET.bat [PATTERN] [TYPE]
 REM
 REM   PATTERN  a policy name, * matches anything (default *)
 REM   TYPE     ALLOW_THEN_DENY or DENY_THEN_ALLOW: only the policies of this type (optional)
@@ -113,5 +113,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.loginRestrictionPolicies_GET.bat [PATTERN [TYPE]]
+echo Usage: 01.loginRestrictionPolicies_GET.bat [PATTERN] [TYPE]
 EXIT /B 2

@@ -15,7 +15,7 @@ REM - Printing what the paths of that file hold now, so that the change can be p
 REM - Checking the HTTP response code instead of printing the whole response
 REM
 REM Usage:
-REM 06.accounts_name_PATCH_with_file.bat [NAME [PATCH_FILE]]
+REM 06.accounts_name_PATCH_with_file.bat [NAME] [PATCH_FILE]
 REM
 REM   NAME        the account (default example_user, the one 02.accounts_POST.bat creates)
 REM   PATCH_FILE  a JSON Patch body: a list of operations (default 06.patch_body/stPatchAccount.json, next to the script)
@@ -50,7 +50,7 @@ IF "%NAME%"=="" SET NAME=example_user
 SET PATCH_FILE=%~2
 REM %~dp0 is the folder of this script, and 06.patch_body follows it
 IF "%PATCH_FILE%"=="" SET PATCH_FILE=%~dp006.patch_body\stPatchAccount.json
-SET USAGE=Usage: 06.accounts_name_PATCH_with_file.bat [NAME [PATCH_FILE]]
+SET USAGE=Usage: 06.accounts_name_PATCH_with_file.bat [NAME] [PATCH_FILE]
 IF NOT "%~3"=="" GOTO usage
 IF NOT EXIST "%PATCH_FILE%" (
     echo The patch body %PATCH_FILE% is not a file.

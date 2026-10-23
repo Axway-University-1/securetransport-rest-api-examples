@@ -13,7 +13,7 @@ REM - Searching by usage (private, local, partner, login, trusted) and type
 REM - The ones that expire within a number of days, with expirationTime.to
 REM
 REM Usage:
-REM 01.certificates_GET.bat [USAGE [DAYS]]
+REM 01.certificates_GET.bat [USAGE] [DAYS]
 REM
 REM   USAGE  private, local, partner, login or trusted (default local); anything else is refused with exit 2, nothing sent
 REM   DAYS   list the ones that expire within this many days (default 30)
@@ -107,5 +107,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.certificates_GET.bat [USAGE [DAYS]]
+echo Usage: 01.certificates_GET.bat [USAGE] [DAYS]
 EXIT /B 2

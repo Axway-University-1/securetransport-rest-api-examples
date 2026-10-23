@@ -12,7 +12,7 @@ REM The path takes the subscription's id, so the script looks the id up by accou
 REM application and folder first.
 REM
 REM Usage:
-REM 06.subscriptions_id_GET.bat [ACCOUNT [APPLICATION [FOLDER]]]
+REM 06.subscriptions_id_GET.bat [ACCOUNT] [APPLICATION] [FOLDER]
 REM
 REM   ACCOUNT      the account that subscribes (default john, or ST_EXAMPLE_ACCOUNT)
 REM   APPLICATION  the application it subscribes to (default AdvancedRoutingApplication)
@@ -116,5 +116,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 06.subscriptions_id_GET.bat [ACCOUNT [APPLICATION [FOLDER]]]
+echo Usage: 06.subscriptions_id_GET.bat [ACCOUNT] [APPLICATION] [FOLDER]
 EXIT /B 2

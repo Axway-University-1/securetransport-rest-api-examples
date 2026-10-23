@@ -11,7 +11,7 @@ REM `/loginRestrictionPolicies/{name}` endpoint with PATCH: allow or deny logins
 REM optionally only while an Expression Language condition is true.
 REM
 REM Usage:
-REM 06.loginRestrictionPolicies_name_PATCH.bat [NAME [RULE_NAME [TYPE [ADDRESS [CONDITION]]]]]
+REM 06.loginRestrictionPolicies_name_PATCH.bat [NAME] [RULE_NAME] [TYPE] [ADDRESS] [CONDITION]
 REM
 REM   NAME       the policy (default example_lrp)
 REM   RULE_NAME  the rule's name (default "example rule")

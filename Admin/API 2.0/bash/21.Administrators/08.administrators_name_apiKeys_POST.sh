@@ -12,7 +12,7 @@
 # session, no password - for scripts and integrations.
 #
 # Usage:
-# ./08.administrators_name_apiKeys_POST.sh [DAYS [PERMISSIONS]]
+# ./08.administrators_name_apiKeys_POST.sh [DAYS] [PERMISSIONS]
 #
 #   DAYS         how many days the key is valid (default 30)
 #   PERMISSIONS  read, write and delete, comma separated (default read).

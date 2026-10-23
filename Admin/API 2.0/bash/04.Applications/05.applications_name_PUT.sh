@@ -13,7 +13,7 @@
 # - Sending a PUT request to update the application
 #
 # Usage:
-# ./05.applications_name_PUT.sh [NAME [NOTES]]
+# ./05.applications_name_PUT.sh [NAME] [NOTES]
 #
 #   NAME   the application (default example_filepurge, one of the two 02.applications_POST.sh creates)
 #   NOTES  the new notes (default "New note" and the time, in UTC); "" for none
@@ -42,7 +42,7 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/applications"
 NAME="${1:-example_filepurge}"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: 05.applications_name_PUT.sh [NAME [NOTES]]\n"
+    printf "Usage: 05.applications_name_PUT.sh [NAME] [NOTES]\n"
     exit 2
 fi
 if [ "$#" -ge 2 ]; then

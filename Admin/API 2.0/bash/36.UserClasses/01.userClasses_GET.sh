@@ -13,7 +13,7 @@
 # - Only the enabled ones
 #
 # Usage:
-# ./01.userClasses_GET.sh [NAME [USER_TYPE]]
+# ./01.userClasses_GET.sh [NAME] [USER_TYPE]
 #
 #   NAME       list only the classes with this name; takes a * wildcard (default *)
 #   USER_TYPE  any (default), real, virtual or * : only the classes of that type. The * is the type of a class that
@@ -53,7 +53,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/userClasses"
 PATTERN="${1:-*}"
 USER_TYPE="${2:-any}"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.userClasses_GET.sh [NAME [USER_TYPE]]\n"
+    printf "Usage: ./01.userClasses_GET.sh [NAME] [USER_TYPE]\n"
     exit 2
 fi
 case "${USER_TYPE}" in

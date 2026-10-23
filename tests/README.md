@@ -257,3 +257,9 @@ are committed. If you are unsure, it belongs in `local/`.
 | A check named `hygiene` fails | It found something that looks like a credential, hostname or IP. Read the `FAIL` line, then replace it with a placeholder such as `<SERVER>`. |
 | A check named `docs_match_repo` fails | You added or removed a script and the README count or a `.claude` skill is now out of date. Update it. |
 | Integration checks 15 to 18 and 20 skip | They need a one-time venv. See [integration/README.md](online/README.md). |
+
+## Which tests cover a script
+
+`python3 tools/test_map.py [WORD ...]` lists each script with the offline and online checks whose files name it
+(`--missing` lists those without one of the two). A check that runs scripts from a folder in a loop, without naming
+them, does not show, so "-" means "not named", and the check file is the place to look.

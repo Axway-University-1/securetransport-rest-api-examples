@@ -10,7 +10,7 @@
 # `/ldapDomains/{name}/operations` endpoint with operation=testConnection.
 #
 # Usage:
-# ./08.ldapDomains_name_operations_POST_testConnection.sh [NAME [SERVER_NUMBER]]
+# ./08.ldapDomains_name_operations_POST_testConnection.sh [NAME] [SERVER_NUMBER]
 #
 #   NAME           the domain (default example_ldap)
 #   SERVER_NUMBER  which of its servers, counting from 1 (default 1)

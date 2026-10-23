@@ -19,7 +19,7 @@
 # today, account by account.
 #
 # Usage:
-# ./billable_GET_report.sh [LABEL [ACCOUNT]]
+# ./billable_GET_report.sh [LABEL] [ACCOUNT]
 #
 # LABEL is printed in the heading (for example "before" or "after"); it does not
 # change what is measured. ACCOUNT reports on another test account than the

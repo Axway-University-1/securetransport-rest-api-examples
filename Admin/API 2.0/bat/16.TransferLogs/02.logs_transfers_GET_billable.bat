@@ -11,7 +11,7 @@ REM `/logs/transfers` endpoint and its `isBillable` filter. It prints one line
 REM per calendar day, today last, and the total.
 REM
 REM Usage:
-REM 02.logs_transfers_GET_billable.bat [DAYS [ACCOUNT]]
+REM 02.logs_transfers_GET_billable.bat [DAYS] [ACCOUNT]
 REM
 REM   DAYS     how many days to count, today included (default 7)
 REM   ACCOUNT  count only this account's transfers (default: every account)
@@ -112,5 +112,5 @@ SET /A TOTAL=%TOTAL%+%DAY_COUNT%
 EXIT /B 0
 
 :usage
-echo Usage: 02.logs_transfers_GET_billable.bat [DAYS [ACCOUNT]]
+echo Usage: 02.logs_transfers_GET_billable.bat [DAYS] [ACCOUNT]
 EXIT /B 2

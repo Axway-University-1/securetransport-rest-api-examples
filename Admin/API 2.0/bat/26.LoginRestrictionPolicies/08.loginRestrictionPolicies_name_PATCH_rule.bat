@@ -10,7 +10,7 @@ REM This script enables, disables or removes one rule of a login restriction pol
 REM `/loginRestrictionPolicies/{name}` endpoint with PATCH.
 REM
 REM Usage:
-REM 08.loginRestrictionPolicies_name_PATCH_rule.bat [NAME [RULE_NAME [ACTION]]]
+REM 08.loginRestrictionPolicies_name_PATCH_rule.bat [NAME] [RULE_NAME] [ACTION]
 REM
 REM   NAME       the policy (default example_lrp)
 REM   RULE_NAME  the rule (default "example rule")

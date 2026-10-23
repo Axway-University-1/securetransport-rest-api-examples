@@ -13,7 +13,7 @@
 # - Reading the new zone's address from the Location header
 #
 # Usage:
-# ./02.zones_POST.sh [NAME [DESCRIPTION [EDGE_TITLE [EDGE_ADDRESS [EDGE_PORT]]]]]
+# ./02.zones_POST.sh [NAME] [DESCRIPTION] [EDGE_TITLE] [EDGE_ADDRESS] [EDGE_PORT]
 #
 #   NAME          the zone's name (default example_zone); not \ / ; ' , at most 255 characters
 #   DESCRIPTION   its description (default "Created by the examples"), at most 255 characters

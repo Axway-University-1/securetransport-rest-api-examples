@@ -11,7 +11,7 @@ REM `/transfers/operations?operation=pull` endpoint. The files the site matches
 REM are downloaded into a folder of the account.
 REM
 REM Usage:
-REM 01.transfers_operations_POST_pull.bat [ACCOUNT [SITE [DESTINATION_FOLDER]]]
+REM 01.transfers_operations_POST_pull.bat [ACCOUNT] [SITE] [DESTINATION_FOLDER]
 REM
 REM   ACCOUNT             the account that pulls (default john, or ST_EXAMPLE_ACCOUNT)
 REM   SITE                the transfer site of that account to pull with (default SSH_PULL)
@@ -42,7 +42,7 @@ SETLOCAL
 CALL ..\set_variables.bat
 
 set REFERER_HEADER=Referer: THIS_IS_A_RANDOM_TEXT
-SET USAGE=Usage: 01.transfers_operations_POST_pull.bat [ACCOUNT [SITE [DESTINATION_FOLDER]]]
+SET USAGE=Usage: 01.transfers_operations_POST_pull.bat [ACCOUNT] [SITE] [DESTINATION_FOLDER]
 
 SET "ACCOUNT=%~1"
 IF "%ACCOUNT%"=="" SET "ACCOUNT=%ST_EXAMPLE_ACCOUNT%"

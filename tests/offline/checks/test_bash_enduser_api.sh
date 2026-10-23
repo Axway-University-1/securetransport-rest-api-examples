@@ -598,22 +598,21 @@ STATUS=404 run 02.Files/07.files_filepath_DELETE.sh
 expect "07 delete: refused, exit 1" "${RC}" "1"
 
 echo
-echo "=== The usage lines: optional parameters nest, and the message is the header's ==="
+echo "=== The usage lines: each optional parameter has its own bracket, and the message is the header's ==="
 BRACKETS=""; DIFFERS=""
 for f in $(cd "${EU_TREE}" && ls */*.sh); do
     hdr=$(awk '/^# Usage:/{getline; sub(/^# */,""); print; exit}' "${EU_TREE}/${f}")
-    # two optional parameters side by side in separate brackets mean either can be given alone: that is true of an option
-    # (--keep) and not of a positional parameter, which needs the one before it. [A [B]] says so.
-    if printf '%s' "${hdr}" | grep -qE '\] \[[A-Z_]+'; then BRACKETS="${BRACKETS} ${f}"; fi
+    # every optional parameter has a bracket of its own: [A] [B], never [A [B]]
+    if printf '%s' "${hdr}" | grep -qE '\[[A-Za-z_]+ \['; then BRACKETS="${BRACKETS} ${f}"; fi
     printed=$(grep -o 'Usage: \./[^\\"]*' "${EU_TREE}/${f}" | head -1 | sed 's/^Usage: //; s/  *$//')
     if [ -n "${printed}" ] && [ -n "${hdr}" ] && [ "${printed#"${hdr}"}" = "${printed}" ] && [ "${hdr#"${printed}"}" = "${hdr}" ]; then
         DIFFERS="${DIFFERS} ${f}"
     fi
 done
-expect "no usage line has a positional optional parameter in brackets of its own after another (it must nest: [A [B]])" "${BRACKETS}" ""
+expect "no usage line has a positional optional parameter in brackets of its own after another (it must nest: [A] [B])" "${BRACKETS}" ""
 expect "the usage a script prints is the one of its header, parameter for parameter" "${DIFFERS}" ""
 OUT=$(cd "${WORK}/eu/03.Myself" && PATH="${WORK}/bin:${PATH}" bash ./05.myself_password_POST_reset.sh 2>&1)
-has "05 reset: the usage it prints nests the optional parameters" "TOKEN NEW_PASSWORD [SECRET_ANSWER [USERNAME]]"
+has "05 reset: the usage it prints nests the optional parameters" "TOKEN NEW_PASSWORD [SECRET_ANSWER] [USERNAME]"
 
 echo "=== The settings file: set_variables.local.sh is the one file, and a script stops without it ==="
 # A copy of the folder with no settings file at all: every script says what to do and sends nothing

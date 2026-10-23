@@ -11,7 +11,7 @@ REM endpoint with PUT: it reads the policy, changes its description, and sends t
 REM back, rules and business units included.
 REM
 REM Usage:
-REM 05.loginRestrictionPolicies_name_PUT.bat [NAME [DESCRIPTION]]
+REM 05.loginRestrictionPolicies_name_PUT.bat [NAME] [DESCRIPTION]
 REM
 REM   NAME         the policy (default example_lrp)
 REM   DESCRIPTION  the new description (default "Replaced by 05.loginRestrictionPolicies_name_PUT.bat")

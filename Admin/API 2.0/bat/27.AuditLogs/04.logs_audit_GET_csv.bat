@@ -10,7 +10,7 @@ REM This script exports the audit log as a CSV file using the `/logs/audit` endp
 REM text/csv in place of JSON.
 REM
 REM Usage:
-REM 04.logs_audit_GET_csv.bat [OUTPUT [HOURS]]
+REM 04.logs_audit_GET_csv.bat [OUTPUT] [HOURS]
 REM
 REM   OUTPUT  the file to write (default audit_log.csv)
 REM   HOURS   how far back, in whole hours (default 24)

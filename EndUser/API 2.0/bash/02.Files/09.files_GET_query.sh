@@ -14,7 +14,7 @@
 # - Listing only the files that match a glob pattern, such as *.txt
 #
 # Usage:
-# ./09.files_GET_query.sh [FOLDER [PATTERN]]
+# ./09.files_GET_query.sh [FOLDER] [PATTERN]
 #
 #   FOLDER   the folder to list, relative to the home folder (default: the
 #            home folder itself)

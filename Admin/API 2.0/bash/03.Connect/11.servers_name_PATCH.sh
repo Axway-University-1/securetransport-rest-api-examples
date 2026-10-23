@@ -12,7 +12,7 @@
 # - A PATCH to remove RSA keys from the publicKeys field
 #
 # Usage:
-# ./11.servers_name_PATCH.sh [NAME [PORT]]
+# ./11.servers_name_PATCH.sh [NAME] [PORT]
 #
 #   NAME  the SSH server to change (default SSH_TEST_SERVER_1, the one 07.servers_POST.sh creates)
 #   PORT  the new port, 1 to 65535 (default 8026)
@@ -49,7 +49,7 @@ source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 NAME="${1:-SSH_TEST_SERVER_1}"
 NEW_PORT="${2:-8026}"
-USAGE="Usage: ./11.servers_name_PATCH.sh [NAME [PORT]]"
+USAGE="Usage: ./11.servers_name_PATCH.sh [NAME] [PORT]"
 
 if [ "$#" -gt 2 ] || [ -z "${NAME}" ]; then
     printf "%s\n" "${USAGE}"

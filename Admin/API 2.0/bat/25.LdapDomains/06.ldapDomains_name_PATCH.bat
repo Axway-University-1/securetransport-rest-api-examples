@@ -10,7 +10,7 @@ REM This script changes an LDAP domain using the `/ldapDomains/{name}` endpoint 
 REM its description, and the port of its first server.
 REM
 REM Usage:
-REM 06.ldapDomains_name_PATCH.bat [NAME [DESCRIPTION [PORT]]]
+REM 06.ldapDomains_name_PATCH.bat [NAME] [DESCRIPTION] [PORT]
 REM
 REM   NAME         the domain (default example_ldap)
 REM   DESCRIPTION  the new description (default "Patched by 06.ldapDomains_name_PATCH.bat")

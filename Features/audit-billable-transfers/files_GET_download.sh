@@ -17,7 +17,7 @@
 # run by hand against a file that is already in the account's home folder.
 #
 # Usage:
-# ./files_GET_download.sh FILE [COUNT [ACCOUNT]]
+# ./files_GET_download.sh FILE [COUNT] [ACCOUNT]
 #
 #   FILE     the file to download, relative to the account's home folder, for
 #            example subscription/s1/only_inbound.txt, where scenario 2.1 lands in
@@ -48,7 +48,7 @@
 SCRIPT_DIR=$(dirname "$(realpath "$0")")
 
 usage() {
-    printf "Usage: ./files_GET_download.sh FILE [COUNT [ACCOUNT]]\n"
+    printf "Usage: ./files_GET_download.sh FILE [COUNT] [ACCOUNT]\n"
     exit 2
 }
 

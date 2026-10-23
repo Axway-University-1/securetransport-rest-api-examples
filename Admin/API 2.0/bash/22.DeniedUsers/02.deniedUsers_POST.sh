@@ -10,7 +10,7 @@
 # endpoint: the name can no longer log in, for good or for a number of hours.
 #
 # Usage:
-# ./02.deniedUsers_POST.sh [LOGIN_NAME [HOURS [NOTE]]]
+# ./02.deniedUsers_POST.sh [LOGIN_NAME] [HOURS] [NOTE]
 #
 #   LOGIN_NAME  the name to block (default example_denied)
 #   HOURS       block for this many hours; leave out to block for good

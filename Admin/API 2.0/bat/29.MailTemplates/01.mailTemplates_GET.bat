@@ -14,7 +14,7 @@ REM - Listing them, one line each with the description
 REM - Searching by name, and by description (both exact)
 REM
 REM Usage:
-REM 01.mailTemplates_GET.bat [NAME [DESCRIPTION]]
+REM 01.mailTemplates_GET.bat [NAME] [DESCRIPTION]
 REM
 REM   NAME         a template's exact name, e.g. AdhocDefault.xhtml (optional)
 REM   DESCRIPTION  an exact description (optional)
@@ -115,5 +115,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.mailTemplates_GET.bat [NAME [DESCRIPTION]]
+echo Usage: 01.mailTemplates_GET.bat [NAME] [DESCRIPTION]
 EXIT /B 2

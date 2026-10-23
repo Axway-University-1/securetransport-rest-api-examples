@@ -11,7 +11,7 @@ REM it reads the profile, changes the line ending of the receiving side (advance
 REM and, when asked, the file it sends (sendMapping, a plain field), and sends the whole profile back.
 REM
 REM Usage:
-REM 05.transferProfiles_id_PUT.bat ACCOUNT NAME [LINE_ENDING [SEND_MAPPING]]
+REM 05.transferProfiles_id_PUT.bat ACCOUNT NAME [LINE_ENDING] [SEND_MAPPING]
 REM
 REM   ACCOUNT       the account the profile belongs to
 REM   NAME          the profile (it must be the only one with that name)
@@ -118,5 +118,5 @@ IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
 EXIT /B 0
 
 :usage
-echo Usage: 05.transferProfiles_id_PUT.bat ACCOUNT NAME [LINE_ENDING [SEND_MAPPING]]
+echo Usage: 05.transferProfiles_id_PUT.bat ACCOUNT NAME [LINE_ENDING] [SEND_MAPPING]
 EXIT /B 2

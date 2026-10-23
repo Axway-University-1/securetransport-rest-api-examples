@@ -19,7 +19,7 @@
 #      today, next to what the rule predicts for it, and whether they match.
 #
 # Usage:
-# ./00.run_all.sh [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
+# ./00.run_all.sh [ACCOUNT] [INBOUND_ONLY] [IN_AND_OUT] [--cleanup]
 #
 #   ACCOUNT        the test account to create and use (default btTestAccount).
 #                  Every other object name is derived from it.
@@ -67,7 +67,7 @@ SCRIPT_DIR=$(dirname "$(realpath "$0")")
 # Ends this script, without changing anything, on a server that is too old
 source "${SCRIPT_DIR}/../lib/st_feature_check.sh" "5.5-20260924"
 usage() {
-    printf "Usage: ./00.run_all.sh [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]\n"
+    printf "Usage: ./00.run_all.sh [ACCOUNT] [INBOUND_ONLY] [IN_AND_OUT] [--cleanup]\n"
     exit 2
 }
 

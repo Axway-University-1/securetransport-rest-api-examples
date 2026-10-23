@@ -11,7 +11,7 @@
 # in, lists the site's download (or upload) folder, and prints what it finds.
 #
 # Usage:
-# ./11.sites_operations_POST_list.sh [ACCOUNT [NAME [FOLDER [LIMIT [FOLDERS]]]]]
+# ./11.sites_operations_POST_list.sh [ACCOUNT] [NAME] [FOLDER] [LIMIT] [FOLDERS]
 #
 #   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.sh creates)

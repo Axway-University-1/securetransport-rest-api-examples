@@ -11,7 +11,7 @@
 # whole class back.
 #
 # Usage:
-# ./05.userClasses_id_PUT.sh [NAME [EXPRESSION [ENABLED]]]
+# ./05.userClasses_id_PUT.sh [NAME] [EXPRESSION] [ENABLED]
 #
 #   NAME        the class (default example_userclass)
 #   EXPRESSION  the new expression (default false); none empties it; - leaves it alone

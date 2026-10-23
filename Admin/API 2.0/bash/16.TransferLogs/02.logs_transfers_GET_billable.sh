@@ -11,7 +11,7 @@
 # per calendar day, today last, and the total.
 #
 # Usage:
-# ./02.logs_transfers_GET_billable.sh [DAYS [ACCOUNT]]
+# ./02.logs_transfers_GET_billable.sh [DAYS] [ACCOUNT]
 #
 #   DAYS     how many days to count, today included (default 7)
 #   ACCOUNT  count only this account's transfers (default: every account)
@@ -50,7 +50,7 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 DAYS="${1:-7}"
 ACCOUNT="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./02.logs_transfers_GET_billable.sh [DAYS [ACCOUNT]]\n"
+    printf "Usage: ./02.logs_transfers_GET_billable.sh [DAYS] [ACCOUNT]\n"
     exit 2
 fi
 [[ "${DAYS}" =~ ^[1-9][0-9]*$ ]] || { printf "DAYS must be a whole number, 1 or more: %s\n" "${DAYS}"; exit 2; }

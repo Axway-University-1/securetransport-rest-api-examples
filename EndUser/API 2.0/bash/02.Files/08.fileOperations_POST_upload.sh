@@ -14,7 +14,7 @@
 #   application/octet-stream
 #
 # Usage:
-# ./08.fileOperations_POST_upload.sh [LOCAL_FILE [FOLDER]]
+# ./08.fileOperations_POST_upload.sh [LOCAL_FILE] [FOLDER]
 #
 #   LOCAL_FILE  the file to upload (default test.txt, next to this script)
 #   FOLDER      where to put it, relative to the home folder (default: the

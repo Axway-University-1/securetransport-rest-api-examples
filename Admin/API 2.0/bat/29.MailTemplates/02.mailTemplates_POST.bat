@@ -10,7 +10,7 @@ REM This script adds a mail template using the `/mailTemplates` endpoint: it upl
 REM XHTML file as a multipart form, with a name and a description.
 REM
 REM Usage:
-REM 02.mailTemplates_POST.bat [NAME [FILE [DESCRIPTION]]]
+REM 02.mailTemplates_POST.bat [NAME] [FILE] [DESCRIPTION]
 REM
 REM   NAME         the template's name, ending in .xhtml (default example_mail.xhtml)
 REM   FILE         the XHTML file to upload (default: a small one the script writes)

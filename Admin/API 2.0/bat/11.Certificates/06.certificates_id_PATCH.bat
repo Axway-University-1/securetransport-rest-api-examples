@@ -11,7 +11,7 @@ REM with PATCH: it makes the certificate visible to every administrator
 REM (accessLevel PUBLIC) and tags it with an additional attribute.
 REM
 REM Usage:
-REM 06.certificates_id_PATCH.bat [NAME [ACCESS_LEVEL]]
+REM 06.certificates_id_PATCH.bat [NAME] [ACCESS_LEVEL]
 REM
 REM   NAME          the certificate's name (default example_cert)
 REM   ACCESS_LEVEL  PRIVATE, PUBLIC or BUSINESS_UNIT (default PUBLIC)

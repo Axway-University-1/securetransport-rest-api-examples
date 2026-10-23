@@ -14,7 +14,7 @@
 # - Asking for the active users count and the incoming file volume
 #
 # Usage:
-# ./01.statisticsSummary_generateReport_GET.sh [START [END [ACTIVE_USERS [VOLUME]]]]
+# ./01.statisticsSummary_generateReport_GET.sh [START] [END] [ACTIVE_USERS] [VOLUME]
 #
 #   START         first day, dd/MM/yyyy (default: today)
 #   END           last day, dd/MM/yyyy, included (default: START)
@@ -74,7 +74,7 @@ DATE_PATTERN='^[0-9]{1,2}/[0-9]{1,2}/[0-9]{4}$'
 if ! [[ "${START}" =~ ${DATE_PATTERN} && "${END}" =~ ${DATE_PATTERN} ]] || [ -n "$5" ] \
     || { [ "${ACTIVE_USERS}" != "true" ] && [ "${ACTIVE_USERS}" != "false" ]; } \
     || { [ "${VOLUME}" != "true" ] && [ "${VOLUME}" != "false" ]; }; then
-    printf "Usage: 01.statisticsSummary_generateReport_GET.sh [START [END [ACTIVE_USERS [VOLUME]]]]   (dates are dd/MM/yyyy, the last two true or false)\n"
+    printf "Usage: 01.statisticsSummary_generateReport_GET.sh [START] [END] [ACTIVE_USERS] [VOLUME]   (dates are dd/MM/yyyy, the last two true or false)\n"
     exit 2
 fi
 

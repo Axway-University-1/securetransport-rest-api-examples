@@ -11,7 +11,7 @@ REM `/configurations/logging/{name}` endpoint with HEAD: 200 when it does, 404
 REM when it does not.
 REM
 REM Usage:
-REM 10.configurations_logging_name_HEAD.bat [NAME [PROFILE_ID]]
+REM 10.configurations_logging_name_HEAD.bat [NAME] [PROFILE_ID]
 REM
 REM   NAME        the option (default Logging.Admin.config)
 REM   PROFILE_ID  its profile (default: the one 09.configurations_logging_GET.bat

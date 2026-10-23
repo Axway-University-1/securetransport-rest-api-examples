@@ -12,7 +12,7 @@
 # until they set one with PUT /myself/secretQuestion: the nearest an administrator gets to taking a question away.
 #
 # Usage:
-# ./06.accounts_name_PATCH_secretQuestion.sh [NAME [true|false]]
+# ./06.accounts_name_PATCH_secretQuestion.sh [NAME] [true|false]
 #
 #   NAME   the user account (default example_user, the one 02.accounts_POST.sh creates)
 #   true|false  force the change (default true), or take the requirement away again
@@ -47,7 +47,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts"
 NAME="${1:-example_user}"
 FORCE="${2:-true}"
 if [ "${FORCE}" != "true" ] && [ "${FORCE}" != "false" ]; then
-    printf "Usage: ./06.accounts_name_PATCH_secretQuestion.sh [NAME [true|false]]\n"
+    printf "Usage: ./06.accounts_name_PATCH_secretQuestion.sh [NAME] [true|false]\n"
     exit 2
 fi
 NAME_URI=$(jq -rn --arg name "${NAME}" '$name | @uri')

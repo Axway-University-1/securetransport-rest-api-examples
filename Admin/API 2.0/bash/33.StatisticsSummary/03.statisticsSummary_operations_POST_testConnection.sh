@@ -14,7 +14,7 @@
 # - Testing other credentials, the secret read from the environment
 #
 # Usage:
-# ./03.statisticsSummary_operations_POST_testConnection.sh [CLIENT_ID [NETWORK_ZONE [ENV_ID]]]
+# ./03.statisticsSummary_operations_POST_testConnection.sh [CLIENT_ID] [NETWORK_ZONE] [ENV_ID]
 #
 #   CLIENT_ID     test this client id (optional; the saved one is used when left out)
 #   NETWORK_ZONE  go through this network zone (optional)
@@ -69,7 +69,7 @@ CLIENT_ID="$1"
 NETWORK_ZONE="$2"
 ENV_ID="$3"
 if [ -n "$4" ]; then
-    printf "Usage: 03.statisticsSummary_operations_POST_testConnection.sh [CLIENT_ID [NETWORK_ZONE [ENV_ID]]]\n"
+    printf "Usage: 03.statisticsSummary_operations_POST_testConnection.sh [CLIENT_ID] [NETWORK_ZONE] [ENV_ID]\n"
     exit 2
 fi
 

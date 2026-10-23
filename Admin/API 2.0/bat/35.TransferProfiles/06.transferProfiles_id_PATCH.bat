@@ -12,7 +12,7 @@ REM (advancedSettings.receiverTranscoding.outputRecordLength), of the sending si
 REM (05.transferProfiles_id_PUT.bat), it sends only what changes.
 REM
 REM Usage:
-REM 06.transferProfiles_id_PATCH.bat ACCOUNT NAME [RECORD_LENGTH [SIDE]]
+REM 06.transferProfiles_id_PATCH.bat ACCOUNT NAME [RECORD_LENGTH] [SIDE]
 REM
 REM   ACCOUNT        the account the profile belongs to
 REM   NAME           the profile (it must be the only one with that name)
@@ -120,5 +120,5 @@ IF EXIST "%RESPONSE_FILE%" DEL "%RESPONSE_FILE%"
 EXIT /B 0
 
 :usage
-echo Usage: 06.transferProfiles_id_PATCH.bat ACCOUNT NAME [RECORD_LENGTH [SIDE]]
+echo Usage: 06.transferProfiles_id_PATCH.bat ACCOUNT NAME [RECORD_LENGTH] [SIDE]
 EXIT /B 2

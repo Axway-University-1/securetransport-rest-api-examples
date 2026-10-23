@@ -10,7 +10,7 @@
 # its description, and the port of its first server.
 #
 # Usage:
-# ./06.ldapDomains_name_PATCH.sh [NAME [DESCRIPTION [PORT]]]
+# ./06.ldapDomains_name_PATCH.sh [NAME] [DESCRIPTION] [PORT]
 #
 #   NAME         the domain (default example_ldap)
 #   DESCRIPTION  the new description (default "Patched by 06.ldapDomains_name_PATCH.sh")

@@ -11,7 +11,7 @@
 # until 06.icapServers_name_PATCH.sh enables it.
 #
 # Usage:
-# ./02.icapServers_POST.sh [NAME [URL [TYPE]]]
+# ./02.icapServers_POST.sh [NAME] [URL] [TYPE]
 #
 #   NAME  the server's name (default example_icap)
 #   URL   icap://host:port/service (default icap://icap.example.com:1344/AVSCAN)

@@ -11,7 +11,7 @@ REM `/configurations/logging/{name}` endpoint with PUT: it uploads a log4j XML
 REM file as a multipart form.
 REM
 REM Usage:
-REM 12.configurations_logging_name_PUT.bat XML_FILE [NAME [PROFILE_ID]]
+REM 12.configurations_logging_name_PUT.bat XML_FILE [NAME] [PROFILE_ID]
 REM
 REM   XML_FILE    the log4j configuration to upload
 REM   NAME        the option (default Logging.Admin.config)
@@ -42,7 +42,7 @@ SET NAME=%~2
 IF "%NAME%"=="" SET NAME=Logging.Admin.config
 SET PROFILE_ID=%~3
 IF NOT EXIST "%XML_FILE%" (
-    echo Usage: 12.configurations_logging_name_PUT.bat XML_FILE [NAME [PROFILE_ID]]
+    echo Usage: 12.configurations_logging_name_PUT.bat XML_FILE [NAME] [PROFILE_ID]
     EXIT /B 2
 )
 IF NOT "%PROFILE_ID%"=="" GOTO have_profile

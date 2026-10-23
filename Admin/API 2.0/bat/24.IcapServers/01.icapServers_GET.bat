@@ -15,7 +15,7 @@ REM - One server by its name, with basicSettings.name=
 REM - Only the ones of one type, with basicSettings.type=
 REM
 REM Usage:
-REM 01.icapServers_GET.bat [NAME [TYPE]]
+REM 01.icapServers_GET.bat [NAME] [TYPE]
 REM
 REM   NAME  list the server with exactly this name (optional)
 REM   TYPE  only the servers of this type: INCOMING, OUTGOING or BOTH (optional)
@@ -129,5 +129,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.icapServers_GET.bat [NAME [TYPE]]
+echo Usage: 01.icapServers_GET.bat [NAME] [TYPE]
 EXIT /B 2

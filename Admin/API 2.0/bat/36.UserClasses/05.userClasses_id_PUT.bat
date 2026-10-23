@@ -11,7 +11,7 @@ REM it reads the class, changes the membership expression and/or whether it is e
 REM whole class back.
 REM
 REM Usage:
-REM 05.userClasses_id_PUT.bat [NAME [EXPRESSION [ENABLED]]]
+REM 05.userClasses_id_PUT.bat [NAME] [EXPRESSION] [ENABLED]
 REM
 REM   NAME        the class (default example_userclass)
 REM   EXPRESSION  the new expression (default false); none empties it; - leaves it alone

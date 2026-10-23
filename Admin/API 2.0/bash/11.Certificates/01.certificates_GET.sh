@@ -13,7 +13,7 @@
 # - The ones that expire within a number of days, with expirationTime.to
 #
 # Usage:
-# ./01.certificates_GET.sh [USAGE [DAYS]]
+# ./01.certificates_GET.sh [USAGE] [DAYS]
 #
 #   USAGE  private, local, partner, login or trusted (default local); anything else is refused with exit 2, nothing sent
 #   DAYS   list the ones that expire within this many days (default 30)
@@ -48,7 +48,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/certificates"
 USAGE="${1:-local}"
 DAYS="${2:-30}"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.certificates_GET.sh [USAGE [DAYS]]\n"
+    printf "Usage: ./01.certificates_GET.sh [USAGE] [DAYS]\n"
     exit 2
 fi
 if ! [[ "${USAGE}" =~ ^(private|local|partner|login|trusted)$ ]]; then

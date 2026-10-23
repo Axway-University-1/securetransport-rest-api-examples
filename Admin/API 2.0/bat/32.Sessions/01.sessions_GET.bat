@@ -12,7 +12,7 @@ REM - Listing every session, one line each: id, user, protocol, client host, the
 REM - Keeping the sessions of one protocol (FTP, HTTP or SSH), and those of one user
 REM
 REM Usage:
-REM 01.sessions_GET.bat [TYPE [USER]]
+REM 01.sessions_GET.bat [TYPE] [USER]
 REM
 REM   TYPE  all, FTP, HTTP or SSH, in capitals (default: all)
 REM   USER  show only the sessions of this user name, exactly as written (optional)
@@ -61,7 +61,7 @@ IF "%TYPE%"=="FTP" GOTO type_ok
 IF "%TYPE%"=="HTTP" GOTO type_ok
 IF "%TYPE%"=="SSH" GOTO type_ok
 :usage
-echo Usage: 01.sessions_GET.bat [TYPE [USER]]   ^(TYPE is all, FTP, HTTP or SSH^)
+echo Usage: 01.sessions_GET.bat [TYPE] [USER]   ^(TYPE is all, FTP, HTTP or SSH^)
 EXIT /B 2
 :type_ok
 SET RESPONSE_FILE=%TEMP%\sessions_%RANDOM%.json

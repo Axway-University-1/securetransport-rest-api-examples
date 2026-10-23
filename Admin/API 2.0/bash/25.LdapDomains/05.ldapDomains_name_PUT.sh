@@ -10,7 +10,7 @@
 # reads the domain, changes its description, and sends the whole domain back.
 #
 # Usage:
-# ./05.ldapDomains_name_PUT.sh [NAME [DESCRIPTION]]
+# ./05.ldapDomains_name_PUT.sh [NAME] [DESCRIPTION]
 #
 #   NAME         the domain (default example_ldap)
 #   DESCRIPTION  the new description (default "Replaced by 05.ldapDomains_name_PUT.sh")

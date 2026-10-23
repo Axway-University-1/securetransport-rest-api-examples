@@ -11,7 +11,7 @@
 # are downloaded into a folder of the account.
 #
 # Usage:
-# ./01.transfers_operations_POST_pull.sh [ACCOUNT [SITE [DESTINATION_FOLDER]]]
+# ./01.transfers_operations_POST_pull.sh [ACCOUNT] [SITE] [DESTINATION_FOLDER]
 #
 #   ACCOUNT             the account that pulls (default john, or ST_EXAMPLE_ACCOUNT)
 #   SITE                the transfer site of that account to pull with (default SSH_PULL)
@@ -46,7 +46,7 @@ source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
     { echo "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."; exit 1; }
 
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
-USAGE="Usage: ./01.transfers_operations_POST_pull.sh [ACCOUNT [SITE [DESTINATION_FOLDER]]]"
+USAGE="Usage: ./01.transfers_operations_POST_pull.sh [ACCOUNT] [SITE] [DESTINATION_FOLDER]"
 
 ACCOUNT="${1:-${ST_EXAMPLE_ACCOUNT:-john}}"
 PULL_SITE="${2:-SSH_PULL}"

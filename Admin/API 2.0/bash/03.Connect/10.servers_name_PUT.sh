@@ -12,7 +12,7 @@
 # - A full update using retrieved server data with modified fields
 #
 # Usage:
-# ./10.servers_name_PUT.sh [NAME [PORT]]
+# ./10.servers_name_PUT.sh [NAME] [PORT]
 #
 #   NAME  the SSH server to change (default SSH_TEST_SERVER_1, the one 07.servers_POST.sh creates)
 #   PORT  the new port, 1 to 65535 (default 8031)
@@ -46,7 +46,7 @@ source "${ST_ADMIN_LOCAL_VARIABLES:-${SCRIPT_DIR}/../set_variables.local.sh}" ||
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 NAME="${1:-SSH_TEST_SERVER_1}"
 NEW_PORT="${2:-8031}"
-USAGE="Usage: ./10.servers_name_PUT.sh [NAME [PORT]]"
+USAGE="Usage: ./10.servers_name_PUT.sh [NAME] [PORT]"
 
 if [ "$#" -gt 2 ] || [ -z "${NAME}" ]; then
     printf "%s\n" "${USAGE}"

@@ -23,7 +23,7 @@
 # billable.
 #
 # Usage:
-#    python3 stBillableTransfers.py [DAYS [ACCOUNT]]
+#    python3 stBillableTransfers.py [DAYS] [ACCOUNT]
 #
 #    DAYS     how many days to count, today included (default reportDays below)
 #    ACCOUNT  count only this account's transfers (default accountName below,
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     # The command line, when given, wins over the configuration above
     if len(sys.argv) > 3 or (len(sys.argv) > 1 and not sys.argv[1].isdigit()) \
             or (len(sys.argv) > 1 and int(sys.argv[1]) < 1):
-        print('Usage: python3 stBillableTransfers.py [DAYS [ACCOUNT]]')
+        print('Usage: python3 stBillableTransfers.py [DAYS] [ACCOUNT]')
         print('DAYS is a whole number, 1 or more.')
         sys.exit(2)
     if len(sys.argv) > 1:

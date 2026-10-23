@@ -13,7 +13,7 @@
 # - Reading the new class's address from the Location header
 #
 # Usage:
-# ./02.userClasses_POST.sh [NAME [USER_NAME [EXPRESSION [ENABLED [USER_TYPE]]]]]
+# ./02.userClasses_POST.sh [NAME] [USER_NAME] [EXPRESSION] [ENABLED] [USER_TYPE]
 #
 #   NAME        the class's name, no spaces (default example_userclass)
 #   USER_NAME   the login names it matches; takes a * wildcard, is case sensitive (default example_nobody)

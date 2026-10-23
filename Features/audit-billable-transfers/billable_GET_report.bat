@@ -19,7 +19,7 @@ REM before anything else and once at the end, to show the before/after change fo
 REM today, account by account.
 REM
 REM Usage:
-REM billable_GET_report.bat [LABEL [ACCOUNT]]
+REM billable_GET_report.bat [LABEL] [ACCOUNT]
 REM
 REM LABEL is printed in the heading (for example "before" or "after"); it does not
 REM change what is measured. ACCOUNT reports on another test account than the

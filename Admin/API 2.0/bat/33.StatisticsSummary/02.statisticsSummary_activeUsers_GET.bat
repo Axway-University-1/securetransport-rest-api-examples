@@ -13,7 +13,7 @@ REM - Paging through the list with limit and offset, and printing one line per u
 REM - Keeping the users whose name holds some text, or the users who logged in after (or before) a time
 REM
 REM Usage:
-REM 02.statisticsSummary_activeUsers_GET.bat [NAME [FROM [TO]]]
+REM 02.statisticsSummary_activeUsers_GET.bat [NAME] [FROM] [TO]
 REM
 REM   NAME  a part of the login name, case sensitive, no `*` (optional; empty for every user)
 REM   FROM  only users whose last login was after this: yyyy-MM-dd, an RFC 2822 date or a timestamp in milliseconds (optional)
@@ -55,7 +55,7 @@ SET NAME=%~1
 SET FROM=%~2
 SET TO=%~3
 IF NOT "%~4"=="" (
-    echo Usage: 02.statisticsSummary_activeUsers_GET.bat [NAME [FROM [TO]]]
+    echo Usage: 02.statisticsSummary_activeUsers_GET.bat [NAME] [FROM] [TO]
     EXIT /B 2
 )
 SET RESPONSE_FILE=%TEMP%\statsum_%RANDOM%.json

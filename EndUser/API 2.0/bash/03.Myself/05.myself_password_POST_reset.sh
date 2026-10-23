@@ -11,7 +11,7 @@
 # from the email 04.myself_password_POST_requestLink.sh asked for.
 #
 # Usage:
-# ./05.myself_password_POST_reset.sh TOKEN NEW_PASSWORD [SECRET_ANSWER [USERNAME]]
+# ./05.myself_password_POST_reset.sh TOKEN NEW_PASSWORD [SECRET_ANSWER] [USERNAME]
 #
 #   TOKEN          the security token from the password reset email
 #   NEW_PASSWORD   the password to set
@@ -49,7 +49,7 @@ NEW_PASSWORD="$2"
 SECRET_ANSWER="$3"
 USERNAME="${4:-${ST_USER}}"
 if [ -z "${TOKEN}" ] || [ -z "${NEW_PASSWORD}" ]; then
-    printf "Usage: ./05.myself_password_POST_reset.sh TOKEN NEW_PASSWORD [SECRET_ANSWER [USERNAME]]\n"
+    printf "Usage: ./05.myself_password_POST_reset.sh TOKEN NEW_PASSWORD [SECRET_ANSWER] [USERNAME]\n"
     exit 2
 fi
 

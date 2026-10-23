@@ -11,7 +11,7 @@
 # back, rules and business units included.
 #
 # Usage:
-# ./05.loginRestrictionPolicies_name_PUT.sh [NAME [DESCRIPTION]]
+# ./05.loginRestrictionPolicies_name_PUT.sh [NAME] [DESCRIPTION]
 #
 #   NAME         the policy (default example_lrp)
 #   DESCRIPTION  the new description (default "Replaced by 05.loginRestrictionPolicies_name_PUT.sh")

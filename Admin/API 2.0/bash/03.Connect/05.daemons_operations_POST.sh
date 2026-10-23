@@ -16,7 +16,7 @@
 #
 # Usage:
 # ./05.daemons_operations_POST.sh DAEMON start
-# ./05.daemons_operations_POST.sh DAEMON stop stop-the-DAEMON-daemon [GRACEFUL [TIMEOUT]]
+# ./05.daemons_operations_POST.sh DAEMON stop stop-the-DAEMON-daemon [GRACEFUL] [TIMEOUT]
 #
 #   DAEMON        ftp, http, ssh, as2 or pesit
 #   stop-the-DAEMON-daemon
@@ -56,7 +56,7 @@ REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/daemons"
 DAEMON="$1"
 OPERATION="$2"
-USAGE="Usage: 05.daemons_operations_POST.sh DAEMON start, or DAEMON stop stop-the-DAEMON-daemon [GRACEFUL [TIMEOUT]]"
+USAGE="Usage: 05.daemons_operations_POST.sh DAEMON start, or DAEMON stop stop-the-DAEMON-daemon [GRACEFUL] [TIMEOUT]"
 
 case "${DAEMON}" in
     ftp|http|ssh|as2|pesit) ;;

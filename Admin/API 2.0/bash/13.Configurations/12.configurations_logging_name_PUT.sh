@@ -11,7 +11,7 @@
 # file as a multipart form.
 #
 # Usage:
-# ./12.configurations_logging_name_PUT.sh XML_FILE [NAME [PROFILE_ID]]
+# ./12.configurations_logging_name_PUT.sh XML_FILE [NAME] [PROFILE_ID]
 #
 #   XML_FILE    the log4j configuration to upload
 #   NAME        the option (default Logging.Admin.config)
@@ -45,7 +45,7 @@ XML_FILE="$1"
 NAME="${2:-Logging.Admin.config}"
 PROFILE_ID="$3"
 if [ ! -f "${XML_FILE}" ]; then
-    printf "Usage: ./12.configurations_logging_name_PUT.sh XML_FILE [NAME [PROFILE_ID]]\n"
+    printf "Usage: ./12.configurations_logging_name_PUT.sh XML_FILE [NAME] [PROFILE_ID]\n"
     exit 2
 fi
 # The profile of the option, when none is given

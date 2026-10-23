@@ -11,7 +11,7 @@
 # when it does not.
 #
 # Usage:
-# ./10.configurations_logging_name_HEAD.sh [NAME [PROFILE_ID]]
+# ./10.configurations_logging_name_HEAD.sh [NAME] [PROFILE_ID]
 #
 #   NAME        the option (default Logging.Admin.config)
 #   PROFILE_ID  its profile (default: the one 09.configurations_logging_GET.sh

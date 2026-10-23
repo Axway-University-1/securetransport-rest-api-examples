@@ -12,7 +12,7 @@
 # (05.transferProfiles_id_PUT.sh), it sends only what changes.
 #
 # Usage:
-# ./06.transferProfiles_id_PATCH.sh ACCOUNT NAME [RECORD_LENGTH [SIDE]]
+# ./06.transferProfiles_id_PATCH.sh ACCOUNT NAME [RECORD_LENGTH] [SIDE]
 #
 #   ACCOUNT        the account the profile belongs to
 #   NAME           the profile (it must be the only one with that name)

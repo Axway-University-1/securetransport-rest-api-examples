@@ -11,7 +11,7 @@
 # connection to the partner and logs in, as a transfer would, and sends nothing.
 #
 # Usage:
-# ./09.sites_operations_POST_test.sh [ACCOUNT [NAME]]
+# ./09.sites_operations_POST_test.sh [ACCOUNT] [NAME]
 #
 #   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.sh creates)

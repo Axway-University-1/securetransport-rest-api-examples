@@ -11,7 +11,7 @@
 # whole server back.
 #
 # Usage:
-# ./05.icapServers_name_PUT.sh [NAME [MAX_MB]]
+# ./05.icapServers_name_PUT.sh [NAME] [MAX_MB]
 #
 #   NAME    the server (default example_icap)
 #   MAX_MB  the largest file, in MB; 0 is unlimited (default 10)

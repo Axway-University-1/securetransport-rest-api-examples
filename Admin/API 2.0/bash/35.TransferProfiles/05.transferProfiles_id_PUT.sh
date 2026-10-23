@@ -11,7 +11,7 @@
 # and, when asked, the file it sends (sendMapping, a plain field), and sends the whole profile back.
 #
 # Usage:
-# ./05.transferProfiles_id_PUT.sh ACCOUNT NAME [LINE_ENDING [SEND_MAPPING]]
+# ./05.transferProfiles_id_PUT.sh ACCOUNT NAME [LINE_ENDING] [SEND_MAPPING]
 #
 #   ACCOUNT       the account the profile belongs to
 #   NAME          the profile (it must be the only one with that name)

@@ -12,7 +12,7 @@
 # - Keeping the sessions of one protocol (FTP, HTTP or SSH), and those of one user
 #
 # Usage:
-# ./01.sessions_GET.sh [TYPE [USER]]
+# ./01.sessions_GET.sh [TYPE] [USER]
 #
 #   TYPE  all, FTP, HTTP or SSH, in capitals (default: all)
 #   USER  show only the sessions of this user name, exactly as written (optional)
@@ -61,12 +61,12 @@ USER_NAME="$2"
 case "${TYPE}" in
     all|FTP|HTTP|SSH) ;;
     *)
-        printf "Usage: 01.sessions_GET.sh [TYPE [USER]]   (TYPE is all, FTP, HTTP or SSH)\n"
+        printf "Usage: 01.sessions_GET.sh [TYPE] [USER]   (TYPE is all, FTP, HTTP or SSH)\n"
         exit 2
         ;;
 esac
 if [ -n "$3" ]; then
-    printf "Usage: 01.sessions_GET.sh [TYPE [USER]]\n"
+    printf "Usage: 01.sessions_GET.sh [TYPE] [USER]\n"
     exit 2
 fi
 

@@ -13,7 +13,7 @@
 # - Only the entries of one kind of operation
 #
 # Usage:
-# ./01.logs_audit_GET.sh [HOURS [OBJECT_TYPE [OBJECT_NAME [OPERATION]]]]
+# ./01.logs_audit_GET.sh [HOURS] [OBJECT_TYPE] [OBJECT_NAME] [OPERATION]
 #
 #   HOURS        how far back to look, in whole hours (default 24)
 #   OBJECT_TYPE  for example BusinessUnit or Account (optional)
@@ -53,7 +53,7 @@ OBJECT_TYPE="$2"
 OBJECT_NAME="$3"
 OPERATION="$4"
 if [ "$#" -gt 4 ]; then
-    printf "Usage: ./01.logs_audit_GET.sh [HOURS [OBJECT_TYPE [OBJECT_NAME [OPERATION]]]]\n"
+    printf "Usage: ./01.logs_audit_GET.sh [HOURS] [OBJECT_TYPE] [OBJECT_NAME] [OPERATION]\n"
     exit 2
 fi
 [[ "${HOURS}" =~ ^[1-9][0-9]*$ ]] || { printf "HOURS must be a whole number of 1 or more: %s\n" "${HOURS}"; exit 2; }

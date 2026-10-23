@@ -12,7 +12,7 @@ REM - Creating a minimal server with name and protocol
 REM - Duplicating an existing server by modifying its configuration
 REM
 REM Usage:
-REM 07.servers_POST.bat [NAME [NEW_NAME [NEW_PORT]]]
+REM 07.servers_POST.bat [NAME] [NEW_NAME] [NEW_PORT]
 REM
 REM   NAME      the minimal SSH server to create (default SSH_TEST_SERVER_1)
 REM   NEW_NAME  the duplicate of it (default SSH_TEST_SERVER_2); not the same as NAME
@@ -49,7 +49,7 @@ SET "NEW_NAME=%~2"
 IF "%NEW_NAME%"=="" SET "NEW_NAME=SSH_TEST_SERVER_2"
 SET "NEW_PORT=%~3"
 IF "%NEW_PORT%"=="" SET "NEW_PORT=8030"
-SET "USAGE=Usage: 07.servers_POST.bat [NAME [NEW_NAME [NEW_PORT]]]"
+SET "USAGE=Usage: 07.servers_POST.bat [NAME] [NEW_NAME] [NEW_PORT]"
 IF NOT "%~4"=="" GOTO usage
 IF "%NAME%"=="%NEW_NAME%" (
     echo NAME and NEW_NAME must differ. Nothing was sent.

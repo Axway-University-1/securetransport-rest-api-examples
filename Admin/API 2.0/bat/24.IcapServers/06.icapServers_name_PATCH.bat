@@ -11,7 +11,7 @@ REM it switches the server on or off, and what happens to a transfer when the se
 REM cannot be reached.
 REM
 REM Usage:
-REM 06.icapServers_name_PATCH.bat [NAME [ENABLED [DENY_ON_ERROR]]]
+REM 06.icapServers_name_PATCH.bat [NAME] [ENABLED] [DENY_ON_ERROR]
 REM
 REM   NAME           the server (default example_icap)
 REM   ENABLED        true to scan, false to stop (default false)

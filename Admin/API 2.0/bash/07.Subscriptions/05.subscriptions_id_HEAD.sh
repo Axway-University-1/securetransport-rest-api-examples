@@ -12,7 +12,7 @@
 # folder first.
 #
 # Usage:
-# ./05.subscriptions_id_HEAD.sh [ACCOUNT [APPLICATION [FOLDER]]]
+# ./05.subscriptions_id_HEAD.sh [ACCOUNT] [APPLICATION] [FOLDER]
 #
 #   ACCOUNT      the account that subscribes (default john, or ST_EXAMPLE_ACCOUNT)
 #   APPLICATION  the application it subscribes to (default AdvancedRoutingApplication)

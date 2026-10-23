@@ -141,7 +141,7 @@ $EDITOR settings.local.sh                             # set BT_ACCOUNT_PASSWORD
 `00.run_all.sh` takes three optional arguments, in this order:
 
 ```
-./00.run_all.sh [ACCOUNT [INBOUND_ONLY [IN_AND_OUT]]] [--cleanup]
+./00.run_all.sh [ACCOUNT] [INBOUND_ONLY] [IN_AND_OUT] [--cleanup]
 
 ./00.run_all.sh test_account            a test account named test_account
 ./00.run_all.sh test_account 6 12       and scenario 2.1 with 6 files (inbound
@@ -234,7 +234,7 @@ ask, in one End User API session. Each download is a transfer of its own, so it
 shows how quickly repeated downloads add up in the usage reporting.
 
 ```
-./files_GET_download.sh FILE [COUNT [ACCOUNT]]
+./files_GET_download.sh FILE [COUNT] [ACCOUNT]
 
 ./billable_GET_report.sh before
 ./files_GET_download.sh subscription/s1/only_inbound.txt 50

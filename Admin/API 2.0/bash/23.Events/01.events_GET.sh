@@ -15,7 +15,7 @@
 # - Only the ones with a heartbeat in the last hour, with lastHeartbeatAfter=
 #
 # Usage:
-# ./01.events_GET.sh [ACCOUNT_PATTERN [STATUS]]
+# ./01.events_GET.sh [ACCOUNT_PATTERN] [STATUS]
 #
 #   ACCOUNT_PATTERN  an account name, * matches anything (default *)
 #   STATUS           only the events with this status, for example active (optional)
@@ -60,7 +60,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/events"
 ACCOUNT_PATTERN="${1:-*}"
 STATUS="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.events_GET.sh [ACCOUNT_PATTERN [STATUS]]\n"
+    printf "Usage: ./01.events_GET.sh [ACCOUNT_PATTERN] [STATUS]\n"
     exit 2
 fi
 LINE='"  \(.id)  \(.status)  \(.accountName // "-")  \(.fullTarget // "-")  retries \(.retryCount)"'

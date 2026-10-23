@@ -12,7 +12,7 @@ REM subscription's id, so the script looks the id up by account, application and
 REM folder first.
 REM
 REM Usage:
-REM 05.subscriptions_id_HEAD.bat [ACCOUNT [APPLICATION [FOLDER]]]
+REM 05.subscriptions_id_HEAD.bat [ACCOUNT] [APPLICATION] [FOLDER]
 REM
 REM   ACCOUNT      the account that subscribes (default john, or ST_EXAMPLE_ACCOUNT)
 REM   APPLICATION  the application it subscribes to (default AdvancedRoutingApplication)

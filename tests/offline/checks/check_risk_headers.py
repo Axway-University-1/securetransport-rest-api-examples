@@ -60,7 +60,7 @@ chk("every disruptive or config example of the Admin API says why, or is in a co
 denied = next(e for e in items if e["path"].endswith("22.DeniedUsers/02.deniedUsers_POST.sh"))
 chk("list_examples reads the method, endpoint, usage and twin of an example",
     (denied["method"], denied["endpoint"], denied["usage"], denied["bat"], denied["topic"])
-    == ("POST", "/deniedUsers", ["./02.deniedUsers_POST.sh [LOGIN_NAME [HOURS [NOTE]]]"],
+    == ("POST", "/deniedUsers", ["./02.deniedUsers_POST.sh [LOGIN_NAME] [HOURS] [NOTE]"],
         "Admin/API 2.0/bat/22.DeniedUsers/02.deniedUsers_POST.bat", "22.DeniedUsers"), denied)
 
 print("check_risk_headers: %s" % ("PASS" if not failed else "%d FAILED" % failed))

@@ -17,7 +17,7 @@ REM Not numbered, so 00.run_all.bat does not run it: it is a separate experiment
 REM run by hand against a file that is already in the account's home folder.
 REM
 REM Usage:
-REM files_GET_download.bat FILE [COUNT [ACCOUNT]]
+REM files_GET_download.bat FILE [COUNT] [ACCOUNT]
 REM
 REM   FILE     the file to download, relative to the account's home folder, for
 REM            example subscription/s1/only_inbound.txt, where scenario 2.1 lands in
@@ -109,5 +109,5 @@ echo   %1 of %COUNT%: HTTP %DL_CODE%
 EXIT /B 0
 
 :usage
-echo Usage: files_GET_download.bat FILE [COUNT [ACCOUNT]]
+echo Usage: files_GET_download.bat FILE [COUNT] [ACCOUNT]
 EXIT /B 2

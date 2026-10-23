@@ -13,7 +13,7 @@ REM - Searching by name, with the * wildcard
 REM - The units nested under another one, with parent=
 REM
 REM Usage:
-REM 02.businessUnits_GET.bat [PATTERN [PARENT]]
+REM 02.businessUnits_GET.bat [PATTERN] [PARENT]
 REM
 REM   PATTERN  a name, * matches anything (default *)
 REM   PARENT   list the units nested under this one (optional)
@@ -99,5 +99,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 02.businessUnits_GET.bat [PATTERN [PARENT]]
+echo Usage: 02.businessUnits_GET.bat [PATTERN] [PARENT]
 EXIT /B 2

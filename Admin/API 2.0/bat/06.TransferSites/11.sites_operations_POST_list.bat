@@ -11,7 +11,7 @@ REM `/sites/operations` endpoint with operation=listRemoteFolder: the server con
 REM in, lists the site's download (or upload) folder, and prints what it finds.
 REM
 REM Usage:
-REM 11.sites_operations_POST_list.bat [ACCOUNT [NAME [FOLDER [LIMIT [FOLDERS]]]]]
+REM 11.sites_operations_POST_list.bat [ACCOUNT] [NAME] [FOLDER] [LIMIT] [FOLDERS]
 REM
 REM   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.bat creates)

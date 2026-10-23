@@ -11,7 +11,7 @@
 # cannot be reached.
 #
 # Usage:
-# ./06.icapServers_name_PATCH.sh [NAME [ENABLED [DENY_ON_ERROR]]]
+# ./06.icapServers_name_PATCH.sh [NAME] [ENABLED] [DENY_ON_ERROR]
 #
 #   NAME           the server (default example_icap)
 #   ENABLED        true to scan, false to stop (default false)

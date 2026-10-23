@@ -16,7 +16,7 @@
 # - Saying which chunk failed, and continuing from it with --resume
 #
 # Usage:
-# ./03.fileOperations_id_PUT_chunked.sh LOCAL_FILE [FOLDER [CHUNK_SIZE]] [--retries N] [--wait SECONDS] [--resume OPERATION_ID CHUNK]
+# ./03.fileOperations_id_PUT_chunked.sh LOCAL_FILE [FOLDER] [CHUNK_SIZE] [--retries N] [--wait SECONDS] [--resume OPERATION_ID CHUNK]
 #
 #   LOCAL_FILE  the path of the file to upload, on this machine
 #   FOLDER      where to put it, relative to the home folder (default: the home
@@ -72,7 +72,7 @@ COOKIE="${SCRIPT_DIR}/../myCookie.jar"
 source "${SCRIPT_DIR}/../ensure_session.sh"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 
-USAGE="Usage: ./03.fileOperations_id_PUT_chunked.sh LOCAL_FILE [FOLDER [CHUNK_SIZE]] [--retries N] [--wait SECONDS] [--resume OPERATION_ID CHUNK]"
+USAGE="Usage: ./03.fileOperations_id_PUT_chunked.sh LOCAL_FILE [FOLDER] [CHUNK_SIZE] [--retries N] [--wait SECONDS] [--resume OPERATION_ID CHUNK]"
 RETRIES=3
 WAIT=2
 RESUME_ID=""

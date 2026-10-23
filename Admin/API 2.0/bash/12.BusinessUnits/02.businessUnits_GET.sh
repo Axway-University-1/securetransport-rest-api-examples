@@ -13,7 +13,7 @@
 # - The units nested under another one, with parent=
 #
 # Usage:
-# ./02.businessUnits_GET.sh [PATTERN [PARENT]]
+# ./02.businessUnits_GET.sh [PATTERN] [PARENT]
 #
 #   PATTERN  a name, * matches anything (default *)
 #   PARENT   list the units nested under this one (optional)
@@ -46,7 +46,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/businessUnits"
 PATTERN="${1:-*}"
 PARENT="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./02.businessUnits_GET.sh [PATTERN [PARENT]]\n"
+    printf "Usage: ./02.businessUnits_GET.sh [PATTERN] [PARENT]\n"
     exit 2
 fi
 

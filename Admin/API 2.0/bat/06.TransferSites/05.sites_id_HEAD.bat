@@ -11,7 +11,7 @@ REM endpoint with HEAD: 200 when it does, 404 when it does not. The path takes t
 REM site's id, so the script looks the id up by account and name first.
 REM
 REM Usage:
-REM 05.sites_id_HEAD.bat [ACCOUNT [NAME]]
+REM 05.sites_id_HEAD.bat [ACCOUNT] [NAME]
 REM
 REM   ACCOUNT  the account the site belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 REM   NAME     the site (default SSH_PULL, which 02.sites_POST_ssh.bat creates)

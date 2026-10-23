@@ -11,7 +11,7 @@
 # (05.userClasses_id_PUT.sh), it sends only what changes.
 #
 # Usage:
-# ./06.userClasses_id_PATCH.sh [NAME [FIELD [VALUE]]]
+# ./06.userClasses_id_PATCH.sh [NAME] [FIELD] [VALUE]
 #
 #   NAME   the class (default example_userclass)
 #   FIELD  enabled (default), expression, order, userName, group, address, userType or className

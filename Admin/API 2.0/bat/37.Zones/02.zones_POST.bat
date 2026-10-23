@@ -13,7 +13,7 @@ REM - Optionally one edge: a title, an address and one SSH protocol with a port 
 REM - Reading the new zone's address from the Location header
 REM
 REM Usage:
-REM 02.zones_POST.bat [NAME [DESCRIPTION [EDGE_TITLE [EDGE_ADDRESS [EDGE_PORT]]]]]
+REM 02.zones_POST.bat [NAME] [DESCRIPTION] [EDGE_TITLE] [EDGE_ADDRESS] [EDGE_PORT]
 REM
 REM   NAME          the zone's name (default example_zone); not \ / ; ' , at most 255 characters
 REM   DESCRIPTION   its description (default "Created by the examples"), at most 255 characters

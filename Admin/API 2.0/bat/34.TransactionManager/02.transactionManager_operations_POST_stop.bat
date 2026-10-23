@@ -15,7 +15,7 @@ REM - An immediate stop (GRACEFUL false)
 REM - A guard: nothing is sent unless the first argument is the confirmation word
 REM
 REM Usage:
-REM 02.transactionManager_operations_POST_stop.bat stop-the-transaction-manager [GRACEFUL [TIMEOUT]]
+REM 02.transactionManager_operations_POST_stop.bat stop-the-transaction-manager [GRACEFUL] [TIMEOUT]
 REM
 REM   stop-the-transaction-manager
 REM                 the confirmation: this exact word, required. Without it, or with any other
@@ -58,7 +58,7 @@ SET CONFIRMATION=stop-the-transaction-manager
 SET GRACEFUL=%~2
 IF "%GRACEFUL%"=="" SET GRACEFUL=true
 SET TIMEOUT=%~3
-SET USAGE=Usage: 02.transactionManager_operations_POST_stop.bat %CONFIRMATION% [GRACEFUL [TIMEOUT]]
+SET USAGE=Usage: 02.transactionManager_operations_POST_stop.bat %CONFIRMATION% [GRACEFUL] [TIMEOUT]
 
 IF NOT "%~1"=="%CONFIRMATION%" (
     echo This stops the Transaction Manager of the whole server, and it cannot be started again through the API.

@@ -13,7 +13,7 @@ REM - The entries for one type of object, and one object by its exact name
 REM - Only the entries of one kind of operation
 REM
 REM Usage:
-REM 01.logs_audit_GET.bat [HOURS [OBJECT_TYPE [OBJECT_NAME [OPERATION]]]]
+REM 01.logs_audit_GET.bat [HOURS] [OBJECT_TYPE] [OBJECT_NAME] [OPERATION]
 REM
 REM   HOURS        how far back to look, in whole hours (default 24)
 REM   OBJECT_TYPE  for example BusinessUnit or Account (optional)
@@ -125,5 +125,5 @@ IF EXIST "%RESPONSE_FILE%" TYPE "%RESPONSE_FILE%"
 EXIT /B 1
 
 :usage
-echo Usage: 01.logs_audit_GET.bat [HOURS [OBJECT_TYPE [OBJECT_NAME [OPERATION]]]]
+echo Usage: 01.logs_audit_GET.bat [HOURS] [OBJECT_TYPE] [OBJECT_NAME] [OPERATION]
 EXIT /B 2

@@ -11,7 +11,7 @@
 # so the script looks the id up by account and name first.
 #
 # Usage:
-# ./03.transferProfiles_id_HEAD.sh [ACCOUNT [NAME]]
+# ./03.transferProfiles_id_HEAD.sh [ACCOUNT] [NAME]
 #
 #   ACCOUNT  the account the profile belongs to (default john, or ST_EXAMPLE_ACCOUNT)
 #   NAME     the profile (default TP)

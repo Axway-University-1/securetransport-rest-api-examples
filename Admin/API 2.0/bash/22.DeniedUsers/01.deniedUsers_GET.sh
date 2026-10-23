@@ -15,7 +15,7 @@
 # - Only the ones blocked since a date (blockedAt.from=)
 #
 # Usage:
-# ./01.deniedUsers_GET.sh [PATTERN [SINCE]]
+# ./01.deniedUsers_GET.sh [PATTERN] [SINCE]
 #
 #   PATTERN  a login name, * matches anything (default *)
 #   SINCE    only the ones blocked on or after this date, as yyyy-MM-dd (optional)
@@ -54,7 +54,7 @@ MAIN_URL="https://${ST_SERVER}:${ST_PORT}/api/v2.0/deniedUsers"
 PATTERN="${1:-*}"
 SINCE="$2"
 if [ "$#" -gt 2 ]; then
-    printf "Usage: ./01.deniedUsers_GET.sh [PATTERN [SINCE]]\n"
+    printf "Usage: ./01.deniedUsers_GET.sh [PATTERN] [SINCE]\n"
     exit 2
 fi
 if [ -n "${SINCE}" ] && ! [[ "${SINCE}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then

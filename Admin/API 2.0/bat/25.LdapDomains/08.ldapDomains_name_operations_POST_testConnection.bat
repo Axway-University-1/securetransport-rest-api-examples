@@ -10,7 +10,7 @@ REM This script tests the connection to one server of an LDAP domain using the
 REM `/ldapDomains/{name}/operations` endpoint with operation=testConnection.
 REM
 REM Usage:
-REM 08.ldapDomains_name_operations_POST_testConnection.bat [NAME [SERVER_NUMBER]]
+REM 08.ldapDomains_name_operations_POST_testConnection.bat [NAME] [SERVER_NUMBER]
 REM
 REM   NAME           the domain (default example_ldap)
 REM   SERVER_NUMBER  which of its servers, counting from 1 (default 1)
