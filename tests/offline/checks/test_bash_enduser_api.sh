@@ -178,6 +178,12 @@ expect "05 reset: token, new password, username; no secret answer when none is g
   "$(payload 1 | jq -c '[.operation, .token, .newPassword, .username, has("secretAnswer")]')" '["reset","tok-1","N3w p@ss","apiadmin",false]'
 run 03.Myself/05.myself_password_POST_reset.sh tok-1 'N3w p@ss' 'blue' john
 expect "05 reset: the secret answer and username, when given" "$(payload 1 | jq -c '[.secretAnswer, .username]')" '["blue","john"]'
+STATUS=401 run 03.Myself/05.myself_password_POST_reset.sh bad-token 'N3w p@ss'
+expect "05 reset: a refused token (401) is exit 1, it was not reset" "${RC}" "1"
+STATUS=401 run 03.Myself/04.myself_password_POST_requestLink.sh john@example.com
+expect "04 requestLink: a refusal is exit 1" "${RC}" "1"
+STATUS=200 run 03.Myself/04.myself_password_POST_requestLink.sh john@example.com
+expect "04 requestLink: 200 is exit 0" "${RC}" "0"
 
 echo "=== 07.SecretQuestions ==="
 GET_BODY=$(body questions '["Your first pet?","Your first school?"]')

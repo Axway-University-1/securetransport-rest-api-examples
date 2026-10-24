@@ -151,6 +151,14 @@ try:
         else:
             c.check("23 is refused only for the known reason", "adminCertificateFileOrPath" in out, out[-300:])
             c.info("this server's login settings are refused on any change: 22 and 23 cannot be shown working here")
+        depth = saved["loginSettings"]["adminCertificateDepthLimit"]
+        out = script("22.configurations_loginSettings_PUT.sh", [str(depth + 1)], expect_rc=None)
+        if "HTTP 204" in out:
+            c.check("22 PUT changed the certificate depth limit", get("loginSettings")["adminCertificateDepthLimit"] == depth + 1)
+            admin.put("configurations/loginSettings", saved["loginSettings"])
+            c.check("22: and it is put back as it was", get("loginSettings") == saved["loginSettings"])
+        else:
+            c.check("22 is refused only for the known reason", "adminCertificateFileOrPath" in out, out[-300:])
         out = script("24.configurations_maintenance_GET.sh")
         c.check("24 prints the maintenance mode", "  maintenance mode: %s" % get("maintenance")["zduMaintenanceMode"] in out)
         out = script("26.configurations_adminui_GET.sh")

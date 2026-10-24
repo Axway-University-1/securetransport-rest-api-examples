@@ -52,6 +52,10 @@ BODY=$(jq -n --arg email "${EMAIL}" --arg username "${USERNAME}" \
   '{operation: "requestLink", email: $email, username: $username}')
 
 printf "Asking for a password reset email to %s...\n" "${EMAIL}"
-curl -s -k -X POST "${ST_URL}/myself/password?operation=requestLink" \
+RESPONSE=$(curl -s -k -X POST "${ST_URL}/myself/password?operation=requestLink" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-  -d "${BODY}" -w "\nHTTP %{http_code}\n"
+  -d "${BODY}" -w "\n%{http_code}")
+STATUS="${RESPONSE##*$'\n'}"
+printf '%s\nHTTP %s\n' "${RESPONSE%$'\n'*}" "${STATUS}"
+# the answer is the example's exit code: 200 is done, anything else is not
+[ "${STATUS}" = "200" ] || exit 1

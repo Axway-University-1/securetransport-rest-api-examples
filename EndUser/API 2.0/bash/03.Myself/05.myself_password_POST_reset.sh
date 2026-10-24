@@ -60,6 +60,10 @@ BODY=$(jq -n --arg token "${TOKEN}" --arg new "${NEW_PASSWORD}" --arg answer "${
    + (if $answer == "" then {} else {secretAnswer: $answer} end)')
 
 printf "Resetting the password of %s...\n" "${USERNAME}"
-curl -s -k -X POST "${ST_URL}/myself/password?operation=reset" \
+RESPONSE=$(curl -s -k -X POST "${ST_URL}/myself/password?operation=reset" \
   -H "accept: application/json" -H "${REFERER_HEADER}" -H "Content-Type: application/json" \
-  -d "${BODY}" -w "\nHTTP %{http_code}\n"
+  -d "${BODY}" -w "\n%{http_code}")
+STATUS="${RESPONSE##*$'\n'}"
+printf '%s\nHTTP %s\n' "${RESPONSE%$'\n'*}" "${STATUS}"
+# the answer is the example's exit code: 200 is done, anything else is not
+[ "${STATUS}" = "200" ] || exit 1
