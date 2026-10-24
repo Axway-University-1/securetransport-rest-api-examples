@@ -348,6 +348,26 @@ has "04: and by direction" "  Outgoing: 1"
 urun ../05-checking-transfers/99.cleanup_DELETE.sh
 expect "99: only the logout" "$(calls | tr '\n' ' ')" "DELETE ${BASE}/myself "
 
+echo "=== 00.run_all of 03, 04 and 05: it stops at the first step that fails, and cleans up either way ==="
+uc 03-files-and-folders
+STUB_STATUS_GET=404 STUB_STATUS_POST=409 urun ../03-files-and-folders/00.run_all.sh
+expect "03 00: a folder that cannot be made is exit 1" "${RC}" "1"
+has "03 00: it names the step that failed" "01.folder_POST failed."
+hasnt "03 00: and does not go on to the upload" "=== 02.files_POST_upload ==="
+has "03 00: and still runs the cleanup" "=== 99.cleanup_DELETE ==="
+uc 04-larger-files
+STUB_STATUS_GET=404 STUB_STATUS_POST=409 urun ../04-larger-files/00.run_all.sh
+expect "04 00: a folder that cannot be made is exit 1" "${RC}" "1"
+has "04 00: it names the step that failed" "01.folder_POST failed."
+hasnt "04 00: and does not go on to the uploads" "=== 02.files_POST_md5 ==="
+has "04 00: and still runs the cleanup" "=== 99.cleanup_DELETE ==="
+uc 05-checking-transfers
+STUB_STATUS_GET=500 urun ../05-checking-transfers/00.run_all.sh
+expect "05 00: a server error on the first call is exit 1" "${RC}" "1"
+has "05 00: it names the step that failed" "01.transfers_GET failed."
+hasnt "05 00: and does not go on to the next" "=== 02.transfers_GET_filtered ==="
+has "05 00: and still runs the cleanup" "=== 99.cleanup_DELETE ==="
+
 echo "=== 06-sharing-a-folder ==="
 F="${BASE_FILES}/example_uc_shared"
 uc 06-sharing-a-folder

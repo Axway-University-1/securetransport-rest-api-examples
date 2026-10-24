@@ -234,7 +234,7 @@ scenario = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False)
 json.dump(world(routes=[{"id": "r1", "name": "A"}]), scenario)
 scenario.close()
 done = subprocess.run([sys.executable, "-c", probe], capture_output=True, text=True,
-                      env=dict(os.environ, PYTHONPATH=run_example.FAKE_REQUESTS, FAKE_ST_SCENARIO=scenario.name))
+                      env=dict(os.environ, PYTHONPATH=os.pathsep.join(p for p in (os.environ.get("COVERAGE_PYTHONPATH"), run_example.FAKE_REQUESTS) if p), FAKE_ST_SCENARIO=scenario.name))
 os.remove(scenario.name)
 c.check("the login answers a csrfToken", "login 200 True" in done.stdout, done.stdout + done.stderr)
 c.check("a write without it is 403", "write without the token 403" in done.stdout, done.stdout)

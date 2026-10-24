@@ -123,7 +123,7 @@ def run(script, args=(), scenario=None, config=None, files=None, fast=False, tim
             if k.startswith("ST_") or k.startswith("FAKE_ST"):
                 del environment[k]
         environment.update({
-            "PYTHONPATH": FAKE_REQUESTS,
+            "PYTHONPATH": os.pathsep.join(p for p in (os.environ.get("COVERAGE_PYTHONPATH"), FAKE_REQUESTS) if p),
             "FAKE_ST_SCENARIO": scenario_file,
             "FAKE_ST_LOG": log_file,
             "PYTHONDONTWRITEBYTECODE": "1",

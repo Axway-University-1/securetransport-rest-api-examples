@@ -1,4 +1,13 @@
 #!/bin/bash
+# tools/script_coverage.py asks which script made each call: the parent's command line is the script
+if [ -n "${COVERAGE_LOG:-}" ]; then
+    _p=$PPID
+    for _i in 1 2 3; do   # past the wrappers around this stub, to the script that called curl
+        _c=$(ps -o command= -p "${_p}" 2>/dev/null)
+        case "${_c}" in *"/curl "*|*"/curl_stub "*|*"stub_curl"*) _p=$(ps -o ppid= -p "${_p}" 2>/dev/null | tr -d ' ') ;; *) break ;; esac
+    done
+    printf 'CALL %s\n' "${_c}" >> "${COVERAGE_LOG}"
+fi
 # ==============================================================================
 # A stand-in for curl, used by the offline tests.
 #

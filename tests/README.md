@@ -113,6 +113,7 @@ server](#against-a-real-server).
 | Check | What it catches |
 | ----- | --------------- |
 | `offline/checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. In a `.bat` file: a single `%` before `{http_code}`, which cmd eats; a `%VAR: =%%20%` substitution, which does not URL-encode; and an RFC 2822 date with a `+03:00` offset or day names in the Windows language. |
+| `offline/checks/test_script_coverage.py` | The matching in `tools/script_coverage.py`: which script a record of the suite's run belongs to, and a script that ran but never made a call. |
 | `offline/checks/check_script_conventions.py` | The house rules for every bash example (Admin, End User, Use Cases, Features), found in manual review: each optional parameter has its own bracket (`[A] [B]`, never `[A [B]]`); the `Usage:` a script prints is the one in its header; a script run without its required parameters exits 2 with a usage and has sent nothing. |
 | `offline/checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: README coverage tables whose counts differ from the directories, and `.claude` skills that describe a layout, file or variable that no longer exists. |
 | `offline/checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
@@ -260,6 +261,10 @@ are committed. If you are unsure, it belongs in `local/`.
 | Integration checks 15 to 18 and 20 skip | They need a one-time venv. See [integration/README.md](online/README.md). |
 
 ## Which tests cover a script
+
+`python3 tools/script_coverage.py` is the measure that counts: it runs the offline suite with a tracer and lists every
+bash and python example that no check ran, and every bash example that ran but never made a call to the server (only
+its usage was tried). It takes as long as the suite. The map below only reads names.
 
 `python3 tools/test_map.py [WORD ...]` lists each script with the offline and online checks whose files name it
 (`--missing` lists those without one of the two). A check that runs scripts from a folder in a loop, without naming
