@@ -111,12 +111,16 @@ try:
         # as2 server and daemon always say so (see below), and that is the only failure that may be there
         result = runner.run(os.path.join(CONNECT_DIR, "13.servers_operations_POST.sh"),
                             ["--all-stopped", "start-all-stopped-servers"], timeout=90)
-        failures = [line for line in result.stdout.splitlines() if "(successful: false)" in line]
+        # a server whose start was refused because its daemon had just brought it up is not a failure: the script
+        # looks again and says "Server: X is running now"
+        came_up = [line.split("Server: ", 1)[1].split(" is running now")[0] for line in result.stdout.splitlines() if " is running now" in line]
+        failures = [line for line in result.stdout.splitlines() if "(successful: false)" in line
+                    and not any(line.startswith(name + " ") for name in came_up)]
         only_as2 = all("as2" in line.lower() for line in failures)
         c.check("13.servers_operations_POST.sh --all-stopped runs without a shell level error "
                 "(exit 0, or exit 1 only for the as2 server and daemon that cannot start)",
                 result.returncode == 0 or (result.returncode == 1 and failures and only_as2),
-                (result.stdout + result.stderr).strip()[-400:] if result.returncode else "")
+                "exit %s, unsuccessful lines: %s" % (result.returncode, failures) if result.returncode else "")
 
     started = wait_until(lambda: all(v == "Running" for k, v in daemon_statuses(client).items()
                                      if original_daemons[k] == "Running"))

@@ -170,6 +170,33 @@ c.check("an active server whose answer has no protocol does not break the status
         ns["getServerDaemonsStatus"](s, "https://st.example.com:8444/api/v2.0/", "T", "ssh") is True)
 s = fake_st.FakeSession({"servers": [{"protocol": "ssh", "isActive": False}]})
 c.check("an inactive one is not running", ns["getServerDaemonsStatus"](s, "https://st.example.com:8444/api/v2.0/", "T", "ssh") is False)
+
+
+class Answer:
+    def __init__(self, body):
+        self.body = body
+
+    def json(self):
+        return self.body
+
+
+def stop_with(body):
+    """stopDaemon with a server that answers `body`: None when it carried on, 'exit 1' when it stopped the script."""
+    ns["stPostOperation"] = lambda session, stUrl, token, path, what: Answer(body)
+    ns["writeLog"] = lambda *a, **k: None
+    try:
+        ns["stopDaemon"](None, "https://st.example.com:8444/api/v2.0/", "T", "ssh", 60)
+    except SystemExit as e:
+        return "exit %s" % e.code
+    return None
+
+
+ok = {"daemon": "SSH", "message": "Daemon SSH is stopped.", "isSuccessful": True}
+no = {"daemon": "SSH", "message": "could not", "isSuccessful": False}
+c.check("a stop answered as the documented object that holds the list goes on", stop_with({"daemonOperationResults": [ok]}) is None)
+c.check("... and one that says it failed stops the script", stop_with({"daemonOperationResults": [no]}) == "exit 1")
+c.check("a stop answered as a bare list (what the 5.5 lab does, RD-24) goes on", stop_with([ok]) is None)
+c.check("... and one that says it failed stops the script", stop_with([no]) == "exit 1")
 failures += 0 if c.summary() else 1
 
 print()

@@ -36,7 +36,7 @@ REM   that was running on it may then need its own start (13.servers_operations_
 REM - A graceful stop with a timeout keeps running on the server after this script is gone: never kill the script before it returns, and do not start the daemon again
 REM   while a delayed stop may still be pending (see st-api-gotchas).
 REM - THIS WAS NOT RUN against a server while the script was made safe: no daemon of the lab was stopped or started, by this change. What follows is from the reference and from
-REM   what check 23 recorded earlier (its docstring and st-api-gotchas): the answer is 200 with `daemonOperationResults`, a list of `{daemon, message, isSuccessful}`; a start of the
+REM   what check 23 recorded earlier (its docstring and st-api-gotchas): the answer is 200 with a list (the documented object with `daemonOperationResults` holding it, or, as the 5.5 lab answers, the bare list) of `{daemon, message, isSuccessful}`; a start of the
 REM   as2 daemon is 200 with `isSuccessful` false and "Can not start AS2 daemon - the default server As2 Default is not enabled." whatever the status code says. This script
 REM   prints every result and exits 1 when one has `isSuccessful` false, or when the status is not 200. It is tested offline against a stub `curl`.
 REM - PowerShell is used to read the status and the answer, in place of jq.

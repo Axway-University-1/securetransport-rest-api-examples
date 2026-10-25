@@ -11,7 +11,7 @@ REM A stop refuses the clients of that server until it is started again.
 REM It demonstrates:
 REM - A guard: nothing is sent unless the server and the operation are given and, for a stop, the confirmation word as well
 REM - Starting one server, with the status of the server and of its daemon printed first and the command that undoes it
-REM - Starting every server that is found not running, and then every daemon that is not running (--all-stopped)
+REM - Starting every daemon that is found not running, and then every server that is not running (--all-stopped)
 REM - The HTTP code, and the result the server gives for each server
 REM
 REM Usage:
@@ -25,7 +25,7 @@ REM             the confirmation of a stop: this exact word, with the server's n
 REM             it, or with any other word, the script prints this usage, sends NOTHING and exits 2. A start needs none
 REM   TIMEOUT   seconds to wait for the server's answer, a whole number (optional; the reference says 150 or more, and 150 is its default)
 REM   --all-stopped start-all-stopped-servers
-REM             starts every server that is not running and then every daemon that is not running: it needs its own word, as it
+REM             starts every daemon that is not running and then every server that is not running: it needs its own word, as it
 REM             starts what an administrator may have stopped on purpose
 REM
 REM Risk: disruptive - stops and starts protocol servers: their clients are refused while one is stopped
@@ -39,10 +39,13 @@ REM   `--all-stopped` now, with its own word.
 REM - It reads the servers first, prints the server's state and the state of the daemon of its protocol, and the command that undoes the
 REM   operation. A server that is not there is a stop of nothing: exit 1, no operation sent. A server already in the state asked for (a start
 REM   of one that is active, a stop of one that is not) is left alone: exit 0, no operation sent.
+REM - Starting a daemon starts the servers of its protocol too, a moment later: --all-stopped waits 5 seconds after a daemon it started,
+REM   and only then looks at which servers are not running.
 REM - A server needs the daemon of its protocol: when that one is not running the script says so and points at
 REM   05.daemons_operations_POST.bat, and still sends the start. Starting a server right after its daemon can fail for a moment and
 REM   succeed on a retry (see st-api-gotchas).
-REM - `--all-stopped` keeps the order of the older script: the servers first, then the daemons. The as2 server and daemon of a lab
+REM - `--all-stopped` starts the daemons first and then the servers: a server cannot start while the daemon of its protocol is stopped
+REM   (the older order left the servers of a stopped daemon off). The as2 server and daemon of a lab
 REM   that has AS2 disabled cannot start (see below), so on such a lab it ends with exit 1 by design.
 REM - THIS WAS NOT RUN against a server while the script was made safe: no server of the lab was started or stopped by this change. The
 REM   status codes and the answer are from the reference and from what check 23 recorded earlier. What WAS confirmed directly, with names
@@ -171,8 +174,21 @@ CALL :server_operation "%SERVER%" %OPERATION% %TIMEOUT%
 IF ERRORLEVEL 1 EXIT /B 1
 EXIT /B 0
 
-REM --all-stopped: the servers that are not running, then the daemons that are not running
+REM --all-stopped: the daemons that are not running first, then the servers that are not running. A server cannot start
+REM while the daemon of its protocol is stopped, so the other order leaves those servers off.
 :all_stopped
+echo Getting the list of daemons...
+CALL :read_daemons
+IF ERRORLEVEL 1 EXIT /B 1
+powershell -NoProfile -Command "Get-Content -Raw $env:DAEMONS_FILE | ConvertFrom-Json | ConvertTo-Json -Compress"
+SET DSTARTED=0
+FOR %%D IN (ssh as2 pesit ftp http) DO CALL :daemon_step %%D
+REM A daemon that starts brings the servers of its protocol up itself, a moment later: look at the servers after it
+IF "%DSTARTED%"=="1" (
+    echo Waiting 5 seconds for the servers of the daemons just started...
+    powershell -NoProfile -Command "Start-Sleep -Seconds 5"
+)
+
 echo Getting the list of servers...
 CALL :list_servers
 IF ERRORLEVEL 1 EXIT /B 1
@@ -180,12 +196,6 @@ FOR /F %%N IN ('powershell -NoProfile -Command "@(Get-Content $env:SERVERS_FILE)
 powershell -NoProfile -Command "Get-Content $env:SERVERS_FILE | ForEach-Object { $f = $_ -split [char]9; if ($f[1] -eq 'false') { $f[0] } } | Set-Content -Path $env:NAMES_FILE"
 IF EXIST "%NAMES_FILE%" FOR /F "usebackq delims=" %%N IN ("%NAMES_FILE%") DO CALL :start_stopped "%%N"
 powershell -NoProfile -Command "Get-Content $env:SERVERS_FILE | ForEach-Object { $f = $_ -split [char]9; if ($f[1] -eq 'true') { 'Server: ' + $f[0] + ' is running' } }"
-
-echo Getting the list of daemons...
-CALL :read_daemons
-IF ERRORLEVEL 1 EXIT /B 1
-powershell -NoProfile -Command "Get-Content -Raw $env:DAEMONS_FILE | ConvertFrom-Json | ConvertTo-Json -Compress"
-FOR %%D IN (ssh as2 pesit ftp http) DO CALL :daemon_step %%D
 IF NOT "%FAILED%"=="0" EXIT /B 1
 EXIT /B 0
 
@@ -193,9 +203,26 @@ REM ----------------------------------------------------------------------------
 REM Starts the server named in %1, which is not running
 REM ------------------------------------------------------------------------------
 :start_stopped
+SET "START_NAME=%~1"
 echo Server: %~1 is not running
 CALL :server_operation "%~1" start
-IF ERRORLEVEL 1 SET FAILED=1
+IF NOT ERRORLEVEL 1 EXIT /B 0
+REM A daemon just started brings its servers up itself, and one of them can take longer than a few seconds:
+REM look again, up to 5 times 3 seconds apart, before calling this a failure
+SET TRY=0
+:start_again
+SET /A TRY+=1
+powershell -NoProfile -Command "Start-Sleep -Seconds 3"
+CALL :list_servers
+IF ERRORLEVEL 1 EXIT /B 1
+SET NOW_ACTIVE=
+FOR /F "delims=" %%L IN ('powershell -NoProfile -Command "Get-Content $env:SERVERS_FILE | ForEach-Object { $f = $_ -split [char]9; if ($f[0] -ceq $env:START_NAME -and $f[1] -eq 'true') { 'yes' } }"') DO SET NOW_ACTIVE=%%L
+IF "%NOW_ACTIVE%"=="yes" (
+    echo Server: %~1 is running now: it came up with its daemon.
+    EXIT /B 0
+)
+IF %TRY% LSS 5 GOTO start_again
+SET FAILED=1
 EXIT /B 0
 
 REM ------------------------------------------------------------------------------
@@ -219,7 +246,7 @@ IF NOT "%HTTP_CODE%"=="200" (
     EXIT /B 0
 )
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; $list = @($r.daemonOperationResults | Where-Object { $_ -ne $null }); if ($list.Count -eq 0) { $list = @($r) }; $bad = 0; foreach ($d in $list) { '{0} {1} (successful: {2})' -f $d.daemon, $d.message, ([string]$d.isSuccessful).ToLower(); if ($null -ne $d.isSuccessful -and -not $d.isSuccessful) { $bad++ } }; if ($bad -gt 0) { exit 1 } else { exit 0 }"
-IF ERRORLEVEL 1 SET FAILED=1
+IF ERRORLEVEL 1 (SET FAILED=1) ELSE (SET DSTARTED=1)
 EXIT /B 0
 
 REM ------------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 # It demonstrates:
 # - A guard: nothing is sent unless the server and the operation are given and, for a stop, the confirmation word as well
 # - Starting one server, with the status of the server and of its daemon printed first and the command that undoes it
-# - Starting every server that is found not running, and then every daemon that is not running (--all-stopped)
+# - Starting every daemon that is found not running, and then every server that is not running (--all-stopped)
 # - The HTTP code, and the result the server gives for each server
 #
 # Usage:
@@ -25,7 +25,7 @@
 #             it, or with any other word, the script prints this usage, sends NOTHING and exits 2. A start needs none
 #   TIMEOUT   seconds to wait for the server's answer, a whole number (optional; the reference says 150 or more, and 150 is its default)
 #   --all-stopped start-all-stopped-servers
-#             starts every server that is not running and then every daemon that is not running: it needs its own word, as it
+#             starts every daemon that is not running and then every server that is not running: it needs its own word, as it
 #             starts what an administrator may have stopped on purpose
 #
 # Risk: disruptive - stops and starts protocol servers: their clients are refused while one is stopped
@@ -39,10 +39,13 @@
 # - It reads the servers first, prints the server's state and the state of the daemon of its protocol, and the command that undoes the
 #   operation. A server that is not there is a stop of nothing: exit 1, no operation sent. A server already in the state asked for (a start
 #   of one that is active, a stop of one that is not) is left alone: exit 0, no operation sent.
+# - Starting a daemon starts the servers of its protocol too, a moment later: --all-stopped waits 5 seconds after a daemon it started,
+#   and only then looks at which servers are not running.
 # - A server needs the daemon of its protocol: when that one is not running the script says so and points at
 #   05.daemons_operations_POST.sh, and still sends the start. Starting a server right after its daemon can fail for a moment and
 #   succeed on a retry (see st-api-gotchas).
-# - `--all-stopped` keeps the order of the older script: the servers first, then the daemons. The as2 server and daemon of a lab
+# - `--all-stopped` starts the daemons first and then the servers: a server cannot start while the daemon of its protocol is stopped
+#   (the older order, servers first, left the servers of a stopped daemon off). The as2 server and daemon of a lab
 #   that has AS2 disabled cannot start (see below), so on such a lab it ends with exit 1 by design.
 # - THIS WAS NOT RUN against a server while the script was made safe: no server of the lab was started or stopped by this change. The
 #   status codes and the answer are from the reference and from what check 23 recorded earlier. What WAS confirmed directly, with names
@@ -184,8 +187,8 @@ daemon_start() {
         show_error "${RESPONSE}"
         return 1
     fi
-    printf '%s' "${RESPONSE}" | jq -r '(.daemonOperationResults // [.])[] | "\(.daemon // "") \(.message // "") (successful: \(.isSuccessful))"'
-    [ "$(printf '%s' "${RESPONSE}" | jq '[(.daemonOperationResults // [.])[] | select(.isSuccessful == false)] | length')" = "0" ]
+    printf '%s' "${RESPONSE}" | jq -r '(if type == "array" then . else (.daemonOperationResults // [.]) end)[] | "\(.daemon // "") \(.message // "") (successful: \(.isSuccessful))"'
+    [ "$(printf '%s' "${RESPONSE}" | jq '[(if type == "array" then . else (.daemonOperationResults // [.]) end)[] | select(.isSuccessful == false)] | length')" = "0" ]
 }
 
 FAILED=0
@@ -224,25 +227,51 @@ if [ "${MODE}" = "one" ]; then
     exit "${FAILED}"
 fi
 
-# --all-stopped: the servers that are not running, then the daemons that are not running
+# --all-stopped: the daemons that are not running first, then the servers that are not running. A server cannot start
+# while the daemon of its protocol is stopped ("The HTTP daemon is not started"), so the other order leaves the servers
+# of a daemon that was stopped off, though the daemon is started afterwards.
+printf "Getting the list of daemons...\n"
+read_daemons
+printf '%s\n' "${DAEMONS_JSON}"
+DAEMON_STARTED=0
+for DAEMON in ssh as2 pesit ftp http; do
+    STATUS=$(printf '%s' "${DAEMONS_JSON}" | jq -r --arg key "${DAEMON}Status" '.[$key] // "unknown"')
+    if [ "${STATUS}" = "Not running" ]; then
+        if daemon_start "${DAEMON}"; then DAEMON_STARTED=1; else FAILED=1; fi
+    else
+        printf "Daemon %s is %s\n" "${DAEMON}" "${STATUS}"
+    fi
+done
+# A daemon that starts brings the servers of its protocol up itself, a moment later: a start sent at once answers
+# "An error occurred while trying to start the server" for a server that is about to be there. Look at the servers after it.
+if [ "${DAEMON_STARTED}" = "1" ]; then
+    printf "Waiting 5 seconds for the servers of the daemons just started...\n"
+    sleep 5
+fi
+
 printf "Getting the list of servers...\n"
 list_servers
 printf "Found %s servers\n" "$(printf '%s' "${SERVERS_JSON}" | jq 'length')"
 while IFS= read -r NAME; do
     printf "Server: %s is not running\n" "${NAME}"
-    server_operation "${NAME}" "start" "" || FAILED=1
+    if ! server_operation "${NAME}" "start" ""; then
+        # a daemon just started brings its servers up itself, and one of them can take longer than a few seconds:
+        # look again, up to 5 times 3 seconds apart, before calling this a failure
+        CAME_UP=0
+        for TRY in 1 2 3 4 5; do
+            sleep 3
+            list_servers
+            if [ "$(printf '%s' "${SERVERS_JSON}" | jq -r --arg n "${NAME}" '[.[] | select(.serverName == $n and .isActive == true)] | length')" -gt 0 ]; then
+                CAME_UP=1
+                break
+            fi
+        done
+        if [ "${CAME_UP}" = "1" ]; then
+            printf "Server: %s is running now: it came up with its daemon.\n" "${NAME}"
+        else
+            FAILED=1
+        fi
+    fi
 done < <(printf '%s' "${SERVERS_JSON}" | jq -r '.[] | select(.isActive == false) | .serverName')
 printf '%s' "${SERVERS_JSON}" | jq -r '.[] | select(.isActive == true) | "Server: \(.serverName) is running"'
-
-printf "Getting the list of daemons...\n"
-read_daemons
-printf '%s\n' "${DAEMONS_JSON}"
-for DAEMON in ssh as2 pesit ftp http; do
-    STATUS=$(printf '%s' "${DAEMONS_JSON}" | jq -r --arg key "${DAEMON}Status" '.[$key] // "unknown"')
-    if [ "${STATUS}" = "Not running" ]; then
-        daemon_start "${DAEMON}" || FAILED=1
-    else
-        printf "Daemon %s is %s\n" "${DAEMON}" "${STATUS}"
-    fi
-done
 exit "${FAILED}"

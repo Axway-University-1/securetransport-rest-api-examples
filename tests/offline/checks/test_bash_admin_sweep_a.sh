@@ -346,20 +346,40 @@ expect "13 stop: a refused stop exits 1" "${RC}" "1"
 OP_FTP_OK='{"serverStatuses":[{"serverName":"Ftp Default","message":"Server started successfully.","isSuccessful":true}]}'
 LIST_TWO_OFF='{"result":[{"protocol":"ssh","serverName":"Ssh Default","isActive":false},{"protocol":"ftp","serverName":"Ftp Default","isActive":false},{"protocol":"http","serverName":"Http Default","isActive":true}]}'
 DAEMON_AS2_NO='{"daemonOperationResults":[{"daemon":"as2","message":"Can not start AS2 daemon - the default server As2 Default is not enabled.","isSuccessful":false}]}'
-SWEEP_SEQ=$(seq s13k "$(sl 200 "$(body list_two_off "${LIST_TWO_OFF}")")" "$(sl 200 "${WORK}/op_ok.json")" "$(sl 200 "$(body op_ftp_ok "${OP_FTP_OK}")")" \
-  "$(sl 200 "${WORK}/daemons_up.json")" "$(sl 200 "$(body daemon_as2_no "${DAEMON_AS2_NO}")")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
-expect "13 all: starts each server that is not running, then each daemon that is not running (as2), with the names encoded" "$(calls)" "GET ${S}?fields=serverName,isActive&limit=200&offset=0
+SWEEP_SEQ=$(seq s13k "$(sl 200 "${WORK}/daemons_up.json")" "$(sl 200 "$(body daemon_as2_no "${DAEMON_AS2_NO}")")" \
+  "$(sl 200 "$(body list_two_off "${LIST_TWO_OFF}")")" "$(sl 200 "${WORK}/op_ok.json")" "$(sl 200 "$(body op_ftp_ok "${OP_FTP_OK}")")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
+expect "13 all: starts each daemon that is not running (as2) first, then each server that is not running, with the names encoded" "$(calls)" "GET ${BASE}/daemons
+POST ${BASE}/daemons/operations?operation=start&daemon=as2
+GET ${S}?fields=serverName,isActive&limit=200&offset=0
 POST ${G}?serverName=Ssh Default&operation=start
-POST ${G}?serverName=Ftp Default&operation=start
-GET ${BASE}/daemons
-POST ${BASE}/daemons/operations?operation=start&daemon=as2"
+POST ${G}?serverName=Ftp Default&operation=start"
 expect "13 all: the as2 daemon that cannot start (200 with isSuccessful false) makes it exit 1" "${RC}" "1"
 has "13 all: it names the active server as running" "Server: Http Default is running"
 has "13 all: and a daemon that is running" "Daemon ssh is Running"
 has "13 all: it prints the reason the as2 daemon did not start" "the default server As2 Default is not enabled. (successful: false)"
-SWEEP_SEQ=$(seq s13l "$(sl 200 "${WORK}/list_on.json")" "$(sl 200 "$(body daemons_all_up '{"ftpStatus":"Running","httpStatus":"Running","pesitStatus":"Running","sshStatus":"Running","as2Status":"Running"}')")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
+expect "13 all: the daemons come before the servers (a server cannot start while its daemon is stopped)" "$(calls | sed -n '1p;3p')" "GET ${BASE}/daemons
+GET ${S}?fields=serverName,isActive&limit=200&offset=0"
+# the 5.5 lab answers the daemon start with a bare list, not the documented object (RD-24)
+DAEMON_AS2_LIST='[{"daemon":"AS2","message":"Daemon AS2 is started.","isSuccessful":true}]'
+SWEEP_SEQ=$(seq s13k2 "$(sl 200 "${WORK}/daemons_up.json")" "$(sl 200 "$(body daemon_as2_list "${DAEMON_AS2_LIST}")")" \
+  "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 200 "${WORK}/op_ok.json")" "$(sl 200 "${WORK}/op_ftp_ok.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
+expect "13 all: the daemon start answered as a bare list is read: exit 0" "${RC}" "0"
+has "13 all: and its result is shown" "AS2 Daemon AS2 is started. (successful: true)"
+has "13 all: after a daemon it started it waits for that daemon's servers, then lists the servers" "Waiting 5 seconds for the servers of the daemons just started"
+SWEEP_SEQ=$(seq s13l "$(sl 200 "$(body daemons_all_up '{"ftpStatus":"Running","httpStatus":"Running","pesitStatus":"Running","sshStatus":"Running","as2Status":"Running"}')")" "$(sl 200 "${WORK}/list_on.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
 expect "13 all: everything running: nothing is posted, exit 0" "${RC}:$(calls | grep -c '^POST')" "0:0"
-SWEEP_SEQ=$(seq s13m "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 403 "${WORK}/refused.json")" "$(sl 200 "${WORK}/op_ftp_ok.json")" "$(sl 200 "${WORK}/daemons_all_up.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
+hasnt "13 all: and it does not wait when it started no daemon" "Waiting 5 seconds"
+# a daemon just started brings its servers up itself: a start that failed for a server that is running by the next look is not a failure
+OP_PORT_BUSY='{"serverStatuses":[{"serverName":"Ssh Default","message":"The port 8022 is in use.","isSuccessful":false}]}'
+LIST_SSH_NOW_ON='{"result":[{"protocol":"ssh","serverName":"Ssh Default","isActive":true},{"protocol":"ftp","serverName":"Ftp Default","isActive":false},{"protocol":"http","serverName":"Http Default","isActive":true}]}'
+SWEEP_SEQ=$(seq s13n "$(sl 200 "${WORK}/daemons_all_up.json")" "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 200 "$(body op_port_busy "${OP_PORT_BUSY}")")" \
+  "$(sl 200 "$(body list_ssh_now_on "${LIST_SSH_NOW_ON}")")" "$(sl 200 "${WORK}/op_ftp_ok.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
+expect "13 all: a start that failed for a server that is running at the next look is not a failure: exit 0" "${RC}" "0"
+has "13 all: and it says the server came up on its own" "Server: Ssh Default is running now: it came up with its daemon."
+SWEEP_SEQ=$(seq s13o "$(sl 200 "${WORK}/daemons_all_up.json")" "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 200 "${WORK}/op_port_busy.json")" \
+  "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 200 "${WORK}/op_ftp_ok.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
+expect "13 all: a failed start for a server that is still not running at the next look is exit 1" "${RC}" "1"
+SWEEP_SEQ=$(seq s13m "$(sl 200 "${WORK}/daemons_all_up.json")" "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 403 "${WORK}/refused.json")" "$(sl 200 "${WORK}/op_ftp_ok.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
 expect "13 all: a refused start exits 1, and the next server is still tried" "${RC}:$(calls | grep -c '^POST')" "1:2"
 reset
 # the risk header stays disruptive, in both twins

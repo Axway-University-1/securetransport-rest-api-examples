@@ -1314,6 +1314,15 @@ POST_BODY=$(body daemon_op_fail '{"daemonOperationResults":[{"daemon":"AS2","mes
 STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" as2 start
 expect "05 operations: a 200 whose result says it did not work is exit 1" "${RC}" "1"
 has "05 operations: and shows the message" "Can not start AS2 daemon"
+# the 5.5 lab answers a bare list, not the documented object that holds it (RD-24)
+POST_BODY=$(body daemon_op_list_ok '[{"daemon":"FTP","message":"Daemon FTP is stopped.","isSuccessful":true}]')
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" ftp stop stop-the-ftp-daemon
+expect "05 operations: the answer as a bare list is read too: exit 0" "${RC}" "0"
+has "05 operations: and its result is shown" "FTP Daemon FTP is stopped. (successful: true)"
+POST_BODY=$(body daemon_op_list_fail '[{"daemon":"AS2","message":"Can not start AS2 daemon.","isSuccessful":false}]')
+STATUS=200 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" as2 start
+expect "05 operations: a bare list that says it did not work is exit 1" "${RC}" "1"
+has "05 operations: and shows the message" "Can not start AS2 daemon."
 STATUS=400 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon
 expect "05 operations: a refusal exits 1, with the code" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^HTTP 400')" "1:1"
 STATUS=200 STATUS_GET=500 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon

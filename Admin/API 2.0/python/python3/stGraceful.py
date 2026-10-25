@@ -217,7 +217,9 @@ def stopDaemon(session, stUrl, token, protocol, gracefultime):
                                '&graceful=true&timeout=' + str(gracefultime),
                                'Stop the ' + protocol + ' daemon')
     try:
-        results = response.json().get('daemonOperationResults', [])
+        answer = response.json()
+        # the documented answer is an object holding the list; the 5.5 lab answers the bare list
+        results = answer if isinstance(answer, list) else answer.get('daemonOperationResults', [])
     except ValueError:
         results = []
     for result in results:
