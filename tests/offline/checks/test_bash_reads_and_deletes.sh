@@ -106,6 +106,15 @@ STARTS=$(calls | sed -n 's/.*startTimeAfter=\([^&]*\)&.*/\1/p' | tail -n 2)
 ENDS=$(calls | sed -n 's/.*endTimeBefore=\([^&]*\)&.*/\1/p' | head -n 2)
 expect "billable: each day ends where the next starts" "${ENDS}" "${STARTS}"
 has "billable: adds up totalCount, not returnCount" "Total: 126 billable transfer(s) in 3 day(s)"
+# the day a clock changes has 25 hours: with a time zone whose clocks went back yesterday (a POSIX rule that does it
+# at 03:00 on yesterday's day of the year), every boundary must still be a midnight. 86400 seconds a day was not.
+DAY_OF_YEAR=$((10#$(date +%j)))
+if [ "${DAY_OF_YEAR}" -gt 3 ]; then
+    BACK_TZ="EET-2EEST,J$((DAY_OF_YEAR > 30 ? DAY_OF_YEAR - 30 : 1))/0,J$((DAY_OF_YEAR - 1))/3"
+    TZ="${BACK_TZ}" STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh" 5 john
+    expect "billable: on the day after a clock change every day still runs midnight to midnight (TZ ${BACK_TZ})" \
+      "$(calls | grep -cE "startTimeAfter=${RFC}&endTimeBefore=${RFC}&limit=1&fields=id$")" "5"
+fi
 
 STATUS=200 PRINT_CODE=1 GET_BODY="${LOOKUP}" run admin "16.TransferLogs/02.logs_transfers_GET_billable.sh"
 expect "billable: 7 days by default" "$(count_calls "isBillable=true")" "7"

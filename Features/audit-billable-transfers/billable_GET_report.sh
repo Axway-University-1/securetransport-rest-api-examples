@@ -64,14 +64,16 @@ LABEL="${1:-report}"
 REFERER_HEADER="Referer: THIS_IS_A_RANDOM_TEXT"
 ACCOUNTS=("${BT_PULL_PARTNER}" "${BT_TEST_ACCOUNT}" "${BT_PUSH_PARTNER}")
 
-# Midnight today, as an epoch second count - the one place BSD and GNU date
-# differ, same split as the Admin Guide's own export example
+# Midnight N days ago, as an epoch second count - the one place BSD and GNU date
+# differ, same split as the Admin Guide's own export example. It is asked of date for
+# each day, not worked out as N * 86400 seconds: the day a clock changes has 23 or 25 hours.
 if date -v-1d >/dev/null 2>&1; then
-    TODAY_MIDNIGHT=$(date -v0H -v0M -v0S +%s)
+    # -v-Nd goes back N days, -v+Nd forward (N = -1 is tomorrow, the end of today)
+    midnight_ago() { if [ "$1" -ge 0 ]; then date -v-"$1"d -v0H -v0M -v0S +%s; else date -v+"$((-$1))"d -v0H -v0M -v0S +%s; fi; }
     to_rfc2822() { date -r "$1" -R; }
     to_day_label() { date -r "$1" +%Y-%m-%d; }
 else
-    TODAY_MIDNIGHT=$(date -d "today 00:00:00" +%s)
+    midnight_ago() { date -d "$1 days ago 00:00:00" +%s; }
     to_rfc2822() { date -d "@$1" -R; }
     to_day_label() { date -d "@$1" +%Y-%m-%d; }
 fi
@@ -97,8 +99,8 @@ printf "\n"
 TODAY_COUNTS=()
 UNREADABLE=0
 for day_offset in $(seq $((BT_REPORT_DAYS - 1)) -1 0); do
-    start_epoch=$((TODAY_MIDNIGHT - day_offset * 86400))
-    end_epoch=$((start_epoch + 86400))
+    start_epoch=$(midnight_ago "${day_offset}")
+    end_epoch=$(midnight_ago $((day_offset - 1)))
     start_rfc=$(to_rfc2822 "${start_epoch}")
     end_rfc=$(to_rfc2822 "${end_epoch}")
 

@@ -268,6 +268,18 @@ OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/repo
 RC=$?
 [ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
 [[ "${OUT}" == *"(before)"* ]] && pass "the label is printed in the heading" || fail "heading: $(echo "${OUT}" | grep Billable)"
+# the day a clock changes has 25 hours: with a time zone whose clocks went back yesterday, every boundary is still a midnight
+DAY_OF_YEAR=$((10#$(date +%j)))
+if [ "${DAY_OF_YEAR}" -gt 3 ]; then
+    BACK_TZ="EET-2EEST,J$((DAY_OF_YEAR > 30 ? DAY_OF_YEAR - 30 : 1))/0,J$((DAY_OF_YEAR - 1))/3"
+    OUT_TZ=$(cd "${RUN}" && TZ="${BACK_TZ}" PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/report.json" STUB_CURL_CSRF="csrf-abc" bash ./billable_GET_report.sh before 2>&1)
+    DAYS_OK=$(echo "${OUT_TZ}" | grep -cE '^  [0-9]{4}-[0-9]{2}-[0-9]{2} +4 +4 +4$')
+    [ "${DAYS_OK}" -eq 7 ] && pass "after a clock change the report still has seven days" || fail "after a clock change: ${DAYS_OK} day lines"
+    # each of the 7 days asks for its start and its end (per account: 3 accounts), all of them at 00:00:00
+    BOUNDS=$(echo "${OUT_TZ}" | grep -oE '(startTimeAfter|endTimeBefore)=[A-Z][a-z]{2}, [0-9]{2} [A-Z][a-z]{2} [0-9]{4} 00:00:00 ' | wc -l | tr -d ' ')
+    ALL=$(echo "${OUT_TZ}" | grep -oE '(startTimeAfter|endTimeBefore)=' | wc -l | tr -d ' ')
+    [ "${BOUNDS}" = "${ALL}" ] && [ "${ALL}" -gt 0 ] && pass "after a clock change every day boundary the report asks for is a midnight (${ALL} of them)" || fail "after a clock change: ${BOUNDS} of ${ALL} boundaries are midnights"
+fi
 DAY_LINES=$(echo "${OUT}" | grep -cE '^  [0-9]{4}-[0-9]{2}-[0-9]{2} +4 +4 +4$')
 [ "${DAY_LINES}" -eq 7 ] && pass "reports seven days, one column per account, using totalCount (4), not returnCount (1)" || fail "day lines: ${DAY_LINES}"
 [ "$(echo "${OUT}" | grep '^TODAY_COUNT' | tr '\n' '|')" = "TODAY_COUNT partner_to_pull_from: 4|TODAY_COUNT btTestAccount: 4|TODAY_COUNT partner_to_push_to: 4|" ] \

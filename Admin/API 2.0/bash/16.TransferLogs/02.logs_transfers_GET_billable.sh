@@ -55,13 +55,15 @@ if [ "$#" -gt 2 ]; then
 fi
 [[ "${DAYS}" =~ ^[1-9][0-9]*$ ]] || { printf "DAYS must be a whole number, 1 or more: %s\n" "${DAYS}"; exit 2; }
 
-# Midnight today, in seconds. BSD date (macOS) and GNU date (Linux) differ here.
+# Midnight N days ago, in seconds. BSD date (macOS) and GNU date (Linux) differ here. It is asked of date for each
+# day, not worked out as N * 86400 seconds: the day a clock changes has 23 or 25 hours.
 if date -v-1d >/dev/null 2>&1; then
-    TODAY_MIDNIGHT=$(date -v0H -v0M -v0S +%s)
+    # -v-Nd goes back N days, -v+Nd forward (N = -1 is tomorrow, the end of today)
+    midnight_ago() { if [ "$1" -ge 0 ]; then date -v-"$1"d -v0H -v0M -v0S +%s; else date -v+"$((-$1))"d -v0H -v0M -v0S +%s; fi; }
     to_rfc2822() { date -r "$1" -R; }
     to_day() { date -r "$1" +%Y-%m-%d; }
 else
-    TODAY_MIDNIGHT=$(date -d "today 00:00:00" +%s)
+    midnight_ago() { date -d "$1 days ago 00:00:00" +%s; }
     to_rfc2822() { date -d "@$1" -R; }
     to_day() { date -d "@$1" +%Y-%m-%d; }
 fi
@@ -75,8 +77,8 @@ printf "Billable transfers per day, for %s\n" "${ACCOUNT:-every account}"
 TOTAL=0
 UNREAD=0
 for OFFSET in $(seq $((DAYS - 1)) -1 0); do
-    START=$((TODAY_MIDNIGHT - OFFSET * 86400))
-    END=$((START + 86400))
+    START=$(midnight_ago "${OFFSET}")
+    END=$(midnight_ago $((OFFSET - 1)))
 
     RESPONSE=$(curl -s -k -G -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/logs/transfers" \
       --data-urlencode "isBillable=true" "${ACCOUNT_FILTER[@]}" \
