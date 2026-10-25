@@ -4,6 +4,9 @@
     python3 tools/script_coverage.py            run tests/offline/run_all.sh with a tracer, list the bash and python
                                                 scripts that nothing ran
     python3 tools/script_coverage.py --log F    read a log from an earlier run instead
+    python3 tools/script_coverage.py --online   the same for tests/online/run_online.sh --write (WRITES TO THE LAB, takes
+                                                long; a check is stopped after 10 minutes). The scripts kept out of the
+                                                online checks on purpose (tools/test_map.py NO_ONLINE) are not listed.
 
 How: bash reads $BASH_ENV at the start of every non-interactive shell, so a tiny file there records the path of each
 script that starts; python scripts are recorded the same way by a sitecustomize on PYTHONPATH. The scripts the tests
@@ -23,7 +26,7 @@ def tracked():
             and Path(f).name not in HELPERS and "/lib/" not in f and "example" not in Path(f).name]
 
 
-def record(log):
+def record(log, online=False):
     work = Path(tempfile.mkdtemp(prefix="cov_"))
     # $0 is just "bash" while BASH_ENV is read, so a DEBUG trap notes the script on its first command and goes away
     (work / "env.sh").write_text(
@@ -43,7 +46,12 @@ def record(log):
         "        break\n")
     env = dict(os.environ, BASH_ENV=str(work / "env.sh"), COVERAGE_LOG=str(log),
                PYTHONPATH=str(work) + os.pathsep + os.environ.get("PYTHONPATH", ""), COVERAGE_PYTHONPATH=str(work))
-    subprocess.run([str(ROOT / "tests/offline/run_all.sh")], cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if online:
+        env["ST_CHECK_TIMEOUT"] = "600"
+        cmd = [str(ROOT / "tests/online/run_online.sh"), "--write"]
+    else:
+        cmd = [str(ROOT / "tests/offline/run_all.sh")]
+    subprocess.run(cmd, cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def main():
@@ -52,9 +60,10 @@ def main():
     else:
         log = Path(tempfile.mkdtemp(prefix="covlog_")) / "log.txt"
         log.write_text("")
-        record(log)
+        record(log, "--online" in sys.argv)
     lines = [p for p in log.read_text().split("\n") if p]
-    paths = [p for p in lines if not p.startswith("CALL ")]
+    # a check that must dodge a name on the lab runs a copy called .zztest_<name> next to the script
+    paths = [p.replace("/.zztest_", "/") for p in lines if not p.startswith("CALL ")]
     # the scripts that made a call to the server (the stub curl), from the parent command line of each call
     called = set()
     for p in lines:
@@ -65,6 +74,10 @@ def main():
     ran = {(Path(p).parent.name, Path(p).name) for p in paths}
     ran_names = {Path(p).name for p in paths}
     files = tracked()
+    if "--online" in sys.argv:
+        sys.path.insert(0, str(ROOT / "tools"))
+        import test_map
+        files = [f for f in files if not any(k in f for k in test_map.NO_ONLINE)]
     count = {}
     for f in files:
         count[Path(f).name] = count.get(Path(f).name, 0) + 1
@@ -74,13 +87,14 @@ def main():
                or (count[Path(f).name] == 1 and Path(f).name in ran_names))]
     for f in missing:
         print(f)
-    # a script that talks to the server, that ran, and never got as far as a call: only its usage was tried
-    silent = [f for f in files if f not in missing and Path(f).name not in called and Path(f).suffix == ".sh"
-              and "curl" in (ROOT / f).read_text(errors="replace") and "run_all" not in f and not Path(f).name.startswith("99.")]
-    print(f"\nran, but never reached a call to the server ({len(silent)}): their usage or an early exit is all that is tested")
-    for f in silent:
-        print("  " + f)
-    print(f"\n{len(missing)} of {len(tracked())} scripts were not run by any offline check (log: {log})")
+    if "--online" not in sys.argv:   # the stub that notes calls is the offline one
+        # a script that talks to the server, that ran, and never got as far as a call: only its usage was tried
+        silent = [f for f in files if f not in missing and Path(f).name not in called and Path(f).suffix == ".sh"
+                  and "curl" in (ROOT / f).read_text(errors="replace") and "run_all" not in f and not Path(f).name.startswith("99.")]
+        print(f"\nran, but never reached a call to the server ({len(silent)}): their usage or an early exit is all that is tested")
+        for f in silent:
+            print("  " + f)
+    print(f"\n{len(missing)} of {len(tracked())} scripts were not run by any {"online" if "--online" in sys.argv else "offline"} check (log: {log})")
 
 
 if __name__ == "__main__":

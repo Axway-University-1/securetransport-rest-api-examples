@@ -67,6 +67,7 @@ The type of share is the `shareRights` of the share. Name it as a word or as its
 
 - **What the other user sees:** the folder in the root of their own home folder, named `example_uc_shared (your.address@example.com)`: your name for it
   and your address in brackets. It is an ordinary folder in their list (so its path has spaces and brackets: URL-encode it).
+- A share does not reach the collaborator at once: for a moment after the `204` the collaborator already sees the folder in the list, but a read of a file in it is refused with `403`. Try again after a couple of seconds.
 - A shared folder shows `isShared: true` and a `sharedDirectoryProperties` object (owner, collaborators, rights) in its metadata.
 - The message of a refused share does not say why: "functionality is disabled" is an account with no e-mail address (or one the session has not yet seen); "Unable to share folder ... with
   user ..." is an address the server does not know. (Both are in the product team's list of known issues.)

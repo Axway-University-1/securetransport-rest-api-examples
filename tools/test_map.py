@@ -74,4 +74,5 @@ def main():
           f"{sum(1 for r in rows if not r[2])} without an online check (and {sum(1 for r in rows if r[2] and r[2][0].startswith('(by design'))} that are meant to have none)")
 
 
-main()
+if __name__ == "__main__":
+    main()

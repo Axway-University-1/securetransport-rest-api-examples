@@ -264,7 +264,7 @@ are committed. If you are unsure, it belongs in `local/`.
 
 `python3 tools/script_coverage.py` is the measure that counts: it runs the offline suite with a tracer and lists every
 bash and python example that no check ran, and every bash example that ran but never made a call to the server (only
-its usage was tried). It takes as long as the suite. The map below only reads names.
+its usage was tried). It takes as long as the suite. `--online` does the same for `tests/online/run_online.sh --write` (it writes to the lab, and takes about half an hour). The map below only reads names.
 
 `python3 tools/test_map.py [WORD ...]` lists each script with the offline and online checks whose files name it
 (`--missing` lists those without one of the two). A check that runs scripts from a folder in a loop, without naming

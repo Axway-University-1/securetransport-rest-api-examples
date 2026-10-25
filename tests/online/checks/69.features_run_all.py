@@ -50,12 +50,24 @@ def scratch_copy(feature, settings):
     return dest
 
 
-def run_feature(title, feature, settings, args, accounts):
+def download(folder, account):
+    # not numbered, so run_all does not run it: a file the run left in the test account, read three times
+    r = runner.run(os.path.join(folder, "files_GET_download.sh"), ["subscription/s1/only_inbound.txt", "3", account], timeout=120)
+    c.check("audit-billable-transfers: files_GET_download.sh reads a delivered file three times and exits 0",
+            r.returncode == 0, (r.stdout + r.stderr)[-400:])
+
+
+def run_feature(title, feature, settings, args, accounts, between=None):
+    """00.run_all.sh with `args`; `between(folder)` runs while everything it made is still there (then the cleanup)."""
     folder = scratch_copy(feature, settings)
     with runner.real_credentials(BASH_TREE, config):
         r = runner.run(os.path.join(folder, "00.run_all.sh"), args, timeout=900)
+        if between:
+            between(folder)
+            gone = runner.run(os.path.join(folder, "99.cleanup_DELETE.sh"), [args[0]], timeout=300)
+            c.check("%s: 99.cleanup_DELETE.sh exits 0" % title, gone.returncode == 0, (gone.stdout + gone.stderr)[-400:])
     out = r.stdout + r.stderr
-    c.check("%s: 00.run_all.sh --cleanup exits 0" % title, r.returncode == 0, "exit %s\n%s" % (r.returncode, out[-600:]))
+    c.check("%s: 00.run_all.sh exits 0" % title, r.returncode == 0, "exit %s\n%s" % (r.returncode, out[-600:]))
     c.check("%s: no step answered 4xx or 5xx" % title, not re.search(r"^HTTP [45]\d\d", out, re.M), out[-400:])
     left = [n for n in accounts if admin.exists("accounts/" + n)]
     c.check("%s: the cleanup left no account behind" % title, not left, left)
@@ -69,7 +81,7 @@ try:
         ("BT_ACCOUNT_PASSWORD", PASSWORD), ("BT_SSH_HOST", SSH_HOST), ("BT_SSH_PORT", ports.ssh),
         ("BT_ENDUSER_PORT", ports.enduser), ("BT_PULL_PARTNER", bt + "_from"), ("BT_PUSH_PARTNER", bt + "_to"),
         ("BT_STEP_PAUSE_SECONDS", "5"), ("BT_WAIT_SECONDS", "60")],
-        [bt, "--cleanup"], [bt, bt + "_from", bt + "_to"])
+        [bt], [bt, bt + "_from", bt + "_to"], between=lambda folder: download(folder, bt))
 
     ar = TAG + "_ar"
     run_feature("trigger-route-after-completed-pull", "trigger-route-after-completed-pull", [
