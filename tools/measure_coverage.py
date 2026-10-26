@@ -235,6 +235,87 @@ def build(state):
     return "\n".join(L), rows
 
 
+def bar(value, width=10):
+    """A bar for a share like '86%'; blank for n/a."""
+    m = re.match(r"(\d+)%", value or "")
+    if not m:
+        return " " * width
+    full = int(m.group(1)) * width // 100       # rounded down: 98% is not a full bar
+    return "#" * full + "." * (width - full)
+
+
+def delta(now, before):
+    """Change in percentage points against the last report, as text."""
+    a, b = re.match(r"(\d+)%", now or ""), re.match(r"(\d+)%", before or "")
+    if not (a and b):
+        return "" if now == before else "(new)" if before in (None, "", "n/a") else ""
+    d = int(a.group(1)) - int(b.group(1))
+    return "=" if d == 0 else "%+d pts" % d
+
+
+def summary(state, rows, before_row):
+    """The screen: a table of the measures (share, bar, what it is of, when measured, change), then where the gaps are."""
+    def when(entry):
+        if not entry:
+            return "never"
+        if "date" in entry:
+            return entry["date"]
+        dates = [v.get("made") for v in entry.get("by_script", {}).values() if v.get("made")]
+        return max(dates) if dates else "?"      # mutation results carry the date of each script
+
+    api, off, on, mu, hr = (state.get(k) for k in ("api", "offline", "online", "mutation", "rules"))
+    ad, ed = (api or {}).get("data", {}).get("admin", {}), (api or {}).get("data", {}).get("enduser", {})
+    od, nd, rd = (off or {}).get("data", {}), (on or {}).get("data", {}), (hr or {}).get("data", {})
+    of = lambda a, b: "%d of %d" % (a, b)
+    items = [
+        ("API reach", "Admin operations an example calls", of(ad["covered"], ad["total"]) if "total" in ad else "no reference", when(api)),
+        ("", "End User operations an example calls", of(ed["covered"], ed["total"]) if "total" in ed else "no reference", when(api)),
+        ("Offline reach", "examples the offline suite runs", of(od["run"], od["total"]) if od else "", when(off)),
+        ("", "...that make a call to the server in a test", of(od["called"], od["with_calls"]) if od else "", when(off)),
+        ("Online reach", "examples a lab run runs", of(nd["run"], nd["total"]) if nd else "", when(on)),
+        ("Assertion depth", "changes to a script that a check catches", of(mu["killed"], mu["valid"]) if mu else "", when(mu)),
+        ("", "scripts probed so far", of(mu["scripts"], len(script_coverage.tracked())) if mu else "", when(mu)),
+        ("House rules", "problems found in %s scripts" % (rd.get("scripts") or "?"), "none" if hr and not rd["problems"] else (str(len(rd["problems"])) if hr else ""), when(hr)),
+    ]
+    values = rows  # one value per item, in the order of HEADER[2:]
+    before = before_row or [""] * (len(HEADER) - 2)
+    table = []
+    for (name, what, detail, measured), v, b in zip(items, values, before):
+        table.append([name, what, v, bar(v) if v.endswith("%") else "", detail, measured, delta(v, b)])
+    head = ["Measure", "What", "Result", "", "Of", "Measured", "Since last"]
+    width = [max(len(str(r[i])) for r in table + [head]) for i in range(len(head))]
+    line = lambda r: "  ".join(str(c).ljust(w) for c, w in zip(r, width)).rstrip()
+    out = ["", line(head), "  ".join("-" * w for w in width)]
+    last = None
+    for r in table:
+        if r[0] and last is not None:
+            out.append("")
+        out.append(line(r))
+        last = r[0] or last
+    out.append("")
+    # where the gaps are: a few of each, the rest in the report
+    gaps = []
+
+    def gap(title, items, none="none"):
+        if items:
+            gaps.append("  %s (%d)" % (title, len(items)))
+            gaps.extend("      %s" % i for i in items[:4])
+            if len(items) > 4:
+                gaps.append("      ... and %d more (report.md)" % (len(items) - 4))
+
+    gap("Admin operations no example calls", ad.get("missing", []))
+    gap("Examples the offline suite does not run", od.get("missing", []))
+    gap("Examples that never call the server in a test", od.get("silent", []))
+    gap("Examples no lab run runs", nd.get("missing", []))
+    if mu:
+        weak = sorted(mu["by_script"].items(), key=lambda kv: kv[1]["killed"] / max(1, kv[1]["valid"]))
+        gap("Changes no check noticed, by script", ["%s: %d of %d caught" % (k.split("/")[-1], v["killed"], v["valid"]) for k, v in weak if v["survivors"]])
+    gap("House rule problems", rd.get("problems", []))
+    out.append("Where the gaps are" if gaps else "No gaps found.")
+    out.extend(gaps)
+    return "\n".join(out)
+
+
 HEADER = ["date", "commit", "api_admin", "api_enduser", "offline_run", "offline_calls", "online_run", "mutation_caught", "mutation_scripts", "house_rules"]
 
 
@@ -264,6 +345,7 @@ def main():
     ap.add_argument("--per-operator", type=int, default=3)
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--history", action="store_true")
+    ap.add_argument("--full", action="store_true", help="print the whole report (it is always saved in report.md)")
     args = ap.parse_args()
     if args.history:
         print_history()
@@ -282,11 +364,11 @@ def main():
     elif "offline" not in state:
         data = execution("offline")
         if data:
-            state["offline"] = {"date": "from the stored trace", "data": data}
+            state["offline"] = {"date": "stored trace", "data": data}
     if "online" not in state:
         data = execution("online")
         if data:
-            state["online"] = {"date": "from the stored trace", "data": data}
+            state["online"] = {"date": "stored trace", "data": data}
     state["api"] = {"date": today(), "data": api_reach()}
     state["rules"] = {"date": today(), "data": house_rules()}
     save_state(state)
@@ -300,11 +382,11 @@ def main():
     row = [today(), commit()] + rows
     with open(hist, "a") as f:
         f.write("\t".join(row) + "\n")
-    print(text)
-    if before:
-        print("Last time (%s, %s): %s" % (before[-1][0], before[-1][1], "  ".join("%s=%s" % (h, v) for h, v in zip(HEADER[2:], before[-1][2:]))))
-    print("This time:             %s" % "  ".join("%s=%s" % (h, v) for h, v in zip(HEADER[2:], rows)))
-    print("\nSaved in %s (report.md, history.tsv, state.json)." % OUT.relative_to(ROOT))
+    if args.full:
+        print(text)
+    print("HOW WELL THE EXAMPLES ARE TESTED   %s   commit %s   %d examples tracked" % (today(), commit(), len(script_coverage.tracked())))
+    print(summary(state, rows, before[-1][2:] if before else None))
+    print("\nDetail of every gap: %s   Earlier reports: python3 tools/measure_coverage.py --history" % (OUT / "report.md").relative_to(ROOT))
     return 0
 
 

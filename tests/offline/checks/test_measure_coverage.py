@@ -59,6 +59,16 @@ check("a survivor is listed under its script", "survived: line 2, header" in tex
 check("a row for the history has one value per column", len(rows) == len(mc.HEADER) - 2, rows)
 check("the missing reference is a note, not a crash", "enduser: no reference" in text)
 
+# the screen: a table of the measures with a bar and the change since the last report, then the gaps
+state["online"] = {"date": "2026-10-25", "data": {"total": 20, "run": 19, "missing": ["Admin/z.sh"]}}
+screen = mc.summary(state, ["75%", "n/a", "90%", "75%", "95%", "50%", "2", "clean"], ["70%", "n/a", "90%", "80%", "n/a", "50%", "2", "clean"])
+check("the screen has a header row and one row per measure", all(h in screen for h in ("Measure", "Result", "Since last")) and "API reach" in screen and "Online reach" in screen)
+check("a share is shown with a bar rounded down (95% is not full)", "95%" in screen and "#########." in screen and "##########  19 of 20" not in screen)
+check("the change since the last report is in points", "+5 pts" in screen and "-5 pts" in screen and "=" in screen)
+check("what is not measured is shown as never, not as a number", "never" in screen)
+check("the gaps are listed under their own heading, with a few names and a count", "Where the gaps are" in screen and "Admin/x.sh" in screen and "(1)" in screen)
+check("bar and delta: n/a gives no bar, a new measure says (new)", mc.bar("n/a") == " " * 10 and mc.delta("95%", "n/a") == "(new)" and mc.delta("80%", "80%") == "=")
+
 # history
 (Path(tmp) / "history.tsv").write_text("\t".join(mc.HEADER) + "\n2026-10-20\tabc1234\t90%\t100%\t95%\t90%\t50%\t80%\t3\tclean\n")
 r = subprocess.run([sys.executable, str(ROOT / "tools" / "measure_coverage.py"), "--history"], capture_output=True, text=True, env=dict(os.environ, ST_COVERAGE_DIR=tmp))
