@@ -30,6 +30,11 @@ feature works on that release and on every later one.
 | ------- | ------------ |
 | [PeSIT end to end acknowledgment](pesit-end-to-end-acknowledgment/) | Send a PeSIT ACK to the partner once its file has gone on to its next destination, or a NACK when it did not, by `coreId`, for one transfer or for every one in a time window. |
 
+## Guidance
+
+[Guidance](Guidance/) is a folder of short guides to read, not examples to run: how to use a feature well and what to avoid. The first one is
+[Daylight saving time and the SecureTransport REST API](Guidance/daylight-saving-time.md).
+
 ## Version check
 
 Every script in this folder starts by asking the server for its version with

@@ -113,6 +113,7 @@ server](#against-a-real-server).
 | Check | What it catches |
 | ----- | --------------- |
 | `offline/checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. In a `.bat` file: a single `%` before `{http_code}`, which cmd eats; a `%VAR: =%%20%` substitution, which does not URL-encode; and an RFC 2822 date with a `+03:00` offset or day names in the Windows language. |
+| `offline/checks/test_feature_guidance.py` | `Features/Guidance`: every guide is listed in the folder's README and linked from `Features/README.md`, its links resolve, it has no internal issue numbers, and the code in the daylight saving guide runs (python, the date function of this platform, the TZ rule for testing). |
 | `offline/checks/test_stubs.py` | The stub curl: a call with no Referer header is an error (found by breaking scripts on purpose: no test noticed a script that stopped sending it). |
 | `offline/checks/test_measure_coverage.py` | `tools/measure_coverage.py`: the report is built from the stored measures with the date of each, mutation results of different scripts are merged, the history is kept and shown. |
 | `offline/checks/test_mutation_probe.py` | `tools/mutation_probe.py`: the changes it makes to a script (method, exit, status, header, url, key, compare, output), where, one at a time, and how it reports survivors. |
