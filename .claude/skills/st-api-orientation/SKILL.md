@@ -213,6 +213,14 @@ manager, are covered by the **python** examples but not yet by bash or bat.
 Every example's header says how much it changes, in a `Risk:` line (read,
 write, config, disruptive); `python3 tools/list_examples.py --table` lists them.
 
+**Which test covers a script, and what is known to fail** (all in `tools/` and `tests/`):
+- `python3 tools/test_map.py [WORD ...]` lists each script with the offline and online checks whose files name it (`--missing`: the gaps; by-design exclusions have their reason).
+- `python3 tools/script_coverage.py` runs the offline suite with a tracer and exits 1 for every bash or python example that no check ran, or that never made a call to the
+  server; `--online` does the same for `tests/online/run_online.sh --write` (it writes to the lab). CI runs the offline one as the `script-coverage` job.
+- `tests/offline/checks/check_script_conventions.py` holds the house rules for every bash example (usage brackets, printed usage = header, a missing parameter is exit 2 before any call).
+- `tests/online/known_failures.tsv` lists the online assertions that fail on purpose-known grounds, each with its reason (an RD id, or what the owner has to do); the online run is green when
+  only those fail, red on anything else, and red when a listed one stops failing. Add a line there, never a skip, when a check fails for a product defect.
+
 ## Exploring the live API
 
 The Open API page lists every endpoint and lets you try it:

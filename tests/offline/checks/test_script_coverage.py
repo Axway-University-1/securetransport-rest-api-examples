@@ -18,11 +18,15 @@ def check(label, ok, detail=""):
         failed.append(label)
 
 
-def report(lines):
+def run_tool(lines):
     with tempfile.TemporaryDirectory() as d:
         log = Path(d) / "log.txt"
         log.write_text("\n".join(lines) + "\n")
-        return subprocess.run([sys.executable, str(TOOL), "--log", str(log)], capture_output=True, text=True).stdout
+        return subprocess.run([sys.executable, str(TOOL), "--log", str(log)], capture_output=True, text=True)
+
+
+def report(lines):
+    return run_tool(lines).stdout
 
 
 unique = "Admin/API 2.0/bash/05.Accounts/05.accounts_name_PUT.sh"          # a file name only one script has
@@ -36,5 +40,18 @@ out = report(["/s/05.accounts_name_PUT.sh"])
 check("a script that ran but made no call is reported as such", "05.accounts_name_PUT.sh" in out.split("never reached a call")[-1])
 out = report(["/s/05.accounts_name_PUT.sh", "CALL bash ./05.accounts_name_PUT.sh a b"])
 check("and not once a call came from it", "05.accounts_name_PUT.sh" not in out.split("never reached a call")[-1])
+check("a log with gaps is exit 1", run_tool(["/s/05.accounts_name_PUT.sh"]).returncode == 1)
+# a log in which every tracked script ran, and every one that talks to the server made a call: exit 0
+import importlib.util
+spec = importlib.util.spec_from_file_location("script_coverage", TOOL)
+sc = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(sc)
+everything = []
+for f in sc.tracked():
+    everything.append("/scratch/%s/%s" % (Path(f).parent.name, Path(f).name))
+    everything.append("CALL bash ./%s" % Path(f).name)
+r = run_tool(everything)
+check("a log in which everything ran and called is exit 0", r.returncode == 0, r.stdout[-300:])
+check("el_client.py, a library, is not asked for", "el_client.py" not in report([]))
 print("test_script_coverage: " + ("FAIL" if failed else "PASS"))
 sys.exit(1 if failed else 0)

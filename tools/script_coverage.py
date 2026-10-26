@@ -18,12 +18,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 HELPERS = {"lib.sh", "session.sh", "ensure_session.sh", "settings.sh"}
+# imported by the examples, never run on its own: the checks that run the examples run it
+LIBRARIES = {"el_client.py"}
 
 
 def tracked():
     out = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()
     return [f for f in out if f.endswith((".sh", ".py")) and not f.startswith(("tests/", "tools/", ".claude/", "review/"))
-            and Path(f).name not in HELPERS and "/lib/" not in f and "example" not in Path(f).name]
+            and Path(f).name not in HELPERS | LIBRARIES and "/lib/" not in f and "example" not in Path(f).name]
 
 
 def record(log, online=False):
@@ -55,6 +57,7 @@ def record(log, online=False):
 
 
 def main():
+    """Prints the gaps; returns 1 when there is one (a script nothing ran, or, offline, one that never made a call)."""
     if "--log" in sys.argv:
         log = Path(sys.argv[sys.argv.index("--log") + 1])
     else:
@@ -87,6 +90,7 @@ def main():
                or (count[Path(f).name] == 1 and Path(f).name in ran_names))]
     for f in missing:
         print(f)
+    silent = []
     if "--online" not in sys.argv:   # the stub that notes calls is the offline one
         # a script that talks to the server, that ran, and never got as far as a call: only its usage was tried
         silent = [f for f in files if f not in missing and Path(f).name not in called and Path(f).suffix == ".sh"
@@ -94,8 +98,11 @@ def main():
         print(f"\nran, but never reached a call to the server ({len(silent)}): their usage or an early exit is all that is tested")
         for f in silent:
             print("  " + f)
-    print(f"\n{len(missing)} of {len(tracked())} scripts were not run by any {"online" if "--online" in sys.argv else "offline"} check (log: {log})")
+    problems = len(missing) + (len(silent) if "--online" not in sys.argv else 0)
+    kind = "online" if "--online" in sys.argv else "offline"
+    print(f"\n{len(missing)} of {len(files)} scripts were not run by any {kind} check (log: {log})")
+    return 1 if problems else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

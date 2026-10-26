@@ -120,6 +120,10 @@ the rest yourself, because a person will not.
 - **A runner (`00.run_all.sh`) checks its inputs first and stops at once**, with its usage, before it logs in or
   creates anything; what can only be checked against the server (a number of questions, a name) is checked right
   after the login, and the session is dropped on a failure.
+- **A check that fails because of a product defect goes on `tests/online/known_failures.tsv`** (check, the text of the FAIL line, and the reason: an RD id), not into a skip
+  and not into silence: the run stays green for it and red for anything new. Before you say a script is covered, run `python3 tools/script_coverage.py`: it lists what no check ran.
+- **A time window per day is built with `date` for each midnight, never as N times 86400 seconds** (the day clocks change has 23 or 25 hours; see st-api-gotchas).
+- **A daemon or server operation is read as `isSuccessful`, from a bare list or an object**, and followed by a wait for the state it asked for (st-api-gotchas).
 - **What the server answers at random** (a 500 that works the next time) is said in the message, and goes in
   `KNOWN_ISSUES_RD.md`.
 - **A behaviour the reader could be surprised by** (a session that keeps stale data, an operation that changes

@@ -1512,6 +1512,44 @@ poll the daemon status until `Running` first, and retry the server start a
 handful of times, rather than trusting a single attempt's response either
 way.
 
+## A daemon start is answered about 20 seconds before the daemon and its servers are up
+
+Measured on the lab (5.5-20260924): `POST /daemons/operations?operation=start&daemon=http` answers `200` "Daemon HTTP is started." at once. The daemon status
+stays `Not running` for another 10 to 15 seconds, and the daemon's servers become active by themselves about 20 seconds after the answer. A server start
+sent in between is refused with `200` and `isSuccessful: false` ("The HTTP daemon is not started", "An error occurred ...", "The port 8443 is in use").
+A script that starts daemons and then servers polls the daemon status until `Running` (45 seconds at most), waits a few seconds more, and looks at the
+servers before it starts any: a server that is active by then is not started again, and one whose start failed is looked at again before it is called a
+failure (`13.servers_operations_POST.sh --all-stopped` does this). Start the daemons first: a server cannot start while its daemon is stopped.
+
+## The answer of a daemon operation is a bare list, the reference says an object
+
+`POST /daemons/operations` answers `[ {"daemon":"FTP","message":"Daemon FTP is stopped.","isSuccessful":true} ]`. The reference documents an object,
+`{"daemonOperationResults": [ ... ]}`. (`POST /servers/operations` does answer an object, `serverStatuses`.) Read both: in jq
+`(if type == "array" then . else (.daemonOperationResults // [.]) end)[]`, in python `answer if isinstance(answer, list) else answer.get("daemonOperationResults", [])`.
+A script that indexes the answer by name fails on the lab with a type error, and the status code is still 200: always read `isSuccessful`.
+
+## A day is not 86400 seconds: ask `date` for each midnight
+
+Per-day windows (`logs/transfers` with `startTimeAfter` and `endTimeBefore`, usage and billing reports) built as "midnight today minus N times 86400 seconds"
+are wrong on the day the clocks change and the days after it (a day of 23 or 25 hours): a boundary lands at 23:00 or 01:00 instead of midnight, and a
+transfer is counted in the wrong day or twice. Ask `date` for each midnight (BSD `date -v-Nd -v0H -v0M -v0S +%s`, `date -v+Nd` for the next day; GNU
+`date -d "N days ago 00:00:00" +%s`), and write the boundary as RFC 2822 with its own offset. The server reads the offset as an exact instant (verified: the same
+instant spelled `+0300`, `+0200` or `+0000` gives the same count, the same digits with another offset a different one), and its answers carry an offset too.
+Test it without waiting for the date: a POSIX `TZ` whose clocks went back yesterday
+(`TZ="EET-2EEST,J<day-30>/0,J<day-1>/3"`, see `test_bash_reads_and_deletes.sh`). The suite found this on the day it happened (25 Oct 2026).
+
+## A share reaches the collaborator late
+
+After the owner's share (`PATCH /files/{folder}` with `sharedDirectoryProperties`, `204`), the collaborator's `GET /files` already lists the folder
+(`<folder> (<owner e-mail>)`), but a read of a file in it can be refused `403` for a moment (about half the first reads on the lab); the same read two seconds
+later works. A check or script that reads straight after a share retries a few times, two seconds apart, before it calls it a failure.
+
+## A locked account looks like a wrong password
+
+After `failedAuthMaximum` wrong passwords the account is locked (`user.locked: true` in the Admin API) and every login answers `401` "Login failed. Re-submit your
+credentials.", **also with the right password**. Nothing in the answer says "locked", and time does not release it: an administrator does. A test that fails a
+login on purpose uses a throwaway account, and counts its attempts.
+
 ## A retry loop needs to tolerate the admin API being briefly unreachable, not just a status that has not changed yet
 
 Confirmed directly, in `23.connect_operations_scripts.py`: while daemons and

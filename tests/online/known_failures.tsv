@@ -1,0 +1,4 @@
+# Known failures of the online checks. See tests/common/known_failures.py.
+# check	text of the FAIL line	why
+46	THE POLICY ENFORCES	RD-19: a login restriction policy that denies every address does not stop the logins of its business unit
+59	did not finish within	st_callback_host is not reachable from the server: set it in tests/local/integration.conf (a lab setting, the owner's)

@@ -19,6 +19,9 @@
 #   4. Objects that get created carry st_object_prefix, default ZZTEST_, and are
 #      deleted again even when a check fails.
 #
+# A check that fails only on lines listed in tests/online/known_failures.tsv (each with its reason) is a known failure: the
+# run stays green. A listed line that no longer fails turns the run red, so the list cannot keep what is fixed.
+#
 # Each check gets ST_CHECK_TIMEOUT seconds (1800 when not set; 0 turns the limit
 # off). A check that hangs is stopped, with SIGTERM so that it cleans up first
 # (ST_CHECK_GRACE seconds, 120), and counted as FAILED. See lib/run_check.py.
@@ -153,9 +156,12 @@ echo
 PASSED=0
 FAILED=0
 SKIPPED=0
+KNOWN=0
 FAILED_NAMES=()
+KNOWN_NAMES=()
 OUTPUT_FILE="$(mktemp)"
-trap 'rm -f "${OUTPUT_FILE}"; cleanup' EXIT
+KNOWN_STATE="$(mktemp)"
+trap 'rm -f "${OUTPUT_FILE}" "${KNOWN_STATE}"; cleanup' EXIT
 START=${SECONDS}
 
 # Only the numbered .py files directly in checks/, in number order (sort -n, so
@@ -178,7 +184,13 @@ for check in $(find checks -maxdepth 1 -name '[0-9]*.py' -type f | sort -t. -k1,
     # something was asserted: a check that skipped, or bailed out with 0 passed,
     # is a skip, which is not the same as a pass.
     passes=$(sed -n 's/^  \([0-9][0-9]*\) passed, .*/\1/p' "${OUTPUT_FILE}" | tail -n 1)
-    if [ "${status}" -ne 0 ]; then
+    # a check that fails only on what known_failures.tsv lists is a known failure, not a new one
+    verdict=$(python3 "${HERE}/../common/known_failures.py" judge "${HERE}/known_failures.tsv" "${name}" "${OUTPUT_FILE}" "${KNOWN_STATE}")
+    if [ "${status}" -ne 0 ] && [ "${verdict}" = "known" ]; then
+        KNOWN=$((KNOWN + 1))
+        KNOWN_NAMES+=("${name}")
+        echo "  (known failure, see tests/online/known_failures.tsv)"
+    elif [ "${status}" -ne 0 ]; then
         FAILED=$((FAILED + 1))
         FAILED_NAMES+=("${name}")
     elif [ "${passes:-0}" -gt 0 ]; then
@@ -189,13 +201,26 @@ for check in $(find checks -maxdepth 1 -name '[0-9]*.py' -type f | sort -t. -k1,
     echo
 done
 
+# a known failure that no longer fails is fixed: the list must not keep it
+FIXED=$(python3 "${HERE}/../common/known_failures.py" report "${HERE}/known_failures.tsv" "${KNOWN_STATE}")
+FIXED_RC=$?
+KNOWN_TEXT=""
+[ "${KNOWN}" -gt 0 ] && KNOWN_TEXT="${KNOWN} known failure(s), "
 echo "######################################################################"
-if [ "${FAILED}" -eq 0 ]; then
-    echo "# ONLINE PASSED  (${PASSED} check(s), ${SKIPPED} skipped, $((SECONDS - START)) s)"
+if [ "${KNOWN}" -gt 0 ]; then
+    echo "# Known failures, not counted (tests/online/known_failures.tsv):"
+    for n in "${KNOWN_NAMES[@]}"; do echo "#   ${n}"; done
+fi
+if [ "${FAILED}" -eq 0 ] && [ "${FIXED_RC}" -eq 0 ]; then
+    echo "# ONLINE PASSED  (${PASSED} check(s), ${KNOWN_TEXT}${SKIPPED} skipped, $((SECONDS - START)) s)"
     echo "######################################################################"
     exit 0
 fi
-echo "# ${FAILED} ONLINE CHECK(S) FAILED, ${PASSED} passed, ${SKIPPED} skipped, $((SECONDS - START)) s"
+if [ "${FIXED_RC}" -ne 0 ]; then
+    echo "# A KNOWN FAILURE IS FIXED: take it off tests/online/known_failures.tsv"
+    printf '%s\n' "${FIXED}" | sed 's/^/#   /'
+fi
+echo "# ${FAILED} ONLINE CHECK(S) FAILED, ${PASSED} passed, ${KNOWN_TEXT}${SKIPPED} skipped, $((SECONDS - START)) s"
 for n in "${FAILED_NAMES[@]}"; do echo "#   ${n}"; done
 echo "######################################################################"
 exit 1

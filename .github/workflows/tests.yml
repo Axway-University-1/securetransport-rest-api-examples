@@ -3,6 +3,9 @@ name: tests
 on:
   push:
   pull_request:
+  schedule:
+    - cron: "0 5 * * 1"      # Mondays: a script nobody tests is found within a week, even with no push
+  workflow_dispatch:
 
 jobs:
   offline-checks:
@@ -11,3 +14,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run the offline checks
         run: ./tests/offline/run_all.sh
+
+  # The same suite, run with a tracer: fails when an example (bash or python) is run by no offline check, or when one that
+  # talks to the server never makes a call in any check (only its usage was tried). It takes as long as the suite, and
+  # runs next to it. Locally: python3 tools/script_coverage.py
+  script-coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every example is run by an offline check
+        run: python3 tools/script_coverage.py

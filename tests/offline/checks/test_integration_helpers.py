@@ -478,6 +478,7 @@ try:
     _shutil.copy(os.path.join(REPO, "tests", "online", "run_online.sh"), integration)
     os.makedirs(os.path.join(work, "common"))
     _shutil.copy(os.path.join(REPO, "tests", "common", "run_check.py"), os.path.join(work, "common"))
+    _shutil.copy(os.path.join(REPO, "tests", "common", "known_failures.py"), os.path.join(work, "common"))
     fake = {"01.ok.py": 'print("  3 passed, 0 failed")',
             "02.zero.py": 'print("  0 passed, 0 failed")',
             "03.skip.py": 'print("  SKIP  no server")',
@@ -523,6 +524,7 @@ try:
     os.makedirs(os.path.join(work, "common"))
     _shutil.copy(os.path.join(REPO, "tests", "online", "run_online.sh"), integration)
     _shutil.copy(os.path.join(REPO, "tests", "common", "run_check.py"), os.path.join(work, "common"))
+    _shutil.copy(os.path.join(REPO, "tests", "common", "known_failures.py"), os.path.join(work, "common"))
     fake = {
         "01.argv.py": 'import sys\nprint("ARGV " + " ".join(sys.argv[1:]))\nprint("  1 passed, 0 failed")',
         "02.hang.py": 'import signal, sys, time\n'
