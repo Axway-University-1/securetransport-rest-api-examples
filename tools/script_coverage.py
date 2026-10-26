@@ -56,15 +56,9 @@ def record(log, online=False):
     subprocess.run(cmd, cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def main():
-    """Prints the gaps; returns 1 when there is one (a script nothing ran, or, offline, one that never made a call)."""
-    if "--log" in sys.argv:
-        log = Path(sys.argv[sys.argv.index("--log") + 1])
-    else:
-        log = Path(tempfile.mkdtemp(prefix="covlog_")) / "log.txt"
-        log.write_text("")
-        record(log, "--online" in sys.argv)
-    lines = [p for p in log.read_text().split("\n") if p]
+def analyse(log, online=False):
+    """{'total', 'missing', 'silent'} for the log of a run: the scripts no check ran, and (offline) the ones that ran and never made a call."""
+    lines = [p for p in Path(log).read_text().split("\n") if p]
     # a check that must dodge a name on the lab runs a copy called .zztest_<name> next to the script
     paths = [p.replace("/.zztest_", "/") for p in lines if not p.startswith("CALL ")]
     # the scripts that made a call to the server (the stub curl), from the parent command line of each call
@@ -77,7 +71,7 @@ def main():
     ran = {(Path(p).parent.name, Path(p).name) for p in paths}
     ran_names = {Path(p).name for p in paths}
     files = tracked()
-    if "--online" in sys.argv:
+    if online:
         sys.path.insert(0, str(ROOT / "tools"))
         import test_map
         files = [f for f in files if not any(k in f for k in test_map.NO_ONLINE)]
@@ -88,20 +82,35 @@ def main():
     # several have (00.run_all.sh) needs its folder as well
     missing = [f for f in files if not ((Path(f).parent.name, Path(f).name) in ran
                or (count[Path(f).name] == 1 and Path(f).name in ran_names))]
-    for f in missing:
-        print(f)
     silent = []
-    if "--online" not in sys.argv:   # the stub that notes calls is the offline one
+    if not online:   # the stub that notes calls is the offline one
         # a script that talks to the server, that ran, and never got as far as a call: only its usage was tried
         silent = [f for f in files if f not in missing and Path(f).name not in called and Path(f).suffix == ".sh"
                   and "curl" in (ROOT / f).read_text(errors="replace") and "run_all" not in f and not Path(f).name.startswith("99.")]
-        print(f"\nran, but never reached a call to the server ({len(silent)}): their usage or an early exit is all that is tested")
-        for f in silent:
+    return {"total": len(files), "missing": missing, "silent": silent,
+            "with_calls": sum(1 for f in files if Path(f).suffix == ".sh" and "curl" in (ROOT / f).read_text(errors="replace")
+                              and "run_all" not in f and not Path(f).name.startswith("99."))}
+
+
+def main():
+    """Prints the gaps; returns 1 when there is one (a script nothing ran, or, offline, one that never made a call)."""
+    online = "--online" in sys.argv
+    if "--log" in sys.argv:
+        log = Path(sys.argv[sys.argv.index("--log") + 1])
+    else:
+        log = Path(tempfile.mkdtemp(prefix="covlog_")) / "log.txt"
+        log.write_text("")
+        record(log, online)
+    r = analyse(log, online)
+    for f in r["missing"]:
+        print(f)
+    if not online:
+        print(f"\nran, but never reached a call to the server ({len(r['silent'])}): their usage or an early exit is all that is tested")
+        for f in r["silent"]:
             print("  " + f)
-    problems = len(missing) + (len(silent) if "--online" not in sys.argv else 0)
-    kind = "online" if "--online" in sys.argv else "offline"
-    print(f"\n{len(missing)} of {len(files)} scripts were not run by any {kind} check (log: {log})")
-    return 1 if problems else 0
+    kind = "online" if online else "offline"
+    print(f"\n{len(r['missing'])} of {r['total']} scripts were not run by any {kind} check (log: {log})")
+    return 1 if r["missing"] or r["silent"] else 0
 
 
 if __name__ == "__main__":

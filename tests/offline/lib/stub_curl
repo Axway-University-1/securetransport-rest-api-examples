@@ -43,6 +43,7 @@ fi
 # that was never set) credentials gets caught: the call shape still looks right.
 # ==============================================================================
 url=""
+has_referer=0
 payload=""
 method="GET"
 header_file=""
@@ -57,7 +58,7 @@ while [[ $# -gt 0 ]]; do
     --data-urlencode)                   query_params+=("$2"); shift 2 ;;
     -G)                                 use_g=1; shift ;;
     -X|--request)                       method="$2"; shift 2 ;;
-    -H|--header)                        echo "HEADER: $2" >&2; shift 2 ;;
+    -H|--header)                        echo "HEADER: $2" >&2; [[ "$2" == [Rr]eferer:* ]] && has_referer=1; shift 2 ;;
     -u|--user)                          echo "BASIC_AUTH: $2" >&2; shift 2 ;;
     -F|--form|--form-string)            echo "FORM: $2" >&2; shift 2 ;;
     -b|--cookie)                        echo "COOKIE: $2" >&2; shift 2 ;;
@@ -70,6 +71,14 @@ while [[ $# -gt 0 ]]; do
     *)                                  shift ;;
   esac
 done
+
+# Every call to the server carries a Referer header (the CSRF protection of the 20230525 release asks for one, see st-api-gotchas):
+# a call without one is an error here, so that a script that stops sending it fails every test that runs it.
+# STUB_CURL_REQUIRE_REFERER=0 turns it off, for a test that is about a call with none.
+if [[ "${STUB_CURL_REQUIRE_REFERER:-1}" != "0" && -n "${url}" && "${has_referer}" -eq 0 ]]; then
+    echo "STUB_ERROR: the call to ${url} has no Referer header" >&2
+    exit 22
+fi
 
 if [[ "${use_g}" -eq 1 && "${#query_params[@]}" -gt 0 ]]; then
     sep="?"

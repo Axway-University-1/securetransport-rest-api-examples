@@ -217,6 +217,8 @@ write, config, disruptive); `python3 tools/list_examples.py --table` lists them.
 - `python3 tools/test_map.py [WORD ...]` lists each script with the offline and online checks whose files name it (`--missing`: the gaps; by-design exclusions have their reason).
 - `python3 tools/script_coverage.py` runs the offline suite with a tracer and exits 1 for every bash or python example that no check ran, or that never made a call to the
   server; `--online` does the same for `tests/online/run_online.sh --write` (it writes to the lab). CI runs the offline one as the `script-coverage` job.
+- `python3 tools/measure_coverage.py` is the one report of how well the examples are tested (API reach, offline and online reach, mutation score, house rules, with dates and a
+  history in `tests/local/coverage/`); `python3 tools/mutation_probe.py SCRIPT` breaks a bash example on purpose and lists the changes no check noticed.
 - `tests/offline/checks/check_script_conventions.py` holds the house rules for every bash example (usage brackets, printed usage = header, a missing parameter is exit 2 before any call).
 - `tests/online/known_failures.tsv` lists the online assertions that fail on purpose-known grounds, each with its reason (an RD id, or what the owner has to do); the online run is green when
   only those fail, red on anything else, and red when a listed one stops failing. Add a line there, never a skip, when a check fails for a product defect.

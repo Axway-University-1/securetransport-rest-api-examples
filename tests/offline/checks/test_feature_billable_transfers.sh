@@ -287,6 +287,20 @@ DAY_LINES=$(echo "${OUT}" | grep -cE '^  [0-9]{4}-[0-9]{2}-[0-9]{2} +4 +4 +4$')
 # Full lines, not calls() (which splits on whitespace via awk): the stub does
 # not URL-encode the RFC 2822 dates, so the URL itself contains spaces
 REPORT_URLS=$(echo "${OUT}" | grep '^URL: ' | sed 's#^URL: ##; s#.*logs/transfers?##')
+# the path of the call is the one of the transfer log, not a look-alike (the stub answers any URL, so this is read from the call itself)
+[ "$(echo "${OUT}" | grep -c '^URL: https://.*:[0-9]*/api/v2.0/logs/transfers?isBillable=true&account=')" -eq 21 ] \
+    && pass "all 21 queries go to /api/v2.0/logs/transfers" || fail "the path of the queries: $(echo "${OUT}" | grep '^URL: ' | head -1)"
+[ "$(echo "${OUT}" | grep -c '^HEADER: Referer: ')" -ge 21 ] && pass "and each one sends the Referer header" || fail "Referer headers: $(echo "${OUT}" | grep -c '^HEADER: Referer: ')"
+# today is the last row: a count that differs only for today shows that TODAY_COUNT is today's and not another day's
+if date -v-1d >/dev/null 2>&1; then MIDNIGHT_TEXT=$(date -v0H -v0M -v0S -R); else MIDNIGHT_TEXT=$(date -d "today 00:00:00" -R); fi
+cat > "${WORK}/report_today.json" <<JSON
+{"version": "5.5-20260924", "resultSet": {"returnCount": 1, "totalCount": 9}}
+JSON
+printf 'startTimeAfter=%s\t%s\n' "${MIDNIGHT_TEXT}" "${WORK}/report_today.json" > "${WORK}/report_rules.tsv"
+OUT_TODAY=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/report.json" STUB_CURL_GET_RULES="${WORK}/report_rules.tsv" STUB_CURL_CSRF="csrf-abc" bash ./billable_GET_report.sh before 2>&1)
+[ "$(echo "${OUT_TODAY}" | grep '^TODAY_COUNT' | tr '\n' '|')" = "TODAY_COUNT partner_to_pull_from: 9|TODAY_COUNT btTestAccount: 9|TODAY_COUNT partner_to_push_to: 9|" ] \
+    && pass "TODAY_COUNT is the count of today (9), not of another day (4)" || fail "TODAY_COUNT: $(echo "${OUT_TODAY}" | grep TODAY_COUNT | tr '\n' '|')"
+[ "$(echo "${OUT_TODAY}" | grep -cE '^  [0-9]{4}-[0-9]{2}-[0-9]{2} +9 +9 +9$')" -eq 1 ] && pass "and only the last row of the table shows it" || fail "rows with 9: $(echo "${OUT_TODAY}" | grep -cE ' 9 +9 +9$')"
 [ "$(echo "${REPORT_URLS}" | grep -c 'isBillable=true')" -eq 21 ] && pass "every query filters isBillable=true: 7 days, 3 accounts" || fail "isBillable missing"
 for a in partner_to_pull_from btTestAccount partner_to_push_to; do
     [ "$(echo "${REPORT_URLS}" | grep -c "&account=${a}&")" -eq 7 ] && pass "seven days scoped to ${a}, with account=" || fail "account=${a}: $(echo "${REPORT_URLS}" | grep -c "account=${a}")"

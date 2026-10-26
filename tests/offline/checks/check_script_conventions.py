@@ -9,6 +9,9 @@ new script cannot repeat it and the person reads the scripts for what only a per
   3. A script whose header lists a required parameter, run without any, stops with exit 2 and a usage, and has sent
      nothing to the server. (Exit 2 is "wrong use"; 1 is "the server said no".)
 
+  4. Without its settings file a script says to copy the example file, exits 1 and has sent nothing. (Tried with a dummy value for each
+     required parameter: a script that stops at a parameter first, exit 2, is not counted as tried.)
+
 Runs offline, with a stub curl. Exit 0 is clean.
 """
 import os, re, subprocess, sys, tempfile, shutil
@@ -54,6 +57,7 @@ try:
     env = dict(os.environ, PATH=f"{work / 'bin'}:{os.environ['PATH']}", ST_ADMIN_LOCAL_VARIABLES=str(work / "settings.sh"),
                ST_ENDUSER_LOCAL_VARIABLES=str(work / "settings.sh"), STUB_CURL_STATUS="200")
     ran = 0
+    tried_settings = 0
     for f in scripts():
         text = (ROOT / f).read_text(errors="replace")
         name, params = header_usage(text)
@@ -68,6 +72,19 @@ try:
                 if not (p.startswith(f"{name} {params}") or f"{name} {params}".startswith(p)):
                     bad(2, f, f"printed usage '{printed}' differs from the header '{name} {params}'")
             break
+        # 4: no settings file. A dummy value for each required parameter; the script may stop at one of them (exit 2) before it gets there
+        env_missing = dict(env, ST_ADMIN_LOCAL_VARIABLES="/nonexistent/settings.sh", ST_ENDUSER_LOCAL_VARIABLES="/nonexistent/settings.sh")
+        r = subprocess.run(["bash", Path(f).name] + ["x"] * len(required(params)), cwd=ROOT / Path(f).parent, env=env_missing, text=True,
+                           input="", capture_output=True, timeout=60)
+        out = r.stdout + r.stderr
+        if r.returncode == 1 and ("set_variables" in out or "settings" in out):
+            tried_settings += 1
+            if re.search(r"^(URL|METHOD):", out, re.M):
+                bad(4, f, "it sent something to the server with no settings file")
+        elif r.returncode == 0 and not re.search(r"^(URL|METHOD):", out, re.M) and "set_variables" in text:
+            bad(4, f, "without its settings file it exits 0")
+        elif re.search(r"^(URL|METHOD):", out, re.M):
+            bad(4, f, "it called the server with no settings file (exit %s)" % r.returncode)
         if required(params):
             ran += 1
             r = subprocess.run(["bash", Path(f).name], cwd=ROOT / Path(f).parent, env=env, text=True, input="",
@@ -82,7 +99,7 @@ try:
 finally:
     shutil.rmtree(work, ignore_errors=True)
 
-print(f"checked {len(scripts())} bash scripts, {ran} of them run without their required parameters")
+print(f"checked {len(scripts())} bash scripts, {ran} of them run without their required parameters, {tried_settings} stopped at a missing settings file")
 for p in problems:
     print("  FAIL  " + p)
 print("# CLEAN" if not problems else f"# {len(problems)} problem(s)")

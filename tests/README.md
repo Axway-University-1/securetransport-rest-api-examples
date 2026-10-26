@@ -113,6 +113,9 @@ server](#against-a-real-server).
 | Check | What it catches |
 | ----- | --------------- |
 | `offline/checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. In a `.bat` file: a single `%` before `{http_code}`, which cmd eats; a `%VAR: =%%20%` substitution, which does not URL-encode; and an RFC 2822 date with a `+03:00` offset or day names in the Windows language. |
+| `offline/checks/test_stubs.py` | The stub curl: a call with no Referer header is an error (found by breaking scripts on purpose: no test noticed a script that stopped sending it). |
+| `offline/checks/test_measure_coverage.py` | `tools/measure_coverage.py`: the report is built from the stored measures with the date of each, mutation results of different scripts are merged, the history is kept and shown. |
+| `offline/checks/test_mutation_probe.py` | `tools/mutation_probe.py`: the changes it makes to a script (method, exit, status, header, url, key, compare, output), where, one at a time, and how it reports survivors. |
 | `offline/checks/test_known_failures.py` | The known failures of the online checks: a check that fails only on lines of `tests/online/known_failures.tsv` is a known failure and the run stays green, a new failure turns it red, a listed line that no longer fails turns it red too; every list line names an existing check. |
 | `offline/checks/test_script_coverage.py` | The matching in `tools/script_coverage.py`: which script a record of the suite's run belongs to, and a script that ran but never made a call. |
 | `offline/checks/check_script_conventions.py` | The house rules for every bash example (Admin, End User, Use Cases, Features), found in manual review: each optional parameter has its own bracket (`[A] [B]`, never `[A [B]]`); the `Usage:` a script prints is the one in its header; a script run without its required parameters exits 2 with a usage and has sent nothing. |
@@ -260,6 +263,13 @@ are committed. If you are unsure, it belongs in `local/`.
 | A check named `hygiene` fails | It found something that looks like a credential, hostname or IP. Read the `FAIL` line, then replace it with a placeholder such as `<SERVER>`. |
 | A check named `docs_match_repo` fails | You added or removed a script and the README count or a `.claude` skill is now out of date. Update it. |
 | Integration checks 15 to 18 and 20 skip | They need a one-time venv. See [integration/README.md](online/README.md). |
+
+## Measuring how well the examples are tested
+
+`python3 tools/measure_coverage.py` is the one report: API reach (operations of the reference that an example calls), offline reach (examples the
+suite runs, and that make a call), online reach, assertion depth (the mutation score) and the house rules, each with the date it was measured, and
+the history of earlier reports (`--history`, kept in `tests/local/coverage/`). `--offline`, `--online` and `--mutation SCRIPT ...` take the slow
+measures again; `tools/mutation_probe.py` breaks a script on purpose, one small change at a time, and lists the changes that no check noticed.
 
 ## Which tests cover a script
 

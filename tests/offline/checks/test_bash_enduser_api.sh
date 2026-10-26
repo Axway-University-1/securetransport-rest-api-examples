@@ -307,6 +307,7 @@ expect "11 md5: a multipart POST into the folder, with the transfer mode" "${RC}
 expect "11 md5: Content-MD5 is the file's MD5, base64" "$(headers | grep '^Content-MD5:')" "Content-MD5: ${LOCAL_MD5}"
 STATUS=500 run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt"
 expect "11 md5: a wrong checksum's 500 is a failure; the home folder is /files" "${RC}:$(calls)" "1:POST ${BASE}/files?transferMode=BINARY"
+has "11 md5: says what it uploads, where, and with which MD5" "Uploading up.txt to /"
 has "11 md5: a failed upload says to run it again, since the 500 is sometimes a one-off" "run it again: the server now and then answers 500"
 run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt" inbox ASCII extra
 expect "11 md5: too many parameters is exit 2 and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"

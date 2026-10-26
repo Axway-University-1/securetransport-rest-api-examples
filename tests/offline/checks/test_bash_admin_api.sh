@@ -1282,6 +1282,7 @@ bad_args "05 operations: an operation that is neither start nor stop, nothing se
 run "${F}/05.daemons_operations_POST.sh" ssh stop
 bad_args "05 operations: a stop without the confirmation word, nothing sent"
 has "05 operations: and says which word" "give the word stop-the-ssh-daemon as the third argument"
+has "05 operations: says that a stop affects every client of the daemon" "This stops the ssh daemon of the whole server: its clients are refused until it is started again."
 run "${F}/05.daemons_operations_POST.sh" ssh stop yes
 bad_args "05 operations: a stop with another word, nothing sent"
 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-http-daemon
@@ -1327,6 +1328,7 @@ STATUS=400 STATUS_GET=200 run "${F}/05.daemons_operations_POST.sh" ssh stop stop
 expect "05 operations: a refusal exits 1, with the code" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^HTTP 400')" "1:1"
 STATUS=200 STATUS_GET=500 run "${F}/05.daemons_operations_POST.sh" ssh stop stop-the-ssh-daemon
 expect "05 operations: the status cannot be read, exit 1, nothing stopped" "${RC}:$(calls | grep -c POST)" "1:0"
+has "05 operations: and says which call failed, with its code" "Could not read the daemons: HTTP 500"
 GET_BODY=
 POST_BODY=
 STATUS=
