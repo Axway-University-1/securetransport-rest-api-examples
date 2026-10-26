@@ -58,7 +58,7 @@ try:
              for root in roots]
     outs = [p.communicate(timeout=300)[0] for p in procs]
     check("both pass: neither deleted the other's folder under it", [p.returncode for p in procs] == [0, 0],
-          [(p.returncode, o[-300:]) for p, o in zip(procs, outs)])
+          [(p.returncode, [l.strip() for l in o.splitlines() if "FAIL" in l][:4] or o[-300:]) for p, o in zip(procs, outs)])
     check("each wrote in its own root, and only there", all(os.listdir(root) == ["bash_pesit_ack"] for root in roots), [os.listdir(r) for r in roots])
 finally:
     for root in roots:
