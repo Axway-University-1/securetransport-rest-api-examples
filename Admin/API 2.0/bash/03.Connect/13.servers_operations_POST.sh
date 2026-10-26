@@ -39,8 +39,8 @@
 # - It reads the servers first, prints the server's state and the state of the daemon of its protocol, and the command that undoes the
 #   operation. A server that is not there is a stop of nothing: exit 1, no operation sent. A server already in the state asked for (a start
 #   of one that is active, a stop of one that is not) is left alone: exit 0, no operation sent.
-# - Starting a daemon starts the servers of its protocol too, a moment later: --all-stopped waits 5 seconds after a daemon it started,
-#   and only then looks at which servers are not running.
+# - Starting a daemon starts the servers of its protocol too, a moment later: --all-stopped waits for a daemon it started to say Running (it takes 10 to 15 seconds
+#   after the answer, and its servers come up about 5 seconds after that), and only then looks at which servers are not running.
 # - A server needs the daemon of its protocol: when that one is not running the script says so and points at
 #   05.daemons_operations_POST.sh, and still sends the start. Starting a server right after its daemon can fail for a moment and
 #   succeed on a retry (see st-api-gotchas).
@@ -233,19 +233,31 @@ fi
 printf "Getting the list of daemons...\n"
 read_daemons
 printf '%s\n' "${DAEMONS_JSON}"
-DAEMON_STARTED=0
+STARTED_LIST=""
 for DAEMON in ssh as2 pesit ftp http; do
     STATUS=$(printf '%s' "${DAEMONS_JSON}" | jq -r --arg key "${DAEMON}Status" '.[$key] // "unknown"')
     if [ "${STATUS}" = "Not running" ]; then
-        if daemon_start "${DAEMON}"; then DAEMON_STARTED=1; else FAILED=1; fi
+        if daemon_start "${DAEMON}"; then STARTED_LIST="${STARTED_LIST} ${DAEMON}"; else FAILED=1; fi
     else
         printf "Daemon %s is %s\n" "${DAEMON}" "${STATUS}"
     fi
 done
-# A daemon that starts brings the servers of its protocol up itself, a moment later: a start sent at once answers
-# "An error occurred while trying to start the server" for a server that is about to be there. Look at the servers after it.
-if [ "${DAEMON_STARTED}" = "1" ]; then
-    printf "Waiting 5 seconds for the servers of the daemons just started...\n"
+# The answer to a daemon start comes at once, and the daemon is "Not running" for another 10 to 15 seconds, then its servers
+# come up by themselves a few seconds after that (about 20 seconds in all on the lab). A server start sent before that is refused
+# ("The HTTP daemon is not started", "An error occurred ..."). So: wait until the daemons just started say Running, 3 seconds at a time,
+# 45 seconds at most.
+if [ -n "${STARTED_LIST}" ]; then
+    printf "Waiting for the daemons just started (%s ) to be running...\n" "${STARTED_LIST}"
+    for TRY in $(seq 1 15); do
+        sleep 3
+        read_daemons
+        PENDING=0
+        for DAEMON in ${STARTED_LIST}; do
+            [ "$(printf '%s' "${DAEMONS_JSON}" | jq -r --arg key "${DAEMON}Status" '.[$key] // "unknown"')" = "Not running" ] && PENDING=1
+        done
+        [ "${PENDING}" = "0" ] && break
+    done
+    printf "Waiting 5 more seconds for their servers...\n"
     sleep 5
 fi
 
@@ -256,9 +268,9 @@ while IFS= read -r NAME; do
     printf "Server: %s is not running\n" "${NAME}"
     if ! server_operation "${NAME}" "start" ""; then
         # a daemon just started brings its servers up itself, and one of them can take longer than a few seconds:
-        # look again, up to 5 times 3 seconds apart, before calling this a failure
+        # look again, up to 10 times 3 seconds apart, before calling this a failure
         CAME_UP=0
-        for TRY in 1 2 3 4 5; do
+        for TRY in 1 2 3 4 5 6 7 8 9 10; do
             sleep 3
             list_servers
             if [ "$(printf '%s' "${SERVERS_JSON}" | jq -r --arg n "${NAME}" '[.[] | select(.serverName == $n and .isActive == true)] | length')" -gt 0 ]; then

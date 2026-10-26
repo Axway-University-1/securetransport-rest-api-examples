@@ -39,8 +39,8 @@ REM   `--all-stopped` now, with its own word.
 REM - It reads the servers first, prints the server's state and the state of the daemon of its protocol, and the command that undoes the
 REM   operation. A server that is not there is a stop of nothing: exit 1, no operation sent. A server already in the state asked for (a start
 REM   of one that is active, a stop of one that is not) is left alone: exit 0, no operation sent.
-REM - Starting a daemon starts the servers of its protocol too, a moment later: --all-stopped waits 5 seconds after a daemon it started,
-REM   and only then looks at which servers are not running.
+REM - Starting a daemon starts the servers of its protocol too, a moment later: --all-stopped waits for a daemon it started to say Running (10 to 15 seconds after the answer, its servers come up
+REM   about 5 seconds after that), and only then looks at which servers are not running.
 REM - A server needs the daemon of its protocol: when that one is not running the script says so and points at
 REM   05.daemons_operations_POST.bat, and still sends the start. Starting a server right after its daemon can fail for a moment and
 REM   succeed on a retry (see st-api-gotchas).
@@ -182,10 +182,15 @@ CALL :read_daemons
 IF ERRORLEVEL 1 EXIT /B 1
 powershell -NoProfile -Command "Get-Content -Raw $env:DAEMONS_FILE | ConvertFrom-Json | ConvertTo-Json -Compress"
 SET DSTARTED=0
+SET "STARTED_LIST="
 FOR %%D IN (ssh as2 pesit ftp http) DO CALL :daemon_step %%D
-REM A daemon that starts brings the servers of its protocol up itself, a moment later: look at the servers after it
+REM The answer to a daemon start comes at once, and the daemon is "Not running" for another 10 to 15 seconds, then its servers
+REM come up by themselves a few seconds after that. A server start sent before that is refused. So: wait until the daemons just
+REM started say Running, 3 seconds at a time, 45 seconds at most, and 5 more seconds for their servers.
 IF "%DSTARTED%"=="1" (
-    echo Waiting 5 seconds for the servers of the daemons just started...
+    echo Waiting for the daemons just started ^(%STARTED_LIST% ^) to be running...
+    CALL :wait_daemons
+    echo Waiting 5 more seconds for their servers...
     powershell -NoProfile -Command "Start-Sleep -Seconds 5"
 )
 
@@ -200,6 +205,21 @@ IF NOT "%FAILED%"=="0" EXIT /B 1
 EXIT /B 0
 
 REM ------------------------------------------------------------------------------
+REM Waits until none of the daemons in %STARTED_LIST% says "Not running": 3 seconds apart, 15 times at most
+REM ------------------------------------------------------------------------------
+:wait_daemons
+SET WTRY=0
+:wait_daemons_again
+SET /A WTRY+=1
+powershell -NoProfile -Command "Start-Sleep -Seconds 3"
+CALL :read_daemons
+IF ERRORLEVEL 1 EXIT /B 1
+SET PENDING=
+FOR /F "delims=" %%P IN ('powershell -NoProfile -Command "$j = Get-Content -Raw $env:DAEMONS_FILE | ConvertFrom-Json; foreach ($d in ($env:STARTED_LIST -split ' ')) { if ($d -and $j.($d + 'Status') -eq 'Not running') { 'pending' } }"') DO SET PENDING=%%P
+IF NOT "%PENDING%"=="" IF %WTRY% LSS 15 GOTO wait_daemons_again
+EXIT /B 0
+
+REM ------------------------------------------------------------------------------
 REM Starts the server named in %1, which is not running
 REM ------------------------------------------------------------------------------
 :start_stopped
@@ -208,7 +228,7 @@ echo Server: %~1 is not running
 CALL :server_operation "%~1" start
 IF NOT ERRORLEVEL 1 EXIT /B 0
 REM A daemon just started brings its servers up itself, and one of them can take longer than a few seconds:
-REM look again, up to 5 times 3 seconds apart, before calling this a failure
+REM look again, up to 10 times 3 seconds apart, before calling this a failure
 SET TRY=0
 :start_again
 SET /A TRY+=1
@@ -221,7 +241,7 @@ IF "%NOW_ACTIVE%"=="yes" (
     echo Server: %~1 is running now: it came up with its daemon.
     EXIT /B 0
 )
-IF %TRY% LSS 5 GOTO start_again
+IF %TRY% LSS 10 GOTO start_again
 SET FAILED=1
 EXIT /B 0
 
@@ -246,7 +266,7 @@ IF NOT "%HTTP_CODE%"=="200" (
     EXIT /B 0
 )
 powershell -NoProfile -Command "$r = Get-Content -Raw $env:RESPONSE_FILE | ConvertFrom-Json; $list = @($r.daemonOperationResults | Where-Object { $_ -ne $null }); if ($list.Count -eq 0) { $list = @($r) }; $bad = 0; foreach ($d in $list) { '{0} {1} (successful: {2})' -f $d.daemon, $d.message, ([string]$d.isSuccessful).ToLower(); if ($null -ne $d.isSuccessful -and -not $d.isSuccessful) { $bad++ } }; if ($bad -gt 0) { exit 1 } else { exit 0 }"
-IF ERRORLEVEL 1 (SET FAILED=1) ELSE (SET DSTARTED=1)
+IF ERRORLEVEL 1 (SET FAILED=1) ELSE (SET DSTARTED=1& SET "STARTED_LIST=%STARTED_LIST% %DAEMON%")
 EXIT /B 0
 
 REM ------------------------------------------------------------------------------

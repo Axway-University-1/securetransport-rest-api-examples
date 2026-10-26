@@ -365,7 +365,7 @@ SWEEP_SEQ=$(seq s13k2 "$(sl 200 "${WORK}/daemons_up.json")" "$(sl 200 "$(body da
   "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 200 "${WORK}/op_ok.json")" "$(sl 200 "${WORK}/op_ftp_ok.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
 expect "13 all: the daemon start answered as a bare list is read: exit 0" "${RC}" "0"
 has "13 all: and its result is shown" "AS2 Daemon AS2 is started. (successful: true)"
-has "13 all: after a daemon it started it waits for that daemon's servers, then lists the servers" "Waiting 5 seconds for the servers of the daemons just started"
+has "13 all: after a daemon it started it waits for that daemon's servers, then lists the servers" "Waiting for the daemons just started"
 SWEEP_SEQ=$(seq s13l "$(sl 200 "$(body daemons_all_up '{"ftpStatus":"Running","httpStatus":"Running","pesitStatus":"Running","sshStatus":"Running","as2Status":"Running"}')")" "$(sl 200 "${WORK}/list_on.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
 expect "13 all: everything running: nothing is posted, exit 0" "${RC}:$(calls | grep -c '^POST')" "0:0"
 hasnt "13 all: and it does not wait when it started no daemon" "Waiting 5 seconds"
@@ -379,6 +379,13 @@ has "13 all: and it says the server came up on its own" "Server: Ssh Default is 
 SWEEP_SEQ=$(seq s13o "$(sl 200 "${WORK}/daemons_all_up.json")" "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 200 "${WORK}/op_port_busy.json")" \
   "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 200 "${WORK}/op_ftp_ok.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
 expect "13 all: a failed start for a server that is still not running at the next look is exit 1" "${RC}" "1"
+# the answer to a daemon start comes before the daemon is up: wait until it says Running, then look at the servers
+DAEMONS_HTTP_DOWN='{"ftpStatus":"Running","httpStatus":"Not running","pesitStatus":"Running","sshStatus":"Running","as2Status":"Running"}'
+DAEMON_HTTP_OK='[{"daemon":"HTTP","message":"Daemon HTTP is started.","isSuccessful":true}]'
+SWEEP_SEQ=$(seq s13p "$(sl 200 "$(body daemons_http_down "${DAEMONS_HTTP_DOWN}")")" "$(sl 200 "$(body daemon_http_ok "${DAEMON_HTTP_OK}")")" \
+  "$(sl 200 "${WORK}/daemons_http_down.json")" "$(sl 200 "${WORK}/daemons_all_up.json")" "$(sl 200 "${WORK}/list_on.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
+expect "13 all: after starting a daemon it reads the daemons until that one says Running (twice here), and only then the servers" \
+  "$(calls | sed "s#${BASE}##" | tr '\n' ' ')" "GET /daemons POST /daemons/operations?operation=start&daemon=http GET /daemons GET /daemons GET /servers?fields=serverName,isActive&limit=200&offset=0 "
 SWEEP_SEQ=$(seq s13m "$(sl 200 "${WORK}/daemons_all_up.json")" "$(sl 200 "${WORK}/list_two_off.json")" "$(sl 403 "${WORK}/refused.json")" "$(sl 200 "${WORK}/op_ftp_ok.json")") run "${F}/13.servers_operations_POST.sh" --all-stopped start-all-stopped-servers
 expect "13 all: a refused start exits 1, and the next server is still tried" "${RC}:$(calls | grep -c '^POST')" "1:2"
 reset
