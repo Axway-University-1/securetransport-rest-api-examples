@@ -68,6 +68,9 @@ if day > 3:
     check("date: the offset changes between the days (the test rule really changes the clocks)", len(set(offsets)) == 2, offsets)
 else:
     print("  (the first days of the year: the TZ rule of the guide needs the fourth day, skipped)")
+check("the guide shows how to send the offset (RFC 2822 with the Z part, encoded by curl) and which endpoints cannot carry one",
+      "How to send the offset" in text and "--data-urlencode \"startTimeAfter=Sun, 25 Oct 2026 00:00:00 +0300\"" in text
+      and "dd/MM/yyyy" in text and "**No.** A date has no offset." in text)
 check("the checklist and the warning about 86,400 seconds are in the guide", "86,400" in text and "- [ ] Every time sent to the API" in text)
 print("test_feature_guidance: " + ("FAIL" if failed else "PASS"))
 sys.exit(1 if failed else 0)

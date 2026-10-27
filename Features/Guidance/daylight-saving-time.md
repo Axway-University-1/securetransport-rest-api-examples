@@ -8,12 +8,46 @@
 Twice a year, clocks change. One day has 23 hours, and one has 25. A script that works out "yesterday" as "now minus 86,400 seconds" is wrong on
 those days and for a day or two after. It can count a transfer in the wrong day, or twice. The server is not the problem. The script is.
 
-## What the server does
+## How to send the offset
 
-- When you send a time window, the server reads the time zone offset you give. The same moment written as `+0300`, `+0200` or `+0000` gives the
-  same result.
+The offset is the last part of the date text itself. The reference gives the format of most time filters as *RFC 2822*: `EEE, d MMM yyyy HH:mm:ss Z`.
+The `Z` is the offset:
+
+```
+Sun, 25 Oct 2026 00:00:00 +0300
+Sun, 25 Oct 2026 00:00:00 GMT
+```
+
+So the offset goes in the request, not only in the answer. With curl, let curl encode the text (it has spaces and a plus sign):
+
+```bash
+curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G "https://${ST_SERVER}:${ST_PORT}/api/v2.0/logs/transfers" \
+  --data-urlencode "startTimeAfter=Sun, 25 Oct 2026 00:00:00 +0300" \
+  --data-urlencode "endTimeBefore=Mon, 26 Oct 2026 00:00:00 +0200" \
+  --data-urlencode "limit=1" --data-urlencode "fields=id" -H "accept: application/json" -H "Referer: x"
+```
+
+Not every date parameter can carry an offset. The reference documents these formats:
+
+| Where | Format in the reference | Can carry an offset |
+| ----- | ----------------------- | ------------------- |
+| `GET /logs/transfers` (`startTimeAfter`, `startTimeBefore`, `endTimeAfter`, `endTimeBefore`) | RFC 2822 | Yes. Tried: ISO 8601, `yyyy-MM-dd` and a timestamp are refused with 400 "Date should be in RFC2822 Format". |
+| `GET /logs/audit`, `GET /logs/server` | RFC 2822 | Yes (not tried here) |
+| End User `GET /transfers` | RFC 2822 | Yes (not tried here) |
+| `GET /administrators` | RFC 2822 or ISO 8601 | Yes (not tried here) |
+| `GET /accounts` (`lastModified.from`, `.to`), `GET /deniedUsers` (`blockedAt`), `GET /statisticsSummary/activeUsers` | RFC 2822, `yyyy-MM-dd` or a timestamp | Only in RFC 2822 (not tried here) |
+| `GET /statisticsSummary/generateReport` (`startDate`, `endDate`) | `dd/MM/yyyy` | **No.** A date has no offset. |
+
+Where the format is a date only (`dd/MM/yyyy`, `yyyy-MM-dd`), you cannot say which time zone the day is in. This guide does not say which zone the server uses
+for it, because it was not verified. Use RFC 2822 wherever the endpoint accepts it, and ask your support contact for the others.
+
+Answers carry an offset too, for example `Sun, 25 Oct 2026 15:53:45 +0200`. The End User `GET /serverTime` answers the server's time in ISO 8601 with its offset
+from UTC.
+
+## What the server does with the offset
+
+- In the RFC 2822 filters it was tried on, the server reads the offset you give. The same moment written as `+0300`, `+0200` or `+0000` gives the same result.
 - If you write the same clock digits with another offset, the window moves to a different moment, and the result changes.
-- Times in answers carry an offset, for example `Sun, 25 Oct 2026 15:53:45 +0200`.
 
 So always send an explicit offset. Never send a time without one.
 
@@ -67,7 +101,7 @@ day_window(date(2026, 10, 25))
 
 The start and end of that day use different offsets, and the window is correct.
 
-Send the values as `startTimeAfter` and `endTimeBefore`. Let your HTTP client encode them, for example with `curl -G --data-urlencode`.
+Send the values as `startTimeAfter` and `endTimeBefore`, and let your HTTP client encode them (see the curl example above).
 
 ## Other places it can hurt
 
@@ -79,7 +113,7 @@ Send the values as `startTimeAfter` and `endTimeBefore`. Let your HTTP client en
 
 ## Usage and billing reports
 
-Ask your support contact which time zone the product uses to cut a day in usage reporting, and how a 23-hour or 25-hour day is shown. Check this
+`GET /statisticsSummary/generateReport` takes dates only (`dd/MM/yyyy`), so you cannot give it an offset. Ask your support contact which time zone the product uses to cut a day in it and in the usage reporting, and how a 23-hour or 25-hour day is shown. Check this
 before you compare your own script's daily totals with a report. This guide does not say, because it was not verified.
 
 ## How to test your script without waiting for the date
