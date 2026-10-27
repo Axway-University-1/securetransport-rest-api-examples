@@ -1242,6 +1242,7 @@ expect "06: login, read, logout, read, in that order" "${RC}:$(calls)" "0:POST $
 GET ${BASE}/myself
 DELETE ${BASE}/myself
 GET ${BASE}/myself"
+has "06: prints the answer of the logout (the text the server gave)" "Logged out"
 expect "06: the three calls after the login send the jar and the token of the login" "$(echoed 'COOKIE: cookie.jar'):$(echoed 'HEADER: csrfToken: tok-9')" "3:3"
 expect "06: the temporary header file is removed" "$(ls "${WORK}/tmp" | wc -l | tr -d ' ')" "0"
 CSRF=tok-9 ST_POST=200 POST_BODY="${LOGIN}" ST_DELETE=200 ERR_BODY="${LOGOUT}" ST_GET_SEQ="200 403" GET_BODY="${B_PLAIN}" run "${S}"
@@ -1254,6 +1255,7 @@ expect "06: a logout that is refused is exit 1, and the last read is not made" "
 has "06: with its status" "HTTP 500"
 CSRF=tok-9 ST_POST=200 POST_BODY="${LOGIN}" ST_GET_SEQ="401" GET_BODY="${B_401}" run "${S}"
 expect "06: a first read that is refused is exit 1, and nothing is logged out" "${RC}:$(ncalls)" "1:2"
+has "06: and shows the status of the refused read" "HTTP 401"
 ST_POST=401 POST_BODY="${B_401}" run "${S}"
 expect "06: a refused login is exit 1 after one call" "${RC}:$(ncalls)" "1:1"
 expect "06: and leaves no jar" "$(test -f "${WORK}/admin/02.Introduction/cookie.jar" && echo yes || echo no)" "no"
@@ -1467,6 +1469,18 @@ GET ${BASE}/routes?fields=id&name=SimpleRoute_Compress
 POST ${BASE}/routes"
 has "05: prints the status of the creation" "HTTP 201"
 expect "05: the body" "$(payload 1 | jq -c '[.routeTemplate, .subscriptions, .steps[0].executeRoute]')" '["obj-1",["obj-1"],"obj-1"]'
+expect "05: the body says it is a composite route, of the account, with the name and the condition" \
+  "$(payload 1 | jq -c '[.type, .account, .name, .conditionType, .steps[0].type, .steps[0].status, .steps[0].autostart]')" '["COMPOSITE","john","CompositeRoute_Subscription","MATCH_ALL","ExecuteRoute","ENABLED",false]'
+has "05: says what it creates, from which ids" "Template obj-1, subscription obj-1, simple route obj-1"
+has "05: and the name of the composite route" "Creating the composite route 'CompositeRoute_Subscription'..."
+expect "05: the creation sends accept, Referer and Content-Type" "$(printf '%s\n' "${ERRS}" | sed -n 's/^HEADER: //p' | tail -3 | tr '\n' '|')" "accept: */*|Referer: THIS_IS_A_RANDOM_TEXT|Content-Type: application/json|"
+EMPTY_LIST=$(body empty_list '{"result":[]}')
+RULES=$(rules '/subscriptions?' "${EMPTY_LIST}") GET_BODY="${FOUND}" run "${S}"
+expect "05: no subscription of the folder is exit 1, nothing created" "${RC}:$(ncalls)" "1:2"
+has "05: and it says which, and what to run first" "Could not find a subscription of 'john' on '/inbox'. Run 07.Subscriptions first."
+RULES=$(rules 'name=SimpleRoute_Compress' "${EMPTY_LIST}") GET_BODY="${FOUND}" run "${S}"
+expect "05: no simple route is exit 1, nothing created" "${RC}:$(ncalls)" "1:3"
+has "05: and it says which, and what to run first" "Could not find the simple route 'SimpleRoute_Compress'. Run 03.routes_POST_simple_compress.sh first."
 ST_GET=401 GET_BODY="${B_401}" run "${S}"
 expect "05: a lookup that is refused is exit 1 after one call, with its status" "${RC}:$(ncalls):$(printf '%s\n' "${OUT}" | grep -c 'HTTP 401')" "1:1:1"
 GET_BODY="$(body none '{"result":[]}')" run "${S}"

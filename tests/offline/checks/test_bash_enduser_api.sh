@@ -291,8 +291,15 @@ GET ${BASE}/files/my%20dir?sortBy=fileName&order=ASC&limit=5&offset=5
 GET ${BASE}/files/my%20dir?metadata=true
 GET ${BASE}/files/my%20dir/*.txt"
 has "09 query: one line per entry" "  f  5  a.txt"
+has "09 query: says what each of the four calls asks for" "The 5 largest, biggest first, without hidden files:"
+has "09 query: the next page" "The next 5, by name:"
+has "09 query: the folder's own metadata" "The folder's own metadata, without its file list:"
+has "09 query: and the glob, with the pattern named" "Only the files matching *.txt:"
 run 02.Files/09.files_GET_query.sh
-expect "09 query: the home folder is /files" "$(calls | head -n 1)" "GET ${BASE}/files?sortBy=size&order=DESC&limit=5&offset=0&showdots=false"
+expect "09 query: the home folder is /files, and the glob is a path under it" "$(calls)" "GET ${BASE}/files?sortBy=size&order=DESC&limit=5&offset=0&showdots=false
+GET ${BASE}/files?sortBy=fileName&order=ASC&limit=5&offset=5
+GET ${BASE}/files?metadata=true
+GET ${BASE}/files/*.txt"
 
 GET_BODY=$(body meta '{"self":{"fileName":"a b.txt","size":5,"permissions":"640","owner":"1050","group":"1050","lastModifiedTime":1791278929000,"transferStatus":"Done"},"parent":{"fileName":"in"}}')
 run 02.Files/10.files_filepath_GET_metadata.sh "/in/a b.txt"
@@ -313,6 +320,8 @@ run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/up.txt" inbox ASCII ex
 expect "11 md5: too many parameters is exit 2 and nothing is sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
 has "11 md5: and says how many were given, which, and that one is extra" "4 parameters were given (${WORK}/files/up.txt inbox ASCII extra), and at most 3 are taken"
 has "11 md5: and then what each parameter is" "TRANSFER_MODE  BINARY (default) or ASCII. It can be given only after FOLDER"
+has "11 md5: LOCAL_FILE is described" "LOCAL_FILE     the file to upload: a path on this machine"
+has "11 md5: FOLDER is described" "FOLDER         the folder to put it in, on the server, relative to the home folder (default: the home folder)"
 run 02.Files/11.files_filepath_POST_md5.sh "${WORK}/files/no_such.txt" inbox
 expect "11 md5: a file that is not there is exit 2, nothing sent" "${RC}:$(raw_calls | wc -l | tr -d ' ')" "2:0"
 has "11 md5: and the message names LOCAL_FILE, what it was, and where it was looked for" "LOCAL_FILE, the first parameter, is '${WORK}/files/no_such.txt', and there is no such file on this machine (looked in "
@@ -381,6 +390,9 @@ PUT ${BASE}/fileOperations/op-2
 PUT ${BASE}/fileOperations/op-2
 PUT ${BASE}/fileOperations/op-2"
 expect "03 chunked: the path in the folder" "$(payload 1 | jq -r .filePath)" "/inbox/chunks.bin"
+expect "03 chunked: the declaring body is an Upload of that path in BINARY mode" "$(payload 1 | jq -c '[.operation, .filePath, .customAttributes.transferMode]')" '["Upload","/inbox/chunks.bin","BINARY"]'
+expect "03 chunked: the declaring call carries the JSON content type" "$(printf '%s\n' "${OUT}" | awk '/^HEADER: Content-Type:/{h=$0} /^METHOD: POST/{print h; exit} /^METHOD:/{h=""}')" "HEADER: Content-Type: application/json"
+has "03 chunked: says what it declares: the path, the size and the chunks" "Declaring the upload of /inbox/chunks.bin, 25 bytes, in 3 chunks of 10 bytes..."
 expect "03 chunked: Content-Range of each chunk, the last one shorter" "$(headers | grep '^Content-Range:' | tr '\n' '|')" \
   "Content-Range: bytes 0-9/25|Content-Range: bytes 10-19/25|Content-Range: bytes 20-24/25|"
 expect "03 chunked: the chunks together are the file" "$(payload 2)$(payload 3)$(payload 4)" "0123456789abcdefghijKLMNO"
@@ -486,6 +498,11 @@ expect "05 push: synchronous by default" "$(payload 1 | jq -c '[.operation, .dat
 calls | sed -n 2p | grep -qE "^GET ${BASE}/transfers\?operationIndex=eu-push-[0-9]+$" \
     && [ "$(payload 1 | jq -r .data.operationIndex)" = "$(calls | sed -n 2p | sed 's/.*operationIndex=//')" ] \
     && pass "05 push: finds the transfer in the log by the operationIndex it sent" || fail "05 push: $(calls)"
+expect "05 push: the call is a POST of /transfers/operations" "$(calls | sed -n 1p)" "POST ${BASE}/transfers/operations"
+has "05 push: says what it pushes, with which site and operation index" "Pushing /out/a.txt with the site mysite, as eu-push-"
+has "05 push: shows the answer's HTTP code" "HTTP 20"
+STATUS=500 run 05.Transfers/05.transfers_operations_POST_push.sh mysite out/a.txt
+expect "05 push: a refused push (500) is exit 1" "${RC}" "1"
 STATUS=202 run 05.Transfers/05.transfers_operations_POST_push.sh mysite out/a.txt async
 expect "05 push: async asks for an asynchronous call, and 202 is a success" "${RC}:$(payload 1 | jq -c .data.asynchronousCall)" "0:true"
 

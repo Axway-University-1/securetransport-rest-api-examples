@@ -210,6 +210,8 @@ expect "01: bare, POSTs the pull and exits 0 on 202" "${RC}:$(calls)" "0:POST ${
 expect "01: john, SSH_PULL, /inbox, not waiting" "$(payload 1 | jq -c .)" '{"accountName":"john","site":"SSH_PULL","destinationDirectory":"/inbox","awaitResult":false}'
 has "01: prints the HTTP code on its own line" "HTTP 202"
 has "01: and the answer" "Pull accepted"
+has "01: says which site pulls into which folder of which account" "Pulling with the site 'SSH_PULL' into '/inbox' of 'john'..."
+expect "01: sends accept, Referer and Content-Type, once each" "$(printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p' | tr '\n' '|')" "accept: */*|Referer: THIS_IS_A_RANDOM_TEXT|Content-Type: application/json|"
 ST_POST=202 run "${F}/${S}" jane "my site" /in/x
 expect "01: account, site and folder as given, by jq" "$(payload 1 | jq -c '[.accountName, .site, .destinationDirectory]')" '["jane","my site","/in/x"]'
 POST_BODY=$(body pull_404 '{"message":"Error validating request","validationErrors":["Cannot find account with name example_nobody or it is not accessible"]}') ST_POST=404 run "${F}/${S}" example_nobody
@@ -221,6 +223,7 @@ run "${F}/${S}" "  "
 expect "01: a blank account is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
 run "${F}/${S}" a b /c d
 expect "01: four arguments are exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "01: and prints the usage" "Usage: ./01.transfers_operations_POST_pull.sh [ACCOUNT] [SITE] [DESTINATION_FOLDER]"
 
 echo
 echo "=== 17.AccessPolicies/02.accessPolicies_POST.sh ==="

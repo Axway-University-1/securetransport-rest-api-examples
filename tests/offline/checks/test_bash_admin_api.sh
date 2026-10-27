@@ -169,6 +169,11 @@ expect "02 POST: example_template takes the first class that is not real, by ord
   "$(payload 3 | jq -c '[.name, .type, .homeFolder, .templateClass]')" '["example_template","template","/home/example_template","ExampleAnyClass"]'
 expect "02 POST: a password given is not printed" "$(printf '%s\n' "${OUT}" | grep -cF 'p "q" $x')" "0"
 has "02 POST: prints HTTP 201" "HTTP 201"
+expect "02 POST: the three creations send accept, Referer and Content-Type (the class lookup, accept and Referer)" \
+  "$(printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p' | sort | uniq -c | tr -s ' ' | tr '\n' '|')" \
+  " 3 Content-Type: application/json| 4 Referer: THIS_IS_A_RANDOM_TEXT| 3 accept: */*| 1 accept: application/json|"
+has "02 POST: says what it creates, one by one" "Creating "
+has "02 POST: and which class the template account takes" "Using the user class ExampleAnyClass."
 STATUS=201 STATUS_GET=200 run "${F}/02.accounts_POST.sh"
 GENERATED=$(printf '%s\n' "${OUT}" | sed -n 's/^The password of example_user is \(.*\) (generated.*/\1/p')
 expect "02 POST: a generated password is printed, and is the one sent" "$(payload 1 | jq -r .user.passwordCredentials.password)" "${GENERATED}"
@@ -181,8 +186,10 @@ has "02 POST: and shows the HTTP code" "HTTP 409"
 GET_BODY=$(body no_classes '{"result":[]}')
 STATUS_GET=200 run "${F}/02.accounts_POST.sh"
 expect "02 POST: no user class to use, exit 1, nothing created" "${RC}:$(calls | grep -c POST)" "1:0"
+has "02 POST: and says why, with the HTTP code, that nothing was created, and what to do" "Could not find a user class for the template account (HTTP 200). Nothing was created: give one as the first argument."
 run "${F}/02.accounts_POST.sh" a b
 bad_args "02 POST: too many arguments, nothing sent"
+has "02 POST: and prints the usage, with the password variable" "Usage: [ACCOUNT_PASSWORD='...'] ./02.accounts_POST.sh [TEMPLATE_CLASS]"
 GET_BODY=
 
 STATUS=200 run "${F}/03.accounts_name_HEAD.sh"

@@ -238,6 +238,10 @@ expect "02: a 404 (no folder) is exit 1" "${RC}" "1"
 urun ../03-files-and-folders/03.files_GET_list.sh
 expect "03: the list, sorted and limited, the glob, the folder's own metadata" "$(ucalls | tr '\n' ' ')" \
   "GET ${F} GET ${F}?sortBy=size&order=DESC&limit=5&showdots=false GET ${F}/*.txt GET ${F}?metadata=true "
+has "03: says what each of the four lists is" "The folder:"
+has "03: the largest first" "The largest first, at most 5, no hidden files:"
+has "03: the glob" "Only the .txt files (a glob in the path):"
+has "03: and the folder itself" "The folder itself, without its list (metadata=true):"
 urun ../03-files-and-folders/04.files_GET_read.sh
 expect "04: GET /files/<folder>/<file>" "$(ucalls)" "GET ${F}/notes.txt"
 expect "04: and a copy is kept in downloaded_files" "$([ -f "${UC}/downloaded_files/notes.txt" ] && echo saved)" "saved"
@@ -441,6 +445,8 @@ STUB_STATUS_DELETE=403 urun ../06-sharing-a-folder/07.folder_DELETE.sh
 expect "07: a refusal stops it after the first (exit 1)" "${RC}:$(ucalls | grep -c DELETE)" "1:1"
 urun ../06-sharing-a-folder/99.cleanup_DELETE.sh
 expect "99: unshares, deletes the file and the folder by name, then logs out" "$(calls | tr '\n' ' ')" "PATCH ${F} DELETE ${F}/notes.txt DELETE ${F} DELETE ${BASE}/myself "
+expect "99: the unshare is a JSON Patch that removes /sharedDirectoryProperties" "$(payload 1 | jq -c .)" '[{"op":"remove","path":"/sharedDirectoryProperties"}]'
+expect "99: and it is sent as JSON, with the Referer header" "$(headers | grep -cE '^(Content-Type: application/json|Referer: .+)$')" "$(( $(ncalls) + 1 ))"
 urun ../06-sharing-a-folder/00.run_all.sh
 expect "00: with no e-mail address it stops at once: exit 2, no call at all (not even the login), no cleanup" "${RC}:$(ncalls)" "2:0"
 has "00: with the usage" "Usage: ./00.run_all.sh EMAIL [RIGHTS]"

@@ -106,6 +106,15 @@ run() {
           bash "./$(basename "${rel}")" "$@" 2>&1)
     RC=$?
 }
+# run_no_settings FOLDER/SCRIPT ARGS...: the settings file is not there (both variables name a file that does not exist)
+run_no_settings() {
+    local rel="$1"; shift
+    mkdir -p "${WORK}/admin/$(dirname "${rel}")"
+    cp "${ADMIN_TREE}/${rel}" "${WORK}/admin/${rel}"
+    OUT=$(cd "${WORK}/admin/$(dirname "${rel}")" && PATH="${WORK}/bin:${PATH}" ST_ADMIN_LOCAL_VARIABLES="${WORK}/no_such_settings.sh" \
+          STUB_CURL_PRINT_CODE=1 bash "./$(basename "${rel}")" "$@" 2>&1)
+    RC=$?
+}
 # reset: the answers of one test do not leak into the next
 reset() { GET_BODY= POST_BODY= LOCATION= STATUS= STATUS_GET= RULES= SWEEP_SEQ= SWEEP_CONTINUE=; }
 calls() { printf '%s\n' "${OUT}" | awk '/^METHOD:/ {m=$2} /^URL: / {sub(/^URL: /, ""); print m " " $0}'; }
@@ -179,6 +188,7 @@ SWEEP_SEQ=$(seq s10b "$(sl 200 "${SSH_FILE}")" 204 "$(sl 200 "${SSH_FILE}")" 204
 expect "10 PUT: a name with a space is encoded, and the port is the one given" "${RC}:$(calls | sed -n 1p):$(payload 1 | jq -c '[.serverName, .port]')" "0:GET ${S}/Ssh%20Default:[\"Ssh Default\",9100]"
 SWEEP_SEQ=$(seq s10c "$(sl 200 "$(body http_server "${HTTP_SERVER}")")") run "${F}/10.servers_name_PUT.sh"
 expect "10 PUT: a server of another protocol is not touched: exit 1, no PUT" "${RC}:$(calls | grep -c '^PUT')" "1:0"
+has "10 PUT: and says which server it is, of which protocol, and that nothing was changed" "The server SSH_TEST_SERVER_1 is a http server: this script changes SSH servers only. Nothing was changed."
 SWEEP_SEQ=$(seq s10d "$(sl 404 "${WORK}/refused.json")") run "${F}/10.servers_name_PUT.sh"
 expect "10 PUT: a server that cannot be read: exit 1, no PUT" "${RC}:$(calls | grep -c '^PUT')" "1:0"
 has "10 PUT: says why" "Could not read the server SSH_TEST_SERVER_1: HTTP 404"
@@ -192,6 +202,12 @@ for port in 0 65536 abc; do
 done
 run "${F}/10.servers_name_PUT.sh" a 8000 extra
 bad_args "10 PUT: a third argument, nothing sent"
+has "10 PUT: and prints the usage" "Usage: ./10.servers_name_PUT.sh [NAME] [PORT]"
+run "${F}/10.servers_name_PUT.sh" a 0
+has "10 PUT: a port out of range says what a port is, what was given, and that nothing was sent" "PORT is a number from 1 to 65535, not 0. Nothing was sent."
+run_no_settings "${F}/10.servers_name_PUT.sh"
+expect "10 PUT: without its settings file it exits 1, with the hint, and sends nothing" "${RC}:$(ncalls)" "1:0"
+has "10 PUT: the hint says to copy the example settings file" "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."
 
 # ==============================================================================
 echo
@@ -278,6 +294,9 @@ reset
 run "${F}/13.servers_operations_POST.sh"
 bad_args "13: bare (it used to start everything), exit 2, nothing sent"
 has "13: bare prints the usage" "Usage: 13.servers_operations_POST.sh SERVER start"
+run_no_settings "${F}/13.servers_operations_POST.sh" "Ssh Default" start
+expect "13: without its settings file it exits 1 and sends nothing" "${RC}:$(ncalls)" "1:0"
+has "13: and says to copy the example settings file" "Copy set_variables.local.example.sh to set_variables.local.sh and fill it in."
 run "${F}/13.servers_operations_POST.sh" "Ssh Default"
 bad_args "13: a server and no operation, nothing sent"
 run "${F}/13.servers_operations_POST.sh" "Ssh Default" restart
@@ -325,10 +344,17 @@ SWEEP_SEQ=$(seq s13c "$(sl 200 "${WORK}/list_off.json")" "$(sl 200 "${WORK}/daem
 expect "13 start: a refused operation exits 1" "${RC}" "1"
 SWEEP_SEQ=$(seq s13d "$(sl 200 "$(body list_on "${SERVER_LIST_ON}")")" "$(sl 200 "${WORK}/daemons_up.json")") run "${F}/13.servers_operations_POST.sh" "Ssh Default" start
 expect "13 start: a server that is already active: no operation sent, exit 0" "${RC}:$(calls | grep -c '^POST')" "0:0"
+has "13 start: and says so, in words" "It is already active: nothing to start. No operation was sent."
 SWEEP_SEQ=$(seq s13e "$(sl 200 "${WORK}/list_off.json")" "$(sl 200 "${WORK}/daemons_up.json")") run "${F}/13.servers_operations_POST.sh" "Nothing Here" start
 expect "13 start: a server that is not there: exit 1, no operation sent" "${RC}:$(calls | grep -c '^POST')" "1:0"
 SWEEP_SEQ=$(seq s13f "$(sl 500 "${WORK}/refused.json")") run "${F}/13.servers_operations_POST.sh" "Ssh Default" start
 expect "13 start: a list that cannot be read: exit 1, nothing else sent" "${RC}:$(ncalls)" "1:1"
+SWEEP_SEQ=$(seq s13f2 "$(sl 200 "${WORK}/list_off.json")" "$(sl 500 "${WORK}/refused.json")") run "${F}/13.servers_operations_POST.sh" "Ssh Default" start
+expect "13 start: daemons that cannot be read: exit 1, and no operation sent" "${RC}:$(calls | grep -c '^POST')" "1:0"
+has "13 start: and it says which call failed, with its code" "Could not read the daemons: HTTP 500"
+SWEEP_SEQ=$(seq s13f3 "$(sl 200 "${WORK}/list_off.json")" "$(sl 200 "${WORK}/daemons_up.json")" "$(sl 200 "$(body op_empty '{"serverStatuses":[]}')")") run "${F}/13.servers_operations_POST.sh" "Ssh Default" start
+expect "13 start: a 200 with no result for the server is exit 1" "${RC}" "1"
+has "13 start: and says the answer had no result, with the answer" "The answer has no result for the server:"
 
 # a stop, with the word
 SWEEP_SEQ=$(seq s13g "$(sl 200 "${WORK}/list_on.json")" "$(sl 200 "${WORK}/daemons_up.json")" "$(sl 200 "${WORK}/op_ok.json")") \
@@ -403,6 +429,8 @@ expect "01 POST: the HTTP site, built by jq, host from ST_SERVER" "$(payload 1 |
   '{"account":"john","downloadPattern":"*","host":"st.example.com","name":"HTTP","port":"443","protocol":"http","type":"http","uploadFolder":"/","userName":"john"}'
 has "01 POST: prints the code" "HTTP 201"
 has "01 POST: and the new id from Location" "New site ID: newsiteid"
+has "01 POST: says which site it creates" "Creating the HTTP site HTTP..."
+expect "01 POST: sends accept, Referer and Content-Type, once each" "$(printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p' | tr '\n' '|')" "accept: */*|Referer: THIS_IS_A_RANDOM_TEXT|Content-Type: application/json|"
 STATUS=201 LOCATION=newsiteid SWEEP_CONTINUE=1 run "${F}/01.sites_POST.sh"
 has "01 POST: with a 100 Continue block before the real status line, it still says 201" "HTTP 201"
 hasnt "01 POST: and not 100" "HTTP 100"
@@ -413,6 +441,7 @@ has "01 POST: and the server's message" "Entry already exist."
 reset
 run "${F}/01.sites_POST.sh" extra
 bad_args "01 POST: an argument is refused, nothing sent"
+has "01 POST: and prints the usage" "Usage: ./01.sites_POST.sh"
 
 # ==============================================================================
 echo
@@ -494,6 +523,8 @@ expect "02 POST: the subscription body pulls with SSH_PULL" "$(payload 2 | jq -c
   '{"type":"AdvancedRouting","account":"john","application":"AdvancedRoutingApplication","folder":"/inbox","transferConfigurations":[{"tag":"PARTNER-IN","outbound":false,"site":"SSH_PULL"}]}'
 expect "02 POST: prints the code of each" "$(printf '%s\n' "${OUT}" | grep -c '^HTTP 201$')" "2"
 has "02 POST: and the new id from Location" "New subscription ID: newsubid"
+has "02 POST: says which folder it subscribes, of which account, to which application" "Subscribing the folder '/inbox' of 'john' to 'AdvancedRoutingApplication'..."
+expect "02 POST: both calls send accept, Referer and Content-Type" "$(printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p' | sort | uniq -c | tr -s ' ' | tr '\n' '|')" " 2 Content-Type: application/json| 2 Referer: THIS_IS_A_RANDOM_TEXT| 2 accept: */*|"
 SWEEP_SEQ=$(seq s02b 201 201) LOCATION=newsubid SWEEP_CONTINUE=1 run "${F}/02.subscriptions_POST.sh"
 hasnt "02 POST: a 100 Continue block in the headers file does not change the code (it used to print HTTP 100)" "HTTP 100"
 has "02 POST: it says 201" "HTTP 201"
@@ -508,6 +539,7 @@ has "02 POST: with the server's message" "Site SSH_PULL not found."
 reset
 run "${F}/02.subscriptions_POST.sh" extra
 bad_args "02 POST: an argument is refused, nothing sent"
+has "02 POST: and prints the usage" "Usage: ./02.subscriptions_POST.sh"
 
 echo
 echo "=== 07.Subscriptions/03.subscriptions_POST_triggerfile.sh ==="
@@ -582,6 +614,8 @@ expect "13 types: the lookup is exact on the folder (a folder that differs by ca
 DELETE ${SU}/b1id?purge=true
 DELETE ${BASE}/applications/ExampleBasicApplication"
 expect "13 types: exit 0 when everything answered as it should" "${RC}" "0"
+has "13 types: says which subscription it deletes, by folder and id" "Deleting the subscription on '/example_Basic' (b1id), and its folder..."
+has "13 types: and which application goes next" "Deleting the application 'ExampleBasicApplication'..."
 SWEEP_SEQ=$(seq s13t2 "$(sl 200 "${WORK}/type_one.json")" "$(sl 400 "${WORK}/refused.json")" 204 "$(sl 200 "${WORK}/none.json")" 204 "$(sl 200 "${WORK}/none.json")" 204 "$(sl 200 "${WORK}/none.json")" 204) run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
 expect "13 types: a refused delete exits 1, the application is still deleted and the other types tried" "${RC}:$(calls | grep -c '^DELETE')" "1:5"
 SWEEP_SEQ=$(seq s13t3 "$(sl 200 "${WORK}/none.json")" 404 "$(sl 200 "${WORK}/none.json")" 404 "$(sl 200 "${WORK}/none.json")" 404 "$(sl 200 "${WORK}/none.json")" 404) run "${F}/13.subscriptions_id_DELETE_types.sh" example_acct
@@ -594,6 +628,7 @@ expect "13 types: a lookup the server refuses exits 1 (it is not 'none found')" 
 reset
 run "${F}/13.subscriptions_id_DELETE_types.sh" a b
 bad_args "13 types: two arguments, nothing sent"
+has "13 types: and prints the usage" "Usage: ./13.subscriptions_id_DELETE_types.sh [ACCOUNT]"
 
 # ==============================================================================
 echo

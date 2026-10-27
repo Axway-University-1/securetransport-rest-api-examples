@@ -268,6 +268,12 @@ OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/repo
 RC=$?
 [ "${RC}" -eq 0 ] && pass "runs on a new enough server" || fail "exit ${RC}"
 [[ "${OUT}" == *"(before)"* ]] && pass "the label is printed in the heading" || fail "heading: $(echo "${OUT}" | grep Billable)"
+# an ACCOUNT with a character outside letters, digits, . _ and - is refused before anything is sent
+OUT_BAD=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/report.json" STUB_CURL_CSRF="csrf-abc" bash ./billable_GET_report.sh before 'bad/name' 2>&1)
+RC_BAD=$?
+# (the version check goes first: it is the one call it may have made)
+[ "${RC_BAD}" -eq 2 ] && [ "$(echo "${OUT_BAD}" | grep '^URL:' | grep -vc '/version$')" -eq 0 ] && pass "an account with a / in its name is refused: exit 2, and nothing is asked of the log" || fail "bad account: exit ${RC_BAD}, calls: $(echo "${OUT_BAD}" | grep '^URL:')"
+[[ "${OUT_BAD}" == *"ACCOUNT may use only letters, digits, '.', '_' and '-': bad/name"* ]] && pass "and it says which characters are allowed, and which name it refused" || fail "no message: ${OUT_BAD}"
 # the day a clock changes has 25 hours: with a time zone whose clocks went back yesterday, every boundary is still a midnight
 DAY_OF_YEAR=$((10#$(date +%j)))
 if [ "${DAY_OF_YEAR}" -gt 3 ]; then
@@ -361,7 +367,7 @@ echo '{"version":"5.5-20260924","id":"op-1","files":[],"result":[],"resultSet":{
 # there, so every name is free and the partners are created). DELETE_STATUS is the status of every
 # DELETE when it is set.
 master() {
-    OUT=$(cd "${RUN}" && PATH="${STUB_BIN:-${WORK}/bin}:${PATH}" STUB_CURL_GET_BODY="${WORK}/all.json" STUB_CURL_POST_BODY="${WORK}/all.json" \
+    OUT=$(cd "${RUN}" && PATH="${STUB_BIN:-${WORK}/bin}:${PATH}" STUB_CURL_GET_BODY="${ALL_BODY:-${WORK}/all.json}" STUB_CURL_POST_BODY="${WORK}/all.json" \
           STUB_CURL_LOCATION_ID="new-id" STUB_CURL_STATUS="${STATUS:-201}" STUB_CURL_STATUS_HEAD="${HEAD_STATUS-404}" \
           STUB_CURL_STATUS_DELETE="${DELETE_STATUS:-}" STUB_CURL_CSRF="csrf-abc" bash ./00.run_all.sh "$@" 2>&1)
     RC=$?
@@ -389,6 +395,17 @@ else
 fi
 master --bogus
 [ "${RC}" -eq 2 ] && pass "an unknown option is refused" || fail "--bogus exit ${RC}"
+[[ "${OUT}" == *"Usage: ./00.run_all.sh [ACCOUNT] [INBOUND_ONLY] [IN_AND_OUT] [--cleanup]"* ]] && pass "and it prints its usage" || fail "no usage line: ${OUT}"
+# the table of step 4: its header, and a row for an account whose count could not be read
+STATUS=201 master
+echo "${OUT}" | grep -qE '^  account +before +after +added +the rule predicts$' \
+    && pass "step 4 prints the header of its table: account, before, after, added, the rule predicts" || fail "step 4 header: $(echo "${OUT}" | sed -n '/Step 4/,$p' | head -8)"
+echo '{"version":"5.5-20260924","id":"op-1","files":[],"result":[]}' > "${WORK}/nocount.json"
+ALL_BODY="${WORK}/nocount.json" STATUS=201 master
+ROWS=$(echo "${OUT}" | sed -n '/=== Step 4/,$p' | grep -E '^  (partner_to_pull_from|btTestAccount|partner_to_push_to) ' | awk '{print $1, $2, $3, $4, $5}' | tr '\n' '|')
+[ "${ROWS}" = "partner_to_pull_from ? ? ? 7|btTestAccount ? ? ? 12|partner_to_push_to ? ? ? 10|" ] \
+    && pass "step 4: an account whose count could not be read shows ? for before, after and added, and still what the rule predicts" || fail "step 4 rows with no counts: ${ROWS}"
+[[ "${OUT}" == *"or its count could not be"* ]] && pass "and it says a count could not be read" || fail "no note about the unreadable count"
 
 echo
 echo "=== 00.run_all.sh: the home folder of the default account ==="

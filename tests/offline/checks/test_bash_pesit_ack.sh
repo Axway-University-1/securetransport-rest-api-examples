@@ -144,6 +144,25 @@ run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com 
 expect "an older server: IteratePesitInbounds.sh sends and looks up nothing either" "${RC}:$(posts | wc -l | tr -d ' '):$(gets | wc -l | tr -d ' ')" "0:0:0"
 
 echo
+# what a person is told: no Core ID, no credentials, and how many outbound transfers it waits for (is / are)
+RULES=$(rules "incoming=true" "${WORK}/inbound.json" "direction=Outgoing" "${WORK}/outbound_1.json")
+run "${ACK_DIR}" ./Acknowledgment.sh
+expect "no Core ID: exit 1, and nothing is sent or looked up" "${RC}:$(posts | wc -l | tr -d ' '):$(gets | wc -l | tr -d ' ')" "1:0:0"
+[[ "${OUT}" == *"Usage: ./Acknowledgment.sh <CORE_ID>"* ]] && pass "and it prints its usage" || fail "no usage line: ${OUT}"
+sed 's/^export ST_USER=.*/export ST_USER=""/' "${WORK}/Admin/API 2.0/bash/set_variables.local.sh" > "${WORK}/settings_no_user.sh"
+export ST_ADMIN_LOCAL_VARIABLES="${WORK}/settings_no_user.sh"
+run "${ACK_DIR}" ./Acknowledgment.sh CORE1 st.example.com MIX 1 TRUE "${WORK}/logs"
+unset ST_ADMIN_LOCAL_VARIABLES
+expect "no user name in the settings: exit 1, and nothing is sent" "${RC}:$(posts | wc -l | tr -d ' ')" "1:0"
+[[ "${OUT}" == *"No credentials found. Set ST_USER and ST_PASSWORD in Admin/API 2.0/bash/set_variables.local.sh."* ]] && pass "and it says which settings to fill in" || fail "no credentials message: ${OUT}"
+rm -rf "${WORK}/logs_one" "${WORK}/logs_two"
+run "${ACK_DIR}" ./Acknowledgment.sh CORE1 st.example.com MIX 1 TRUE "${WORK}/logs_one"
+grep -q "Checking if there is 1 processed outbound transfer with Core ID CORE1" "${WORK}"/logs_one/acks/*/COREID_CORE1.log \
+    && pass "one outbound transfer expected: the log says 'there is 1'" || fail "the log does not say 'there is 1': $(grep Checking "${WORK}"/logs_one/acks/*/COREID_CORE1.log)"
+run "${ACK_DIR}" ./Acknowledgment.sh CORE1 st.example.com MIX 2 TRUE "${WORK}/logs_two"
+grep -q "Checking if there are 2 processed outbound transfer with Core ID CORE1" "${WORK}"/logs_two/acks/*/COREID_CORE1.log \
+    && pass "two expected: the log says 'there are 2'" || fail "the log does not say 'there are 2': $(grep Checking "${WORK}"/logs_two/acks/*/COREID_CORE1.log)"
+
 echo "=== IteratePesitInbounds.sh ==="
 
 cat > "${WORK}/list.json" <<'JSON'
@@ -202,6 +221,32 @@ expect "the API output files are kept by default" "$([ "$(files_left "${WORK}/it
 rm -rf "${WORK}/iterate_logs_clear"
 run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs_clear" TRUE
 expect "with CLEAR_API_OUTPUT_FILES=TRUE none is left, not just the last Core ID's" "$(files_left "${WORK}/iterate_logs_clear")" "0"
+
+# what the list query carries: the two times of the window are encoded for a URL (RFC 2822: comma, spaces, colons and the plus of the offset)
+rm -rf "${WORK}/iterate_logs_enc"
+RULES=$(rules "fields=coreId,pesitAckStatus" "${WORK}/list.json" \
+              "incoming=true&status=Processed&coreId=CORE_NO_OUT" "${WORK}/inbound_no.json" \
+              "incoming=true&status=Processed&coreId=CORE_OUT" "${WORK}/inbound_out.json" \
+              "direction=Outgoing&status=Processed&coreId=CORE_NO_OUT" "${WORK}/outbound_0.json" \
+              "direction=Outgoing&status=Processed&coreId=CORE_OUT" "${WORK}/outbound_1.json")
+run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs_enc"
+TIME_RE='[A-Z][a-z]{2}%2C%20[0-9]{2}%20[A-Z][a-z]{2}%20[0-9]{4}%20[0-9]{2}%3A[0-9]{2}%3A[0-9]{2}%20(%2B|-)[0-9]{4}'
+gets | head -n 1 | grep -qE "endTimeAfter=${TIME_RE}&endTimeBefore=${TIME_RE}&fields=" \
+    && pass "both times of the window are RFC 2822, encoded: 'Mon%2C%2026%20Oct%202026%2008%3A00%3A00%20%2B0200'" \
+    || fail "the times of the window in the list query: $(gets | head -n 1)"
+# its own log: a line of date, Core ID, level and text
+ITER_LOG=$(cat "${WORK}"/iterate_logs_enc/acks/*/All_PeSIT_Inbound_2_0.log 2>/dev/null)
+printf '%s\n' "${ITER_LOG}" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2} - .* - INFO - HTTPC: 200$' \
+    && pass "its log has a line for each call: date and time, the level, and 'HTTPC: 200'" || fail "its log: ${ITER_LOG}"
+# no parameters, and no user name
+run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh"
+expect "no window: exit 1, and nothing is sent or looked up" "${RC}:$(posts | wc -l | tr -d ' '):$(gets | wc -l | tr -d ' ')" "1:0:0"
+[[ "${OUT}" == *"Usage: "*"IteratePesitInbounds.sh <START_HOURS_AGO> <END_HOURS_AGO> [HOST] [ROOT_FOLDER] [CLEAR_API_OUTPUT_FILES]"* ]] && pass "and it prints its usage" || fail "no usage line: ${OUT}"
+export ST_ADMIN_LOCAL_VARIABLES="${WORK}/settings_no_user.sh"
+run "${WORK}/elsewhere" "${ACK_DIR}/IteratePesitInbounds.sh" 2 0 st.example.com "${WORK}/iterate_logs_nouser"
+unset ST_ADMIN_LOCAL_VARIABLES
+expect "no user name in the settings: exit 1, and nothing is sent or looked up" "${RC}:$(posts | wc -l | tr -d ' '):$(gets | wc -l | tr -d ' ')" "1:0:0"
+[[ "${OUT}" == *"No credentials found. Set ST_USER and ST_PASSWORD in Admin/API 2.0/bash/set_variables.local.sh."* ]] && pass "and it says which settings to fill in" || fail "no credentials message: ${OUT}"
 
 echo
 echo "=== The bat twins, read as text (they cannot run here) ==="

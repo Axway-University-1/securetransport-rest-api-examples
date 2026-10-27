@@ -44,6 +44,7 @@ fi
 # ==============================================================================
 url=""
 has_referer=0
+has_ctype=0
 payload=""
 method="GET"
 header_file=""
@@ -58,7 +59,7 @@ while [[ $# -gt 0 ]]; do
     --data-urlencode)                   query_params+=("$2"); shift 2 ;;
     -G)                                 use_g=1; shift ;;
     -X|--request)                       method="$2"; shift 2 ;;
-    -H|--header)                        echo "HEADER: $2" >&2; [[ "$2" == [Rr]eferer:* ]] && has_referer=1; shift 2 ;;
+    -H|--header)                        echo "HEADER: $2" >&2; [[ "$2" == [Rr]eferer:* ]] && has_referer=1; [[ "$2" == [Cc]ontent-[Tt]ype:* ]] && has_ctype=1; shift 2 ;;
     -u|--user)                          echo "BASIC_AUTH: $2" >&2; shift 2 ;;
     -F|--form|--form-string)            echo "FORM: $2" >&2; shift 2 ;;
     -b|--cookie)                        echo "COOKIE: $2" >&2; shift 2 ;;
@@ -77,6 +78,13 @@ done
 # STUB_CURL_REQUIRE_REFERER=0 turns it off, for a test that is about a call with none.
 if [[ "${STUB_CURL_REQUIRE_REFERER:-1}" != "0" && -n "${url}" && "${has_referer}" -eq 0 ]]; then
     echo "STUB_ERROR: the call to ${url} has no Referer header" >&2
+    exit 22
+fi
+
+# A JSON body sent with no Content-Type is read by the server as a form and refused (415 or 400): a call like that is an error here too.
+# STUB_CURL_REQUIRE_CONTENT_TYPE=0 turns it off.
+if [[ "${STUB_CURL_REQUIRE_CONTENT_TYPE:-1}" != "0" && "${has_ctype}" -eq 0 && "${payload}" == [\{\[]* && "${method}" =~ ^(POST|PUT|PATCH)$ ]]; then
+    echo "STUB_ERROR: the call to ${url} sends a JSON body with no Content-Type header" >&2
     exit 22
 fi
 
@@ -130,6 +138,10 @@ if [[ -n "${payload}" ]]; then
         file="${payload#@}"
         if [[ -f "${file}" ]]; then
             payload="$(cat "${file}")"
+            if [[ "${STUB_CURL_REQUIRE_CONTENT_TYPE:-1}" != "0" && "${has_ctype}" -eq 0 && "${payload}" == [\{\[]* && "${method}" =~ ^(POST|PUT|PATCH)$ ]]; then
+                echo "STUB_ERROR: the call to ${url} sends a JSON body (a file) with no Content-Type header" >&2
+                exit 22
+            fi
         else
             echo "PAYLOAD_MISSING_FILE: ${file}" >&2
             exit 0

@@ -234,6 +234,39 @@ ST_GET_SEQ="200 500" run ${EL_08}
 expect "08: a read that fails is exit 1, and the site is deleted all the same" "${RC}:$(calls | grep '^DELETE ')" "1:DELETE ${BASE}/sites/ID1"
 
 echo
+echo "=== the lookups and the cleanup of 02 to 08: a refused lookup, no Location in the answer, nothing created ==="
+for s in ${EL_02} ${EL_03} ${EL_04} ${EL_05} ${EL_06} ${EL_07} ${EL_08}; do
+    kind=$(sed -n 's#^MAIN_URL=.*/api/v2.0/\([a-zA-Z]*\)"#\1#p' "${REPO}/Admin/API 2.0/bash/14.ExpressionLanguage/${s}")
+    run ${s}
+    N=$(calls | grep -c "^GET ${BASE}/${kind}?name=.*&fields=id,name$")           # the names it looks for before it creates anything
+    FIRST_LOOKED=$(calls | head -1 | sed 's/.*name=//; s/&.*//')
+    FIRST_MADE=$(created | jq -r '.[0]')
+    has "${s}: a normal run says it cleans up the throwaway objects" "Cleaning up the throwaway objects..."
+    # a lookup that is refused: nothing is created, the message says which name and which code, exit 1
+    ST_GET=500 run ${s}
+    expect "${s}: a lookup that is refused (500) is exit 1, and nothing is created" "${RC}:$(count POST "${BASE}/${kind}")" "1:0"
+    has "${s}: and it says which name could not be looked for, and the code" "Could not look for ${FIRST_LOOKED} (HTTP 500), so nothing was created."
+    expect "${s}: nothing to clean up, so it does not say it cleans up" "$(printf '%s\n' "${OUT}" | grep -c 'Cleaning up the throwaway objects')" "0"
+    # a creation that is refused leaves nothing to clean up either
+    ST_POST=400 run ${s}
+    expect "${s}: a creation that is refused does not say it cleans up" "$(printf '%s\n' "${OUT}" | grep -c 'Cleaning up the throwaway objects')" "0"
+    # no Location in the answer, and the name is not found afterwards: it stops and says to delete by hand, and deletes nothing
+    rm -rf "${WORK}/seq" && mkdir -p "${WORK}/seq"
+    for i in $(seq 1 $((N + 1))); do printf '{"result":[]}\n' > "${WORK}/seq/${i}.json"; done
+    rm -f "${WORK}/seq/.served"
+    LOC_PREFIX= SEQUENCE="${WORK}/seq" run ${s}
+    expect "${s}: a creation with no Location whose name is not found afterwards is exit 1, and nothing is deleted" "${RC}:$(count DELETE "${BASE}")" "1:0"
+    has "${s}: and it says it did not say where, and that the object is to be deleted by hand" "The server created ${FIRST_MADE} but did not say where, and its id could not be found: delete it by hand."
+    expect "${s}: the id is looked up with a GET of the exact name, right after the POST" "$(calls | sed -n "$((N + 2))p")" "GET ${BASE}/${kind}?name=${FIRST_MADE}&fields=id,name"
+    # the name is found: that id is the one deleted by the cleanup, whatever happens later
+    printf '{"result":[{"id":"FOUND1","name":"%s"}]}\n' "${FIRST_MADE}" > "${WORK}/seq/$((N + 1)).json"
+    printf '{"result":[{"id":"FOUND1","name":"%s"}]}\n' "${FIRST_MADE}" > "${WORK}/seq/$((N + 2)).json"
+    rm -f "${WORK}/seq/.served"      # the stub counts the GETs it served in that folder
+    LOC_PREFIX= SEQUENCE="${WORK}/seq" run ${s}
+    expect "${s}: the id found by the lookup is deleted by the cleanup" "$(calls | grep -c "^DELETE ${BASE}/${kind}/FOUND1$")" "1"
+    SEQUENCE=
+done
+
 echo "=== the cleanup is by id, and an interruption runs it ==="
 for s in ${EL_02} ${EL_03} ${EL_04} ${EL_05} ${EL_06} ${EL_07} ${EL_08}; do
     expect "${s}: no delete looks a name up (no jq .result[0].id)" "$(grep -c 'result\[0\]' "${REPO}/Admin/API 2.0/bash/14.ExpressionLanguage/${s}")" "0"
