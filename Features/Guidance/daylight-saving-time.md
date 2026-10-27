@@ -27,19 +27,26 @@ curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G "https://${ST_SERVER}:${ST_PORT}/ap
   --data-urlencode "limit=1" --data-urlencode "fields=id" -H "accept: application/json" -H "Referer: x"
 ```
 
-Not every date parameter can carry an offset. The reference documents these formats:
+Not every date parameter can carry an offset. These are all the date and time parameters the two references have, by what they accept:
 
-| Where | Format in the reference | Can carry an offset |
-| ----- | ----------------------- | ------------------- |
-| `GET /logs/transfers` (`startTimeAfter`, `startTimeBefore`, `endTimeAfter`, `endTimeBefore`) | RFC 2822 | Yes. Tried: ISO 8601, `yyyy-MM-dd` and a timestamp are refused with 400 "Date should be in RFC2822 Format". |
-| `GET /logs/audit`, `GET /logs/server` | RFC 2822 | Yes (not tried here) |
-| End User `GET /transfers` | RFC 2822 | Yes (not tried here) |
-| `GET /administrators` | RFC 2822 or ISO 8601 | Yes (not tried here) |
-| `GET /accounts` (`lastModified.from`, `.to`), `GET /deniedUsers` (`blockedAt`), `GET /statisticsSummary/activeUsers` | RFC 2822, `yyyy-MM-dd` or a timestamp | Only in RFC 2822 (not tried here) |
-| `GET /statisticsSummary/generateReport` (`startDate`, `endDate`) | `dd/MM/yyyy` | **No.** A date has no offset. |
+| Where | Parameters | Accepts (reference) | Can carry an offset |
+| ----- | ---------- | ------------------- | ------------------- |
+| `GET /logs/transfers` | `startTimeAfter`, `startTimeBefore`, `endTimeAfter`, `endTimeBefore` | RFC 2822 | Yes. Tried: ISO 8601, `yyyy-MM-dd` and a timestamp are refused with 400 "Date should be in RFC2822 Format". |
+| `GET /logs/audit`, `GET /logs/server` | `fromDate`, `endDate` | RFC 2822 | Yes (not tried here) |
+| End User `GET /transfers` | `startTimeAfter`, `startTimeBefore`, `endTimeAfter`, `endTimeBefore` | RFC 2822 or a timestamp | Yes, in RFC 2822 (not tried here) |
+| `GET /administrators` | `apiKeys.createdAt`, `.expiresAt`, `.lastAccessedAt`, each `.from` and `.to` | RFC 2822 or ISO 8601 | Yes (not tried here) |
+| `GET /accounts` | `lastModified`, `user.lastLogin`, `user.lastFailedAuth`, `user.lastFailedSshKeyAuth`, `user.passwordCredentials.lastPasswordChange`, each `.from` and `.to` | RFC 2822, `yyyy-MM-dd` or a timestamp | Yes, in RFC 2822 (not tried here) |
+| `GET /deniedUsers` | `blockedAt`, `blockedUntil`, each `.from` and `.to` | RFC 2822, `yyyy-MM-dd` or a timestamp | Yes, in RFC 2822 (not tried here) |
+| `GET /statisticsSummary/activeUsers` | `lastAccessTime`, `lastAdhocAccessTime`, each `.from` and `.to` | RFC 2822, `yyyy-MM-dd` or a timestamp | Yes, in RFC 2822 (not tried here) |
+| `GET /statisticsSummary/generateReport` | `startDate`, `endDate` | `dd/MM/yyyy` | **No.** A date has no offset. |
 
-Where the format is a date only (`dd/MM/yyyy`, `yyyy-MM-dd`), you cannot say which time zone the day is in. This guide does not say which zone the server uses
-for it, because it was not verified. Use RFC 2822 wherever the endpoint accepts it, and ask your support contact for the others.
+**What this guide is about.** It is about the first group: a window of time that you build in your script and send with an offset. That is where counting a
+day as 86,400 seconds goes wrong. A **timestamp** is one exact moment, so it has no offset to get wrong (the day you took it from is still yours to compute).
+Every other resource of the two APIs has no date or time parameter, and is not touched.
+
+**What it is not about.** Where the parameter is a date only (`dd/MM/yyyy` in `generateReport`, `yyyy-MM-dd` in the others), your script cannot make that
+mistake, because it sends no time. But the server then decides which time zone the day is in, and this guide does not say which, because it was not verified.
+Use RFC 2822 wherever the endpoint accepts it, and ask your support contact for the others.
 
 Answers carry an offset too, for example `Sun, 25 Oct 2026 15:53:45 +0200`. The End User `GET /serverTime` answers the server's time in ISO 8601 with its offset
 from UTC.
