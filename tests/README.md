@@ -113,6 +113,15 @@ server](#against-a-real-server).
 | Check | What it catches |
 | ----- | --------------- |
 | `offline/checks/check_hygiene.sh` | A credential, hostname, IP or customer name committed by accident. Naming that drifts from the convention. A shell file that does not parse. A bash example with no bat twin. In a `.bat` file: a single `%` before `{http_code}`, which cmd eats; a `%VAR: =%%20%` substitution, which does not URL-encode; and an RFC 2822 date with a `+03:00` offset or day names in the Windows language. |
+| `offline/checks/test_guidance_usage_and_billing_reporting.py` | The guide `usage-and-billing-reporting.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_reading_api_answers.py` | The guide `reading-api-answers.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_protocol_servers_and_daemons.py` | The guide `protocol-servers-and-daemons.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_moving_files_end_user_api.py` | The guide `moving-files-end-user-api.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_authentication_and_sessions.py` | The guide `authentication-and-sessions.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_changing_configuration.py` | The guide `changing-configuration.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_expression_language_escaping.py` | The guide `expression-language-escaping.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_field_names_between_releases.py` | The guide `field-names-between-releases.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_guidance_testing_your_scripts.py` | The guide `testing-your-scripts.md`: the sections and key statements it promises, and the code in it that can run offline. |
 | `offline/checks/test_feature_guidance.py` | `Features/Guidance`: every guide is listed in the folder's README and linked from `Features/README.md`, its links resolve, it has no internal issue numbers, and the formats guide has a row, an example and a curl command that runs for each format, and its code runs (python, the date function of this platform, the TZ rule for testing). |
 | `offline/checks/test_stubs.py` | The stub curl: a call with no Referer header is an error (found by breaking scripts on purpose: no test noticed a script that stopped sending it). |
 | `offline/checks/test_measure_coverage.py` | `tools/measure_coverage.py`: the report is built from the stored measures with the date of each, mutation results of different scripts are merged, the history is kept and shown. |

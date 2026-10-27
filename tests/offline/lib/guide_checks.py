@@ -49,6 +49,7 @@ def run_curl(code, env=None, body=None):
         if body:
             e["STUB_CURL_GET_BODY"] = body
         e.update(env or {})
-        return subprocess.run(["bash", "-c", code], capture_output=True, text=True, env=e, timeout=60)
+        # in a folder of its own: a curl example may write a file (-D headers, -c a cookie jar) and must not leave it in the repository
+        return subprocess.run(["bash", "-c", code], capture_output=True, text=True, env=e, timeout=60, cwd=d)
     finally:
         shutil.rmtree(d, ignore_errors=True)
