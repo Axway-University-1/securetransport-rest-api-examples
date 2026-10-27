@@ -380,8 +380,10 @@ def main():
     if not hist.exists():
         hist.write_text("\t".join(HEADER) + "\n")
     row = [today(), commit()] + rows
-    with open(hist, "a") as f:
-        f.write("\t".join(row) + "\n")
+    # a report that shows what the last one showed (same commit, same numbers) is not a new row of the history
+    if not (before and before[-1][1:] == row[1:] and before[-1][0] == row[0]):
+        with open(hist, "a") as f:
+            f.write("\t".join(row) + "\n")
     if args.full:
         print(text)
     print("HOW WELL THE EXAMPLES ARE TESTED   %s   commit %s   %d examples tracked" % (today(), commit(), len(script_coverage.tracked())))
