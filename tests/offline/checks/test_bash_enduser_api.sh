@@ -159,6 +159,11 @@ STUB_STATUS_POST_SEQ="200 200 400" STUB_COUNTER="${WORK}/ctr_pw" run 03.Myself/0
 rm -f "${WORK}"/ctr_pw.*
 expect "03 change: a change back that is refused exits 1" "${RC}" "1"
 has "03 change: and prints the password the account is on" "The password of apiadmin is now: N3w p@ss"
+STUB_STATUS_POST_SEQ="200 401" STUB_COUNTER="${WORK}/ctr_pw2" run 03.Myself/03.myself_password_POST_change.sh 'N3w p@ss'
+rm -f "${WORK}"/ctr_pw2.*
+expect "03 change: the login with the new password refused: exit 1" "${RC}" "1"
+has "03 change: and says so, with the code" "The login failed (HTTP 401)."
+hasnt "03 change: and does not say it works" "It works."
 run 03.Myself/03.myself_password_POST_change.sh s3cret
 expect "03 change: the password it already has is exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 run 03.Myself/03.myself_password_POST_change.sh a b
@@ -349,6 +354,10 @@ expect "14 share: PATCH on the folder" "${RC}:$(calls)" "0:PATCH ${BASE}/files/s
 expect "14 share: adds sharedDirectoryProperties, with each collaborator and the rights" \
   "$(payload 1 | jq -c '.[0] | [.op, .path, .value.collaborators, .value.shareRights, .value.isOwner]')" \
   '["add","/sharedDirectoryProperties",["a@example.com","b@example.com"],3,true]'
+has "14 share: says what it shares, with whom, and the rights" "Sharing shared with a@example.com, b@example.com, rights 3..."
+STUB_STATUS_PATCH=403 run 02.Files/14.files_filepath_PATCH_share.sh shared a@example.com 1
+expect "14 share: a refused share is exit 1" "${RC}" "1"
+has "14 share: and says it failed, with the code" "The share failed (HTTP 403)"
 run 02.Files/14.files_filepath_PATCH_share.sh shared a@example.com 2
 expect "14 share: rights other than 1, 3, 7 are refused before any call" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 

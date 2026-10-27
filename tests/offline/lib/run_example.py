@@ -78,7 +78,7 @@ def _snapshot(folder):
     return out
 
 
-def run(script, args=(), scenario=None, config=None, files=None, fast=False, timeout=40, env=None, edits=None, tree_files=None, start_method=None):
+def run(script, args=(), scenario=None, config=None, files=None, fast=False, timeout=40, env=None, edits=None, tree_files=None, start_method=None, allow_violations=False):
     """
     Run <script>, a path under python/python3 ("../utils/x.py" reaches the utils) and return a Result.
 
@@ -89,6 +89,9 @@ def run(script, args=(), scenario=None, config=None, files=None, fast=False, tim
     env       more environment variables for the script
     edits     {old text: new text} applied to the copy of the script, as the integration checks do
     tree_files {path under python/: text or bytes} written into the copy of the folder, next to the config
+    allow_violations  a call the fake server refuses for what it carries (no Referer, no csrfToken, a JSON body with no Content-Type, a resource
+              that does not exist) makes the run exit 97, so that a script that stops sending one fails every test that runs it; True for a test
+              that is about such a call
     start_method  "spawn", "fork" or "forkserver": how multiprocessing starts a worker. Left out it is the
               platform's own, which is what a person gets; "spawn" is the strict one (macOS, Windows,
               and Linux from Python 3.14) and finds a worker that relies on what only the parent set up
@@ -165,6 +168,9 @@ def run(script, args=(), scenario=None, config=None, files=None, fast=False, tim
         snapshot = {"cwd": _snapshot(cwd), "script": _snapshot(os.path.dirname(script_path))}
         result = Result(process.returncode, output, entries, snapshot)
         result.timed_out = timed_out
+        if not allow_violations and result.violations():
+            result.returncode = 97
+            result.output = output + "\nFAKE SERVER REFUSED: %s\n" % (result.violations(),)
         return result
     finally:
         shutil.rmtree(workdir, ignore_errors=True)

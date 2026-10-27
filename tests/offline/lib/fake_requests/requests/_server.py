@@ -50,6 +50,13 @@ def for_this_process():
     return _instance
 
 
+KNOWN_RESOURCES = {'accessPolicies', 'accountSetup', 'accounts', 'addressBook', 'administrativeRoles', 'administrators', 'applications', 'businessUnits',
+                   'certificates', 'clusterServices', 'configurations', 'daemons', 'deniedUsers', 'events', 'icapServers', 'ldapDomains',
+                   'loginRestrictionPolicies', 'logs', 'mailTemplates', 'myself', 'routeStepsCharsets', 'routeStepsMetadata', 'routes', 'servers',
+                   'sessions', 'siteTemplates', 'sites', 'statisticsSummary', 'subscriptions', 'transactionManager', 'transferProfiles', 'transfers',
+                   'userClasses', 'version', 'zones'}
+
+
 class FakeST:
     def __init__(self):
         path = os.environ.get("FAKE_ST_SCENARIO")
@@ -62,9 +69,16 @@ class FakeST:
         self.stop_lag = int(scenario.get("stop_lag", 0))
         self.service_lag = int(scenario.get("service_lag", 0))
         self.csrf = scenario.get("csrf", True)
+        # strict: the checks of what a script sends beyond the Referer and the csrfToken of a write (scenario "strict": false turns them off)
+        self.strict = scenario.get("strict", True)
         self.ignored_filters = scenario.get("ignore_filters", [])
         self.log_path = os.environ.get("FAKE_ST_LOG")
         self.calls = 0
+
+    def known_resources(self):
+        """The resources of the API, the collections a scenario brings, and the paths it serves as objects or totals."""
+        extra = set(self.collections) | {p.split("/")[0] for p in list(self.objects) + list(self.totals)}
+        return KNOWN_RESOURCES | {e.split("/")[0] for e in extra}
 
     # -- the log --------------------------------------------------------------
     def record(self, entry):
@@ -130,6 +144,15 @@ class FakeST:
         elif method != "GET" and method != "HEAD" and self.csrf and session._logged_in:
             if lower.get("csrftoken") != session._token:
                 violation = "a write with no valid csrfToken header"
+        elif self.csrf and session._logged_in and not lower.get("csrftoken") and self.strict:
+            # the real server does not ask for it on a read; every example sends it on every call of a session, and so does a test of one
+            violation = "a call in a session with no csrfToken header"
+        if not violation and self.strict and isinstance(data, (str, bytes)) and not files and "content-type" not in lower:
+            text = data.decode("latin-1") if isinstance(data, bytes) else data
+            if text.lstrip()[:1] in ("{", "["):
+                violation = "a JSON body with no Content-Type header"
+        if not violation and self.strict and not is_login and path.split("/")[0] and path.split("/")[0] not in self.known_resources():
+            violation = "a resource that does not exist: %s" % path.split("/")[0]
         if violation:
             entry["violation"] = violation
             entry["status"] = 403

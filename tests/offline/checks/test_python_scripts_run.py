@@ -190,6 +190,83 @@ for (script, label), r in sorted(results.items()):
     c.check("%s, %s: no traceback" % (script, label), "Traceback" not in r.output, r.output[-300:])
 failures += 0 if c.summary() else 1
 
+# ------------------------------------------- what the scripts say when a call fails, and what they send
+print()
+c = fake_st.Checker("every python example: the message of a failed connection or timeout, and the bodies it sends")
+PYDIR = run_example.PYTHON_DIR
+for case in CASES:
+    src = open(os.path.join(PYDIR, "python3", case.script) if os.path.exists(os.path.join(PYDIR, "python3", case.script)) else os.path.join(PYDIR, case.script)).read()
+    for phrase, labels in (("cannot connect to", ("a connection error on every call", "a connection error after the login")),
+                           ("Timeout talking to", ("a timeout on every call", "a read timeout on every call", "a timeout after the login"))):
+        if phrase in src:
+            for label in labels:
+                r = results.get((case.script, label))
+                if r is not None:
+                    c.check("%s, %s: it says '%s'" % (case.script, label, phrase), phrase.lower() in r.output.lower() or "timeout" in r.output.lower() and phrase.startswith("Timeout"),
+                            r.output[-200:])
+# the bodies the clean runs send, as written when the scripts were last changed on purpose (UPDATE_GOLDEN=1 writes them again)
+GOLDEN = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "fixtures", "python_write_bodies.json")
+
+
+def no_ids(value):
+    """The ids the fake server makes up are different in every run: they are written as <id>."""
+    if isinstance(value, dict):
+        return {k: no_ids(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [no_ids(v) for v in value]
+    if isinstance(value, str) and len(value) == 16 and all(ch in "0123456789abcdef" for ch in value):
+        return "<id>"
+    return value
+
+
+def shape(entry):
+    path = entry["path"].split("/")
+    return [entry["method"], path[0], len(path) > 1, no_ids(entry.get("body"))]
+
+
+# the writes of a script with worker processes come in no fixed order: every list is sorted
+actual = {case.script: sorted((shape(e) for e in results[(case.script, "clean")].writes()), key=lambda x: json.dumps(x, sort_keys=True)) for case in CASES}
+if os.environ.get("UPDATE_GOLDEN") == "1":
+    with open(GOLDEN, "w") as f:
+        json.dump(actual, f, indent=1, sort_keys=True)
+        f.write("\n")
+golden = json.load(open(GOLDEN)) if os.path.exists(GOLDEN) else {}
+for case in CASES:
+    c.check("%s: the bodies of its writes are the ones recorded" % case.script, golden.get(case.script) == json.loads(json.dumps(actual[case.script])),
+            (json.dumps(actual[case.script])[:300], json.dumps(golden.get(case.script))[:300]))
+failures += 0 if c.summary() else 1
+
+# ------------------------------------------------ a wrong command line, and no config file: the message and the exit code
+print()
+c = fake_st.Checker("every python example that reads a command line: a wrong one is exit 2 with the usage, and no call is made")
+USAGE_CASES = (
+    ("stAddLoginRestrictionRule.py", [], ["Please provide argument 1 - The name of your login Restriction", "Usage: python3 stAddLoginRestrictionRule.py POLICY_NAME"]),
+    ("stConfigScan.py", [], ["Please provide argument 1 - either MAKEBASELINE or COMPAREBASELINE", "Usage: python3 stConfigScan.py MAKEBASELINE|COMPAREBASELINE [BASELINE_FILE]"]),
+    ("stGraceful.py", [], ["Please provide argument 1 - the number of seconds the connections in progress may take", "Usage: python3 stGraceful.py SECONDS --yes"]),
+    ("stBuildTestAccounts.py", ["ZZ", "3", "extra"], ["Usage: python3 stBuildTestAccounts.py [--apply] [PREFIX] [COUNT]"]),
+    ("stBuildTestAccounts.py", ["ZZ", "many"], ["Usage: python3 stBuildTestAccounts.py [--apply] [PREFIX] [COUNT]"]),
+    ("stDeleteTestAccounts.py", ["ZZ", "extra"], ["Usage: python3 stDeleteTestAccounts.py"]),
+    ("stDeleteTestAccounts.py", ["a"], ["The prefix is at least 2 characters", "Usage: python3 stDeleteTestAccounts.py"]),
+    ("stUpdateAllAccounts.py", ["--nope"], ["Usage: python3 stUpdateAllAccounts.py [--apply]"]),
+    ("stGetAccountsAfterDate.py", [], ["Please provide argument 1 to list all accounts created after date X in format YYYY-MM-DD"]),
+    ("stGetPrivateCert.py", [], ["Please provide argument 1 - the certificate ID you wish to export", "Usage: python3 stGetPrivateCert.py CERTIFICATE_ID [OUTPUT_FILE]"]),
+    ("../utils/stCompareExportedConfigurations.py", [], ["Please enter the Filename of the first exported Server Config XML", "Usage: python3 stCompareExportedConfigurations.py filename1 filename2"]),
+    ("../utils/stCompareExportedConfigurations.py", ["a.xml"], ["Please enter the Filename of the second exported Server Config XML", "Usage: python3 stCompareExportedConfigurations.py filename1 filename2"]),
+)
+with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+    jobs = [(sc, args, phrases, pool.submit(run_example.run, sc, args, world(), fast=True, allow_violations=True)) for sc, args, phrases in USAGE_CASES]
+    for sc, args, phrases, job in jobs:
+        r = job.result()
+        c.check("%s %s: exit 2, no call to the server" % (sc, " ".join(args) or "(no argument)"), r.returncode == 2 and r.calls == [], (r.returncode, len(r.calls), r.output[-200:]))
+        for phrase in phrases:
+            c.check("%s %s: it says '%s'" % (sc, " ".join(args) or "(no argument)", phrase[:60]), phrase in r.output, r.output[-300:])
+NO_CONFIG = (("stGetAccountsAfterDate.py", ["2026-01-01"]), ("stReplaceSites.py", []))
+for sc, args in NO_CONFIG:
+    r = run_example.run(sc, args, world(), config=False, fast=True, allow_violations=True)
+    c.check("%s with no config file: non-zero exit, 'Copy config.example to config', no call" % sc,
+            r.returncode != 0 and "Copy config.example to config" in r.output and r.calls == [], (r.returncode, r.output[-200:]))
+failures += 0 if c.summary() else 1
+
 # ----------------------------------------------------- the certificate check can be turned on
 print()
 c = fake_st.Checker("every python example: st_verify and st_ca_bundle in the config reach every call")

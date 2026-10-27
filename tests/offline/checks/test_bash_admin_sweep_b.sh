@@ -94,6 +94,7 @@ expect "01: a base folder that is not absolute is exit 2, nothing sent" "${RC}:$
 has "01: and says so" "BASE_FOLDER must be an absolute path"
 run "${F}/${S}" Sales /home/sales extra
 expect "01: three arguments are exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "01: and prints the usage" "Usage: ./01.businessUnits_POST.sh [NAME] [BASE_FOLDER]"
 
 echo
 echo "=== 13.Configurations/38 to 47 (external stores and S3 storage profiles) ==="

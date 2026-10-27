@@ -1,0 +1,905 @@
+{
+ "14.ExpressionLanguage/01.loginRestrictionPolicy_sessionExpression.py": [
+  [
+   "DELETE",
+   "loginRestrictionPolicies",
+   true,
+   null
+  ],
+  [
+   "PATCH",
+   "loginRestrictionPolicies",
+   true,
+   [
+    {
+     "op": "add",
+     "path": "/rules/0",
+     "value": {
+      "clientAddress": "*",
+      "description": "Only allow if less than 4 sessions",
+      "expression": "${currentSessions <= 3}",
+      "isEnabled": true,
+      "name": "sessions fewer than 4",
+      "type": "ALLOW"
+     }
+    }
+   ]
+  ],
+  [
+   "POST",
+   "loginRestrictionPolicies",
+   false,
+   {
+    "name": "ZZTEST_EL_sessionLimit",
+    "type": "ALLOW_THEN_DENY"
+   }
+  ]
+ ],
+ "14.ExpressionLanguage/02.routes_condition_EL.py": [
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "condition": "${!empty account.email}",
+    "conditionType": "EL",
+    "name": "ZZTEST_EL_route_hasEmail",
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "condition": "${account.disabled != '0'}",
+    "conditionType": "EL",
+    "name": "ZZTEST_EL_route_disabled",
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "condition": "${transfer.transferredBytes ge 20}",
+    "conditionType": "EL",
+    "name": "ZZTEST_EL_route_bytesGE20",
+    "type": "SIMPLE"
+   }
+  ]
+ ],
+ "14.ExpressionLanguage/03.routes_step_fileFilterExpression_glob.py": [
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_glob_anyXml",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "*.xml",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_glob_fooDotTwoAny",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "foo.??",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_glob_notDigit",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "*.[!0-9]",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_glob_singleDigit",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "*.[0-9]",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ]
+ ],
+ "14.ExpressionLanguage/04.routes_step_fileFilterExpression_regexp.py": [
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_regexp_caseInsensitive",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "(?i)data\\.xml",
+      "fileFilterExpressionType": "REGEXP",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_regexp_negativeLookahead",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "^(?!.*__TID\\d{6}__[A-Za-z0-9]{16}).*$",
+      "fileFilterExpressionType": "REGEXP",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_regexp_xmlOrTxt",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": ".*\\.(xml|txt)",
+      "fileFilterExpressionType": "REGEXP",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ]
+ ],
+ "14.ExpressionLanguage/05.routes_step_condition_matches_backslashDoubling.py": [
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "condition": "${transfer.target.matches('.*\\.txt')}",
+    "conditionType": "EL",
+    "name": "ZZTEST_EL_single",
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "condition": "${transfer.target.matches('.*\\\\.txt')}",
+    "conditionType": "EL",
+    "name": "ZZTEST_EL_doubled",
+    "type": "SIMPLE"
+   }
+  ]
+ ],
+ "14.ExpressionLanguage/06.routes_step_renameExpression.py": [
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "routes",
+   true,
+   null
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_rename_accountName",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "*",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "postTransformationActionRenameAsExpression": "${account.name}_${basename(transfer.target)}",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_rename_randomId",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "*",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "postTransformationActionRenameAsExpression": "${basename(transfer.target)}-${random()}.${extension(transfer.target)}",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "conditionType": "ALWAYS",
+    "name": "ZZTEST_EL_rename_timestamped",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "*",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "postTransformationActionRenameAsExpression": "${basename(transfer.target)}-${date('yyyyMMdd_HHmmss')}${extension(transfer.target)}",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ]
+ ],
+ "14.ExpressionLanguage/07.transferSites_downloadPattern.py": [
+  [
+   "DELETE",
+   "sites",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "sites",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "sites",
+   true,
+   null
+  ],
+  [
+   "POST",
+   "sites",
+   false,
+   {
+    "account": "john",
+    "downloadFolder": "/tmp",
+    "downloadPattern": "*.[0-9]",
+    "downloadPatternType": "glob",
+    "host": "st.example.com",
+    "name": "ZZTEST_EL_dlpattern_singleDigit",
+    "password": "placeholder",
+    "port": "22",
+    "protocol": "ssh",
+    "type": "ssh",
+    "uploadFolder": "/",
+    "usePassword": true,
+    "userName": "john"
+   }
+  ],
+  [
+   "POST",
+   "sites",
+   false,
+   {
+    "account": "john",
+    "downloadFolder": "/tmp",
+    "downloadPattern": "*.xml",
+    "downloadPatternType": "glob",
+    "host": "st.example.com",
+    "name": "ZZTEST_EL_dlpattern_anyXml",
+    "password": "placeholder",
+    "port": "22",
+    "protocol": "ssh",
+    "type": "ssh",
+    "uploadFolder": "/",
+    "usePassword": true,
+    "userName": "john"
+   }
+  ],
+  [
+   "POST",
+   "sites",
+   false,
+   {
+    "account": "john",
+    "downloadFolder": "/tmp",
+    "downloadPattern": ".*\\.(xml|txt)",
+    "downloadPatternType": "regex",
+    "host": "st.example.com",
+    "name": "ZZTEST_EL_dlpattern_xmlOrTxt",
+    "password": "placeholder",
+    "port": "22",
+    "protocol": "ssh",
+    "type": "ssh",
+    "uploadFolder": "/",
+    "usePassword": true,
+    "userName": "john"
+   }
+  ]
+ ],
+ "14.ExpressionLanguage/08.transferSites_dynamicProperties.py": [
+  [
+   "DELETE",
+   "sites",
+   true,
+   null
+  ],
+  [
+   "POST",
+   "sites",
+   false,
+   {
+    "account": "john",
+    "downloadPattern": "${DXAGENT_TRANSFERSAPI_FILE}",
+    "host": "${DXAGENT_TRANSFERSAPI_SERVER}",
+    "name": "ZZTEST_EL_dynamicSite",
+    "port": "443",
+    "protocol": "http",
+    "type": "http",
+    "uploadFolder": "/",
+    "userName": "john"
+   }
+  ]
+ ],
+ "stAddLoginRestrictionRule.py": [
+  [
+   "PATCH",
+   "loginRestrictionPolicies",
+   true,
+   [
+    {
+     "op": "add",
+     "path": "/rules/0",
+     "value": {
+      "clientAddress": "*",
+      "description": "Only allow if less than 4 sessions",
+      "expression": "${currentSessions <= 3}",
+      "isEnabled": true,
+      "name": "sessions fewer than 4",
+      "type": "ALLOW"
+     }
+    }
+   ]
+  ]
+ ],
+ "stBillableTransfers.py": [],
+ "stBuildFullTestAccount.py": [
+  [
+   "POST",
+   "accounts",
+   false,
+   {
+    "gid": "1000",
+    "homeFolder": "/usrdata/NoBU/TestAccount1",
+    "name": "TestAccount1",
+    "type": "user",
+    "uid": "1000",
+    "user": {
+     "name": "TestAccount1",
+     "passwordCredentials": {
+      "password": "change_me"
+     }
+    }
+   }
+  ],
+  [
+   "POST",
+   "certificates",
+   false,
+   null
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "account": "TestAccount1",
+    "conditionType": "MATCH_ALL",
+    "name": "PackageRouteToSFTPsite",
+    "routeTemplate": "t1",
+    "steps": [
+     {
+      "autostart": false,
+      "executeRoute": "<id>",
+      "status": "ENABLED",
+      "type": "ExecuteRoute"
+     }
+    ],
+    "subscriptions": [
+     "<id>"
+    ],
+    "type": "COMPOSITE"
+   }
+  ],
+  [
+   "POST",
+   "routes",
+   false,
+   {
+    "condition": true,
+    "conditionType": "ALWAYS",
+    "name": "SimpleRouteToSFTPsite",
+    "steps": [
+     {
+      "actionOnStepFailure": "FAIL",
+      "autostart": false,
+      "fileFilterExpression": "*",
+      "fileFilterExpressionType": "GLOB",
+      "status": "ENABLED",
+      "transferSiteExpression": "SFTPsite#!#CVD#!#",
+      "transferSiteExpressionType": "LIST",
+      "type": "SendToPartner"
+     }
+    ],
+    "type": "SIMPLE"
+   }
+  ],
+  [
+   "POST",
+   "sites",
+   false,
+   {
+    "account": "TestAccount1",
+    "clientCertificate": "<id>",
+    "downloadFolder": "/tmp",
+    "downloadPattern": "nofiles",
+    "host": "<SERVER>",
+    "name": "SFTPsite",
+    "port": "22",
+    "protocol": "ssh",
+    "type": "ssh",
+    "uploadFolder": "/tmp",
+    "usePassword": false,
+    "userName": "stapp"
+   }
+  ],
+  [
+   "POST",
+   "sites",
+   false,
+   {
+    "account": "TestAccount1",
+    "downloadFolder": "/tmp",
+    "downloadPattern": "nofiles",
+    "name": "FolderMonitor",
+    "protocol": "folder",
+    "type": "folder",
+    "uploadFolder": "/tmp"
+   }
+  ],
+  [
+   "POST",
+   "subscriptions",
+   false,
+   {
+    "account": "TestAccount1",
+    "application": "AdvRouting",
+    "folder": "/inbound",
+    "postProcessingActions": {
+     "ppaOnSuccessInDoDelete": true
+    },
+    "transferConfigurations": [
+     {
+      "outbound": false,
+      "tag": "PARTNER-IN"
+     }
+    ],
+    "type": "AdvancedRouting"
+   }
+  ]
+ ],
+ "stBuildTestAccounts.py": [
+  [
+   "POST",
+   "accounts",
+   false,
+   {
+    "gid": "1000",
+    "homeFolder": "/tmp/ZZ0",
+    "name": "ZZ0",
+    "type": "user",
+    "uid": "1000",
+    "user": {
+     "name": "ZZ0",
+     "passwordCredentials": {
+      "password": "axway"
+     }
+    }
+   }
+  ],
+  [
+   "POST",
+   "accounts",
+   false,
+   {
+    "gid": "1000",
+    "homeFolder": "/tmp/ZZ1",
+    "name": "ZZ1",
+    "type": "user",
+    "uid": "1000",
+    "user": {
+     "name": "ZZ1",
+     "passwordCredentials": {
+      "password": "axway"
+     }
+    }
+   }
+  ],
+  [
+   "POST",
+   "accounts",
+   false,
+   {
+    "gid": "1000",
+    "homeFolder": "/tmp/ZZ2",
+    "name": "ZZ2",
+    "type": "user",
+    "uid": "1000",
+    "user": {
+     "name": "ZZ2",
+     "passwordCredentials": {
+      "password": "axway"
+     }
+    }
+   }
+  ],
+  [
+   "POST",
+   "businessUnits",
+   false,
+   {
+    "baseFolder": "/usrdata/CatFoodCo",
+    "name": "CatFoodCorporation"
+   }
+  ]
+ ],
+ "stCertificateExpiry.py": [],
+ "stConfigScan.py": [],
+ "stDeleteTestAccounts.py": [
+  [
+   "DELETE",
+   "accounts",
+   true,
+   null
+  ],
+  [
+   "DELETE",
+   "accounts",
+   true,
+   null
+  ]
+ ],
+ "stGetAccountsAfterDate.py": [],
+ "stGetPrivateCert.py": [
+  [
+   "POST",
+   "certificates",
+   true,
+   null
+  ]
+ ],
+ "stReplaceSites.py": [
+  [
+   "PUT",
+   "sites",
+   true,
+   {
+    "account": "jane",
+    "id": "s3",
+    "keyExchangeAlgorithms": "diffie-hellman-group14-sha256,diffie-hellman-group-exchange-sha256,curve25519-sha256@libssh.org,diffie-hellman-group15-sha512,diffie-hellman-group17-sha512,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512",
+    "name": "PartnerThree",
+    "protocol": "ssh"
+   }
+  ],
+  [
+   "PUT",
+   "sites",
+   true,
+   {
+    "account": "john",
+    "id": "s1",
+    "keyExchangeAlgorithms": "diffie-hellman-group14-sha256,diffie-hellman-group-exchange-sha256,curve25519-sha256@libssh.org,diffie-hellman-group15-sha512,diffie-hellman-group17-sha512,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512",
+    "name": "PartnerOne",
+    "protocol": "ssh"
+   }
+  ]
+ ],
+ "stUpdateAllAccounts.py": [
+  [
+   "PATCH",
+   "accounts",
+   true,
+   [
+    {
+     "op": "replace",
+     "path": "/enrolledWithExternalPass",
+     "value": false
+    }
+   ]
+  ]
+ ],
+ "stUpdateAllRoutes.py": [
+  [
+   "PATCH",
+   "routes",
+   true,
+   [
+    {
+     "op": "replace",
+     "path": "/failureEmailName",
+     "value": "keep@example.com"
+    }
+   ]
+  ],
+  [
+   "PATCH",
+   "routes",
+   true,
+   [
+    {
+     "op": "replace",
+     "path": "/steps/1/customProperties/mHostName",
+     "value": "sentinel.example.com"
+    },
+    {
+     "op": "replace",
+     "path": "/steps/1/customProperties/mPort",
+     "value": "1325"
+    }
+   ]
+  ]
+ ],
+ "stUpdateAllSubscriptions.py": [
+  [
+   "PATCH",
+   "subscriptions",
+   true,
+   [
+    {
+     "op": "replace",
+     "path": "/postProcessingActions/ppaOnSuccessInDoDelete",
+     "value": true
+    },
+    {
+     "op": "add",
+     "path": "/subscriptionEncryptMode",
+     "value": "Default"
+    },
+    {
+     "op": "add",
+     "path": "/flowAttrsMergeMode",
+     "value": "preserve"
+    },
+    {
+     "op": "add",
+     "path": "/maxParallelSitPulls",
+     "value": "10"
+    }
+   ]
+  ],
+  [
+   "PATCH",
+   "subscriptions",
+   true,
+   [
+    {
+     "op": "replace",
+     "path": "/postProcessingActions/ppaOnSuccessInDoDelete",
+     "value": true
+    },
+    {
+     "op": "add",
+     "path": "/subscriptionEncryptMode",
+     "value": "Default"
+    },
+    {
+     "op": "add",
+     "path": "/flowAttrsMergeMode",
+     "value": "preserve"
+    },
+    {
+     "op": "add",
+     "path": "/maxParallelSitPulls",
+     "value": "10"
+    }
+   ]
+  ]
+ ],
+ "stUpdateRouteWithPut.py": [
+  [
+   "PUT",
+   "routes",
+   true,
+   {
+    "id": "c1"
+   }
+  ]
+ ],
+ "stUsersPerSharedFolder.py": []
+}

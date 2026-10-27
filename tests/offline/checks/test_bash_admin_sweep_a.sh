@@ -663,6 +663,12 @@ has "02 templates: it shows the code and the server's message" "[3/4] RouteFromT
 has "02 templates: and how far it got" "Stopped at the first refusal: 2 created, 0 skipped, 1 not tried."
 SWEEP_SEQ=$(seq s0802c "$(sl 200 "$(body templates_all '{"result":[{"name":"RouteFromOne"},{"name":"RouteFromTwo"},{"name":"RouteFromThree"},{"name":"RouteFromFour"}]}')")") run_trim
 expect "02 templates: a second run, with every template there: nothing posted, exit 0" "${RC}:$(calls | grep -c '^POST')" "0:0"
+run "${F}/02.routes_POST.sh" extra
+expect "02 templates: an argument is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "02 templates: and the usage is printed" "Usage: ./02.routes_POST.sh"
+SWEEP_SEQ=$(seq s0802e "$(sl 500 "$(body templates_err '{"message":"Internal error"}')")") run_trim
+expect "02 templates: the list of templates cannot be read (500): exit 1, nothing posted" "${RC}:$(calls | grep -c '^POST')" "1:0"
+has "02 templates: and says which call failed, with the code" "Could not read the route templates: HTTP 500"
 SWEEP_SEQ=$(seq s0802d "$(sl 500 "${WORK}/refused.json")") run_trim
 expect "02 templates: a read of the templates that fails: exit 1, nothing posted" "${RC}:$(calls | grep -c '^POST')" "1:0"
 SWEEP_SEQ= run_trim extra

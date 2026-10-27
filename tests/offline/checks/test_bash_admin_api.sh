@@ -233,16 +233,22 @@ PUT ${U}/example_user"
 expect "05 PUT: sends the whole object back, with only the uid changed" "$(payload 1 | jq -c --argjson a "${ACCOUNT}" '. == ($a | .uid = "1111")')" "true"
 has "05 PUT: prints the old uid" "The uid of example_user is now 41733."
 has "05 PUT: and the command that puts it back" "To put it back: ./05.accounts_name_PUT.sh example_user 41733"
+has "05 PUT: says which uid it is changing to" "Changing the uid to 1111..."
 has "05 PUT: prints HTTP 204" "HTTP 204"
 expect "05 PUT: leaves no file behind" "$(ls "${WORK}/admin/${F}" | grep -cE '^(result|new_result)\.json$')" "0"
 STATUS=204 STATUS_GET=200 run "${F}/05.accounts_name_PUT.sh" "a b" 2222
 expect "05 PUT: another account and uid, name URL-encoded" "$(calls | head -1):$(payload 1 | jq -r .uid)" "GET ${U}/a%20b:2222"
 STATUS=400 STATUS_GET=200 run "${F}/05.accounts_name_PUT.sh"
 expect "05 PUT: a refusal exits 1" "${RC}" "1"
+GET_BODY=$(body acct_missing '{"message":"Error validating request","validationErrors":["Account with name example_user not found."]}')
 STATUS=204 STATUS_GET=404 run "${F}/05.accounts_name_PUT.sh"
 expect "05 PUT: an account that cannot be read, exit 1, nothing sent" "${RC}:$(calls | grep -c PUT)" "1:0"
+has "05 PUT: and says which call failed, with the code" "Could not read the account example_user: HTTP 404"
+has "05 PUT: and shows the server's own reason" "Account with name example_user not found."
+GET_BODY=$(body acct "${ACCOUNT}")
 run "${F}/05.accounts_name_PUT.sh" example_user abc
 bad_args "05 PUT: a uid that is not a number, nothing sent"
+has "05 PUT: and prints the usage" "Usage: 05.accounts_name_PUT.sh [NAME] [NEW_UID]"
 GET_BODY=
 
 AB='{"type":"user","homeFolder":"/home/example_user","addressBookSettings":{"policy":"default","nonAddressBookCollaborationAllowed":null,"sources":[{"name":"LDAP"},{"name":"Local"}],"contacts":[{"fullName":"Existing"}]}}'
@@ -577,8 +583,10 @@ expect "02 POST: a refusal exits 1" "${RC}" "1"
 has "02 POST: and shows the HTTP code" "HTTP 400"
 STATUS=201 STATUS_GET=500 run "${F}/02.applications_POST.sh"
 expect "02 POST: the lookup by type cannot be done, exit 1, no maintenance application created" "${RC}:$(calls | grep -c POST)" "1:1"
+has "02 POST: and says which call failed, with the code" "Could not look for it: HTTP 500"
 run "${F}/02.applications_POST.sh" sometimes
 bad_args "02 POST: a schedule that is neither none nor once, nothing sent"
+has "02 POST: and prints the usage" "Usage: 02.applications_POST.sh [SCHEDULE]   (SCHEDULE is none, the default, or once)"
 run "${F}/02.applications_POST.sh" once extra
 bad_args "02 POST: too many arguments, nothing sent"
 GET_BODY=
@@ -1368,12 +1376,16 @@ has "02 POST: says for good" "Blocking example_denied for good..."
 STATUS=201 LOCATION=x run "${F}/02.deniedUsers_POST.sh" "a name" 5 "why not"
 expect "02 POST: a name with a space, ttl as a number, and the note" "$(payload 1 | jq -c .)" '{"loginName":"a name","ttl":5,"note":"why not"}'
 has "02 POST: says for how long" "Blocking a name for 5 hours..."
-STATUS=400 run "${F}/02.deniedUsers_POST.sh"
+DENIED_EXISTS=$(body denied_exists '{"message":"Error validating request","validationErrors":["Denied user example_denied already exists."]}')
+STATUS=400 POST_BODY="${DENIED_EXISTS}" run "${F}/02.deniedUsers_POST.sh"
 expect "02 POST: 'already exists' (400) exits 1" "${RC}" "1"
+has "02 POST: and prints the code" "HTTP 400"
+has "02 POST: and what the server said" "Denied user example_denied already exists."
 for BAD in "" " "; do
     run "${F}/02.deniedUsers_POST.sh" "${BAD}"
     [ -z "${BAD}" ] && continue
     nothing_sent "02 POST: a blank LOGIN_NAME is refused, nothing sent"
+    has "02 POST: and says why: the server would accept it and not let it be removed" "LOGIN_NAME must not be empty: the server would accept it and then not let it be removed."
 done
 for HOURS in 0 -1 two 1.5; do
     run "${F}/02.deniedUsers_POST.sh" example_denied "${HOURS}"
@@ -3128,13 +3140,21 @@ has "05 PUT: and prints the code" "HTTP 403"
 SEQUENCE=
 GET_BODY=$(body tp_none "${NO_PROFILE}")
 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile UNIX
-expect "05 PUT: no such profile, exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+has "05 PUT: and says how many it found" "Found 0 transfer profiles named example_profile on the account example_acct; this script acts on exactly one."
+GET_BODY=
+SEQUENCE=$(sequence tp_put_unreadable "${ONE_PROFILE}" '{"message":"Error validating request","validationErrors":["Transfer Profile with id p1id not found or not accessible."]}')
+STATUS=204 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile UNIX
+expect "05 PUT: the profile found cannot be read (an answer with no id): exit 1, no PUT" "${RC}:$(calls | grep -c PUT)" "1:0"
+has "05 PUT: and says which one" "Could not read the transfer profile example_profile (id p1id)."
+SEQUENCE=
 GET_BODY=
 for args in "" "example_acct" "example_acct example_profile SOMETIMES" "example_acct example_profile -" "example_acct example_profile windows"; do
     # shellcheck disable=SC2086
     run "${F}/05.transferProfiles_id_PUT.sh" ${args}
     expect "05 PUT: bad arguments (${args:-none}), exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 done
+run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile -
+has "05 PUT: a - and no send mapping says there is nothing to change" "Nothing to change: give a LINE_ENDING or a SEND_MAPPING."
 run "${F}/05.transferProfiles_id_PUT.sh" example_acct example_profile - "${LONG_SEND}"
 expect "05 PUT: a sendMapping over 250 characters, exit 2, nothing sent" "${RC}:$(calls | wc -l | tr -d ' ')" "2:0"
 

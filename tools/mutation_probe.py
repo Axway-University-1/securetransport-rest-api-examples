@@ -19,6 +19,17 @@ The changes (operators), each applied at up to --per-operator places of the scri
   compare    a comparison turned round (-eq / -ne, -gt / -le, -lt / -ge)
   output     a line the script prints, which is not printed (reported apart: a test may rightly not read every line)
 
+The same operators exist for the python examples (a .py file is probed against the test_python_*.py checks that name it):
+  method     requests.get / post / put / patch / delete (or the same on a session) turned into another one
+  exit       sys.exit(1) or sys.exit(2) that no longer exits with an error
+  status     the status code compared (200, 201, 204, 4xx) changed to 299
+  header     a Referer, csrfToken, Content-Type or accept entry of a headers dict that is not sent
+  url        a path of the API (accounts, sites, logs ...) with a wrong first letter
+  key        a name in a dict that is sent as a body, renamed
+  compare    ==, !=, >, <, >=, <=, and, or turned round
+  output     a print() that does not print (it becomes `pass`)
+The lines of a module docstring, of any triple-quoted text and of comments are never changed.
+
 Exit code: 0 when every mutant was caught, 1 when there are survivors, 2 for a problem with the run itself.
 """
 import argparse
@@ -102,6 +113,80 @@ def sites(lines, operator):
                 out.append((i, n))
     return out
 
+PY_METHOD_SWAP = {"get": "delete", "post": "put", "put": "post", "patch": "put", "delete": "get"}
+PY_API_WORDS = ("accounts|sites|routes|subscriptions|applications|servers|daemons|transfers|logs|certificates|configurations|businessUnits|"
+                "loginRestrictionPolicies|userClasses|files|fileOperations|myself|version|administrators|deniedUsers|statisticsSummary|zones|"
+                "mailTemplates|events|sessions|transferProfiles|addressBook|accessPolicies|icapServers|ldapDomains|accountSetup|options|clusterServices")
+PY_HEADER_KEYS = ("Referer", "csrfToken", "Content-Type", "accept")
+
+
+def python_skipped_lines(text):
+    """The (1-based) numbers of the lines that are never changed: comments and every line of a multi-line string (docstrings)."""
+    import io
+    import tokenize
+    skip = set()
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(text).readline):
+            if tok.type == tokenize.COMMENT:
+                skip.add(tok.start[0])
+            elif tok.type == tokenize.STRING and tok.end[0] != tok.start[0]:
+                skip.update(range(tok.start[0], tok.end[0] + 1))
+            elif tok.type == tokenize.STRING and tok.string.lstrip("rbuRBUfF").startswith(('"""', "'''")):
+                skip.add(tok.start[0])
+    except (tokenize.TokenError, IndentationError):
+        pass
+    return skip
+
+
+def py_sites(lines, operator, skip):
+    out = []
+    for i, line in enumerate(lines):
+        if not is_code(line) or (i + 1) in skip or line.startswith("#!"):
+            continue
+        new = []
+        if operator == "method":
+            for m in re.finditer(r"\b(requests|session|s|self\.session|sess)\.(get|post|put|patch|delete)\(", line):
+                new.append(line[:m.start(2)] + PY_METHOD_SWAP[m.group(2)] + line[m.end(2):])
+            for m in re.finditer(r"""(['"])(GET|POST|PUT|PATCH|DELETE)\1""", line):
+                if "request" in line.lower():
+                    new.append(line[:m.start(2)] + {"GET": "DELETE", "POST": "PUT", "PUT": "POST", "PATCH": "PUT", "DELETE": "GET"}[m.group(2)] + line[m.end(2):])
+        elif operator == "exit":
+            for m in re.finditer(r"\b(sys\.exit|exit)\(([12])\)", line):
+                new.append(line[:m.start()] + m.group(1) + "(0)" + line[m.end():])
+        elif operator == "status":
+            if re.search(r"status", line, re.I) and not re.match(r"\s*(print|writeLog|logging)", line):
+                m = re.search(r"\b(200|201|202|204|400|401|403|404|409|500)\b", line)
+                if m:
+                    new.append(line[:m.start()] + "299" + line[m.end():])
+        elif operator == "header":
+            for m in re.finditer(r"""(['"])(%s)\1\s*:\s*[^,}]+(?:,\s*)?""" % "|".join(PY_HEADER_KEYS), line):
+                new.append(line[:m.start()] + line[m.end():])
+        elif operator == "url":
+            if re.search(r"requests|session|\bs\.|url|Url|URL|post|get|put|patch|delete", line):
+                m = re.search(r"""(['"])(/?)(%s)\b""" % PY_API_WORDS, line)
+                if m:
+                    new.append(line[:m.end(2)] + "x" + line[m.end(2):])
+        elif operator == "key":
+            if "{" in line and not re.match(r"\s*(print|writeLog|logging|def|class|import|from)\b", line):
+                for m in re.finditer(r"""(['"])([A-Za-z]{3,})\1\s*:""", line):
+                    if m.group(2) not in PY_HEADER_KEYS:
+                        new.append(line[:m.end(2)] + "X" + line[m.end(2):])
+                        break
+        elif operator == "compare":
+            if re.match(r"\s*(if|elif|while|assert|return)\b", line) or " if " in line:
+                for a, b in (("==", "!="), ("!=", "=="), (">=", "<"), ("<=", ">"), (" > ", " <= "), (" < ", " >= "), (" and ", " or "), (" or ", " and ")):
+                    if a in line:
+                        new.append(line.replace(a, b, 1))
+                        break
+        elif operator == "output":
+            s = line.strip()
+            if re.match(r"print\(", s) and s.count("(") == s.count(")") and s.endswith(")"):
+                new.append(line[:len(line) - len(line.lstrip())] + "pass")
+        for n in new:
+            if n != line:
+                out.append((i, n))
+    return out
+
 
 def spread(items, n):
     if len(items) <= n:
@@ -110,11 +195,13 @@ def spread(items, n):
     return [items[int(k * step)] for k in range(n)]
 
 
-def mutants(text, per_operator):
+def mutants(text, per_operator, python=False):
     lines = lines_of(text)
     result = []
+    skip = python_skipped_lines(text) if python else None
     for operator in ("method", "exit", "status", "header", "url", "key", "compare", "output"):
-        for i, new in spread(sites(lines, operator), per_operator):
+        found = py_sites(lines, operator, skip) if python else sites(lines, operator)
+        for i, new in spread(found, per_operator):
             copy = list(lines)
             copy[i] = new
             result.append({"operator": operator, "line": i + 1, "before": lines[i].strip(), "after": new.strip() or "(line removed)",
@@ -129,13 +216,14 @@ def covering_tests(script):
         if p.suffix in {".sh", ".py"} and name in p.read_text(errors="replace"):
             tests.append(p.name)
     # the house rules apply to every bash example (a missing settings file, a missing parameter): last, since it is the slowest
-    if (ROOT / "tests" / "offline" / "checks" / "check_script_conventions.py").exists():
+    if not name.endswith(".py") and (ROOT / "tests" / "offline" / "checks" / "check_script_conventions.py").exists():
         tests.append("check_script_conventions.py")
     return tests
 
 
 def make_copy(dest):
-    files = subprocess.check_output(["git", "ls-files", "-z"], cwd=ROOT).decode().split("\0")
+    # the tracked files and the new ones that git does not ignore (a test or a fixture just written and not yet added)
+    files = subprocess.check_output(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"], cwd=ROOT).decode().split("\0")
     for f in files:
         if not f or not (ROOT / f).is_file():
             continue
@@ -170,14 +258,18 @@ def run_tests(copy, tests, limit=TEST_TIMEOUT):
 
 def probe(script, args, pool_dirs):
     path = ROOT / script
-    if not path.is_file() or path.suffix != ".sh":
-        print("%s: not a tracked bash script, skipped" % script)
+    if not path.is_file() or path.suffix not in (".sh", ".py"):
+        print("%s: not a tracked bash or python script, skipped" % script)
         return None
+    python = path.suffix == ".py"
     original = path.read_text()
     tests = covering_tests(script)
+    if not tests:
+        print("%s: no offline check names it (a coverage gap): nothing to probe" % script)
+        return None
     if tests == ["check_script_conventions.py"]:
         print("%s: no offline check names it, only the house rules cover it (a coverage gap): probing against those alone" % script)
-    todo = mutants(original, args.per_operator)
+    todo = mutants(original, args.per_operator, python)
     free = queue.Queue()
     for d in pool_dirs:
         free.put(d)
@@ -189,8 +281,15 @@ def probe(script, args, pool_dirs):
             target = Path(d) / script
             target.write_text(m["text"])
             target.chmod(mode)
-            syntax = subprocess.run(["bash", "-n", str(target)], capture_output=True)
-            if syntax.returncode != 0:
+            if python:
+                try:
+                    compile(m["text"], str(target), "exec")
+                    ok = True
+                except (SyntaxError, ValueError):
+                    ok = False
+            else:
+                ok = subprocess.run(["bash", "-n", str(target)], capture_output=True).returncode == 0
+            if not ok:
                 m["verdict"] = "invalid"
             else:
                 failed, _ = run_tests(d, tests, limit)
@@ -245,7 +344,7 @@ def render(results):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("scripts", nargs="+", help="repo-relative paths of bash examples")
+    ap.add_argument("scripts", nargs="+", help="repo-relative paths of bash or python examples")
     ap.add_argument("--per-operator", type=int, default=4)
     ap.add_argument("--workers", type=int, default=min(6, os.cpu_count() or 2))
     ap.add_argument("--report", help="also write the report to this file")

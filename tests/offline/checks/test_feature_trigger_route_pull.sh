@@ -486,6 +486,8 @@ for bad in "test_account other" "bad/name" "-x"; do
     # shellcheck disable=SC2086
     STATUS=201 master ${bad}
     [ "${RC}" -eq 2 ] && ! calls | grep -q '^POST' && pass "refused, nothing sent: ./00.run_all.sh ${bad}" || fail "accepted: ./00.run_all.sh ${bad} (exit ${RC})"
+    # a name with characters that are not allowed has a message of its own; the other two print the usage
+    [ "${bad}" = "bad/name" ] || echo "${OUT}" | grep -qF "Usage: ./00.run_all.sh [ACCOUNT] [--cleanup]" && pass "and it prints the usage: ./00.run_all.sh ${bad}" || fail "no usage for ./00.run_all.sh ${bad}"
 done
 run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json"
 EXTRA_OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${WORK}/version_and_objects.json" STUB_CURL_STATUS_HEAD=200 STUB_CURL_STATUS=201 STUB_CURL_CSRF=csrf-abc bash ./99.cleanup_DELETE.sh test_account 2>&1)

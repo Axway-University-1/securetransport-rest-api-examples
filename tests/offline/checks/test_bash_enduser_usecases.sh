@@ -394,19 +394,23 @@ urun ../06-sharing-a-folder/03.folder_PATCH_share.sh
 expect "03: with no e-mail address it prints the usage, exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
 has "03: the usage names the parameters" "Usage: ./03.folder_PATCH_share.sh EMAIL [RIGHTS]"
 has "03: and what RIGHTS can be" "read (1), write (3: read and upload) or full (7: read, upload and delete)"
+has "03: and that read is the default" "(default read)"
 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com bogus
 expect "03: RIGHTS that is not one of them is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
 STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com
 expect "03: PATCH of the folder" "$(ucalls)" "PATCH ${F}"
 expect "03: adds the sharing, read only by default, with the user, no e-mail sent" "$(payload 1 | jq -c '[.[0].op, .[0].path, .[0].value.collaborators, .[0].value.shareRights, .[0].value.enableNotifications, .[0].value.enableOwnerNotifications]')" \
   '["add","/sharedDirectoryProperties",["guest@example.com"],1,false,false]'
+expect "03: the owner is the one who shares, and the collaborators are not shown to each other" "$(payload 1 | jq -c '[.[0].value.isOwner, .[0].value.showCollaboratorsToAll]')" "[true,false]"
+has "03: says what it shared, with whom, the rights and the code" "Share example_uc_shared with guest@example.com, rights 1: HTTP 204"
 expect "03: exit 0" "${RC}" "0"
 for pair in "read:1" "write:3" "full:7" "1:1" "3:3" "7:7"; do
     STUB_STATUS_PATCH=204 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com "${pair%%:*}"
     expect "03: RIGHTS ${pair%%:*} is shareRights ${pair##*:}" "$(payload 1 | jq -r '.[0].value.shareRights')" "${pair##*:}"
 done
-STUB_STATUS_PATCH=400 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com
+STUB_BODY_OTHER="$(body share_disabled '{"message":"Shared folders functionality is disabled."}')" STUB_STATUS_PATCH=400 urun ../06-sharing-a-folder/03.folder_PATCH_share.sh guest@example.com
 expect "03: a 400 is exit 1, with the two likely reasons" "${RC}" "1"
+has "03: and the server's own answer" "Shared folders functionality is disabled."
 has "03: the hint" "an account with no e-mail address (see 01), or an address the server does not know"
 has "03: and the note about the session" "end the session with ./99.cleanup_DELETE.sh"
 SHARED=$(body shared_meta '{"self":{"isShared":true,"sharedDirectoryProperties":{"ownerName":"owner","ownerEmail":"owner@example.com","collaborators":["guest@example.com"],"shareRights":3}}}')
