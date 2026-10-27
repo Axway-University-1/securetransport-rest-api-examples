@@ -29,6 +29,21 @@ for md in [G / "README.md"] + [G / g for g in guides]:
 check("no guide carries an internal issue number", not any(re.search(r"\bRD-\d+\b", (G / g).read_text()) for g in guides))
 check("each guide says who it is for and what it was checked on", all("**For:**" in (G / g).read_text() and "**Checked on:**" in (G / g).read_text() for g in guides))
 
+# every guide, whatever its topic
+sys.path.insert(0, str(ROOT / "tests" / "offline" / "lib"))
+import guide_checks as gc  # noqa: E402
+for g in gc.guides():
+    gtext = gc.read(g)
+    check("%s: it starts with a title, and says who it is for and what it was checked on" % g,
+          gtext.lstrip().startswith("# ") and "**For:**" in gtext[:600] and "**Checked on:**" in gtext[:800])
+    check("%s: the code blocks are closed" % g, gtext.count("```") % 2 == 0)
+    ex = gc.curl_examples(gtext)
+    for k, code in enumerate(ex, 1):
+        r = gc.run_curl(code)
+        check("%s: curl example %d runs against the stub, with a Referer header" % (g, k), r.returncode == 0 and "URL: https://" in r.stderr
+              and "HEADER: Referer:" in r.stderr, (r.returncode, r.stderr[-200:]))
+    check("%s: no internal issue numbers or file names of internal lists" % g, not re.search(r"\bRD-\d+\b|KNOWN_ISSUES", gtext))
+
 text = (G / "time-formats.md").read_text()
 blocks = re.findall(r"```(\w+)\n(.*?)```", text, re.S)
 
