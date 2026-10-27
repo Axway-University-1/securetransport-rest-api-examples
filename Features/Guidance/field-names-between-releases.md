@@ -2,14 +2,14 @@
 
 **For:** integrators and administrators who write clients for the Admin API and the End User API, and who run them against more than one release.
 **Checked on:** SecureTransport 5.5-20260924. Only this release was available, so a statement about another release is marked "reported, not tried on this release".
-Everything else was run on the lab.
+Everything else was run on the lab. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
 The same thing can have two names. This happens inside one release, between the Admin API and the End User API, and between a list and a single object. It also
 happens between releases: names and defaults have changed. A client that hard-codes one name works on the server it was written on, and fails with an empty value, not an error, on another.
-This guide lists the differences that were found, shows each one, and ends with four habits that make a client safe: look the field up before you use it, read the version first, ask for
-fields and fall back, and keep the reference of your own release open.
+This guide lists the differences that were found and shows each one. It ends with four habits: look the field up, read the version, ask for
+fields and fall back, and keep your release's reference open.
 
 - [Between releases](#between-releases)
 - [The same thing, two names](#the-same-thing-two-names)
@@ -44,7 +44,7 @@ Tried on the lab (an end user with a file transfer, and the Admin API):
 | The id of the transfer | `transferId`, a string that holds characters you must encode in a URL | `transferId` | `id`, an **object** with `mTransferStatusId`, `mTransferStartTime` and `urlrepresentation` |
 | Start time | `startTime` (RFC 2822 with an offset) | `startTime` | `startTime` |
 
-The list and the single object of the End User API have 19 and 38 names, and they share only 10 of them (`account`, `coreId`, `duration`, `login`, `operationIndex`,
+The list and the single object of the End User API have 19 and 38 names. They share only 10 of them (`account`, `coreId`, `duration`, `login`, `operationIndex`,
 `protocol`, `securityParameters`, `startTime`, `status` and `transferId`). A script that reads a transfer from the list and then asks for the single object cannot reuse its names.
 
 The name of the user also differs by place:
@@ -121,8 +121,8 @@ curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${ST_SERVER}:${ST_POR
 ```
 
 (That call was made on a daemon that was running, so it changed nothing. A real start answers the same shape with `"Daemon FTP is started."` and `true`.) The reference says
-`{"daemonOperationResults": [ ... ]}`. A server operation (`POST /servers/operations`) answers an object, `{"serverStatuses": [ ... ]}`, as the reference says (the Admin examples of this
-repository read it, and their online check passed on this lab).
+`{"daemonOperationResults": [ ... ]}`. A server operation (`POST /servers/operations`) answers an object, `{"serverStatuses": [ ... ]}`, as the reference says. The Admin examples of this
+repository read it, and their online check passed on this lab.
 
 Write the reader for both. In both cases, read `isSuccessful` and not the status code: a 200 can mean that it did not work.
 
@@ -152,8 +152,8 @@ The repository's `stCertificateExpiry.py` does the same for the certificate fiel
 
 ### 2. Read the version first
 
-`GET /version` gives the release. The examples in `Features` stop when the server is older than the release that brought the feature:
-`Features/lib/st_feature_check.sh` (a version looks like `5.5-20260924`, and the date part is compared too).
+`GET /version` gives the release. The examples in `Features` stop when the server is older than the release that brought the feature.
+`Features/lib/st_feature_check.sh` does the check. A version looks like `5.5-20260924`, and the date part is compared too.
 
 ```bash
 curl -s -k -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/version" -H "accept: application/json" -H "Referer: x"
@@ -164,7 +164,7 @@ curl -s -k -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v
 ```
 
 `GET /version` is an Admin API call. The End User API has none: the same path on the End User port answered 404. A client that only has an end user account cannot ask for the
-release, and has to be told it (in its settings) or to read the names with the habit above.
+release. It has to be given the release in its settings, or it has to read the names as described above.
 
 To compare two versions in a program, turn each into a key that sorts:
 

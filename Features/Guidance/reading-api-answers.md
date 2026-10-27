@@ -2,11 +2,11 @@
 
 **For:** anyone who writes a script or a program that calls the Admin API or the End User API.
 **Checked on:** SecureTransport 5.5-20260924. Where the text says "tried", it was run on a lab server of this version, with throwaway accounts. A statement marked
-"not tried" comes from the API reference, or from earlier work, and was not run for this guide.
+"not tried" comes from the API reference, or from earlier work, and was not run for this guide. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
-The status code is the first thing to read, and not the last. The two APIs answer in more than one way, and a script that reads only the code, or only one shape of
+The status code is the first thing to read, and not the last. The two APIs answer in more than one way. A script that reads only the code, or only one shape of
 the body, will be wrong in some cases.
 
 - **A `200` can carry a failure.** Operations on servers and daemons answer `200` and say in the body, in `isSuccessful`, whether they worked. The two operations
@@ -200,7 +200,7 @@ An Admin list answers an object:
 
 - `totalCount` is the number of entries that match your filter, in all. `returnCount` is the number in this answer.
 - **A page is 100 entries when you do not ask for more.** That is the setting `Webservices.EntriesPerPage` (100 on the lab). `limit=0` gives the same 100: it does not mean "all".
-- Tried on the transfer log (23,706 entries): no `limit` gave 100, `limit=0` gave 100, `limit=1000` gave 1000. `limit=5000` gave 5000 entries in about 15 seconds (1000 took about 4 seconds), so a client with a 30 second timeout can fail when the server is busy. Ask for pages of a few
+- Tried on the transfer log (23,706 entries): no `limit` gave 100, `limit=0` gave 100, `limit=1000` gave 1000. `limit=5000` gave 5000 entries in about 15 seconds (1000 took about 4 seconds). A client with a 30 second timeout can fail when the server is busy. Ask for pages of a few
   hundred, and walk them.
 - `offset` is the number of entries to skip. An `offset` past the end gives an empty `result`, and `totalCount` stays the same.
 - A filter changes `totalCount`: `GET /accounts?name=ZZTEST_ans*` gave 1 of 1, and a pattern that matches nothing gave 0 of 0. (Earlier work found that on some resources the
@@ -266,7 +266,7 @@ there):
 curl -s -k -I -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/accounts/john" -H "Referer: x"
 ```
 
-Not every resource has a `HEAD` (earlier work found that denied users answers `405`): look at the code, and do not take a `405` for "not there".
+Not every resource has a `HEAD` (earlier work found that denied users answers `405`). Look at the code, and do not take a `405` for "not there".
 
 ## A new object: the `Location` header
 
@@ -283,7 +283,7 @@ curl -s -k -D - -o /dev/null -u "${ST_USER}:${ST_PASSWORD}" -X POST "https://${S
   -d '{"name":"example_new","type":"user","uid":"1999","gid":"1999","homeFolder":"/home/example_new","user":{"name":"example_new","passwordCredentials":{"password":"a-long-Password-1"}}}'
 ```
 
-Look for the line that starts with `Location:`. (This call creates the account `example_new`. Run it on a test server, and delete the account afterwards.) For some objects the last part of
+Look for the line that starts with `Location:`. This call creates the account `example_new`: run it on a test server, and delete the account afterwards. For some objects the last part of
 the address is an id, not a name (routes, for example).
 
 ## One call or a session
@@ -316,7 +316,7 @@ a password that is right and stop at the first `401`.
 
 ## Checklist
 
-- [ ] After an operation on a server or a daemon, read `isSuccessful` of each result, from both shapes (a list, or an object with a list in it). An empty answer is not a success.
+- [ ] After an operation on a server or a daemon, read `isSuccessful` of each result. The answer is a list, or an object with a list in it. An empty answer is not a success.
 - [ ] An error may be JSON with `validationErrors`, JSON with `errors`, JSON with `message`, plain text or HTML. Read the body with a guard.
 - [ ] Do not retry a `500` on an upload without checking the checksum first.
 - [ ] A `204` for a share does not prove that the folder exists.

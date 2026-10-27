@@ -2,13 +2,13 @@
 
 **For:** administrators and integrators who create routes, route steps, transfer sites and login restriction policies through the REST API.
 **Checked on:** SecureTransport 5.5-20260924. Where the text says "the server does", it was tried on this version with throwaway objects that were removed
-afterwards. A statement marked "not tried" comes from the product documentation or from the example scripts in this repository, and was not run here.
+afterwards. A statement marked "not tried" comes from the product documentation or from the example scripts in this repository, and was not run here. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
 Some fields of the API hold an *expression*, a small program in the Expression Language (EL), written as `${ ... }`. When you send one through the API,
-it passes through **three layers that each have their own rules for the backslash and the dollar sign**: your shell, JSON, and the EL itself. Most mistakes
-come from counting backslashes in the wrong layer. This guide says which fields take an expression, which only look like they do, and how to write the text
+it passes through **three layers**: your shell, JSON, and the EL itself. Each layer has its own rules for the backslash and the dollar sign. Most mistakes
+come from counting backslashes in the wrong layer. This guide says which fields take an expression and which only look like they do. It also shows how to write the text
 so that the server stores what you meant.
 
 The three things to remember:
@@ -26,12 +26,12 @@ The three things to remember:
 | A route step's `condition`, when its `conditionType` is `EL` | the same form, for example `${account.disabled != '0'}` | Yes |
 | A route step's `postTransformationActionRenameAsExpression` | `${basename(transfer.target)}-${date('yyyyMMdd_HHmmss')}${extension(transfer.target)}` | Yes |
 | A login restriction policy rule's `expression` | `${currentSessions <= 3}` | Yes |
-| A site's `host`, `downloadPattern` and similar fields | a template such as `${DXAGENT_TRANSFERSAPI_SERVER}` | Stored as typed, and filled in when a transfer runs |
+| A transfer site's `host`, `downloadPattern` and similar fields | a template such as `${DXAGENT_TRANSFERSAPI_SERVER}` | Stored as typed, and filled in when a transfer runs |
 | A route step's `fileFilterExpression` | a pattern, with `fileFilterExpressionType` `GLOB`, `REGEXP` or `TEXT_FILES` | **No.** A plain file filter. |
-| A site's `downloadPattern`, with `downloadPatternType` | a pattern, with the type `glob` or `regex` | **No.** A plain file filter. |
+| A transfer site's `downloadPattern`, with `downloadPatternType` | a pattern, with the type `glob` or `regex` | **No.** A plain file filter. |
 | A user class's `expression` | another language again: no `${ }`, and the server checks it when it is saved | Not EL (not tried here: from the product notes of this repository) |
 
-All the rows marked "Yes" or "Stored as typed" were created on the lab and read back unchanged: the server keeps the text exactly as it was sent.
+All the rows marked "Yes" or "Stored as typed" were created on the lab and read back unchanged. The server keeps the text exactly as it was sent.
 
 A filter and an expression look alike but are not the same. A filter has no `${ }`, and its type name has its own spelling, as the next section shows.
 
@@ -58,7 +58,7 @@ The text itself is accepted, whatever it is. Each of these was sent in a route a
 | `${nosuchfn(transfer.target)}` | there is no such function |
 | `transfer.target` | not an expression, no `${ }` |
 
-Two more cases were accepted and stored: a `condition` on a route whose `conditionType` is `ALWAYS`, and a regular expression that does not compile
+The server accepted and stored two more cases. One is a `condition` on a route whose `conditionType` is `ALWAYS`. The other is a regular expression that does not compile
 (`(unclosed`) in a `REGEXP` filter. Nothing tells you it will not work.
 
 ## The three layers
@@ -87,7 +87,7 @@ Each row was sent to a throwaway route as a `condition` of type `EL`, and read b
 
 With a tool you type the EL text once, as the EL wants it (two backslashes), and the tool does the JSON layer. With a hand-made body you must type both layers.
 
-A plain filter has no EL layer. A step with `"fileFilterExpressionType": "REGEXP"` and the regex `.*\.(xml|txt)` needs only the JSON layer: **two**
+A plain filter has no EL layer. A step with `"fileFilterExpressionType": "REGEXP"` and the regex `.*\.(xml|txt)` needs only the JSON layer. Send **two**
 backslashes in the body, and **one** is stored (tried: the stored text was `.*\.(xml|txt)`).
 
 ## Write the body with a tool

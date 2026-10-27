@@ -2,12 +2,12 @@
 
 **For:** integrators and administrators who upload, download, rename, delete and share files with scripts through the End User API.
 **Checked on:** SecureTransport 5.5-20260924. Everything marked "tried" was run on the lab with throwaway accounts. A statement marked "not tried" comes from the
-reference or from earlier notes.
+reference or from earlier notes. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
-Uploading a file is one call. The hard part is knowing what happened when something goes wrong. Several answers on this version do not say what you would expect: a missing
-file on a rename is a 403, a refused upload can leave a file behind, and a refused chunk can leave a file of the full size. This guide shows each call, what it answers,
+Uploading a file is one call. The hard part is knowing what happened when something goes wrong. Several answers on this version are not what you would expect. A missing
+file on a rename answers 403, and a refused upload can leave a file behind. A refused chunk can leave a file of the full size. This guide shows each call, what it answers,
 and a way to be sure that a file arrived whole. At the end it shows sharing a folder.
 
 - [Before you start](#before-you-start)
@@ -27,7 +27,7 @@ and a way to be sure that a file arrived whole. At the end it shows sharing a fo
 - The user and password are those of an end user account, not an administrator. The examples use `${ST_USER}` and `${ST_PASSWORD}` for them.
 - Every call sends the `Referer` header, and the examples use Basic authentication (see [Authentication and sessions](authentication-and-sessions.md)).
 - Paths are relative to the home folder of the user: `/docs/report.txt` is `docs/report.txt` in the home folder.
-- An account's home folder outlives the account. When an account is deleted, its files stay on disk, and an account made later with the same home folder can see them
+- An account's home folder outlives the account. When an account is deleted, its files stay on disk. An account made later with the same home folder can see them
   (reported in earlier notes, not tried again). A new account does not always start with an empty folder.
 
 Make a folder first. The body only says that it is a folder:
@@ -189,7 +189,7 @@ A 500 on an upload does **not** mean that nothing was stored. Tried:
 
 - **A wrong `Content-MD5`:** the answer was 500, and the file **was stored**, with the full size and the same bytes as the one sent. The server recorded the right MD5 of what it
   received in the file's metadata.
-- **A chunk out of order:** the answer was 500, and a file of the **full declared size** (300 bytes of a 300 byte upload) was listed, although only the last 100 bytes were sent.
+- **A chunk out of order:** the answer was 500. A file of the **full declared size** (300 bytes of a 300 byte upload) was listed, although only the last 100 bytes were sent.
 - **A valid upload, now and then:** a 500 was also seen for uploads that were right. About 3 in 100 in earlier runs on this lab, and none in 100 uploads on the day of this check.
   It cannot be made to happen on demand.
 
@@ -214,7 +214,7 @@ curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -X PATCH "https://${ST_SERVER}:${ST_EN
 
 The answer is 204. What was tried:
 
-- **The owner must have an e-mail address.** For an account without one, the same call was answered 400, "Unable to complete the operation. Shared folders functionality is disabled." The
+- **The owner must have an email address.** For an account without one, the same call was answered 400, "Unable to complete the operation. Shared folders functionality is disabled." The
   server's sharing feature was on: the message points at the wrong thing. `GET /myself` shows `sharingAllowed: false` for such an account. An open session does not see an address
   added later (see [Authentication and sessions](authentication-and-sessions.md)).
 - **`shareRights`:** 1, 3 or 7.
@@ -227,7 +227,7 @@ The answer is 204. What was tried:
 
 - **Change the rights** with a `replace` of `/sharedDirectoryProperties/shareRights`.
 - **What the collaborator sees:** in their root folder, the folder is named `<folder> (<owner e-mail>)`, for example `docs (owner@example.com)`.
-- **The first read can be late.** After the 204, the collaborator's list already shows the folder, but a read of a file in it was answered 403 for a moment in some runs, and
+- **The first read can be late.** After the 204, the collaborator's list already shows the folder. A read of a file in it was answered 403 for a moment in some runs, and
   200 in others. Read again after two seconds, a few times, before you call it a failure.
 - **Stop sharing** with a `remove` of `/sharedDirectoryProperties` (204). The folder is gone from the collaborator's root, and stays with the owner.
 

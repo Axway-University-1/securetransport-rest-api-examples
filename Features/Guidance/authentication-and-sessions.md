@@ -2,14 +2,14 @@
 
 **For:** administrators and integrators who write scripts or programs against the Admin API or the End User API.
 **Checked on:** SecureTransport 5.5-20260924. Where the text says "the server does", it was tried on this version only. A statement marked "not tried"
-comes from the API reference or from earlier notes and was not run again.
+comes from the API reference or from earlier notes and was not run again. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
 There are three ways to prove who you are. Basic authentication works on both APIs. A session (a login that gives a cookie) works on both. An API key works
-on the Admin API only. This guide shows each one with a command you can run, and then the things that surprise people: what a session remembers, what an
-ended session answers, what a locked account answers, and what a forced secret-question change does to your calls. It ends with advice on which way to use
-in which case. The advice is not product behaviour.
+on the Admin API only. This guide shows each one with a command you can run. Then it covers what can surprise you. These are what a session remembers, what an
+ended session answers, and what a locked account answers. The last is what a forced secret-question change does to your calls. It ends with advice on which way to use
+in which case. The advice is not a statement about the product.
 
 - [The three ways in](#the-three-ways-in)
 - [Basic authentication](#basic-authentication)
@@ -27,7 +27,7 @@ in which case. The advice is not product behaviour.
 
 | Way | Admin API | End User API | What you send | Needs a login call |
 | --- | --------- | ------------ | ------------- | ------------------ |
-| **Basic authentication** | Yes | Yes | The user name and password on every call (`curl -u user:password`) | No |
+| **Basic authentication** | Yes | Yes | The login name and password on every call (`curl -u user:password`) | No |
 | **A session** | Yes | Yes | The cookie from the login, and the `csrfToken` header on a write | Yes: `POST /myself` |
 | **An API key** | Yes | **No** | The header `SECURETRANSPORT-API-KEY: <key>` on every call | No, but the key must be made first |
 
@@ -38,7 +38,7 @@ but not always. The examples below use `${ST_ENDUSER_PORT:-8443}`.
 
 ## Basic authentication
 
-Every call carries the user name and the password. There is no login and no logout, and no token to keep. It works on both APIs.
+Every call carries the login name and the password. There is no login and no logout, and no token to keep. It works on both APIs.
 
 ```bash
 curl -s -k -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" \
@@ -47,7 +47,7 @@ curl -s -k -u "${ST_USER}:${ST_PASSWORD}" "https://${ST_SERVER}:${ST_PORT}/api/v
 
 The answer is 200 with your own account. A call with no credentials is refused with 401 (tried).
 
-On the lab, a write with only Basic authentication works: no cookie and no token are needed (tried: a `PATCH` of `/myself` to its own value answered 204).
+On the lab, a write with only Basic authentication works. No cookie and no token are needed. Tried: a `PATCH` of `/myself` to its own value answered 204.
 
 ## A session
 
@@ -89,8 +89,8 @@ curl -s -k -b session.jar -X PATCH "https://${ST_SERVER}:${ST_PORT}/api/v2.0/mys
 curl -s -k -b session.jar -X DELETE "https://${ST_SERVER}:${ST_PORT}/api/v2.0/myself" -H "csrfToken: ${TOKEN}" -H "Referer: x"
 ```
 
-The answer is 200. The same cookie is refused with 401 afterwards (tried). `DELETE /myself` with Basic authentication also answers 200, but it logs a new session
-in and out, and the session in your cookie jar stays open (reported in earlier notes, not tried again).
+The answer is 200. The same cookie is refused with 401 afterwards (tried). `DELETE /myself` with Basic authentication also answers 200. It logs a new session
+in and out, so the session in your cookie jar stays open (reported in earlier notes, not tried again).
 
 The End User API works the same way. Use its own port: `https://${ST_SERVER}:${ST_ENDUSER_PORT:-8443}/api/v2.0/myself`.
 
@@ -150,8 +150,8 @@ Revoke a key by its id: `DELETE /administrators/{name}/api-keys/{id}` (answer 20
 
 A session keeps what the server knew when you logged in. If something changes on the account later, the open session does not see it. Example, tried with the End User API:
 
-1. An account has no e-mail address. `GET /myself` says `"sharingAllowed": false`.
-2. An administrator adds the e-mail address (`PATCH /accounts/{name}`, answer 204).
+1. An account has no email address. `GET /myself` says `"sharingAllowed": false`.
+2. An administrator adds the email address (`PATCH /accounts/{name}`, answer 204).
 3. In the same session, `GET /myself` still says `false`.
 4. After a new login, it says `true`.
 
@@ -179,7 +179,7 @@ The End User examples of this repository do this: `EndUser/API 2.0/bash/ensure_s
 
 ## A locked account
 
-After the maximum number of wrong passwords (the setting `failedAuthMaximum`; it was 3 when this lab was last read), an account is locked: the Admin API shows
+An account is locked after the maximum number of wrong passwords (the setting `failedAuthMaximum`, which was 3 when this lab was last read). The Admin API then shows
 `user.locked: true`. Tried with an End User account:
 
 - Five wrong passwords: 401 each time.
@@ -206,7 +206,7 @@ with `error.secretQuestion.required` ("You have to set a new secret question.").
 | `DELETE /myself` | 200 |
 | `PUT /myself/secretQuestion` with the password, a question from the list and an answer | 204, and it lifts the block |
 
-After the `PUT`, `GET /myself` answered 200 again. Before you set the new question you cannot log in, so a script that gets 403 `error.secretQuestion.required` has to
+After the `PUT`, `GET /myself` answered 200 again. You cannot log in before you set the new question. A script that gets 403 `error.secretQuestion.required` has to
 use Basic authentication for these three calls.
 
 The service has a switch, the server option `Users.SecretQuestion.Enabled` (it was on during this check, and was tried both ways earlier on the same lab). With the
@@ -215,7 +215,7 @@ With it on, `GET /myself/secretQuestion` also answers 503 for an account that ha
 
 ## What the server does with the CSRF token
 
-The Admin option `Webservices.Admin.CsrfToken.enabled` was `true` on the lab. The login answer has a `csrfToken` header, and the reference asks you to send it back on every
+CSRF means cross-site request forgery: the token protects against it. The Admin option `Webservices.Admin.CsrfToken.enabled` was `true` on the lab. The login answer has a `csrfToken` header, and the reference asks you to send it back on every
 write in a session. **What the lab does today:** a write in a session was accepted with the right token, with a wrong token (`csrfToken: nope`) and with none. This was
 true for the Admin API (a `PATCH` of `/myself`, 204) and for the End User API (creating a folder, 201). A GET needs no token.
 

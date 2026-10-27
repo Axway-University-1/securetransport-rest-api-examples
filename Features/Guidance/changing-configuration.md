@@ -1,9 +1,9 @@
 # Changing objects through the REST API without breaking them
 
 **For:** administrators and integrators who change accounts, routes, sites, settings and other objects with PATCH and PUT.
-**Checked on:** SecureTransport 5.5-20260924. Where the text says "the server does" or "tried", it was run on this version with throwaway objects that were
+**Checked on:** SecureTransport 5.5-20260924. Where the text says "the server does" or "tried", it was run on this version with throwaway objects. The objects were
 removed afterwards, and every setting that was changed was put back and compared. A statement marked "not tried" comes from the example scripts of this
-repository or from the product notes, and was not run here.
+repository or from the product notes, and was not run here. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
@@ -49,7 +49,7 @@ The answer is `204`, with no body.
 Four things follow:
 
 - **`replace` needs the field to exist, and `add` creates it.** When you do not know whether a field is set, read the object first. (`add` on a field that already
-  has a value may replace it, refuse it or duplicate it, depending on the resource: from the notes of this repository, not tried.)
+  has a value may replace it, refuse it or duplicate it, depending on the resource. This comes from the notes of this repository and was not tried.)
 - **A typo in an `add` path is not an error.** It answers 204 and changes nothing. Read the object back.
 - **`remove` does not delete the field from the answer.** It sets the value to `null`. When you check the result, test for `null`, not for a missing key.
 - **A patch is all or nothing.** Two operations were sent together, the first valid and the second on a field that does not exist. The answer was 400, and the
@@ -84,8 +84,8 @@ jq '.steps | map(.fileFilterExpression) | index("*.two")' route.json
 
 For a route whose steps have a `fileFilterExpression`, this prints the position of the step with that filter. Do not assume a position: steps can be added and moved.
 
-The `-` at the end of a path means "add at the end". On this route it is the end. On some other lists it is not promised (from the notes of this repository, not
-tried here: the new rule goes first in `/rules/-` of a login restriction policy). When the order matters, read the list back.
+The `-` at the end of a path means "add at the end". On this route it is the end. On some other lists it is not promised. The notes of this repository say that the new rule goes first in `/rules/-` of a login restriction policy (not
+tried here). When the order matters, read the list back.
 
 ## PUT: send back the whole object
 
@@ -112,7 +112,7 @@ Replace `ROUTE_ID` with the id of the route. What was tried on a route that has 
 | **A fragment:** only `name`, `type`, `conditionType` and `description` | 204 | **The two steps are gone.** |
 
 Send back what you read, with the `id` as it was. Never send a fragment: the server does not warn you that it removed something. (From the notes of this
-repository, not tried here: the same happens to sites, subscriptions, zones, transfer profiles and user classes.)
+repository, not tried here: the same happens to transfer sites, subscriptions, zones, transfer profiles and user classes.)
 
 The example `Admin/API 2.0/python/python3/stUpdateRouteWithPut.py` in this repository does the read, change and write for a route.
 
@@ -126,8 +126,8 @@ PATCH /configurations/loginSettings   [{"op":"replace","path":"/requirePassword"
 ->  400  You must specify adminCertificateFileOrPath when certificateIssuer is set to other.
 ```
 
-The message names a field you did not touch. When a harmless change is refused, read the message: the cause may be in another field of the same object, and
-you have to fix that one first (or in the same request).
+The message names a field you did not touch. When a harmless change is refused, read the message. The cause may be in another field of the same object.
+Fix that field first, or in the same request.
 
 ## Configuration options
 
@@ -167,7 +167,7 @@ option must be the same as the saved one.
 
 ## A complete example: read, change, check, restore
 
-This changes the e-mail address of a throwaway account, and puts it back. It uses `jq` to build every body, so no text is edited by hand.
+This changes the email address of a throwaway account, and puts it back. It uses `jq` to build every body, so no text is edited by hand.
 
 ```bash
 ACCOUNT=ZZTEST_example

@@ -1,13 +1,13 @@
 # Testing your own scripts against the SecureTransport REST API
 
-**For:** engineers and support staff who write scripts or programs that call the REST API, and who want to know that they work before they run them against a server people use.
+**For:** engineers and support staff who write scripts or programs that call the REST API. They want to know that the scripts work before they run them against a server that people use.
 **Checked on:** SecureTransport 5.5-20260924 (for the facts about the lab). The method itself does not depend on a release. The tools named here are in this repository
 (`tests/offline/lib/stub_curl`, `tools/mutation_probe.py`, `tools/script_coverage.py`, `tools/measure_coverage.py`) and you can copy them.
 
 ## Summary
 
-A script that calls an API fails in two ways. It sends the wrong call, or it reads the answer wrongly. You can find the first kind with no server at all, by putting a stand-in
-for `curl` in front of the script and looking at what it would send. You find the second kind with a lab server. This guide shows both, a small test you can run now, and a way to
+A script that calls an API fails in two ways. It sends the wrong call, or it reads the answer wrongly. You can find the first kind with no server. Put a stand-in
+for `curl` in front of the script and look at what it would send. You find the second kind with a lab server. This guide shows both, a small test you can run now, and a way to
 check that your tests would notice a broken script.
 
 - [Two places to test](#two-places-to-test)
@@ -27,7 +27,7 @@ check that your tests would notice a broken script.
 | **A lab server** | The real answers: the status codes, the shape of the body, the timing. | It is slow, and it can leave objects behind. |
 
 Do both. The offline test is fast and you can run it on every change. The lab test confirms the assumptions that the offline test is built on. When the lab shows that an answer
-is not what you assumed, change the offline test to match, so that the next change is checked against what the server really does.
+is not what you assumed, change the offline test to match. Then the next change is checked against what the server really does.
 
 ## A lab that is not production
 
@@ -45,8 +45,8 @@ Use a server that nobody depends on. A test that writes can leave a changed sett
 
 `curl` is found by name. If a file named `curl` comes first on `PATH`, your script runs that one. A stand-in that sends nothing and prints what it was asked to do lets a test read the call.
 
-Here is a small one. It prints the method, the URL, each header and the body to the error output, and it **refuses a call with no `Referer` header** (the API asks for one on every call, see
-[Authentication and sessions](authentication-and-sessions.md)). It answers with the status in `STUB_STATUS` (201 by default):
+Here is a small one. It prints the method, the URL, each header and the body to the error output. It **refuses a call with no `Referer` header**: the API asks for one on every call (see
+[Authentication and sessions](authentication-and-sessions.md)). The stand-in of this repository (`tests/offline/lib/stub_curl`) also refuses a JSON body sent with no `Content-Type` header. It answers with the status in `STUB_STATUS` (201 by default):
 
 ```bash
 #!/bin/bash
@@ -70,8 +70,8 @@ echo "URL: ${url}" >&2
 exit 0
 ```
 
-The stand-in of this repository, `tests/offline/lib/stub_curl`, does the same and much more: it echoes the body as base64 (a body can have quotes and new lines), serves a file as the
-answer to a `GET`, answers different statuses to different methods, and follows a list of answers one by one.
+The stand-in of this repository, `tests/offline/lib/stub_curl`, does the same and more. It echoes the body as base64, because a body can have quotes and new lines. It serves a file as the
+answer to a `GET`. It answers different statuses to different methods, and it can follow a list of answers one by one.
 
 ### A script to test
 
@@ -140,7 +140,7 @@ Do not check only the exit code. The test above checks eight things. A test that
 A test that passes does not tell you that it would fail. The way to find out is **mutation testing**: break the script on purpose, in one small way, run the test, and see whether it fails. If the test
 still passes, it would not have noticed that bug.
 
-Try it by hand on the script above. Make a copy, change one thing, and run the test on the copy. Here are six changes, tried against the test above and against a weak test
+Try it by hand on the script above. Make a copy, change one thing, and run the test on the copy. Here are six changes. They were tried against the test above and against a weak test
 that only checks that the exit code is 0 for a 201:
 
 | Change | The test above | A test that only checks the exit code |
@@ -155,7 +155,7 @@ that only checks that the exit code is 0 for a 201:
 The weak test misses four of the six. All six were tried.
 
 **This repository has a tool that does it for you:** `tools/mutation_probe.py SCRIPT`. It works in a scratch copy of the repository, so your files are not touched. It makes the changes below, one at
-a time, runs the checks that name the script, and lists the **survivors**, the changes that no check noticed:
+a time, and runs the checks that name the script, and the house rules check of the repository. It lists the **survivors**, the changes that no check noticed:
 
 | Change | What it does |
 | ------ | ------------ |
@@ -175,11 +175,11 @@ that fails on the mutant, and then see it pass on the real script. Copy the tool
 
 Two more tools of this repository, if you have many scripts:
 
-- **`tools/script_coverage.py`** runs your tests with a tracer and lists the scripts that **no test ran**, and the scripts that ran but **never made a call**, which means that a test tried only
-  their usage message. The tracer is two small hooks: for bash, a trap that writes the name of each script that starts (it is read from the variable `BASH_ENV`), and for python a
+- **`tools/script_coverage.py`** runs your tests with a tracer. It lists the scripts that **no test ran**, and the scripts that ran but **never made a call** (a test tried only
+  their usage message). The tracer is two small hooks. For bash, it is a trap that writes the name of each script that starts (the trap is read from the variable `BASH_ENV`). For python, it is a
   `sitecustomize` that writes the name of the script when the interpreter ends. A copy of the `curl` stand-in that writes the script that called it tells the second list.
-- **`tools/measure_coverage.py`** puts the numbers on one screen: how many operations of the API reference your scripts call, how many scripts the tests run, how many of those make a call, and how many
-  of the mutations your tests catch, with the date of each measure and the change since the last report.
+- **`tools/measure_coverage.py`** puts the numbers on one screen. It counts the operations of the API reference that your scripts call, and the scripts that the tests run. It also counts how many of those make a call, and how many
+  of the mutations your tests catch. It adds the date of each measure and the change since the last report.
 
 A script that no test runs has no protection. A script that the tests run but never call has only half. A script whose test would pass after a mutation has less than it seems.
 
@@ -187,7 +187,7 @@ A script that no test runs has no protection. A script that the tests run but ne
 
 Some bugs wait for a date. A script that works out a day as 86,400 seconds is right on most days of the year. Test it with a time zone whose clocks changed yesterday, as shown in
 [Time formats in the SecureTransport REST API, and daylight saving time](time-formats.md#how-to-test-your-script-without-waiting-for-the-date). The same idea fits other conditions
-that a normal run does not meet: a full disk, a very long name, a name with a space or a quote, an answer that is empty.
+that a normal run does not meet. Examples are a full disk, a very long name, a name with a space or a quote, and an empty answer.
 
 ## Checklist
 

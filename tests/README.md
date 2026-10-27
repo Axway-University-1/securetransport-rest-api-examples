@@ -122,6 +122,10 @@ server](#against-a-real-server).
 | `offline/checks/test_guidance_expression_language_escaping.py` | The guide `expression-language-escaping.md`: the sections and key statements it promises, and the code in it that can run offline. |
 | `offline/checks/test_guidance_field_names_between_releases.py` | The guide `field-names-between-releases.md`: the sections and key statements it promises, and the code in it that can run offline. |
 | `offline/checks/test_guidance_testing_your_scripts.py` | The guide `testing-your-scripts.md`: the sections and key statements it promises, and the code in it that can run offline. |
+| `offline/checks/test_fast_plan.py` | The quick run (`tests/offline/run_fast.sh`, `lib/fast_plan.py`): the quick checks, and the slow ones it adds for the scripts, checks, tools and stubs that changed. |
+| `offline/checks/test_guide_readability.py` | The readability of the guides in `Features/Guidance`: no sentence above 35 words, at most 3% above 25, no filler phrases or dashes, a summary first, one name for one thing, and "the lab" explained. |
+| `offline/checks/test_guide_review_sheet.py` | `tools/guide_review_sheet.py`: the review sheet it writes for a guide (claims tried and not tried, status codes, code blocks and the tests that run them, words to double check, a checklist), on a made-up guide and on the real guides. |
+| `offline/checks/test_guide_examples_tool.py` | `tools/guide_examples.py`: the status it reads from the text of a guide in several phrasings, the method and path of an example, which examples are run, and the real guides. |
 | `offline/checks/test_feature_guidance.py` | `Features/Guidance`: every guide is listed in the folder's README and linked from `Features/README.md`, its links resolve, it has no internal issue numbers, and the formats guide has a row, an example and a curl command that runs for each format, and its code runs (python, the date function of this platform, the TZ rule for testing). |
 | `offline/checks/test_stubs.py` | The stub curl: a call with no Referer header is an error (found by breaking scripts on purpose: no test noticed a script that stopped sending it). |
 | `offline/checks/test_measure_coverage.py` | `tools/measure_coverage.py`: the report is built from the stored measures with the date of each, mutation results of different scripts are merged, the history is kept and shown. |
@@ -280,6 +284,18 @@ are committed. If you are unsure, it belongs in `local/`.
 suite runs, and that make a call), online reach, assertion depth (the mutation score) and the house rules, each with the date it was measured, and
 the history of earlier reports (`--history`, kept in `tests/local/coverage/`). `--offline`, `--online` and `--mutation SCRIPT ...` take the slow
 measures again; `tools/mutation_probe.py` breaks a script on purpose, one small change at a time, and lists the changes that no check noticed.
+
+## The quick run
+
+`./tests/offline/run_fast.sh` takes about 2 minutes, against about 8 for `run_all.sh`. It runs every check except the nine slow ones (listed in `tests/offline/lib/fast_plan.py`),
+and adds the slow check that names a script you changed, a slow check you changed, and the slow checks that use a tool or a stub you changed. `--list` says what it would run.
+Use it before a commit. `run_all.sh` is still what has to pass before the work is done, and what CI runs.
+
+## The guides
+
+`python3 tools/guide_review_sheet.py` writes a review sheet for each guide in `Features/Guidance` into `tests/local/guide_review/` (claims tried and not tried, status codes, code blocks and
+whether a test runs them, a checklist). `python3 tools/guide_examples.py` lists the curl examples of the guides with the status each one documents, and online check 70 runs the ones that only
+read, so a guide that went stale is found.
 
 ## Which tests cover a script
 

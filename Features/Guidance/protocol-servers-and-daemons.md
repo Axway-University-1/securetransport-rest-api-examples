@@ -3,14 +3,14 @@
 **For:** operators and administrators who stop and start the protocol daemons and servers of SecureTransport with scripts, for maintenance, tests or recovery.
 **Checked on:** SecureTransport 5.5-20260924, on a lab with one FTP, one SSH, one PeSIT, one AS2 and two HTTP servers. Where the text says "tried", it was run on this
 lab, and every daemon and server was put back and checked. The times are what that lab showed: yours will differ, but the pattern is the same. A statement marked
-"not tried" comes from the API reference or from the notes of this repository.
+"not tried" comes from the API reference or from the notes of this repository. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
 - A **daemon** runs one protocol (FTP, HTTP, SSH, PeSIT, AS2). A **server** is a listener of that protocol, with its own port. Stop a daemon, and its servers stop.
   Start a daemon, and its servers come back **by themselves, about 3 to 8 seconds after the daemon says `Running`**.
 - Both operations answer **200 even when the operation fails** (a request that is wrong, such as an unknown daemon name, is a 400). Read `isSuccessful` in the answer, and the `message`.
-- The answer to a daemon **start** comes in half a second, **about 11 seconds before the daemon is `Running`**, and 15 to 19 seconds before its servers are active.
+- The answer to a daemon **start** comes in half a second. The daemon is `Running` **about 11 seconds later**, and its servers are active 15 to 19 seconds after the answer.
   Do not start a server in that time: it is refused. Start the daemons first, wait until each says `Running`, then look at the servers.
 - A **graceful** stop answers at once, and the stopping goes on in the server. A stop that is **not graceful** answers after the daemon has stopped, 9 to 15 seconds later.
 - A mistake in the `graceful` parameter is not an error: `graceful=maybe` stopped the daemon at once.
@@ -123,8 +123,8 @@ The server name has a space: let curl encode it (`--data-urlencode`). The answer
 | Start a server that is already active | false | `The port 8021 is in use.` (there is no message that says "already active": the port is used by the server itself) |
 | A server that does not exist | false | `Server with name No Such does not exist.` |
 
-Two points: a server start can **take a long time to answer**: one that was sent while the daemon was not running was refused after 10 seconds. And "the port is in use"
-on a server that is active is not a problem: look at `isActive` before you start a server, and do not start one that is active.
+Two points. A server start can **take a long time to answer**: one that was sent while the daemon was not running was refused after 10 seconds. The message "the port is in use"
+for a server that is active is not a problem. Look at `isActive` before you start a server, and do not start one that is active.
 
 ## How long it takes
 
@@ -194,7 +194,7 @@ What follows from it:
 - **Never kill the script that sent a graceful stop and then start the daemon again.** A stop that was already submitted can still arrive later and undo the start.
   This was the cause of a real outage during the development of the examples in this repository (from its notes, not tried again here).
 - **Put back every server too.** A stopped daemon makes its servers inactive: save the `isActive` of every server before you stop anything, and compare after.
-- **Check twice**, with a wait in between that is as long as the `timeout` you gave, to catch a stop that was still pending at the first look.
+- **Check twice**, with a wait in between as long as the `timeout` you gave. This catches a stop that was still pending at the first look.
 
 ## What does not work
 
@@ -204,8 +204,8 @@ What follows from it:
 | `POST /transactionManager/operations?operation=start` | **400** `stopGracefully.arg1 must match "(?i)(stop)"`. The Transaction Manager can be stopped through the API, and there is no way to start it again. |
 | Starting the AS2 daemon when the AS2 listener is switched off | **200**, with `isSuccessful` false and "Can not start AS2 daemon - the default server As2 Default is not enabled." (from the notes of this repository: not tried here, AS2 was left alone) |
 
-Never stop the Transaction Manager from a script that has to start it again. For AS2, switching the listener off is a different setting from stopping the daemon: a daemon
-that does not come up does not mean that your call failed. Read the message.
+Never stop the Transaction Manager from a script that has to start it again. For AS2, switching the listener off is a different setting from stopping the daemon. If the AS2 daemon
+does not come up, your call may not have failed: the listener may be switched off. Read the message.
 
 ## The confirmation words of the examples
 
@@ -216,8 +216,8 @@ The example scripts in `Admin/API 2.0/bash/03.Connect` stop nothing unless you g
 | `05.daemons_operations_POST.sh` | `stop-the-ftp-daemon` (the daemon's name in it) | |
 | `13.servers_operations_POST.sh` | `stop-the-Ssh Default-server` (the server's name in it) | `--all-stopped start-all-stopped-servers` |
 
-`13.servers_operations_POST.sh --all-stopped` follows the order of this guide: it starts the daemons that are stopped, waits for them to say `Running`, and then
-starts the servers that are not active, looking again before it calls one a failure.
+`13.servers_operations_POST.sh --all-stopped` follows the order of this guide. It starts the daemons that are stopped and waits for them to say `Running`. Then it
+starts the servers that are not active, and looks again before it calls one a failure.
 
 ## Checklist
 

@@ -2,7 +2,7 @@
 
 **For:** administrators who report on the use of SecureTransport, or who invoice for it.
 **Checked on:** SecureTransport 5.5-20260924. Where the text says "tried", it was run on a lab server of this version. A statement marked "not tried" comes from the
-API reference, from the description of a setting, or from the product owner, and was not run.
+API reference, from the description of a setting, or from the product owner, and was not run. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
@@ -18,7 +18,7 @@ The main points:
 
 - An active user is counted by **name**, not by account. A deleted account stays in the list.
 - The report cuts its days at midnight **in the server's time zone**.
-- On the lab, the report's `ST.Transfers` was equal to the number of billable transfers in the log on two days, and close to it on others. Its `ST.TransfersOut`
+- On the lab, `ST.Transfers` in the report was equal to the number of billable transfers in the log on three days (25, 26 and 27 October). On the other days it was close. `ST.TransfersOut`
   could not be rebuilt from the log. Do not rebuild a report from the log: take the numbers from the report.
 - When you read a count from a list, read `resultSet.totalCount`. `returnCount` is the size of the page you asked for.
 
@@ -128,13 +128,13 @@ The same day for both dates is accepted and gives one entry. A day written witho
 ```
 
 - `granularity` is the size of an entry in milliseconds: 86,400,000, one day.
-- **An entry is named by the start of its day in the server's time zone, with the offset of that moment** (`+03:00` on the 25th, `+02:00` on the 26th: the clocks went
-  back in between). The reference's example writes the names with `Z` (UTC); the lab answered with the offset of the server.
+- **An entry is named by the start of its day in the server's time zone, with the offset of that moment.** The offset is `+03:00` on the 25th and `+02:00` on the 26th, because the clocks went
+  back in between. The reference's example writes the names with `Z` (UTC); the lab answered with the offset of the server.
 - `reportSummary` is the sum of the days. On the lab it was: 1282 + 88 = 1370 for `ST.Transfers`.
-- `meta` says who and what made the report: the company, the product and its version, the patch, whether the server is in an Enterprise Cluster and whether Advanced Data
-  Intelligence is on, and the plugins installed.
+- `meta` says who and what made the report. It holds the company, the product and its version, the patch, and the plugins installed. It also says whether the server is in an Enterprise Cluster and whether Advanced Data
+  Intelligence is on.
 - `reportTimeframe.endDate` is the start of the day **after** your end date.
-- **A report you generate by hand includes today.** A report for 26 and 27 October, asked on the 27th, had 117 transfers for the 27th, the same as the 117 billable transfers the log had for
+- **A report you generate by hand includes today.** A report for 26 and 27 October, asked on the 27th, had 117 transfers for the 27th. The log had the same number, 117 billable transfers, for
   that day at that moment. The automatic report to the Amplify Platform does not include the current day (the description of `DaysToInclude`, not tried).
 
 This turns the answer into rows:
@@ -171,8 +171,14 @@ A comparison of the report with the log, day by day, on the lab (the log: billab
 | 26 Oct | 88 / 80 / 30 | 88 / 80 / 87 | 8 |
 | 27 Oct (the day it was asked) | 117 / 111 / 11 | 117 / 111 / 35 | 6 |
 
-What this shows: the report's total follows the billable count of the log, and is equal on some days and a few more or fewer on others. The outbound number of the
-report is neither the outbound count of the log nor the billable outbound count. Why the numbers differ was not found. For 25 October, these did not give the report's 1089 outbound: the outgoing transfers by status, protocol, `serverInitiated`, `secure` and `resubmitted`; the distinct core ids (769), the distinct pairs of account and file name (928) and the distinct file names (467); and the outgoing transfers with a size above 0 (1070). So:
+What this shows: the report's total follows the billable count of the log. It is equal on some days, and a few more or fewer on others. The outbound number of the
+report is neither the outbound count of the log nor the billable outbound count. Why the numbers differ was not found. For 25 October, none of these gave the report's 1089 outbound:
+
+- the outgoing transfers by status, protocol, `serverInitiated`, `secure` and `resubmitted`;
+- the distinct core ids (769), the distinct pairs of account and file name (928) and the distinct file names (467);
+- the outgoing transfers with a size above 0 (1070).
+
+So:
 
 - Take the numbers for a report or an invoice **from the report**, not from a count of the log.
 - Use the log to look at the transfers behind a day, not to rebuild it.
@@ -216,19 +222,19 @@ curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G "https://${ST_SERVER}:${ST_PORT}/ap
 ```
 
 - **Read `resultSet.totalCount`.** With `limit=1` the answer holds one transfer, so `returnCount` is 1. A script that counted `returnCount` counted 1 for every day.
-- The window is `startTimeAfter` and `endTimeBefore`, in RFC 2822 with an offset: see the [time formats guide](time-formats.md) for the offset and for the day on which the clocks
+- The window is `startTimeAfter` and `endTimeBefore`, in RFC 2822 with an offset. The [time formats guide](time-formats.md) explains the offset and the day on which the clocks
   change.
 - **Filter by account with `account=`.** It is an exact match that ignores case, and `*` is a wildcard (`account=john*`). `accountName=` is **not** a filter: the answer
   to `accountName=no_such_account` held every transfer of the server (2873 on the day tried). A name that matches nothing in `account=` gives `totalCount` 0.
-- **`isBillable` has three values.** On the day tried, 1282 transfers were billable, 1583 were not, and 8 had no value (they are in neither count: 1282 + 1583 is 2865 of
-  2873). `isBillable=true` and `isBillable=false` are filters; the 8 are the ones that are neither.
+- **`isBillable` has three values.** On the day tried, 1282 transfers were billable, 1583 were not, and 8 had no value. The 8 are in neither count: 1282 + 1583 is 2865 of
+  2873. `isBillable=true` and `isBillable=false` are filters; the 8 are the ones that are neither.
 
 ### The rule
 
 Every inbound transfer is billable. The first outbound transfer after it is not, and each later outbound is. This is applied for each **transfer chain**: the transfers that
 share one `coreId`. These facts come from the example `Features/audit-billable-transfers`, which reads each transfer's `coreId`:
 
-- A **decompress** step keeps the chain of the archive: two files unpacked from one archive and pushed out are two outbounds of one chain, so the second is billable.
+- A **decompress** step keeps the chain of the archive. Two files unpacked from one archive and pushed out are two outbounds of one chain, so the second is billable.
 - A **compress** step starts a new chain: the one push of the archive is free.
 - A **pull** out of a partner account shares the chain of the upload into it. The pull that lands in the receiving account starts a new chain and is an inbound.
 - A file **deleted through the End User API** is logged as an outgoing transfer under its `coreId`, and it is not billable.
@@ -237,8 +243,8 @@ To see the rule at work, run `Features/audit-billable-transfers`: it builds six 
 
 ### Counting by account and day
 
-This reads the count for each day of a window with the billable filter. It asks `date` for each midnight, as the time formats guide explains (the function works with GNU
-`date`, on Linux, and with BSD `date`, on macOS):
+This reads the count for each day of a window with the billable filter. It asks `date` for each midnight, as the time formats guide explains. The function works with GNU
+`date` on Linux and with BSD `date` on macOS:
 
 ```bash
 midnight_ago() {

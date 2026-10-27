@@ -2,13 +2,13 @@
 
 **For:** administrators and integrators who script against the REST API, or who build reports and scheduled jobs on it.
 **Checked on:** SecureTransport 5.5-20260924. Where the text says "the server does", it was tried on this version only. A statement marked "not tried"
-comes from the API reference and was not run.
+comes from the API reference and was not run. In this guide, "the lab" is the test server that it was checked on.
 
 ## Summary
 
 The REST API does not use one date format. It uses five, and which one you send depends on the resource. Some of them carry a time zone offset, and some
 are a date only. This guide first lists the formats and which resource takes which, with an example of each. Then it explains what that means when the
-clocks change (daylight saving time), because a script that builds a window of time in the wrong way gets it wrong twice a year.
+clocks change (daylight saving time). A script that builds a window of time in the wrong way gets it wrong twice a year.
 
 - [The five formats](#the-five-formats)
 - [Which resource takes which format](#which-resource-takes-which-format)
@@ -102,7 +102,7 @@ curl -s -k -u "${ST_USER}:${ST_PASSWORD}" -G "https://${ST_SERVER}:${ST_PORT}/ap
 ```
 
 `1790812800000` is 1 October 2026, 00:00 UTC, in **milliseconds**. The answer is the same accounts as with `lastModified.from=2026-10-01`. A number in seconds
-(`1790812800`) is read as milliseconds, so it means a moment in January 1970 and the filter lets through every account that has a modification time. Most languages give you seconds: multiply by 1000.
+(`1790812800`) is read as milliseconds. It means a moment in January 1970, so the filter lets through every account that has a modification time. Most languages give you seconds: multiply by 1000.
 
 ### `dd/MM/yyyy`
 
@@ -225,11 +225,11 @@ A date only (`yyyy-MM-dd`, `dd/MM/yyyy`) leaves the time zone to the server.
 | `/accounts` (`lastModified`) | from the start of the 27th | **up to the start of the 27th**: the 27th is out, the 26th is in |
 | `/deniedUsers` | from the start of the 27th | **up to the start of the 27th**: the 27th is out, the 26th is in |
 
-So to ask for one whole day with a date only, send the day and the next day as `.from` and `.to` on `/accounts` and `/deniedUsers`, and the same day twice on `activeUsers`.
+To ask for one whole day with a date only, send the day and the next day as `.from` and `.to` on `/accounts` and `/deniedUsers`. On `activeUsers`, send the same day twice.
 With RFC 2822 you give both ends exactly, and there is nothing to remember.
 
-What this guide did not check: how many hours `generateReport` counts for the 25-hour day. The lab had no traffic in the repeated hour, and the daily counts of the report
-are not the counts of the transfer log (for the 25th: 1089 outgoing and 774 incoming in the report, 2061 and 812 in the log), so one cannot be read from the other. Check
+What this guide did not check: how many hours `generateReport` counts for the 25-hour day. The lab had no traffic in the repeated hour. The daily counts of the report
+are not the counts of the transfer log, so one cannot be read from the other. For the 25th the report has 1089 outgoing and 774 incoming, and the log has 2061 and 812. Check
 it on a server that has transfers in that hour, or ask your support contact.
 
 ### Other places it can hurt

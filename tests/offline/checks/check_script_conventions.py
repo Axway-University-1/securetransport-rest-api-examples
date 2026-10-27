@@ -12,9 +12,9 @@ new script cannot repeat it and the person reads the scripts for what only a per
   4. Without its settings file a script says to copy the example file, exits 1 and has sent nothing. (Tried with a dummy value for each
      required parameter: a script that stops at a parameter first, exit 2, is not counted as tried.)
 
-Runs offline, with a stub curl. Exit 0 is clean.
+Runs offline, with a stub curl, 8 scripts at a time. Exit 0 is clean. With --changed it checks only the scripts changed since the last commit (the quick run).
 """
-import os, re, subprocess, sys, tempfile, shutil
+import concurrent.futures, os, re, subprocess, sys, tempfile, shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -56,9 +56,12 @@ try:
     shutil.copy(TESTS / "fixtures" / "set_variables.test.sh", work / "settings.sh")
     env = dict(os.environ, PATH=f"{work / 'bin'}:{os.environ['PATH']}", ST_ADMIN_LOCAL_VARIABLES=str(work / "settings.sh"),
                ST_ENDUSER_LOCAL_VARIABLES=str(work / "settings.sh"), STUB_CURL_STATUS="200")
-    ran = 0
-    tried_settings = 0
-    for f in scripts():
+    def check_one(f):
+        """Problems of one script and how many of its two tries reached what they try: (problems, ran, tried)."""
+        local, ran, tried = [], 0, 0
+
+        def bad(rule, f, msg):
+            local.append(f"rule {rule}: {f}: {msg}")
         text = (ROOT / f).read_text(errors="replace")
         name, params = header_usage(text)
         if NESTED.search(params):
@@ -78,7 +81,7 @@ try:
                            input="", capture_output=True, timeout=60)
         out = r.stdout + r.stderr
         if r.returncode == 1 and ("set_variables" in out or "settings" in out):
-            tried_settings += 1
+            tried += 1
             if re.search(r"^(URL|METHOD):", out, re.M):
                 bad(4, f, "it sent something to the server with no settings file")
         elif r.returncode == 0 and not re.search(r"^(URL|METHOD):", out, re.M) and "set_variables" in text:
@@ -96,10 +99,24 @@ try:
                 bad(3, f, "and it prints no usage")
             if re.search(r"^(URL|METHOD):", out, re.M):
                 bad(3, f, "and it already sent something to the server")
+        return local, ran, tried
+
+    todo = scripts()
+    if "--changed" in sys.argv:
+        # only the scripts changed since the last commit (and the new ones): the quick run before a commit
+        changed = set(subprocess.check_output(["git", "diff", "--name-only", "HEAD"], cwd=ROOT, text=True).splitlines()) | \
+            set(subprocess.check_output(["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT, text=True).splitlines())
+        todo = [f for f in todo if f in changed]
+    ran = tried_settings = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        for local, r_ran, r_tried in pool.map(check_one, todo):
+            problems.extend(local)
+            ran += r_ran
+            tried_settings += r_tried
 finally:
     shutil.rmtree(work, ignore_errors=True)
 
-print(f"checked {len(scripts())} bash scripts, {ran} of them run without their required parameters, {tried_settings} stopped at a missing settings file")
+print(f"checked {len(todo)} bash scripts, {ran} of them run without their required parameters, {tried_settings} stopped at a missing settings file")
 for p in problems:
     print("  FAIL  " + p)
 print("# CLEAN" if not problems else f"# {len(problems)} problem(s)")
