@@ -16,7 +16,8 @@
 8. [HTTP Methods](#st-api-20-methods)
 9. [What Is Covered](#what-is-covered)
 10. [Features and Use Cases](#features-and-use-cases)
-11. [License and Support](#license-and-support)
+11. [Guidance](#guidance)
+12. [License and Support](#license-and-support)
 
 ## Introduction
 These examples are for REST API 2.0 of SecureTransport 5.5, and were verified on release 5.5-20260924. The older API 1.4 is also served by 5.5 but is not covered here.
@@ -69,6 +70,9 @@ Three short guides save you working this out for yourself:
   reading before your first call.
 - **[Adding an example](.claude/skills/st-api-add-example/SKILL.md)** — the house
   style, if you plan to contribute.
+
+For how the API behaves when you use it, such as the date formats, usage reports, sessions or
+stopping a daemon, read the [Guidance](#guidance) guides.
 
 ### Check your clone works
 
@@ -205,7 +209,7 @@ This is what you see at the root of the repository.
 | ------ | ------------- |
 | `Admin/` | The examples for the **administrator API** (port 444, or 8444 on a non root install): `API 2.0/bash` (curl examples, numbered by topic), `API 2.0/bat` (the same examples for Windows) and `API 2.0/python` (small complete programs for real tasks, and `utils` for tools that work on an exported configuration XML). |
 | `EndUser/` | The examples for the **end user API** (port 443, or 8443): `API 2.0/bash` has one example per call, `UseCases` has complete end user scenarios, a learning path in five steps. |
-| `Features/` | Complete solutions, one folder per feature, grouped by the release that introduced it. Each is a whole scenario you can run from `00.run_all` to the clean-up. See [Features](Features/README.md). |
+| `Features/` | Complete solutions, one folder per feature, grouped by the release that introduced it. Each is a whole scenario you can run from `00.run_all` to the clean-up. See [Features](Features/README.md). `Features/Guidance/` is different: guides to read, with no scripts of their own. See [Guidance](#guidance). |
 
 ### Working on the repository
 
@@ -245,6 +249,7 @@ EndUser/
     API 2.0/bash/       end user API, on the user port
     UseCases/           complete end user scenarios, a learning path
 Features/               complete solutions, one folder per feature
+    Guidance/           guides to read: time formats, usage reports, sessions, daemons ...
 ```
 
 The bash and bat examples are numbered by topic and, within a topic, by HTTP
@@ -500,6 +505,25 @@ which ones your version supports. Every script also checks the server version wi
 The end user API has its own folder of complete scenarios,
 [Use Cases](EndUser/UseCases/README.md), and so does the administration API,
 [Admin Use Cases](Admin/UseCases/README.md).
+
+## Guidance
+
+[Features/Guidance](Features/Guidance/README.md) is a folder of short guides to **read**, not examples to run. Each one says how part of the REST API
+behaves when you use it, shows commands that were run on a lab server, and says what was not tried. Each guide says who it is for and which release
+it was checked on (5.5-20260924). They are written in short sentences, so that they can be handed to a customer as they are.
+
+| Guide | What it is about |
+| ----- | ---------------- |
+| [Time formats, and daylight saving time](Features/Guidance/time-formats.md) | The five date formats of the API, which resource takes which, an example of each, and what to do when the clocks change. |
+| [Usage and billing reporting](Features/Guidance/usage-and-billing-reporting.md) | What active users, the usage report and the billable transfers count, and how they relate. |
+| [Reading the answers](Features/Guidance/reading-api-answers.md) | A 200 that says no, the shapes of an error, paging, `fields=`, `HEAD`. |
+| [Protocol servers and daemons](Features/Guidance/protocol-servers-and-daemons.md) | Starting and stopping through the API: the messages, the times, the order, a loop that waits. |
+| [Moving files with the End User API](Features/Guidance/moving-files-end-user-api.md) | Upload, checksums, chunks, rename, delete and sharing. |
+| [Authentication and sessions](Features/Guidance/authentication-and-sessions.md) | Basic, session and API key, what each answers, and advice on which fits which case. |
+| [Changing objects without breaking them](Features/Guidance/changing-configuration.md) | PATCH and PUT, what `replace`, `add` and `remove` do, save and restore. |
+| [Expression Language escaping](Features/Guidance/expression-language-escaping.md) | Where an expression goes and how to escape it in the shell, in JSON and in the expression. |
+| [Field names between releases](Features/Guidance/field-names-between-releases.md) | The same thing under two names, and how to write a client that survives. |
+| [Testing your own scripts](Features/Guidance/testing-your-scripts.md) | A lab and an offline method, mutation testing, and the coverage tools. |
 
 ## License and Support
 
