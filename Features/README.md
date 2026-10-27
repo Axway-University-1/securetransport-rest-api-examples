@@ -33,7 +33,7 @@ feature works on that release and on every later one.
 ## Guidance
 
 [Guidance](Guidance/) is a folder of short guides to read, not examples to run: how to use a feature well and what to avoid. The first one is
-[Daylight saving time and the SecureTransport REST API](Guidance/daylight-saving-time.md).
+[Time formats in the SecureTransport REST API, and daylight saving time](Guidance/time-formats.md).
 
 ## Version check
 

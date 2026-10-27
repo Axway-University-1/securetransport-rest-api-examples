@@ -21,7 +21,7 @@ readme = (G / "README.md").read_text()
 guides = sorted(p.name for p in G.glob("*.md") if p.name != "README.md")
 check("every guide is listed in the folder's README", all(g in readme for g in guides), guides)
 check("Features/README.md points to the folder and to the guide", "Guidance/" in (ROOT / "Features" / "README.md").read_text()
-      and "Guidance/daylight-saving-time.md" in (ROOT / "Features" / "README.md").read_text())
+      and "Guidance/time-formats.md" in (ROOT / "Features" / "README.md").read_text())
 for md in [G / "README.md"] + [G / g for g in guides]:
     for target in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", md.read_text()):
         if not target.startswith(("http", "mailto")):
@@ -29,7 +29,7 @@ for md in [G / "README.md"] + [G / g for g in guides]:
 check("no guide carries an internal issue number", not any(re.search(r"\bRD-\d+\b", (G / g).read_text()) for g in guides))
 check("each guide says who it is for and what it was checked on", all("**For:**" in (G / g).read_text() and "**Checked on:**" in (G / g).read_text() for g in guides))
 
-text = (G / "daylight-saving-time.md").read_text()
+text = (G / "time-formats.md").read_text()
 blocks = re.findall(r"```(\w+)\n(.*?)```", text, re.S)
 
 # the python snippet: the day the clocks go back has two offsets, and so does the day they go forward
@@ -68,9 +68,38 @@ if day > 3:
     check("date: the offset changes between the days (the test rule really changes the clocks)", len(set(offsets)) == 2, offsets)
 else:
     print("  (the first days of the year: the TZ rule of the guide needs the fourth day, skipped)")
-check("the guide shows how to send the offset (RFC 2822 with the Z part, encoded by curl) and which endpoints cannot carry one",
-      "How to send the offset" in text and "--data-urlencode \"startTimeAfter=Sun, 25 Oct 2026 00:00:00 +0300\"" in text
-      and "dd/MM/yyyy" in text and "**No.** A date has no offset." in text)
-check("the checklist and the warning about 86,400 seconds are in the guide", "86,400" in text and "- [ ] Every time sent to the API" in text)
+
+# the formats: each has a row in the table of formats, and an example under its own heading, in a curl command that runs
+formats = {"RFC 2822": "Sun, 25 Oct 2026 00:00:00 +0300", "ISO 8601": "2025-01-06T10:30:00Z", "`yyyy-MM-dd`": "2026-10-01",
+           "Timestamp": "1790812800000", "`dd/MM/yyyy`": "26/10/2026"}
+for name, sample in formats.items():
+    check("the table of formats has %s, with an example value" % name, "| **%s**" % name.strip("`") in text or "| **%s**" % name in text, name)
+for heading in ("### RFC 2822, with the offset", "### ISO 8601", "### `yyyy-MM-dd`", "### Timestamp", "### `dd/MM/yyyy`"):
+    check("an example has its own heading: %s" % heading, heading in text)
+check("the table of resources is there, before the examples, and the daylight saving part after them",
+      text.index("## Which resource takes which format") < text.index("## An example of each format") < text.index("## Daylight saving time"))
+check("a timestamp is said to be milliseconds, and the value is the first of October 2026 UTC",
+      "**milliseconds**" in text and "1790812800000` is 1 October 2026, 00:00 UTC" in text)
+import datetime as _dt
+check("... and it is", int(_dt.datetime(2026, 10, 1, tzinfo=_dt.timezone.utc).timestamp() * 1000) == 1790812800000)
+
+# the curl examples, run against the stub curl: each one sends its date text as the guide says, with a Referer (the stub refuses a call without)
+import os
+curls = [b for lang, b in blocks if lang == "bash" and b.lstrip().startswith("curl")]
+check("the guide has a curl example for each of the five formats and the refusal", len(curls) == 6, len(curls))
+import shutil
+import tempfile
+stub_dir = tempfile.mkdtemp(prefix="guide_stub_")
+shutil.copy(ROOT / "tests" / "offline" / "lib" / "stub_curl", os.path.join(stub_dir, "curl"))
+os.chmod(os.path.join(stub_dir, "curl"), 0o755)
+env = dict(os.environ, PATH=stub_dir + os.pathsep + os.environ["PATH"], ST_SERVER="st.example.com", ST_PORT="8444", ST_USER="u", ST_PASSWORD="p")
+wanted = ["startTimeAfter=Sun, 25 Oct 2026 00:00:00 +0300", "startTimeAfter=2026-10-25T00:00:00+03:00", "apiKeys.createdAt.from=2025-01-06T10:30:00Z",
+          "lastModified.from=2026-10-01", "lastModified.from=1790812800000", "startDate=23/10/2026"]
+for block, expect in zip(curls, wanted):
+    r = subprocess.run(["bash", "-c", block], capture_output=True, text=True, env=env)
+    check("the example with %s runs, and sends it to the right resource" % expect.split("=")[0],
+          r.returncode == 0 and expect in r.stderr and "/api/v2.0/" in r.stderr, (r.returncode, r.stderr[-300:]))
+shutil.rmtree(stub_dir, ignore_errors=True)
+check("the checklist and the warning about 86,400 seconds are in the guide", "86,400" in text and "- [ ] The format matches the resource" in text)
 print("test_feature_guidance: " + ("FAIL" if failed else "PASS"))
 sys.exit(1 if failed else 0)

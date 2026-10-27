@@ -9,7 +9,7 @@ The folders next to this one ([Features](../README.md)) are examples to run. Thi
 
 | Guide | For | What it covers |
 | ----- | --- | -------------- |
-| [Daylight saving time and the SecureTransport REST API](daylight-saving-time.md) | Administrators and integrators who script against the REST API or run scheduled jobs | Why a day is not always 86,400 seconds, how the server reads the offset of a time window, how to compute each midnight on Linux, macOS and in Python, what to watch in scheduled jobs and daily reports, and how to test a script without waiting for the date. |
+| [Time formats in the SecureTransport REST API, and daylight saving time](time-formats.md) | Administrators and integrators who script against the REST API, or who build reports and scheduled jobs on it | The five date formats of the API (RFC 2822, ISO 8601, `yyyy-MM-dd`, a timestamp, `dd/MM/yyyy`), which resource takes which, an example of each that was run on the lab, the forms the answers use, and then daylight saving time: why a day is not always 86,400 seconds, how to compute each midnight on Linux, macOS and in Python, how `generateReport` cuts a day, scheduled jobs, and how to test a script without waiting for the date. |
 
 ## What a guide in this folder has
 
