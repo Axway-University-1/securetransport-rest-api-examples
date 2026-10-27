@@ -126,11 +126,12 @@ The same call with `startDate=2026-10-23` is refused with 400: "Date 2026-10-23 
 
 ## Dates in the answers
 
-The answers use three forms. Do not expect them to look like what you sent.
+The answers use four forms. Do not expect them to look like what you sent.
 
 | Where | Looks like |
 | ----- | ---------- |
 | Log and transfer lists: `startTime` | RFC 2822 with an offset: `Sun, 25 Oct 2026 15:53:45 +0200` |
+| `GET /statisticsSummary/activeUsers`: `lastAccessTime` | Text for people, to the minute, **with no offset**: `October 27, 2026, 6:57 AM` (the server's time) |
 | Fields such as `accountCreationDate`, and the transfer id's `mTransferStartTime` | A timestamp in milliseconds: `1787902411110` |
 | End User `GET /serverTime`, and the entries and times of a `generateReport` answer | ISO 8601 with an offset: `2026-10-27T06:45:26.168+0200` (`serverTime`), `2026-10-26T00:00:00.000+02:00` (report) |
 
@@ -209,10 +210,15 @@ A date only (`yyyy-MM-dd`, `dd/MM/yyyy`) leaves the time zone to the server.
 - **`generateReport` (`dd/MM/yyyy`).** Tried: the server cuts each day at midnight **in its own time zone**, and names the day with the offset of that midnight. In
   the example above, the 25th starts at `+03:00` and the 26th at `+02:00`: the clocks went back in between. So the days of this report are the server's days, not
   yours. If your time zone is not the server's, your own daily totals will not match it.
-- **`yyyy-MM-dd` on `/accounts`, `/deniedUsers` and `/statisticsSummary/activeUsers`.** Not tried: this guide does not say which time zone the day is in. Use RFC 2822
-  there if you need to be exact, and ask your support contact if you must use the date.
+- **`yyyy-MM-dd` on `/statisticsSummary/activeUsers`.** Tried: a day is the day **in the server's time zone**. A user last seen at 23:57 on 8 October is in the day
+  `2026-10-08`. A user last seen at 00:39 on 9 October is in `2026-10-09` and not in `2026-10-08`, although in UTC that moment is still the 8th. The times this resource
+  shows are the server's time too: a login at 06:57 server time (04:57 UTC) was listed as 6:57 AM.
+- **`yyyy-MM-dd` on `/accounts` and `/deniedUsers`.** Not tried: this guide does not say which time zone the day is in. Use RFC 2822 there if you need to be exact, and
+  ask your support contact if you must use the date.
 
-What this guide did not check: how many hours the report counts for the 25-hour day, and whether other reports of the product cut the day the same way.
+What this guide did not check: how many hours `generateReport` counts for the 25-hour day. The lab had no traffic in the repeated hour, and the daily counts of the report
+are not the counts of the transfer log (for the 25th: 1089 outgoing and 774 incoming in the report, 2061 and 812 in the log), so one cannot be read from the other. Check
+it on a server that has transfers in that hour, or ask your support contact.
 
 ### Other places it can hurt
 
