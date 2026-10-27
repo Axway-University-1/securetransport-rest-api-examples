@@ -172,7 +172,7 @@ A comparison of the report with the log, day by day, on the lab (the log: billab
 | 27 Oct (the day it was asked) | 117 / 111 / 11 | 117 / 111 / 35 | 6 |
 
 What this shows: the report's total follows the billable count of the log, and is equal on some days and a few more or fewer on others. The outbound number of the
-report is neither the outbound count of the log nor the billable outbound count. Why the numbers differ was not found. So:
+report is neither the outbound count of the log nor the billable outbound count. Why the numbers differ was not found. For 25 October, these did not give the report's 1089 outbound: the outgoing transfers by status, protocol, `serverInitiated`, `secure` and `resubmitted`; the distinct core ids (769), the distinct pairs of account and file name (928) and the distinct file names (467); and the outgoing transfers with a size above 0 (1070). So:
 
 - Take the numbers for a report or an invoice **from the report**, not from a count of the log.
 - Use the log to look at the transfers behind a day, not to rebuild it.

@@ -37,7 +37,7 @@ These are all the date and time parameters of the two references.
 | `GET /logs/server` | `fromDate`, `endDate` | RFC 2822 | RFC 2822 works. |
 | End User `GET /transfers` | `startTimeAfter`, `startTimeBefore`, `endTimeAfter`, `endTimeBefore` | RFC 2822 or a timestamp | RFC 2822 works. A timestamp in milliseconds and ISO 8601 are refused with 400. |
 | `GET /administrators` | `apiKeys.createdAt`, `apiKeys.expiresAt`, `apiKeys.lastAccessedAt`, each with `.from` and `.to` | RFC 2822 or ISO 8601 | Both work. |
-| `GET /accounts` | `lastModified`, `user.lastLogin`, `user.lastFailedAuth`, `user.lastFailedSshKeyAuth`, `user.passwordCredentials.lastPasswordChange`, each with `.from` and `.to` | RFC 2822, `yyyy-MM-dd` or a timestamp | All three work (tried on `lastModified.from`). |
+| `GET /accounts` | `lastModified`, `user.lastLogin`, `user.lastFailedAuth`, `user.lastFailedSshKeyAuth`, `user.passwordCredentials.lastPasswordChange`, each with `.from` and `.to` | RFC 2822, `yyyy-MM-dd` or a timestamp | All three work on `lastModified`. **The four `user.*` filters are accepted, and have no effect:** every account is returned, whatever the value (tried in all three formats). |
 | `GET /deniedUsers` | `blockedAt`, `blockedUntil`, each with `.from` and `.to` | RFC 2822, `yyyy-MM-dd` or a timestamp | `yyyy-MM-dd` works. |
 | `GET /statisticsSummary/activeUsers` | `lastAccessTime`, `lastAdhocAccessTime`, each with `.from` and `.to` | RFC 2822, `yyyy-MM-dd` or a timestamp | `yyyy-MM-dd` works. |
 | `GET /statisticsSummary/generateReport` | `startDate`, `endDate` | `dd/MM/yyyy` | `dd/MM/yyyy` works. `yyyy-MM-dd` is refused with 400. |
@@ -213,8 +213,20 @@ A date only (`yyyy-MM-dd`, `dd/MM/yyyy`) leaves the time zone to the server.
 - **`yyyy-MM-dd` on `/statisticsSummary/activeUsers`.** Tried: a day is the day **in the server's time zone**. A user last seen at 23:57 on 8 October is in the day
   `2026-10-08`. A user last seen at 00:39 on 9 October is in `2026-10-09` and not in `2026-10-08`, although in UTC that moment is still the 8th. The times this resource
   shows are the server's time too: a login at 06:57 server time (04:57 UTC) was listed as 6:57 AM.
-- **`yyyy-MM-dd` on `/accounts` and `/deniedUsers`.** Not tried: this guide does not say which time zone the day is in. Use RFC 2822 there if you need to be exact, and
-  ask your support contact if you must use the date.
+- **`yyyy-MM-dd` on `/deniedUsers`.** Tried: also the server's time zone. A block that ends at 00:10 on 28 October (`+0200`, which is 22:10 UTC on the 27th) is found by
+  `blockedUntil.from=2026-10-28`, and not by `blockedUntil.from=2026-10-29`. A UTC day would have put it in the 27th.
+- **`yyyy-MM-dd` on `/accounts` (`lastModified`).** Not tried for the time zone: the accounts of the lab were not modified near midnight. Use RFC 2822 if you need to be exact.
+
+**What `.to` means with a date only differs between resources.** Tried with entries that sit on both sides of the day:
+
+| Resource | `.from=2026-10-27` | `.to=2026-10-27` |
+| -------- | ------------------ | ---------------- |
+| `/statisticsSummary/activeUsers` | from the start of the 27th | **to the end of the 27th**: the 27th is in |
+| `/accounts` (`lastModified`) | from the start of the 27th | **up to the start of the 27th**: the 27th is out, the 26th is in |
+| `/deniedUsers` | from the start of the 27th | **up to the start of the 27th**: the 27th is out, the 26th is in |
+
+So to ask for one whole day with a date only, send the day and the next day as `.from` and `.to` on `/accounts` and `/deniedUsers`, and the same day twice on `activeUsers`.
+With RFC 2822 you give both ends exactly, and there is nothing to remember.
 
 What this guide did not check: how many hours `generateReport` counts for the 25-hour day. The lab had no traffic in the repeated hour, and the daily counts of the report
 are not the counts of the transfer log (for the 25th: 1089 outgoing and 774 incoming in the report, 2061 and 812 in the log), so one cannot be read from the other. Check

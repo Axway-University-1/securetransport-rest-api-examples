@@ -121,6 +121,9 @@ for block, expect in zip(curls, wanted):
 shutil.rmtree(stub_dir, ignore_errors=True)
 check("the guide says what was tried for the day of a date only, and what was not", "a day is the day **in the server's time zone**" in text
       and "How many hours `generateReport` counts for the 25-hour day" not in text and "how many hours `generateReport` counts for the 25-hour day" in text)
+check("the guide says what .to means with a date only, per resource, and that four account filters have no effect",
+      "What `.to` means with a date only differs between resources" in text and "**to the end of the 27th**" in text and "**up to the start of the 27th**" in text
+      and "have no effect" in text)
 check("the answer forms: four, with the one that has no offset", "The answers use four forms." in text and "October 27, 2026, 6:57 AM" in text)
 check("the checklist and the warning about 86,400 seconds are in the guide", "86,400" in text and "- [ ] The format matches the resource" in text)
 print("test_feature_guidance: " + ("FAIL" if failed else "PASS"))

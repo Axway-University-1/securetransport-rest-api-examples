@@ -200,7 +200,7 @@ An Admin list answers an object:
 
 - `totalCount` is the number of entries that match your filter, in all. `returnCount` is the number in this answer.
 - **A page is 100 entries when you do not ask for more.** That is the setting `Webservices.EntriesPerPage` (100 on the lab). `limit=0` gives the same 100: it does not mean "all".
-- Tried on the transfer log (23,706 entries): no `limit` gave 100, `limit=0` gave 100, `limit=1000` gave 1000. `limit=5000` did not answer within 30 seconds. Ask for pages of a few
+- Tried on the transfer log (23,706 entries): no `limit` gave 100, `limit=0` gave 100, `limit=1000` gave 1000. `limit=5000` gave 5000 entries in about 15 seconds (1000 took about 4 seconds), so a client with a 30 second timeout can fail when the server is busy. Ask for pages of a few
   hundred, and walk them.
 - `offset` is the number of entries to skip. An `offset` past the end gives an empty `result`, and `totalCount` stays the same.
 - A filter changes `totalCount`: `GET /accounts?name=ZZTEST_ans*` gave 1 of 1, and a pattern that matches nothing gave 0 of 0. (Earlier work found that on some resources the

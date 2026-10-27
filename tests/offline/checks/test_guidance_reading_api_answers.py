@@ -36,7 +36,7 @@ for label, needle in (
         ("sharing a missing folder answers 204", "**Sharing a folder that does not exist answers `204`.**"),
         ("a locked account looks like a wrong password", "**A locked account looks like a wrong password.**"),
         ("a page is 100 and limit=0 is not all", "`limit=0` gives the same 100: it does not mean \"all\""),
-        ("limit=5000 timed out", "`limit=5000` did not answer within 30 seconds"),
+        ("limit=5000 is slow, not refused", "`limit=5000` gave 5000 entries in about 15 seconds"),
         ("GET /files has no cap and no count", "Without `limit`, every entry is returned"),
         ("limit=0 on /files returns nothing", "**`limit=0` returned no entries.**"),
         ("/transfers is a plain list", "`GET /transfers` answers a plain list"),
