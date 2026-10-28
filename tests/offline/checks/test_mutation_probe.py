@@ -104,5 +104,32 @@ check("python: each mutant is one line different, and compiles",
 check("python: the covering tests of a python example are the python checks, not the bash house rules",
       "check_script_conventions.py" not in mp.covering_tests("Admin/API 2.0/python/python3/stCertificateExpiry.py")
       and any(t.startswith("test_python_") for t in mp.covering_tests("Admin/API 2.0/python/python3/stCertificateExpiry.py")))
+
+# the progress file and the line that reads it
+import json
+import os
+import tempfile
+sys.path.insert(0, str(ROOT / "tools"))
+import mutation_progress as mpg  # noqa: E402
+with tempfile.TemporaryDirectory() as _d:
+    pf = os.path.join(_d, "progress.jsonl")
+    os.environ["MUTATION_PROGRESS"] = pf
+    mp.progress({"event": "start", "scripts": 2, "mutants": 20})
+    mp.progress({"event": "script", "script": "Admin/x/a.py", "mutants": 12})
+    for v in ["killed"] * 8 + ["survived"] * 2 + ["invalid"]:
+        mp.progress({"event": "mutant", "script": "Admin/x/a.py", "verdict": v})
+    lines = open(pf).read().splitlines()
+    t0 = json.loads(lines[0])["t"]
+    text = mpg.summarize(lines, now=t0 + 600)
+    check("a progress file has a line for each step", len(lines) == 13 and all(json.loads(l)["event"] in {"start", "script", "mutant"} for l in lines))
+    check("it says how far the run is, with what was caught, and which script it is on",
+          "still running: 11 of 20 mutants (55%)" in text and "caught 8, survived 2, did not parse 1" in text and "now on script 1 of 2 (a.py, 11 of 12 mutants)" in text, text)
+    check("it estimates the time left from the pace so far", "about 8 min left" in text, text)
+    mp.progress({"event": "end"})
+    check("a finished run says so", mpg.summarize(open(pf).read().splitlines()).startswith("FINISHED:"))
+    del os.environ["MUTATION_PROGRESS"]
+    mp.progress({"event": "start", "scripts": 1, "mutants": 1})
+    check("without MUTATION_PROGRESS nothing is written", len(open(pf).read().splitlines()) == 14)
+    check("an empty file is said to be empty", "no run yet" in mpg.summarize([]))
 print("test_mutation_probe: " + ("FAIL" if failed else "PASS"))
 sys.exit(1 if failed else 0)

@@ -15,6 +15,11 @@
 # each starting with the check for an active session (st_session in
 # UseCases/session.sh: a jar that is missing or refused is a login).
 #
+# 03-onboard-a-user-account: the account made (HEAD first, then a POST with the body of a user account and
+# a user id that is the same for the same name), read back, changed with a JSON Patch, logged in to on the End
+# User API (and refused with a wrong password), used (a folder, a file), emptied and deleted, the cleanup twice,
+# and run_all stopping at a failing step, still cleaning up.
+#
 # Runs offline. Exit code 0 means clean.
 # ==============================================================================
 cd "$(dirname "$0")/.." || exit 1
@@ -70,6 +75,8 @@ ucalls() { calls | sed 1d; }
 ncalls() { calls | wc -l | tr -d ' '; }
 payload() { printf '%s\n' "${OUT}" | sed -n 's/^PAYLOAD_B64: //p' | sed -n "${1}p" | base64 -d; }
 headers() { printf '%s\n' "${OUT}" | sed -n 's/^HEADER: //p'; }
+# hdrs_of METHOD: the headers of the call with that method (they are printed before its METHOD line)
+hdrs_of() { printf '%s\n' "${OUT}" | awk -v M="$1" '/^HEADER:/ {b = b $0 "\n"} /^METHOD:/ {if ($2 == M) r = b; b = ""} END {printf "%s", r}' | sed 's/^HEADER: //'; }
 
 echo "=== 01 Basic authentication on one call ==="
 uc 01-authentication
@@ -292,10 +299,200 @@ RULESET=$(rules /version "${WORK}/version.json" /daemons "${WORK}/daemons.json" 
 RULES="${RULESET}" urun 00.run_all.sh
 expect "00: runs the seven scripts, then 99, and exits 0" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^=== ')" "0:8"
 
+echo "=== 03-onboard-a-user-account ==="
+uc 03-onboard-a-user-account
+EUBASE="https://st.example.com:8443/api/v2.0"
+PWFILE="${UC}/state.local.password"
+rm -f "${PWFILE}"
+# 01: the account is looked for, then made
+STUB_STATUS_HEAD=404 STUB_STATUS_POST=201 STUB_CURL_LOCATION_ID=abc123 urun 01.accounts_POST.sh
+expect "01: HEAD the name, then POST /accounts" "${RC}:$(ucalls | tr '\n' ' ')" "0:HEAD ${BASE}/accounts/example_onboard POST ${BASE}/accounts "
+expect "01: a user account with a home folder, an email and the same uid and gid" \
+  "$(payload 1 | jq -c '[.name, .type, .homeFolder, .contact.email, (.uid == .gid), (.uid | tonumber >= 50000 and tonumber <= 59999)]')" '["example_onboard","user","/home/example_onboard","example_onboard@example.com",true,true]'
+expect "01: the password goes in user.passwordCredentials.password, and it is not empty" "$(payload 1 | jq -r '.user.passwordCredentials.password | length > 8')" "true"
+expect "01: the name goes in user.name too" "$(payload 1 | jq -r .user.name)" "example_onboard"
+expect "01: the POST carries accept, Referer, the content type and the csrfToken" "$(hdrs_of POST | grep -cE '^(Referer: |Content-Type: application/json|accept: \*/\*|csrfToken:)')" "4"
+has "01: says what it makes" "Creating the account example_onboard (home /home/example_onboard, user id "
+has "01: shows the answer's code and where the account is" "HTTP 201"
+has "01: and says where the password went" "The password is in state.local.password"
+expect "01: the password is kept in state.local.password, and it is the one that was sent" "$(cat "${PWFILE}")" "$(payload 1 | jq -r .user.passwordCredentials.password)"
+FIRST_UID=$(payload 1 | jq -r .uid)
+rm -f "${PWFILE}"
+STUB_STATUS_HEAD=404 STUB_STATUS_POST=201 urun 01.accounts_POST.sh example_onboard
+expect "01: the same name has the same user id every time" "$(payload 1 | jq -r .uid)" "${FIRST_UID}"
+STUB_STATUS_HEAD=404 STUB_STATUS_POST=201 urun 01.accounts_POST.sh example_onboard_other ann@corp.example
+expect "01: another name has its own folder, id and email" "$(payload 1 | jq -c '[.name, .homeFolder, .contact.email, (.uid != "'"${FIRST_UID}"'")]')" '["example_onboard_other","/home/example_onboard_other","ann@corp.example",true]'
+rm -f "${PWFILE}"
+STUB_STATUS_HEAD=200 urun 01.accounts_POST.sh
+expect "01: an account that exists is not made again: exit 1, no POST" "${RC}:$(ucalls | grep -c POST)" "1:0"
+has "01: and it says so, and how to remove it" "The account example_onboard already exists. Nothing was created. Remove it with 99.cleanup_DELETE.sh example_onboard"
+expect "01: nothing is saved for an account that was not made" "$([ -e "${PWFILE}" ] && echo kept || echo none)" "none"
+STUB_STATUS_HEAD=500 urun 01.accounts_POST.sh
+expect "01: a HEAD that is not 200 or 404 is exit 1, nothing made" "${RC}:$(ucalls | grep -c POST)" "1:0"
+has "01: and says it could not tell" "Could not tell whether the account example_onboard exists (HTTP 500). Nothing was created."
+STUB_STATUS_HEAD=404 STUB_STATUS_POST=400 urun 01.accounts_POST.sh
+expect "01: a refused create is exit 1, and no password is kept" "${RC}:$([ -e "${PWFILE}" ] && echo kept || echo none)" "1:none"
+urun 01.accounts_POST.sh real_account
+expect "01: a name that does not start with example_ is exit 2, and nothing at all is sent (not even the login)" "${RC}:$(ncalls)" "2:0"
+has "01: with the reason" "NAME is 'real_account': it must start with example_"
+has "01: and the usage" "Usage: ./01.accounts_POST.sh [NAME] [EMAIL]"
+urun 01.accounts_POST.sh example_a b@c.d extra
+expect "01: three parameters is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "01: and it says how many were given and how many are taken" "3 parameters were given, and at most 2 are taken: NAME and EMAIL."
+
+# 02: read back
+ACCT='{"name":"example_onboard","type":"user","homeFolder":"/home/example_onboard","disabled":false,"contact":{"email":"example_onboard@example.com"},"accountCreationDate":1793184896737,"transfersWebServiceAllowed":false,"user":{"locked":false,"failedAuthMaximum":3,"secretQuestion":{"secretQuestion":null},"passwordCredentials":{"password":null}}}'
+GET_BODY="$(body acct "${ACCT}")" STUB_STATUS_HEAD=200 urun 02.accounts_GET.sh
+expect "02: HEAD, then GET of the account" "${RC}:$(ucalls | tr '\n' ' ')" "0:HEAD ${BASE}/accounts/example_onboard GET ${BASE}/accounts/example_onboard "
+has "02: shows the home folder" "homeFolder                  /home/example_onboard"
+has "02: shows the email and what it is for" "needed to share folders"
+has "02: shows when the account was made, in UTC" "accountCreationDate         2026-10-28T"
+has "02: says that a null secret question is no secret question" "secret question set         no"
+has "02: shows the lock and the number of wrong passwords that locks" "true after 3 wrong passwords"
+has "02: says the password is never returned" "the password is never returned"
+GET_BODY="$(body acct_sq "$(echo "${ACCT}" | jq -c '.user.secretQuestion.secretQuestion = "Dog?"')")" STUB_STATUS_HEAD=200 urun 02.accounts_GET.sh
+has "02: and yes when it is set" "secret question set         yes"
+STUB_STATUS_HEAD=404 urun 02.accounts_GET.sh
+expect "02: no account is exit 1, and no GET" "${RC}:$(ucalls | grep -c GET)" "1:0"
+has "02: it says to run 01 first" "There is no account example_onboard. Run 01.accounts_POST.sh first."
+GET_BODY="$(body acct)" STUB_STATUS_HEAD=200 STUB_STATUS_GET=500 urun 02.accounts_GET.sh
+expect "02: a GET that fails is exit 1" "${RC}" "1"
+urun 02.accounts_GET.sh not_ours
+expect "02: a name that does not start with example_ is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+
+# 03: one change
+GET_BODY="$(body acct_new "$(echo "${ACCT}" | jq -c '.contact.email = "example_onboard_changed@example.com"')")" STUB_STATUS_PATCH=204 urun 03.accounts_PATCH.sh
+expect "03: reads, PATCHes, reads again" "${RC}:$(ucalls | tr '\n' ' ')" "0:GET ${BASE}/accounts/example_onboard PATCH ${BASE}/accounts/example_onboard GET ${BASE}/accounts/example_onboard "
+expect "03: the patch replaces /contact/email" "$(payload 1 | jq -c .)" '[{"op":"replace","path":"/contact/email","value":"example_onboard_changed@example.com"}]'
+expect "03: the PATCH carries accept, Referer, the content type and the csrfToken" "$(hdrs_of PATCH | grep -cE '^(Referer: |Content-Type: application/json|accept: application/json|csrfToken:)')" "4"
+has "03: says that nothing else was touched" "Changed, and nothing else was touched."
+GET_BODY="$(body acct_new)" STUB_STATUS_PATCH=204 urun 03.accounts_PATCH.sh example_onboard ann@corp.example
+expect "03: a new address given is the one sent" "$(payload 1 | jq -r '.[0].value')" "ann@corp.example"
+has "03: and an address that is not the one read back is said and is exit 1 (the change did not take)" "the change did not take."
+expect "03: ... exit 1" "${RC}" "1"
+GET_BODY="$(body acct_new)" STUB_STATUS_PATCH=400 urun 03.accounts_PATCH.sh
+expect "03: a refused PATCH is exit 1" "${RC}" "1"
+has "03: and says the address was not changed" "The server did not accept the change. The address was not changed."
+urun 03.accounts_PATCH.sh not_ours
+expect "03: a name that does not start with example_ is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+
+# 04: the user logs in on the End User API
+rm -f "${PWFILE}"
+run 04.enduser_login_GET.sh
+expect "04: with no state.local.password it says to run 01 first, exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+has "04: and says why" "There is no state.local.password: run 01.accounts_POST.sh first"
+printf '%s' 'pw-secret-1' > "${PWFILE}"
+GET_BODY="$(body me '{"name":"example_onboard","type":"user","sharingAllowed":true}')" STUB_STATUS_GET_SEQ="200 401" STUB_COUNTER="${WORK}/ctr04" run 04.enduser_login_GET.sh
+rm -f "${WORK}"/ctr04.*
+expect "04: two GETs of /myself on the End User port" "${RC}:$(calls | tr '\n' ' ')" "0:GET ${EUBASE}/myself GET ${EUBASE}/myself "
+has "04: the first is the user with the password of state.local.password" "BASIC_AUTH: example_onboard:pw-secret-1"
+has "04: the second is a wrong password, on purpose" "BASIC_AUTH: example_onboard:not-the-password"
+has "04: says who logged in, and whether sharing is allowed" "Logged in as example_onboard (user); sharingAllowed: true"
+has "04: says that the wrong password was refused, the same as an unknown user" "Refused, as it should be. The answer is the same for a wrong password and for a user that does not exist."
+GET_BODY="$(body me)" STUB_STATUS_GET=401 run 04.enduser_login_GET.sh
+expect "04: a login that fails is exit 1" "${RC}" "1"
+has "04: and says the account could not log in" "The new account could not log in."
+GET_BODY="$(body me)" STUB_STATUS_GET=000 run 04.enduser_login_GET.sh
+expect "04: no answer at all is exit 1" "${RC}" "1"
+has "04: and names the setting for the port" "set ST_ENDUSER_PORT in set_variables.local.sh"
+GET_BODY="$(body me)" run 04.enduser_login_GET.sh
+has "04: a wrong password that is accepted (200) is said, and is exit 1" "A wrong password was answered 200, not 401."
+expect "04: ... exit 1" "${RC}" "1"
+run 04.enduser_login_GET.sh not_ours
+expect "04: a name that does not start with example_ is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+
+# 05: the home folder is used
+GET_BODY="$(body files '{"files":[{"fileName":"hello.txt","size":30}]}')" STUB_STATUS_POST=201 run 05.enduser_home_POST.sh
+expect "05: POST the folder, POST the file, GET the list" "${RC}:$(calls | tr '\n' ' ')" "0:POST ${EUBASE}/files/welcome POST ${EUBASE}/files/welcome GET ${EUBASE}/files/welcome "
+expect "05: the folder body says that it is a directory" "$(payload 1 | jq -c '[.isDirectory, .isRegularFile]')" "[true,false]"
+has "05: as the user, with the password" "BASIC_AUTH: example_onboard:pw-secret-1"
+has "05: the file goes in as a form with the name hello.txt" "filename=hello.txt"
+has "05: the list is shown" "  hello.txt	30 bytes"
+STUB_STATUS_POST=403 run 05.enduser_home_POST.sh
+expect "05: a 403 on the folder is exit 1, no upload" "${RC}:$(calls | grep -c POST)" "1:1"
+has "05: and the message names the cause (a home owned by another user id)" "another user id, use another name"
+STUB_STATUS_POST_SEQ="409 201" STUB_COUNTER="${WORK}/ctr05" GET_BODY="$(body files)" run 05.enduser_home_POST.sh
+rm -f "${WORK}"/ctr05.*
+expect "05: a folder that is already there (409) is not an error: the file is uploaded" "${RC}" "0"
+has "05: and it says so" "The folder welcome is already there."
+STUB_STATUS_POST_SEQ="201 500" STUB_COUNTER="${WORK}/ctr05b" GET_BODY="$(body files)" run 05.enduser_home_POST.sh
+rm -f "${WORK}"/ctr05b.*
+expect "05: an upload that fails is exit 1" "${RC}" "1"
+has "05: and says the file was not uploaded" "The file was not uploaded."
+rm -f "${PWFILE}"
+run 05.enduser_home_POST.sh
+expect "05: with no password file it says to run 01, exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+
+# 06: the home is emptied, then the account goes
+printf '%s' 'pw-secret-1' > "${PWFILE}"
+WEL="$(body welcome '{"files":[{"fileName":"hello.txt","isDirectory":false}]}')"
+ROOT_LIST="$(body root '{"files":[{"fileName":"welcome","isDirectory":true}]}')"
+LRULES="$(rules "${EUBASE}/files/welcome" "${WEL}" "${EUBASE}/files" "${ROOT_LIST}")"
+RULES="${LRULES}" STUB_STATUS_HEAD=200 STUB_STATUS_DELETE=204 STUB_STATUS_GET_SEQ="200 200 200 404" STUB_COUNTER="${WORK}/ctr06" urun 06.accounts_DELETE.sh
+rm -f "${WORK}"/ctr06.*
+expect "06: looks for the account, empties the home as the user, deletes the account, reads it" "${RC}:$(ucalls | tr '\n' ' ')" \
+  "0:HEAD ${BASE}/accounts/example_onboard GET ${EUBASE}/files GET ${EUBASE}/files/welcome DELETE ${EUBASE}/files/welcome/hello.txt DELETE ${EUBASE}/files/welcome DELETE ${BASE}/accounts/example_onboard GET ${BASE}/accounts/example_onboard "
+has "06: says how many entries it removed from the home (the file, then the folder)" "Emptied the home folder of example_onboard: 2 entries removed."
+has "06: shows the DELETE answer and the read after it" "DELETE: HTTP 204"
+has "06: and the 404" "GET: HTTP 404"
+has "06: says that the home folder stays, with the user id" "Its home folder /home/example_onboard is not: it stays on the server with user id ${FIRST_UID}."
+expect "06: the password file goes with the account" "$([ -e "${PWFILE}" ] && echo kept || echo gone)" "gone"
+STUB_STATUS_HEAD=404 urun 06.accounts_DELETE.sh
+expect "06: no account is exit 0 and no DELETE" "${RC}:$(ucalls | grep -c DELETE)" "0:0"
+has "06: and it says there is nothing to delete" "There is no account example_onboard: nothing to delete."
+STUB_STATUS_HEAD=500 urun 06.accounts_DELETE.sh
+expect "06: a HEAD that is not 200 or 404 is exit 1, nothing deleted" "${RC}:$(ucalls | grep -c DELETE)" "1:0"
+printf '%s' 'pw-secret-1' > "${PWFILE}"
+STUB_STATUS_HEAD=200 STUB_STATUS_DELETE=403 RULES="${LRULES}" urun 06.accounts_DELETE.sh
+expect "06: a refused DELETE of the account is exit 1" "${RC}" "1"
+has "06: and says the account was not deleted" "The account was not deleted."
+rm -f "${PWFILE}"
+STUB_STATUS_HEAD=200 STUB_STATUS_DELETE=204 STUB_STATUS_GET_SEQ="404" STUB_COUNTER="${WORK}/ctr06b" urun 06.accounts_DELETE.sh
+rm -f "${WORK}"/ctr06b.*
+has "06: with no password file the home cannot be emptied, and it says so" "There is no state.local.password: the home folder cannot be emptied as the user, so its files stay."
+expect "06: and the account is still deleted" "${RC}:$(ucalls | grep -c 'DELETE '"${BASE}"'/accounts')" "0:1"
+printf '%s' 'pw-secret-1' > "${PWFILE}"
+STUB_STATUS_HEAD=200 STUB_STATUS_DELETE=204 STUB_STATUS_GET=200 RULES="${LRULES}" urun 06.accounts_DELETE.sh
+expect "06: an account that is still there after the DELETE is exit 1" "${RC}" "1"
+has "06: and says so" "The account is still there."
+urun 06.accounts_DELETE.sh not_ours
+expect "06: a name that does not start with example_ is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+
+# 99: the cleanup, twice
+printf '%s' 'pw-secret-1' > "${PWFILE}"; echo tok > "${UC}/state.local.csrf"
+STUB_STATUS_HEAD=200 STUB_STATUS_DELETE=204 RULES="${LRULES}" urun 99.cleanup_DELETE.sh
+expect "99: the account is looked for, emptied, deleted, and the session ended" "${RC}:$(ucalls | tr '\n' ' ')" \
+  "0:HEAD ${BASE}/accounts/example_onboard GET ${EUBASE}/files GET ${EUBASE}/files/welcome DELETE ${EUBASE}/files/welcome/hello.txt DELETE ${EUBASE}/files/welcome DELETE ${BASE}/accounts/example_onboard DELETE ${BASE}/myself "
+has "99: says the account was deleted" "The account example_onboard was deleted."
+expect "99: the state files and the jar are gone" "$([ -e "${PWFILE}" ] || [ -e "${UC}/state.local.csrf" ] || [ -e "${UC}/session.cookie.jar" ] && echo kept || echo gone)" "gone"
+STUB_STATUS_HEAD=404 run 99.cleanup_DELETE.sh
+expect "99: a second run, with nothing to remove, is exit 0 and deletes nothing" "${RC}:$(calls | grep -c DELETE)" "0:0"
+has "99: and says there is nothing to delete" "There is no account example_onboard: nothing to delete."
+has "99: and that it cleaned up" "Cleaned up."
+printf '%s' 'pw-secret-1' > "${PWFILE}"
+STUB_STATUS_HEAD=200 STUB_STATUS_DELETE=403 RULES="${LRULES}" urun 99.cleanup_DELETE.sh
+expect "99: an account that cannot be deleted is exit 1, with the hint" "${RC}" "1"
+has "99: names the account and the code" "The account example_onboard could not be deleted (HTTP 403): delete it by hand."
+urun 99.cleanup_DELETE.sh not_ours
+expect "99: a name that does not start with example_ is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+
+# 00: run_all
+rm -f "${PWFILE}"
+STUB_STATUS_HEAD=200 run 00.run_all.sh example_onboard_x
+has "00: a step that fails stops it, by name (01 finds the account already there)" "01.accounts_POST failed."
+has "00: and the cleanup still runs" "=== 99.cleanup_DELETE ==="
+expect "00: exit 1, and no step after 01 ran" "${RC}:$(printf '%s\n' "${OUT}" | grep -c '^=== 02')" "1:0"
+run 00.run_all.sh real_account
+expect "00: a name that does not start with example_ stops it at once: exit 2, nothing sent, no cleanup" "${RC}:$(ncalls):$(printf '%s\n' "${OUT}" | grep -c '99.cleanup')" "2:0:0"
+has "00: with the usage" "Usage: ./00.run_all.sh [NAME] [EMAIL]"
+run 00.run_all.sh example_a b@c.d extra
+expect "00: three parameters is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"
+rm -f "${PWFILE}" "${UC}/state.local.csrf" "${UC}/session.cookie.jar"
+
 echo "=== The scripts say where they were copied from ==="
 for s in "${UC_ROOT}"/*/[0-9][0-9].*.sh; do
     case "$(basename "${s}")" in 99.*|00.*) continue ;; esac
-    refs=$(sed -n 's/^# - Copied from \(Admin\/API 2.0\/bash\/[^ ,]*\).*/\1/p' "${s}" | head -1 | sed 's/\.$//')
+    refs=$(sed -nE 's/^# - Copied from ((Admin|EndUser)\/API 2.0\/bash\/[^ ,]*).*/\1/p' "${s}" | head -1 | sed 's/\.$//')
     n="$(basename "$(dirname "${s}")")/$(basename "${s}")"
     if [ -z "${refs}" ]; then pass "${n}: written for this use case (no reference script)"
     elif [ -f "${REPO}/${refs}" ]; then pass "${n}: copied from ${refs}, which exists"

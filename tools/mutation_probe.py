@@ -34,6 +34,7 @@ Exit code: 0 when every mutant was caught, 1 when there are survivors, 2 for a p
 """
 import argparse
 import concurrent.futures
+import json
 import os
 import queue
 import re
@@ -41,6 +42,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
 
@@ -256,6 +258,20 @@ def run_tests(copy, tests, limit=TEST_TIMEOUT):
     return None, time.time() - began
 
 
+_PROGRESS_LOCK = threading.Lock()
+
+
+def progress(event):
+    """One line of JSON for each step, appended to the file named by MUTATION_PROGRESS (when it is set): tools/mutation_progress.py reads it."""
+    path = os.environ.get("MUTATION_PROGRESS")
+    if not path:
+        return
+    event = dict(event, t=round(time.time(), 1))
+    with _PROGRESS_LOCK:
+        with open(path, "a") as f:
+            f.write(json.dumps(event) + "\n")
+
+
 def probe(script, args, pool_dirs):
     path = ROOT / script
     if not path.is_file() or path.suffix not in (".sh", ".py"):
@@ -270,6 +286,7 @@ def probe(script, args, pool_dirs):
     if tests == ["check_script_conventions.py"]:
         print("%s: no offline check names it, only the house rules cover it (a coverage gap): probing against those alone" % script)
     todo = mutants(original, args.per_operator, python)
+    progress({"event": "script", "script": script, "mutants": len(todo)})
     free = queue.Queue()
     for d in pool_dirs:
         free.put(d)
@@ -295,6 +312,7 @@ def probe(script, args, pool_dirs):
                 failed, _ = run_tests(d, tests, limit)
                 m["verdict"] = "killed" if failed else "survived"
                 m["by"] = failed
+            progress({"event": "mutant", "script": script, "verdict": m["verdict"]})
             return m
         finally:
             (Path(d) / script).write_text(original)
@@ -359,12 +377,19 @@ def main():
             make_copy(d)
             dirs.append(d)
         results = []
+        total = 0
+        for s in args.scripts:
+            p = ROOT / s
+            if p.is_file() and p.suffix in {".sh", ".py"}:
+                total += len(mutants(p.read_text(), args.per_operator, p.suffix == ".py"))
+        progress({"event": "start", "scripts": len(args.scripts), "mutants": total})
         for s in args.scripts:
             r = probe(s, args, dirs)
             if r == "base":
                 return 2
             if r:
                 results.append(r)
+        progress({"event": "end"})
         text = render(results)
         print(text)
         print("(%d s)" % (time.time() - started))
