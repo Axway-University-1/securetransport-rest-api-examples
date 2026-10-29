@@ -171,6 +171,17 @@ a time, and runs the checks that name the script, and the house rules check of t
 Some survivors are not a gap. A change that nobody could see (two headers swapped) is an "equivalent" change. Read each survivor and decide. When the survivor is a real gap, write the test
 that fails on the mutant, and then see it pass on the real script. Copy the tool, and change its list of tests to find the tests of your own scripts.
 
+## What the probes taught us
+
+We ran the probe on 60 scripts of this repository. It found no bug in a script. It found many holes in the tests. These are the lessons.
+
+- **Make the stand-in as strict as the server.** It should refuse a call with no `Referer` header, a JSON body with no `Content-Type`, and a call to a path that does not exist. One rule in the stand-in protects every script.
+- **Check the whole call.** Check the method, the full URL, the body fields, the headers and the exit code. A test that checks only the body lets a wrong method or a wrong path pass.
+- **Check the messages that tell a person something.** Examples are an error with its code, a usage line, and "nothing was created". A heading or a progress line is not worth a check.
+- **Test every refusal path.** Give each one its exit code. A refusal turned into `exit 0` was the survivor we saw most often.
+- **Read the survivors that nobody can see.** They often point to dead or copied code.
+- **Cap the time a changed script may run.** A change can make a test loop forever. Stop it after a few minutes and count it as caught.
+
 ## Counting what is covered
 
 Two more tools of this repository, if you have many scripts:

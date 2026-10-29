@@ -93,5 +93,10 @@ for label, old, new, weak_catches in mutants:
     shutil.rmtree(wd, ignore_errors=True)
 check("the table says four of the six are missed by the weak test", "The weak test misses four of the six" in text and sum(1 for *_, w in mutants if not w) == 4)
 shutil.rmtree(d, ignore_errors=True)
+
+_g = g.read("testing-your-scripts.md")
+check("the guide has the lessons of the probes, with the strict stand-in, the whole call, the messages, the refusal paths and the time cap",
+      "## What the probes taught us" in _g and "Make the stand-in as strict as the server." in _g and "Check the whole call." in _g
+      and "Test every refusal path." in _g and "Cap the time a changed script may run." in _g)
 print("test_guidance_testing_your_scripts: " + ("FAIL" if failed else "PASS"))
 sys.exit(1 if failed else 0)

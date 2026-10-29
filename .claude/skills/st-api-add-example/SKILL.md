@@ -262,6 +262,19 @@ A script that starts worker processes hands each one everything it needs as plai
 arguments, ends the queue with one `None` per worker, and counts with
 `counter.get_lock()` (see the gotchas).
 
+## Tests that notice (what the mutation probes taught)
+
+`tools/mutation_probe.py` breaks a script on purpose, one small change at a time, and lists the changes that no check noticed (`tools/measure_coverage.py --mutation SCRIPT ...` keeps the score).
+On 60 scripts it found no bug in a script and many holes in the tests. Write tests so that these holes are not there:
+
+- **A stand-in refuses what the real server refuses.** `tests/offline/lib/stub_curl` fails a call with no `Referer`, and a JSON body with no `Content-Type`. The `requests` stand-in (`tests/offline/lib/fake_requests`)
+  also fails a call in a session with no `csrfToken` and a path that does not exist. Put such a rule in the stand-in, not in one test: it protects every script at once. A rule of the stand-in has a test of its own (`test_stubs.py`, `test_fake_requests.py`).
+- **Assert the whole call**: the method, the full URL, the body keys, the headers and the exit code. Checking only the first call, or only the body, let a wrong method or a wrong path (`/xlogs/...`) pass.
+- **Assert the messages that tell a person something**: an error with its code, a usage line, "nothing was created", "could not look for ...". Do not pin decoration (a heading, a progress line, a blank line): such survivors are cosmetic.
+- **Every refusal path has a test with its exit code**: a refused lookup, a created object with no `Location`, a missing file, a wrong login. `exit 1` turned into `exit 0` survived most often.
+- **An equivalent survivor is a hint.** A change that nobody can see (a comment test whose result is never used, a header that `json=` sets anyway) is dead or duplicated code. Decide: remove it, or leave it on purpose.
+- **A probe takes hours.** Run it in waves of 10 to 25 scripts, writes and deletes first. Give it `MUTATION_PROGRESS=FILE` and read `python3 tools/mutation_progress.py FILE` for where it is. Its time limit is capped at 4 minutes, and a laptop that sleeps does not count as time spent.
+
 ## Before you call it done
 
 - [ ] `bash -n` passes on every shell file you touched, matched case-insensitively
@@ -278,7 +291,8 @@ arguments, ends the queue with one `None` per worker, and counts with
 - [ ] no JSON edited by text substitution
 - [ ] temporary files removed by the script, and gitignored as a backstop
 - [ ] a test covers the new or changed script (`tests/offline/checks/`, see CLAUDE.md)
-      and `./tests/offline/run_all.sh` passes
+      and `./tests/offline/run_all.sh` passes (`./tests/offline/run_fast.sh` is the quick run before a commit)
+- [ ] for a script that writes or deletes: `python3 tools/mutation_probe.py SCRIPT` lists no survivor that tells a person something
 - [ ] anything the example showed that looks like a product defect is in `KNOWN_ISSUES_RD.md` (git ignores it), with a reproduction you ran:
       see "The internal list of product defects" in the gotchas skill
 - [ ] the README coverage table updated — the per-topic counts in it are meant
