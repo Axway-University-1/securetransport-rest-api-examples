@@ -4,7 +4,7 @@
     MUTATION_PROGRESS=/tmp/progress.jsonl python3 tools/mutation_probe.py SCRIPT ...     (or tools/measure_coverage.py --mutation ...)
     python3 tools/mutation_progress.py /tmp/progress.jsonl
 
-It says: the script it is on (and which one of how many), the mutants done of the total, how many were caught, survived or did not parse, the time spent, and an estimate of the
+It says: the script it is on (and which one of how many), the mutants done of the total, how many were caught, survived or did not parse, the time spent (the time it was really going: a gap of more than 5 minutes, such as a sleeping laptop, counts as 5), and an estimate of the
 time that is left (the mutants done so far set the pace, so the estimate is rough, and the first scripts are not typical of the last).
 """
 import json
@@ -19,12 +19,15 @@ def summarize(lines, now=None):
     verdicts = {"killed": 0, "survived": 0, "invalid": 0}
     ended = False
     first_t = last_t = None
+    active = 0.0          # time the run was really going: a gap of more than 5 minutes between two steps (a sleeping laptop) counts as 5 minutes
     for line in lines:
         try:
             e = json.loads(line)
         except ValueError:
             continue
         first_t = first_t or e.get("t")
+        if last_t is not None and e.get("t") is not None:
+            active += min(max(e["t"] - last_t, 0), 300)
         last_t = e.get("t", last_t)
         if e["event"] == "start":
             start = e
@@ -43,7 +46,7 @@ def summarize(lines, now=None):
     done = sum(verdicts.values())
     total = start["mutants"]
     now = now or time.time()
-    elapsed = max(0, (now if not ended else (last_t or now)) - (first_t or now))
+    elapsed = active if ended or last_t is None else active + min(max(now - last_t, 0), 300)
     mins = lambda s: "%d min" % round(s / 60) if s >= 90 else "%d s" % s
     text = "%s: %d of %d mutants (%d%%); caught %d, survived %d, did not parse %d; %s spent" % (
         "FINISHED" if ended else "still running", done, total, round(100 * done / max(1, total)), verdicts["killed"], verdicts["survived"], verdicts["invalid"], mins(elapsed))

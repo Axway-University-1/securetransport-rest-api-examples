@@ -40,6 +40,20 @@ elif mode == "unknown_resource":
     s.get(URL + "xaccounts", headers=good, verify=False, timeout=10)
 elif mode == "no_referer":
     s.get(URL + "accounts", headers={"csrfToken": tok}, verify=False, timeout=10)
+elif mode == "login_text":
+    print("LOGIN:", r.json().get("message"))
+elif mode == "get_change_put":
+    # what an example does: GET an object, change it, PUT the very object it was given
+    route = s.get(URL + "routes/r1", headers=good, verify=False, timeout=10).json()
+    route["name"] = "Changed"
+    route["steps"].append({"type": "X"})
+    s.put(URL + "routes/r1", headers=dict(good, **{"Content-Type": "application/json"}), data=json.dumps(route), verify=False, timeout=10)
+    print("AFTER:", json.dumps(s.get(URL + "routes/r1", headers=good, verify=False, timeout=10).json(), sort_keys=True))
+elif mode == "put_json":
+    route = s.get(URL + "routes/r1", headers=good, verify=False, timeout=10).json()
+    route["name"] = "Changed"
+    s.put(URL + "routes/r1", headers=good, json=route, verify=False, timeout=10)
+    print("AFTER:", json.dumps(s.get(URL + "routes/r1", headers=good, verify=False, timeout=10).json(), sort_keys=True))
 """
 
 
@@ -59,5 +73,19 @@ r = probe("unknown_resource", scenario={"strict": False})
 check('scenario "strict": false turns the three rules off', r.returncode == 0 and r.violations() == [], (r.returncode, r.violations()))
 r = probe("unknown_resource", scenario={"collections": {"xaccounts": []}})
 check("a collection the scenario brings is a resource", r.returncode == 0 and r.violations() == [], (r.returncode, r.violations()))
+r = probe("login_text", scenario={"login_message": "Welcome"})
+check('scenario "login_message" is what the login answers', "LOGIN: Welcome" in r.output, r.output[-200:])
+r = probe("login_text")
+check("the login answers 'Logged in' by default", "LOGIN: Logged in" in r.output, r.output[-200:])
+ROUTES = {"collections": {"routes": [{"id": "r1", "name": "Original", "steps": [{"type": "A"}]}]}}
+for mode in ("get_change_put", "put_json"):
+    r = probe(mode, scenario=ROUTES)
+    after = [l for l in r.output.splitlines() if l.startswith("AFTER:")]
+    check("%s: a PUT of the object a GET gave stores what was sent (the stored object was the very dict, and was emptied first)" % mode,
+          after and '"name": "Changed"' in after[0] and '"id": "r1"' in after[0], (r.returncode, r.output[-300:]))
+r = probe("get_change_put", scenario=ROUTES)
+puts = [e for e in r.calls if e["method"] == "PUT"]
+check("a body sent as text is recorded (data), so that a test reads its keys",
+      puts and '"name": "Changed"' in puts[0].get("data", "") and '"type": "X"' in puts[0].get("data", ""), puts[:1])
 print("test_fake_requests: " + ("FAIL" if failed else "PASS"))
 sys.exit(1 if failed else 0)

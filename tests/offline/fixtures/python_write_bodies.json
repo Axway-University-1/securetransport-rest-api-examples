@@ -897,7 +897,31 @@
    "routes",
    true,
    {
-    "id": "c1"
+    "id": "c1",
+    "name": "Composite1",
+    "steps": [
+     {
+      "actionOnStepFailure": "PROCEED",
+      "conditionType": "ALWAYS",
+      "fileFilterExpression": "*",
+      "fileFilterExpressionType": "GLOB",
+      "inputCharset": "UTF-8",
+      "outputCharset": "UTF-8",
+      "status": "ENABLED",
+      "type": "EncodingConversion",
+      "usePrecedingStepFiles": false
+     },
+     {
+      "type": "A"
+     },
+     {
+      "type": "B"
+     }
+    ],
+    "subscriptions": [
+     "sub-existing"
+    ],
+    "type": "COMPOSITE"
    }
   ]
  ],

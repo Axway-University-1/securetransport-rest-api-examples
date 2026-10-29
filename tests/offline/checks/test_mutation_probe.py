@@ -109,6 +109,7 @@ check("python: the covering tests of a python example are the python checks, not
 import json
 import os
 import tempfile
+import time
 sys.path.insert(0, str(ROOT / "tools"))
 import mutation_progress as mpg  # noqa: E402
 with tempfile.TemporaryDirectory() as _d:
@@ -124,12 +125,28 @@ with tempfile.TemporaryDirectory() as _d:
     check("a progress file has a line for each step", len(lines) == 13 and all(json.loads(l)["event"] in {"start", "script", "mutant"} for l in lines))
     check("it says how far the run is, with what was caught, and which script it is on",
           "still running: 11 of 20 mutants (55%)" in text and "caught 8, survived 2, did not parse 1" in text and "now on script 1 of 2 (a.py, 11 of 12 mutants)" in text, text)
-    check("it estimates the time left from the pace so far", "about 8 min left" in text, text)
+    check("it estimates the time left from the pace so far (a pause of minutes counts as 5)", "about 4 min left" in text, text)
+    gap = [json.dumps({"event": "start", "scripts": 1, "mutants": 20, "t": 0}), json.dumps({"event": "script", "script": "a.py", "mutants": 20, "t": 1})]
+    gap += [json.dumps({"event": "mutant", "script": "a.py", "verdict": "killed", "t": 10 + i}) for i in range(10)]
+    gap += [json.dumps({"event": "mutant", "script": "a.py", "verdict": "killed", "t": 10 + 9 + 30000 + i}) for i in range(5)]   # eight hours later
+    check("a night of sleep does not count as time spent", "about 2 min left" in mpg.summarize(gap, now=10 + 9 + 30000 + 4 + 1), mpg.summarize(gap, now=10 + 9 + 30000 + 5))
     mp.progress({"event": "end"})
     check("a finished run says so", mpg.summarize(open(pf).read().splitlines()).startswith("FINISHED:"))
     del os.environ["MUTATION_PROGRESS"]
     mp.progress({"event": "start", "scripts": 1, "mutants": 1})
     check("without MUTATION_PROGRESS nothing is written", len(open(pf).read().splitlines()) == 14)
     check("an empty file is said to be empty", "no run yet" in mpg.summarize([]))
+
+# the time limit of a changed script
+check("the limit is 4 times the baseline, at least 30 s and at most 4 minutes", mp.limit_for(2) == 30 and mp.limit_for(20) == 80 and mp.limit_for(900) == 240, (mp.limit_for(2), mp.limit_for(20), mp.limit_for(900)))
+with tempfile.TemporaryDirectory() as _c:
+    _chk = Path(_c) / "tests" / "offline" / "checks"
+    _chk.mkdir(parents=True)
+    (_chk / "test_endless.sh").write_text("#!/bin/bash\nwhile true; do :; done\n")
+    (_chk / "test_fine.sh").write_text("#!/bin/bash\nexit 0\n")
+    _t0 = time.time()
+    _failed, _ = mp.run_tests(_c, ["test_endless.sh"], limit=2)
+    check("a test that never ends is stopped at the limit and counted as a failure (a change that makes it endless is caught)", _failed and "hung" in _failed and time.time() - _t0 < 15, _failed)
+    check("a test that passes returns no failure", mp.run_tests(_c, ["test_fine.sh"], limit=5)[0] is None)
 print("test_mutation_probe: " + ("FAIL" if failed else "PASS"))
 sys.exit(1 if failed else 0)

@@ -23,6 +23,7 @@ The scenario (a JSON file named by FAKE_ST_SCENARIO) holds:
     service_lag   the same for a cluster service stopped through /clusterServices/operations
     csrf          false to behave like a server without CSRF (default true)
     ignore_filters  query parameters a list answer does not filter by, as accountType= on the lab
+    login_message   what the login answers in its "message" (default "Logged in"), for a script that checks it
 
 Every call is appended to FAKE_ST_LOG as one JSON line.
 """
@@ -119,6 +120,16 @@ class FakeST:
         lower = {k.lower(): v for k, v in headers.items()}
         entry = {"method": method, "path": path, "query": qs, "url": url,
                  "has_csrf": "csrftoken" in lower, "verify": verify, "body": body, "files": sorted((files or {}).keys())}
+        if isinstance(data, (str, bytes)):
+            # a body sent as text (data=json.dumps(...)) is recorded too, so that a test can read the keys of what the script sent,
+            # and it is the body of the call when no json= came with it (a PUT or POST of text that is JSON stores what it says)
+            text = data.decode("latin-1") if isinstance(data, bytes) else data
+            entry["data"] = text[:20000]
+            if body is None and not files and text.lstrip()[:1] in ("{", "["):
+                try:
+                    body = json.loads(text)
+                except ValueError:
+                    pass
 
         kind = self._failure(session, method, path, is_login)
         if kind and kind.startswith("raise:"):
@@ -165,7 +176,7 @@ class FakeST:
             session._token = "tok-" + uuid.uuid4().hex[:8] if self.csrf else None
             entry["status"] = 200
             self.record(entry)
-            return self._response(200, {"message": "Logged in"},
+            return self._response(200, {"message": self.scenario.get("login_message", "Logged in")},
                                   {"csrfToken": session._token} if session._token else {})
         if not session._logged_in:
             entry["status"] = 401
@@ -218,8 +229,11 @@ class FakeST:
             return self._response(204, {})
         if method == "PUT":
             keep = found.get("id")
+            # a script that GETs an object, changes it and PUTs it sends the very dict the fake gave it (it is the stored object): copy
+            # it before the stored object is emptied, or the PUT stores (and the log records) an empty body
+            payload = copy.deepcopy(body or {})
             found.clear()
-            found.update(copy.deepcopy(body or {}))
+            found.update(payload)
             if keep is not None:
                 found["id"] = keep
             return self._response(204, {})

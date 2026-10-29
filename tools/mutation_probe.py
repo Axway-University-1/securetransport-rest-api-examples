@@ -237,6 +237,15 @@ def make_copy(dest):
     subprocess.run(["git", "add", "-A"], cwd=dest, check=True, capture_output=True)
 
 
+MAX_LIMIT = 240
+
+
+def limit_for(took):
+    """Seconds a check may take on a changed script: 4 times what the checks need, at least 30, at most 4 minutes. (A baseline taken on a loaded
+    machine is slow, and without a cap a change that makes a loop endless was waited for for the better part of an hour.)"""
+    return min(max(30, int(took * 4)), MAX_LIMIT)
+
+
 def run_tests(copy, tests, limit=TEST_TIMEOUT):
     """(None when every test passed, else the name of the first one that failed; seconds the run took)."""
     began = time.time()
@@ -322,7 +331,7 @@ def probe(script, args, pool_dirs):
     # the unmutated script must pass first: otherwise every mutant is "killed"
     base, took = run_tests(pool_dirs[0], tests)
     # a mutant gets 4 times as long as the checks need (and at least 30 s): longer than that, it is stuck
-    limit = max(30, int(took * 4))
+    limit = limit_for(took)
     if base:
         print("%s: the checks fail without any change (%s): fix that first" % (script, base))
         return "base"
