@@ -33,8 +33,7 @@ feature works on that release and on every later one.
 ## Guidance
 
 [Guidance](Guidance/) is a folder of short guides to read, not examples to run: how to use the REST API well and what to avoid. It starts with
-[Time formats in the SecureTransport REST API, and daylight saving time](Guidance/time-formats.md), and goes on with usage and billing reporting,
-reading the answers, authentication, Expression Language escaping and field names between releases. The folder's [README](Guidance/README.md) lists them.
+[Time formats in the SecureTransport REST API, and daylight saving time](Guidance/time-formats.md), and goes on with reading the answers, authentication, Expression Language escaping and field names between releases. The folder's [README](Guidance/README.md) lists them.
 
 ## Version check
 

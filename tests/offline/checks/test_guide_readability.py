@@ -107,7 +107,7 @@ def own_words_removed(text):
 
 
 guides = {os.path.basename(p): open(p).read() for p in GUIDES}
-check("there are guides to read", len(guides) >= 6, sorted(guides))
+check("there are guides to read", len(guides) >= 5, sorted(guides))
 
 for name, text in guides.items():
     ss = sentences(text)

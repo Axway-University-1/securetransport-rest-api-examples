@@ -71,7 +71,7 @@ Three short guides save you working this out for yourself:
 - **[Adding an example](.claude/skills/st-api-add-example/SKILL.md)** — the house
   style, if you plan to contribute.
 
-For how the API behaves when you use it, such as the date formats, usage reports or sessions, read the [Guidance](#guidance) guides. For doing it step by step (stopping a daemon,
+For how the API behaves when you use it, such as the date formats or sessions, read the [Guidance](#guidance) guides. For doing it step by step (usage reporting, stopping a daemon,
 changing an object, reading lists, moving files), run the [Admin](Admin/UseCases/README.md) and [End User](EndUser/UseCases/README.md) use cases.
 
 ### Check your clone works
@@ -530,7 +530,6 @@ it was checked on (5.5-20260924). They are written in short sentences, so that t
 | Guide | What it is about |
 | ----- | ---------------- |
 | [Time formats, and daylight saving time](Features/Guidance/time-formats.md) | The five date formats of the API, which resource takes which, an example of each, and what to do when the clocks change. |
-| [Usage and billing reporting](Features/Guidance/usage-and-billing-reporting.md) | What active users, the usage report and the billable transfers count, and how they relate. |
 | [Reading the answers](Features/Guidance/reading-api-answers.md) | A 200 that says no, and the shapes of an error. |
 | [Authentication and sessions](Features/Guidance/authentication-and-sessions.md) | Basic, session and API key, what each answers, and advice on which fits which case. |
 | [Expression Language escaping](Features/Guidance/expression-language-escaping.md) | Where an expression goes and how to escape it in the shell, in JSON and in the expression. |
