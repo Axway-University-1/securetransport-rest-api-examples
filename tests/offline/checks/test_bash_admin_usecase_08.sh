@@ -418,6 +418,11 @@ printf 'x' > "${UC}/state.local.password"
 for bad in 0 x -1; do run 05.upload_POST.sh "${bad}"; expect "05: SECONDS of '${bad}' is exit 2, nothing sent" "${RC}:$(ncalls)" "2:0"; done
 run 05.upload_POST.sh 5 6
 expect "05: two parameters is exit 2" "${RC}" "2"
+printf 'Ex1!password' > "${UC}/state.local.password"
+RULES="$(IDS_RULES)" POST_STATUS=000 run 05.upload_POST.sh 5
+expect "05: no answer from the End User port is exit 1, the content is not sent, and the message names ST_ENDUSER_PORT" "${RC}:$(calls | grep -c '^PUT'):$(printf '%s\n' "${OUT}" | grep -c 'The End User API has its own port: set ST_ENDUSER_PORT in set_variables.local.sh')" "1:0:1"
+has "05: and the host and port that did not answer" "No answer from "
+rm -f "${UC}/state.local.password"
 rm -f "${UC}/state.local.password"
 
 echo "=== 06 the step is disabled ==="

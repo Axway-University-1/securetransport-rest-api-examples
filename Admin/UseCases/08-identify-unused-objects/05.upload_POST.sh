@@ -43,6 +43,10 @@ RESULT=$(curl -k -s -w "\n%{http_code}" -u "${A1}:${PASSWORD}" -X POST "${EU_URL
          -H "Content-Type: application/json" -d "$(jq -cn --arg path "${SUB_FOLDER}/${FILE}" '{operation: "Upload", filePath: $path, customAttributes: {transferMode: "BINARY"}}')")
 CODE="${RESULT##*$'\n'}"
 OPERATION=$(printf '%s' "${RESULT%$'\n'*}" | jq -r '.id // empty' 2>/dev/null)
+if [ "${CODE}" = "000" ]; then
+    echo "No answer from ${ST_SERVER}:${ST_ENDUSER_PORT}. The End User API has its own port: set ST_ENDUSER_PORT in set_variables.local.sh."
+    exit 1
+fi
 if [ "${CODE}" != "200" ] && [ "${CODE}" != "201" ] || [ -z "${OPERATION}" ]; then
     echo "POST /fileOperations: HTTP ${CODE}: no operation id came back, so nothing was uploaded."
     printf '%s\n' "${RESULT%$'\n'*}" | jq -r '(.message // empty)' 2>/dev/null
