@@ -15,7 +15,7 @@
 #
 # Notes:
 # - Copied from Admin/API 2.0/bash/33.StatisticsSummary/02.statisticsSummary_activeUsers_GET.sh.
-# - Without limit the server sends at most 100. To read everything, add the limit to the offset until the offset passes totalCount.
+# - Without limit the server sends a page of 100. To read everything, add the limit to the offset until the offset passes totalCount.
 # - lastAccessTime is text for people, not a date to parse.
 # ==============================================================================
 

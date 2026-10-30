@@ -234,6 +234,6 @@ https://<SERVER>:8444/api/v2.0/docs/index.html
 It is the authority on field names, which vary between releases. When an example
 disagrees with it, believe the Open API page for your version.
 
-By default a list call returns at most 100 objects. That limit is the
+By default a list call returns a page of 100 objects, which is not a cap: `limit=1000` returns 1000. That default is the
 `Webservices.EntriesPerPage` Server Configuration Option.
 

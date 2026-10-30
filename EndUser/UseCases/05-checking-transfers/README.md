@@ -35,7 +35,7 @@ ignores).
 - A `DELETE /files/...` shows up in the transfer list too, as an `Outgoing` transfer of type "User download" (confirmed 2026-10-19 with one upload and one delete): a delete is logged like a download, so the newest entries after a cleanup are deletes, not reads. An upload is `Incoming` / "User upload".
 - The list and the single transfer name some fields differently (`filename` and `direction`, against `file` and `transferType`).
 - A 403 on `/transfers` usually means the account may not use the transfers web service (`transfersWebServiceAllowed` in `GET /myself`; the administrator sets it).
-- The server has no summary call: `group_by` on the list makes one (the list is at most 100 long).
+- The server has no summary call: `group_by` on the list makes one (the scripts ask for `limit=100`, so they count the newest 100: the server itself has no cap, and `limit=500` returned 105 entries; a longer history needs a larger `limit` or `offset`).
 
 ## Tests
 

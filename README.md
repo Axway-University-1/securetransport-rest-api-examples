@@ -322,7 +322,7 @@ The Open API provides a curl command equivalent that it is using to fetch the da
 
 The HTTP success code of 200 is shown next to the response assuming all worked correctly. Finally, if you wish to download the response there is an option to download the output json to your PC.
 
-A list answers at most 100 objects by default; ask for more with `limit` and `offset`, or change the default with the Server Configuration Option Webservices.EntriesPerPage.
+A list answers 100 objects by default (a page, not a cap); ask for more with `limit` and `offset`, or change the default with the Server Configuration Option Webservices.EntriesPerPage.
 
 
 ## ST API 2.0 Methods
@@ -330,7 +330,7 @@ A list answers at most 100 objects by default; ask for more with `limit` and `of
 How the methods behave on SecureTransport. The details, and the surprises, are in the
 [gotchas](.claude/skills/st-api-gotchas/SKILL.md); each was confirmed on a real server.
 
-**GET** reads, and changes nothing. A list answers at most 100 objects, in no fixed order
+**GET** reads, and changes nothing. A list answers a page of 100 objects by default, in no fixed order
 unless you ask; page it with `limit` and `offset`.
 
 **POST** creates an object (201, with its URL in the `Location` header: the created object

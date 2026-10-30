@@ -15,7 +15,7 @@
 #
 # Notes:
 # - Copied from EndUser/API 2.0/bash/05.Transfers/01.transfers_GET.sh.
-# - LIMIT is how many to ask for (default 5); the server never sends more than 100 at a time, so a longer history is read with offset.
+# - LIMIT is how many to ask for (default 5); without a limit the server sends a page of 100, which is not a cap (limit=500 returned 105); a longer history is read with limit and offset.
 # ==============================================================================
 
 source "$(dirname "$(realpath "$0")")/lib.sh"

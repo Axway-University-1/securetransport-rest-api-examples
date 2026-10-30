@@ -134,7 +134,7 @@ CALL :log_message INFO "Start time (%START_HOURS_AGO% hours ago), encoded: %STAR
 CALL :log_message INFO "End time (%END_HOURS_AGO% hours ago), encoded: %END_TIME_ENCODED%"
 
 REM
-REM Read the log a page at a time: it answers at most 100 transfers a call. Oldest
+REM Read the log a page at a time: it answers a page of 100 transfers a call unless asked for more. Oldest
 REM first, so that the pages do not move. From each page, select the transfers that
 REM have no acknowledgment status yet and collect their Core IDs (the PowerShell
 REM equivalent of the jq select of the bash version), until a page is not full.

@@ -22,7 +22,7 @@
 source "$(dirname "$(realpath "$0")")/lib.sh"
 st_session
 
-# count NAME QUERY...: how many transfers a set of filters finds (at most 100 are counted)
+# count NAME QUERY...: how many transfers a set of filters finds (the newest 100 are counted: the script asks for limit=100)
 count() {
     local name="$1"; shift
     local result code

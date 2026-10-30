@@ -174,7 +174,7 @@ START_TIME_ENCODED=$(url_encode_rfc2822 "$START_TIME")
 END_TIME_ENCODED=$(url_encode_rfc2822 "$END_TIME")
 log_message "INFO" "Start time (${START_HOURS_AGO} hours ago): $START_TIME. Encoded: $START_TIME_ENCODED"
 log_message "INFO" "End time (${END_HOURS_AGO} hours ago): $END_TIME. Encoded: $END_TIME_ENCODED"
-# The log answers at most 100 transfers a call, so it is read a page at a time,
+# The log answers a page of 100 transfers a call unless asked for more, so it is read a page at a time,
 # oldest first so that the pages do not move, until a page is not full. Only the
 # first page was read before: every transfer after the 100th was never acknowledged.
 PAGE_SIZE=100

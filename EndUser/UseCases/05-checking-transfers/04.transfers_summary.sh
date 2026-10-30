@@ -6,7 +6,7 @@
 # Location: Sofia
 # ==============================================================================
 # Description:
-# A summary of the history: how many transfers there are of each status and of each direction, counted on this side with jq from the list (up to 100).
+# A summary of the history: how many transfers there are of each status and of each direction, counted on this side with jq from the list (the newest 100: the script asks for limit=100).
 #
 # Usage:
 # ./04.transfers_summary.sh
