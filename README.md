@@ -71,8 +71,8 @@ Three short guides save you working this out for yourself:
 - **[Adding an example](.claude/skills/st-api-add-example/SKILL.md)** — the house
   style, if you plan to contribute.
 
-For how the API behaves when you use it, such as the date formats, usage reports, sessions or
-stopping a daemon, read the [Guidance](#guidance) guides.
+For how the API behaves when you use it, such as the date formats, usage reports or sessions, read the [Guidance](#guidance) guides. For doing it step by step (stopping a daemon,
+changing an object, reading lists, moving files), run the [Admin](Admin/UseCases/README.md) and [End User](EndUser/UseCases/README.md) use cases.
 
 ### Check your clone works
 
@@ -83,6 +83,21 @@ stopping a daemon, read the [Guidance](#guidance) guides.
 Takes up to 5 minutes, needs no server and no credentials. See the
 [tests Quick Start](tests/README.md) for what it checks and how to add a test
 with your change.
+
+### Testing your own scripts
+
+A script that calls an API fails in two ways: it sends the wrong call, or it reads the answer wrongly. The first kind needs no server, the second needs a lab. This repository
+tests its own scripts both ways, and you can copy the method.
+
+- **A lab that is not production.** Give everything a test makes a throwaway prefix (`example_`, `ZZTEST_`) and a random tail. Read what you change, keep a copy, change it, look, put it back and compare with the copy.
+  Clean up even when the test fails, and never run what changes the whole server for good (maintenance mode, the keystore password, the database connection).
+- **A stand-in for `curl`, with no server.** `curl` is found by name, so a file named `curl` first on `PATH` runs instead. `tests/offline/lib/stub_curl` prints the method, the URL, the headers and the body instead of sending them, and refuses what the
+  server refuses: a call with no `Referer`, and a JSON body with no `Content-Type`. The python examples run against `tests/offline/lib/fake_requests` in the same way.
+- **What a test checks.** The method, the full path, the body field by field, the headers, the exit code of every answer the script knows, the message a person reads, and that **nothing** was sent after a bad parameter. A test that checks only the exit code passes for a script that sends the wrong method.
+- **Would the test notice a broken script?** `python3 tools/mutation_probe.py SCRIPT` breaks the script in a scratch copy, one small change at a time (another method, a refusal that no longer stops, another status, a dropped header, a wrong path, a renamed key), runs the tests and lists the changes that no test noticed. Each one is a gap in the tests, or a change nobody could see.
+- **What is covered.** `python3 tools/script_coverage.py` lists the scripts that no test ran, and the ones that ran but never made a call. `python3 tools/measure_coverage.py` puts the numbers on one screen.
+
+[tests/README.md](tests/README.md) has the details: how to add a test with a script, the lab checks, and the map from a script to its tests.
 
 ### Prerequisites
 
@@ -516,14 +531,10 @@ it was checked on (5.5-20260924). They are written in short sentences, so that t
 | ----- | ---------------- |
 | [Time formats, and daylight saving time](Features/Guidance/time-formats.md) | The five date formats of the API, which resource takes which, an example of each, and what to do when the clocks change. |
 | [Usage and billing reporting](Features/Guidance/usage-and-billing-reporting.md) | What active users, the usage report and the billable transfers count, and how they relate. |
-| [Reading the answers](Features/Guidance/reading-api-answers.md) | A 200 that says no, the shapes of an error, paging, `fields=`, `HEAD`. |
-| [Protocol servers and daemons](Features/Guidance/protocol-servers-and-daemons.md) | Starting and stopping through the API: the messages, the times, the order, a loop that waits. |
-| [Moving files with the End User API](Features/Guidance/moving-files-end-user-api.md) | Upload, checksums, chunks, rename, delete and sharing. |
+| [Reading the answers](Features/Guidance/reading-api-answers.md) | A 200 that says no, and the shapes of an error. |
 | [Authentication and sessions](Features/Guidance/authentication-and-sessions.md) | Basic, session and API key, what each answers, and advice on which fits which case. |
-| [Changing objects without breaking them](Features/Guidance/changing-configuration.md) | PATCH and PUT, what `replace`, `add` and `remove` do, save and restore. |
 | [Expression Language escaping](Features/Guidance/expression-language-escaping.md) | Where an expression goes and how to escape it in the shell, in JSON and in the expression. |
 | [Field names between releases](Features/Guidance/field-names-between-releases.md) | The same thing under two names, and how to write a client that survives. |
-| [Testing your own scripts](Features/Guidance/testing-your-scripts.md) | A lab and an offline method, mutation testing, and the coverage tools. |
 
 ## License and Support
 

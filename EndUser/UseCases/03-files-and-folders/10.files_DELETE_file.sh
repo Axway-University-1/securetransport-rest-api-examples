@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 08.files_DELETE_file.sh
+# Script Name: 10.files_DELETE_file.sh
 # Author: Plamen Milenkov
 # Created: 2026-10-15
 # Location: Sofia
@@ -9,7 +9,7 @@
 # Deletes the file (now named as 07 left it). DELETE /files/<folder>/<file> answers 204, and the next read of it is 404, which this checks.
 #
 # Usage:
-# ./08.files_DELETE_file.sh
+# ./10.files_DELETE_file.sh
 #
 # Risk: write
 #

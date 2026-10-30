@@ -27,6 +27,9 @@ if [ -f "${JAR}" ] || st_session; then
     done
     curl -k -s -o /dev/null -b "${JAR}" -X DELETE "${ST_URL}/files/$(st_enc "${FOLDER}")" \
          -H "accept: application/json" -H "Referer: ${REFERER}"
+    # The file 09 sends with a folder in its name lands in the home folder, not in the folder
+    curl -k -s -o /dev/null -b "${JAR}" -X DELETE "${ST_URL}/files/$(st_enc "${LANDED}")" \
+         -H "accept: application/json" -H "Referer: ${REFERER}"
 fi
 rm -rf "${UC_DIR}/downloaded_files"
 

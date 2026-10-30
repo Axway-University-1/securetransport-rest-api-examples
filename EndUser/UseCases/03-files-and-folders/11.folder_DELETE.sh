@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 09.folder_DELETE.sh
+# Script Name: 11.folder_DELETE.sh
 # Author: Plamen Milenkov
 # Created: 2026-10-15
 # Location: Sofia
@@ -9,7 +9,7 @@
 # Deletes the folder. A folder with anything in it is refused with 403, so the files go first and the folder last: this shows the refusal, then empties the folder, then deletes it.
 #
 # Usage:
-# ./09.folder_DELETE.sh
+# ./11.folder_DELETE.sh
 #
 # Risk: write
 #

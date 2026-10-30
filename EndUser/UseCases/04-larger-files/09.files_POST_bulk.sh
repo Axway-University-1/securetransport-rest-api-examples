@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 06.files_POST_bulk.sh
+# Script Name: 09.files_POST_bulk.sh
 # Author: Plamen Milenkov
 # Created: 2026-10-15
 # Location: Sofia
@@ -9,7 +9,7 @@
 # Uploads several files in a loop, one POST each, and stops at the first refusal with a count of what went. A loop of the same call is what a bulk upload is.
 #
 # Usage:
-# ./06.files_POST_bulk.sh
+# ./09.files_POST_bulk.sh
 #
 # Risk: write
 #

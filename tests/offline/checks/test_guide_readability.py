@@ -10,8 +10,7 @@ outside code blocks, tables, headings and links' addresses. A word in backticks 
   3. No filler or hype phrase from a short list (BANNED below), and no em dash or en dash.
   4. The first section of detail is preceded by a summary: the guide opens with a "## Summary" with at least two sentences of prose.
   5. One name for one thing: a table of pairs where one form is preferred (TERMS below). The server's own words, in double quotes, are not checked.
-  6. The words "the lab" are explained in the first block of the guide ("the test server that it was checked on"), except in the guide about testing,
-     where "a lab" is something the reader sets up.
+  6. The words "the lab" are explained in the first block of the guide ("the test server that it was checked on").
 
 Runs offline. Exit 0 is clean.
 """
@@ -108,7 +107,7 @@ def own_words_removed(text):
 
 
 guides = {os.path.basename(p): open(p).read() for p in GUIDES}
-check("there are guides to read", len(guides) >= 10, sorted(guides))
+check("there are guides to read", len(guides) >= 6, sorted(guides))
 
 for name, text in guides.items():
     ss = sentences(text)
@@ -138,7 +137,7 @@ for name, text in guides.items():
     check("%s: one name for one thing (%s)" % (name, ", ".join(sorted(TERMS))), not bad, bad)
 
     head = text.split("\n## ", 1)[0]
-    if name != "testing-your-scripts.md" and "lab" in text.lower():
+    if "lab" in text.lower():
         check("%s: \"the lab\" is explained in the first block" % name, 'the lab" is the test server' in head, head[-200:])
 
 # the checks work: a text that breaks each rule is caught (so that a pass above means something)

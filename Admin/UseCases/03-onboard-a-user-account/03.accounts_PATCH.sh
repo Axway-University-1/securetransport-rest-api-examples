@@ -17,7 +17,7 @@
 # Risk: write
 #
 # Notes:
-# - Copied from Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh. Features/Guidance/changing-configuration.md explains what replace, add and remove do.
+# - Copied from Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh. Admin/UseCases/05-changing-an-object explains what replace, add and remove do.
 # - `replace` needs the field to exist (the account has an email from step 01). A write in a session carries the csrfToken header.
 # - Exit 1 when the server refuses, or when the address is not the new one afterwards.
 # ==============================================================================

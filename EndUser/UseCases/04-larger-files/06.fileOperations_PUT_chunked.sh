@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================================
-# Script Name: 04.fileOperations_PUT_chunked.sh
+# Script Name: 06.fileOperations_PUT_chunked.sh
 # Author: Plamen Milenkov
 # Created: 2026-10-15
 # Location: Sofia
@@ -9,7 +9,7 @@
 # Uploads a file in pieces. POST /fileOperations declares the upload and returns an id; each piece is a PUT to that id with a Content-Range header that says which bytes it is. The way to send a file too big for one request, or to resume.
 #
 # Usage:
-# ./04.fileOperations_PUT_chunked.sh
+# ./06.fileOperations_PUT_chunked.sh
 #
 # Risk: write
 #
@@ -17,6 +17,7 @@
 # - Copied from EndUser/API 2.0/bash/04.FileOperations/03.fileOperations_id_PUT_chunked.sh.
 # - The file is 250000 bytes sent in pieces of 100000.
 # - Content-Range is bytes START-END/TOTAL, both ends included, counted from 0.
+# - The pieces go in order. The operation stays IN_PROGRESS after the last one, so the proof that the file arrived whole is its MD5 (04 and st_md5calc), checked at the end. 07 shows what happens out of order.
 # ==============================================================================
 
 source "$(dirname "$(realpath "$0")")/lib.sh"
@@ -44,3 +45,6 @@ while [ "${START}" -lt "${SIZE}" ]; do
     START=$((END + 1))
 done
 echo "Uploaded ${FOLDER}/${CHUNKED_FILE} in pieces of ${CHUNK_SIZE} bytes."
+st_md5calc "/${FOLDER}/${CHUNKED_FILE}" || exit 1
+[ "${SERVER_MD5}" = "$(st_md5 "${LOCAL}")" ] || { echo "The server holds ${SERVER_SIZE} bytes with MD5 ${SERVER_MD5}, not the MD5 of the file that was sent."; exit 1; }
+echo "Verified: the server holds ${SERVER_SIZE} bytes with the MD5 of the local file."

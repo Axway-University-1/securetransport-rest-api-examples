@@ -169,7 +169,7 @@ urun() { touch "${UC}/session.cookie.jar"; run "$@"; }
 BASE_FILES="${BASE}/files"
 
 echo "=== Every later script starts with the check for a session, and logs in when there is none ==="
-for rel in 02-knowing-yourself/01.myself_GET.sh 03-files-and-folders/03.files_GET_list.sh 04-larger-files/06.files_POST_bulk.sh 05-checking-transfers/01.transfers_GET.sh; do
+for rel in 02-knowing-yourself/01.myself_GET.sh 03-files-and-folders/03.files_GET_list.sh 04-larger-files/09.files_POST_bulk.sh 05-checking-transfers/01.transfers_GET.sh; do
     uc "$(dirname "${rel}")"; rm -f "${UC}/session.cookie.jar"
     run "../${rel}"
     expect "${rel}: with no jar it logs in first (POST /myself with the user and password), then goes on" \
@@ -257,24 +257,59 @@ expect "06: the same upload again, then a read of it" "$(ucalls | tr '\n' ' ')" 
 urun ../03-files-and-folders/07.files_PATCH_rename.sh
 expect "07: PATCH of the file" "$(ucalls)" "PATCH ${F}/notes.txt"
 expect "07: the patch body" "$(payload 1 | jq -c .)" '[{"op":"add","path":"/newFilePath","value":"/example_uc_files/notes_renamed.txt"}]'
+STUB_STATUS_PATCH_SEQ="403 403 204" STUB_COUNTER="${WORK}/ctr7" urun ../03-files-and-folders/07.files_PATCH_rename.sh
+rm -f "${WORK}"/ctr7.*
+expect "07: a 403 right after the upload is tried again, and the third try is 204: three PATCHes, exit 0" "$(ucalls | grep -c PATCH):${RC}" "3:0"
+has "07: and it says it is trying again" "HTTP 403, trying again in a second (2 of 10)."
 STUB_STATUS_PATCH=403 urun ../03-files-and-folders/07.files_PATCH_rename.sh
-expect "07: a refused rename is exit 1" "${RC}" "1"
-STUB_STATUS_DELETE=204 STUB_STATUS_GET=404 urun ../03-files-and-folders/08.files_DELETE_file.sh
-expect "08: DELETE the renamed file, then read it again" "$(ucalls | tr '\n' ' ')" "DELETE ${F}/notes_renamed.txt GET ${F}/notes_renamed.txt "
-STUB_STATUS_DELETE=204 STUB_STATUS_GET=200 urun ../03-files-and-folders/08.files_DELETE_file.sh
-expect "08: a file that is still there afterwards is exit 1" "${RC}" "1"
-STUB_STATUS_DELETE=404 urun ../03-files-and-folders/08.files_DELETE_file.sh
-expect "08: deleting what is not there is exit 1" "${RC}" "1"
-STUB_STATUS_POST=201 STUB_STATUS_DELETE_SEQ="403 204 204" STUB_COUNTER="${WORK}/ctr9" urun ../03-files-and-folders/09.folder_DELETE.sh
+expect "07: a rename that is refused every time is tried 10 times, then exit 1" "$(ucalls | grep -c PATCH):${RC}" "10:1"
+STUB_STATUS_PATCH=409 urun ../03-files-and-folders/07.files_PATCH_rename.sh
+expect "07: any other refusal is not tried again: one PATCH, exit 1" "$(ucalls | grep -c PATCH):${RC}" "1:1"
+STUB_STATUS_PATCH=403 STUB_STATUS_GET=404 urun ../03-files-and-folders/08.files_PATCH_rename_missing.sh
+expect "08: renames the old name, then looks for it" "$(ucalls | tr '\n' ' ')" "PATCH ${F}/notes.txt GET ${F}/notes.txt?metadata=true "
+expect "08: to the new name, whole path" "$(payload 1 | jq -c .)" '[{"op":"add","path":"/newFilePath","value":"/example_uc_files/notes_renamed.txt"}]'
+has "08: says the 403 was for a file that is not there" "No: the 403 was for a file that is not there."
+expect "08: 403 for a name that is not there is the expected answer: exit 0" "${RC}" "0"
+STUB_STATUS_PATCH=204 urun ../03-files-and-folders/08.files_PATCH_rename_missing.sh
+expect "08: a rename that works is not what it shows: exit 1, and no read" "${RC}:$(ucalls | grep -c GET)" "1:0"
+has "08: and it says what it expected" "Expected 403."
+STUB_STATUS_PATCH=403 STUB_STATUS_GET=200 urun ../03-files-and-folders/08.files_PATCH_rename_missing.sh
+expect "08: a 403 for a file that is there is exit 1" "${RC}" "1"
+has "08: and says the 403 is about something else" "this 403 is about something else"
+STUB_STATUS_POST=201 STUB_STATUS_GET_SEQ="200 404 200" STUB_STATUS_DELETE=204 STUB_COUNTER="${WORK}/ctr9" urun ../03-files-and-folders/09.files_POST_folder_in_name.sh
 rm -f "${WORK}"/ctr9.*
-expect "09: puts a file in, tries the folder, deletes the file, then the folder" "$(ucalls | tr '\n' ' ')" \
+expect "09: POST to the home folder with the folder in the name, look in the folder, look in the home folder, delete from the home folder" "$(ucalls | tr '\n' ' ')" \
+  "POST ${BASE_FILES} GET ${F}/example_uc_landed.txt?metadata=true GET ${BASE_FILES}/example_uc_landed.txt?metadata=true DELETE ${BASE_FILES}/example_uc_landed.txt "
+has "09: the folder is in the filename of the form" "filename=example_uc_files/example_uc_landed.txt"
+has "09: says where it landed" "It landed in the home folder"
+expect "09: exit 0" "${RC}" "0"
+STUB_STATUS_POST=201 STUB_STATUS_GET_SEQ="200 200 200" STUB_COUNTER="${WORK}/ctr9" urun ../03-files-and-folders/09.files_POST_folder_in_name.sh
+rm -f "${WORK}"/ctr9.*
+expect "09: a file that is in the folder too is not what it shows: exit 1, nothing deleted" "${RC}:$(ucalls | grep -c DELETE)" "1:0"
+STUB_STATUS_POST=201 STUB_STATUS_GET_SEQ="200 404 404" STUB_COUNTER="${WORK}/ctr9" urun ../03-files-and-folders/09.files_POST_folder_in_name.sh
+rm -f "${WORK}"/ctr9.*
+expect "09: a file that is in neither is exit 1" "${RC}" "1"
+STUB_STATUS_POST=500 urun ../03-files-and-folders/09.files_POST_folder_in_name.sh
+expect "09: a refused upload is exit 1, with no look and no delete" "${RC}:$(ucalls | grep -c 'GET\|DELETE')" "1:0"
+STUB_STATUS_POST=201 STUB_STATUS_GET_SEQ="200 404 200" STUB_STATUS_DELETE=403 STUB_COUNTER="${WORK}/ctr9" urun ../03-files-and-folders/09.files_POST_folder_in_name.sh
+rm -f "${WORK}"/ctr9.*
+expect "09: a delete that is refused is exit 1" "${RC}" "1"
+STUB_STATUS_DELETE=204 STUB_STATUS_GET=404 urun ../03-files-and-folders/10.files_DELETE_file.sh
+expect "10: DELETE the renamed file, then read it again" "$(ucalls | tr '\n' ' ')" "DELETE ${F}/notes_renamed.txt GET ${F}/notes_renamed.txt "
+STUB_STATUS_DELETE=204 STUB_STATUS_GET=200 urun ../03-files-and-folders/10.files_DELETE_file.sh
+expect "10: a file that is still there afterwards is exit 1" "${RC}" "1"
+STUB_STATUS_DELETE=404 urun ../03-files-and-folders/10.files_DELETE_file.sh
+expect "10: deleting what is not there is exit 1" "${RC}" "1"
+STUB_STATUS_POST=201 STUB_STATUS_DELETE_SEQ="403 204 204" STUB_COUNTER="${WORK}/ctr11" urun ../03-files-and-folders/11.folder_DELETE.sh
+rm -f "${WORK}"/ctr11.*
+expect "11: puts a file in, tries the folder, deletes the file, then the folder" "$(ucalls | tr '\n' ' ')" \
   "POST ${F} DELETE ${F} DELETE ${F}/notes.txt DELETE ${F} "
-expect "09: a refused folder, then done: exit 0" "${RC}" "0"
-STUB_STATUS_POST=201 STUB_STATUS_DELETE=204 urun ../03-files-and-folders/09.folder_DELETE.sh
-expect "09: a folder that is deleted at once while it has a file is not the behaviour shown: exit 1" "${RC}" "1"
+expect "11: a refused folder, then done: exit 0" "${RC}" "0"
+STUB_STATUS_POST=201 STUB_STATUS_DELETE=204 urun ../03-files-and-folders/11.folder_DELETE.sh
+expect "11: a folder that is deleted at once while it has a file is not the behaviour shown: exit 1" "${RC}" "1"
 urun ../03-files-and-folders/99.cleanup_DELETE.sh
-expect "99: deletes the two file names, the folder last, by exact name, then logs out" "$(calls | tr '\n' ' ')" \
-  "DELETE ${F}/notes_renamed.txt DELETE ${F}/notes.txt DELETE ${F} DELETE ${BASE}/myself "
+expect "99: deletes the two file names, the folder, what 09 may have left in the home folder, by exact name, then logs out" "$(calls | tr '\n' ' ')" \
+  "DELETE ${F}/notes_renamed.txt DELETE ${F}/notes.txt DELETE ${F} DELETE ${BASE_FILES}/example_uc_landed.txt DELETE ${BASE}/myself "
 
 echo "=== 04-larger-files ==="
 F="${BASE_FILES}/example_uc_large"
@@ -291,38 +326,146 @@ expect "02: right is 201, wrong is refused: exit 0" "${RC}" "0"
 STUB_STATUS_POST=500 urun ../04-larger-files/02.files_POST_md5.sh
 expect "02: a right checksum that is refused is exit 1" "${RC}" "1"
 LOCAL_MD5=$(cd "${UC}" && source ./lib.sh >/dev/null 2>&1; f="${WORK}/s.bin"; st_sample "${f}" 100000 md5; st_md5 "${f}")
+expect "lib: the MD5 form is base64 of the 16 raw bytes (md5 of 'hello world' is 5eb63bbbe01eeed093cb22bb8f5acdc3)" \
+  "$(cd "${UC}" && source ./lib.sh >/dev/null 2>&1; f="${WORK}/hw.txt"; printf 'hello world' > "${f}"; st_md5 "${f}")" "XrY7u+Ae7tCTyyK7j1rNww=="
 OP=$(body op_done "{\"id\":\"op1\",\"status\":\"DONE\",\"result\":{\"md5Checksum\":\"${LOCAL_MD5}\",\"fileSize\":100000}}")
-STUB_CURL_POST_BODY="${OP}" urun ../04-larger-files/03.fileOperations_POST_md5calc.sh
-expect "03: POST /fileOperations (MD5Calc) and no wait when it is done" "$(ucalls)" "POST ${BASE}/fileOperations"
-has "03: the checksums match" "They match."
+REFUSED_MD5=$(cd "${UC}" && source ./lib.sh >/dev/null 2>&1; f="${WORK}/r.bin"; st_sample "${f}" 100000 refused; st_md5 "${f}")
+OPR=$(body op_refused "{\"id\":\"op1\",\"status\":\"DONE\",\"result\":{\"md5Checksum\":\"${REFUSED_MD5}\",\"fileSize\":100000}}")
+# 03: the upload is refused, the server is asked what it holds, the file is deleted and sent again, and checked
+STUB_STATUS_POST_SEQ="500 200 201 200" STUB_STATUS_GET=200 STUB_STATUS_DELETE=204 STUB_CURL_POST_BODY="${OPR}" STUB_COUNTER="${WORK}/ctr3" urun ../04-larger-files/03.files_POST_md5_refused.sh
+rm -f "${WORK}"/ctr3.*
+expect "03: wrong upload, look, MD5Calc, delete, right upload, MD5Calc again" "$(ucalls | tr '\n' ' ')" \
+  "POST ${F}?transferMode=BINARY GET ${F}/example_md5_wrong.bin?metadata=true POST ${BASE}/fileOperations DELETE ${F}/example_md5_wrong.bin POST ${F}?transferMode=BINARY POST ${BASE}/fileOperations "
+expect "03: the first upload carries a checksum that is not the file's, the second the file's" \
+  "$(headers | grep Content-MD5 | sed "s/${REFUSED_MD5//+/\\+}/RIGHT/" | sed 's/Content-MD5: [A-Za-z0-9+\/=]*==$/Content-MD5: WRONG/' | tr '\n' ' ')" "Content-MD5: WRONG Content-MD5: RIGHT "
+has "03: says the content is whole" "The content is whole. The refusal was about the checksum header only."
+has "03: ends verified" "6. Verified: the server holds 100000 bytes with the MD5 of the local file."
+expect "03: exit 0" "${RC}" "0"
+STUB_STATUS_POST=201 STUB_CURL_POST_BODY="${OPR}" urun ../04-larger-files/03.files_POST_md5_refused.sh
+expect "03: a wrong checksum that is accepted leaves nothing to recover from: exit 1, one call" "${RC}:$(ucalls | wc -l | tr -d ' ')" "1:1"
+STUB_STATUS_POST_SEQ="500 201 200" STUB_STATUS_GET_SEQ="200 404" STUB_CURL_POST_BODY="${OPR}" STUB_COUNTER="${WORK}/ctr3" urun ../04-larger-files/03.files_POST_md5_refused.sh
+rm -f "${WORK}"/ctr3.*
+expect "03: nothing stored: nothing to delete, still sent again and checked (exit 0, no DELETE)" "${RC}:$(ucalls | grep -c DELETE)" "0:0"
+has "03: and it says so" "3. Nothing is stored under that name, so there is nothing to delete."
+STUB_STATUS_POST_SEQ="500 200 201 200" STUB_STATUS_GET=200 STUB_STATUS_DELETE=403 STUB_CURL_POST_BODY="${OPR}" STUB_COUNTER="${WORK}/ctr3" urun ../04-larger-files/03.files_POST_md5_refused.sh
+rm -f "${WORK}"/ctr3.*
+expect "03: a delete that is refused stops it (exit 1), without a second upload" "${RC}:$(ucalls | grep -c 'POST .*files')" "1:1"
+STUB_STATUS_POST_SEQ="500 200 500 200" STUB_STATUS_GET=200 STUB_STATUS_DELETE=204 STUB_CURL_POST_BODY="${OPR}" STUB_COUNTER="${WORK}/ctr3" urun ../04-larger-files/03.files_POST_md5_refused.sh
+rm -f "${WORK}"/ctr3.*
+expect "03: a second upload that is refused is exit 1" "${RC}" "1"
+STUB_STATUS_POST_SEQ="500 200 201 200" STUB_STATUS_GET=200 STUB_STATUS_DELETE=204 STUB_CURL_POST_BODY="${OP}" STUB_COUNTER="${WORK}/ctr3" urun ../04-larger-files/03.files_POST_md5_refused.sh
+rm -f "${WORK}"/ctr3.*
+expect "03: an MD5 on the server that is not the local one after the second upload is exit 1" "${RC}" "1"
+has "03: and says what it is" "the file is not the one that was sent"
+# 02 and the rest
+STUB_STATUS_POST=201 urun ../04-larger-files/02.files_POST_md5.sh
+expect "02: two uploads into the folder, as BINARY" "$(ucalls | tr '\n' ' ')" "POST ${F}?transferMode=BINARY POST ${F}?transferMode=BINARY "
+has "02: the first carries a Content-MD5 header" "HEADER: Content-MD5: "
+expect "02: a wrong checksum that is accepted (201 for both) is exit 1" "${RC}" "1"
+STUB_STATUS_POST_SEQ="201 500" STUB_COUNTER="${WORK}/ctr2" urun ../04-larger-files/02.files_POST_md5.sh
+rm -f "${WORK}"/ctr2.*
+expect "02: right is 201, wrong is refused: exit 0" "${RC}" "0"
+has "02: it does not say that nothing was stored (the file is stored on the lab)" "The refusal is not proof that nothing was stored: 03 looks."
+STUB_STATUS_POST=500 urun ../04-larger-files/02.files_POST_md5.sh
+expect "02: a right checksum that is refused is exit 1" "${RC}" "1"
+STUB_CURL_POST_BODY="${OP}" urun ../04-larger-files/04.fileOperations_POST_md5calc.sh
+expect "04: POST /fileOperations (MD5Calc) and no wait when it is done" "$(ucalls)" "POST ${BASE}/fileOperations"
+expect "04: asks for the file by its path" "$(payload 1 | jq -c .)" '{"operation":"MD5Calc","filePath":"/example_uc_large/example_md5.bin"}'
+has "04: the checksums match" "They match."
 OPBAD=$(body op_bad '{"id":"op1","status":"DONE","result":{"md5Checksum":"AAAAAAAAAAAAAAAAAAAAAA==","fileSize":100000}}')
-STUB_CURL_POST_BODY="${OPBAD}" urun ../04-larger-files/03.fileOperations_POST_md5calc.sh
-expect "03: checksums that differ are exit 1" "${RC}" "1"
+STUB_CURL_POST_BODY="${OPBAD}" urun ../04-larger-files/04.fileOperations_POST_md5calc.sh
+expect "04: checksums that differ are exit 1" "${RC}" "1"
 OPWAIT=$(body op_wait '{"id":"op1","status":"IN_PROGRESS"}')
-STUB_CURL_POST_BODY="${OPWAIT}" GET_BODY="${OP}" urun ../04-larger-files/03.fileOperations_POST_md5calc.sh
-expect "03: an operation in progress is followed with GET /fileOperations/<id> until done" "$(ucalls | tr '\n' ' ')" "POST ${BASE}/fileOperations GET ${BASE}/fileOperations/op1 "
-STUB_CURL_POST_BODY="${WORK}/me.json" urun ../04-larger-files/03.fileOperations_POST_md5calc.sh
-expect "03: no operation id is exit 1" "${RC}" "1"
-STUB_CURL_POST_BODY="$(body opid '{"id":"op9"}')" urun ../04-larger-files/04.fileOperations_PUT_chunked.sh
-expect "04: declares the upload, then three PUTs to the id" "$(ucalls | tr '\n' ' ')" \
-  "POST ${BASE}/fileOperations PUT ${BASE}/fileOperations/op9 PUT ${BASE}/fileOperations/op9 PUT ${BASE}/fileOperations/op9 "
-expect "04: with the ranges of 250000 bytes in pieces of 100000" "$(headers | grep Content-Range | tr '\n' ' ')" \
+STUB_CURL_POST_BODY="${OPWAIT}" GET_BODY="${OP}" urun ../04-larger-files/04.fileOperations_POST_md5calc.sh
+expect "04: an operation in progress is followed with GET /fileOperations/<id> until done" "$(ucalls | tr '\n' ' ')" "POST ${BASE}/fileOperations GET ${BASE}/fileOperations/op1 "
+STUB_CURL_POST_BODY="${OPWAIT}" GET_BODY="${OPWAIT}" urun ../04-larger-files/04.fileOperations_POST_md5calc.sh
+expect "04: an operation that stays in progress for 30 seconds is exit 1" "${RC}:$(ucalls | grep -c GET)" "1:30"
+has "04: and says so" "Still IN_PROGRESS after 30 seconds."
+STUB_CURL_POST_BODY="$(body op_failed '{"id":"op1","status":"ERROR"}')" urun ../04-larger-files/04.fileOperations_POST_md5calc.sh
+expect "04: an operation that ends in an error is exit 1" "${RC}" "1"
+STUB_CURL_POST_BODY="${WORK}/me.json" urun ../04-larger-files/04.fileOperations_POST_md5calc.sh
+expect "04: no operation id is exit 1" "${RC}" "1"
+# 05: text and binary
+TB="${WORK}/seq05"; rm -rf "${TB}"; mkdir -p "${TB}"
+cp "${WORK}/me.json" "${TB}/1.json"; printf 'a\nb\n' > "${TB}/2.json"; printf 'a\r\nb\r\n' > "${TB}/3.json"
+STUB_CURL_GET_SEQUENCE="${TB}" STUB_STATUS_POST=201 urun ../04-larger-files/05.files_POST_text_binary.sh
+expect "05: uploads as ASCII and reads it, uploads as BINARY and reads it" "$(ucalls | tr '\n' ' ')" \
+  "POST ${F}?transferMode=ASCII GET ${F}/example_text_ascii.txt POST ${F}?transferMode=BINARY GET ${F}/example_text_binary.txt "
+has "05: the local file has CR LF (0d 0a)" "Local file, in hex: 610d0a620d0a"
+has "05: ASCII on the server has lost the CR" "ASCII on the server, in hex: 610a620a"
+has "05: BINARY has every byte" "BINARY on the server, in hex: 610d0a620d0a"
+expect "05: exit 0" "${RC}" "0"
+cp "${TB}/3.json" "${TB}/2.json"; rm -f "${TB}/.served"
+STUB_CURL_GET_SEQUENCE="${TB}" STUB_STATUS_POST=201 urun ../04-larger-files/05.files_POST_text_binary.sh
+expect "05: an ASCII upload that kept the CR is not what was expected: exit 1" "${RC}" "1"
+STUB_STATUS_POST=404 urun ../04-larger-files/05.files_POST_text_binary.sh
+expect "05: a refused upload is exit 1 before any read" "${RC}:$(ucalls | grep -c GET)" "1:0"
+STUB_STATUS_POST=201 STUB_STATUS_GET_SEQ="200 404" STUB_COUNTER="${WORK}/ctr5" urun ../04-larger-files/05.files_POST_text_binary.sh
+rm -f "${WORK}"/ctr5.*
+expect "05: a file that cannot be read back is exit 1" "${RC}" "1"
+# 06: the pieces in order, then the check
+OP6=$(body op6 "{\"id\":\"op9\",\"status\":\"DONE\",\"result\":{\"md5Checksum\":\"$(cd "${UC}" && source ./lib.sh >/dev/null 2>&1; f="${WORK}/c.bin"; st_sample "${f}" 250000; st_md5 "${f}")\",\"fileSize\":250000}}")
+STUB_CURL_POST_BODY="${OP6}" urun ../04-larger-files/06.fileOperations_PUT_chunked.sh
+expect "06: declares the upload, three PUTs to the id, then asks for the MD5" "$(ucalls | tr '\n' ' ')" \
+  "POST ${BASE}/fileOperations PUT ${BASE}/fileOperations/op9 PUT ${BASE}/fileOperations/op9 PUT ${BASE}/fileOperations/op9 POST ${BASE}/fileOperations "
+expect "06: with the ranges of 250000 bytes in pieces of 100000" "$(headers | grep Content-Range | tr '\n' ' ')" \
   "Content-Range: bytes 0-99999/250000 Content-Range: bytes 100000-199999/250000 Content-Range: bytes 200000-249999/250000 "
-STUB_CURL_POST_BODY="$(body opid '{"id":"op9"}')" STUB_STATUS_PUT=500 urun ../04-larger-files/04.fileOperations_PUT_chunked.sh
-expect "04: a refused piece stops the upload after one PUT (exit 1)" "$(ucalls | grep -c PUT):${RC}" "1:1"
-STUB_CURL_POST_BODY="${WORK}/me.json" urun ../04-larger-files/04.fileOperations_PUT_chunked.sh
-expect "04: no operation id: nothing is sent (exit 1)" "$(ucalls | grep -c PUT):${RC}" "0:1"
-STUB_CURL_POST_BODY="$(body opid '{"id":"op9"}')" urun ../04-larger-files/05.fileOperations_POST_multipart.sh
-expect "05: declares it, then POSTs the content to the id" "$(ucalls | tr '\n' ' ')" "POST ${BASE}/fileOperations POST ${BASE}/fileOperations/op9 "
-has "05: with the name in the form" "filename=example_multipart.bin"
-STUB_STATUS_POST=201 urun ../04-larger-files/06.files_POST_bulk.sh
-expect "06: three uploads into the folder" "$(ucalls | tr '\n' ' ')" "POST ${F} POST ${F} POST ${F} "
-STUB_STATUS_POST_SEQ="201 500" STUB_COUNTER="${WORK}/ctr6" urun ../04-larger-files/06.files_POST_bulk.sh
+has "06: ends verified" "Verified: the server holds 250000 bytes with the MD5 of the local file."
+expect "06: exit 0" "${RC}" "0"
+expect "06: the upload is declared as BINARY at the path of the file" "$(payload 1 | jq -c .)" \
+  '{"operation":"Upload","filePath":"/example_uc_large/example_chunked.bin","customAttributes":{"transferMode":"BINARY"}}'
+STUB_CURL_POST_BODY="${OPBAD}" urun ../04-larger-files/06.fileOperations_PUT_chunked.sh
+expect "06: a file whose MD5 is not the local one after the pieces is exit 1" "${RC}" "1"
+STUB_CURL_POST_BODY="$(body opid '{"id":"op9"}')" STUB_STATUS_PUT=500 urun ../04-larger-files/06.fileOperations_PUT_chunked.sh
+expect "06: a refused piece stops the upload after one PUT (exit 1)" "$(ucalls | grep -c PUT):${RC}" "1:1"
+STUB_CURL_POST_BODY="${WORK}/me.json" urun ../04-larger-files/06.fileOperations_PUT_chunked.sh
+expect "06: no operation id: nothing is sent (exit 1)" "$(ucalls | grep -c PUT):${RC}" "0:1"
+# 07: the last piece first
+LISTORDER=$(body listorder '{"files":[{"fileName":"example_order.bin","size":215985}]}')
+OPORDER=$(body oporder '{"id":"op9","status":"DONE","result":{"md5Checksum":"AAAAAAAAAAAAAAAAAAAAAA==","fileSize":215985}}')
+OS="${WORK}/seq07"; rm -rf "${OS}"; mkdir -p "${OS}"; cp "${WORK}/me.json" "${OS}/1.json"; cp "${LISTORDER}" "${OS}/2.json"
+STUB_CURL_GET_SEQUENCE="${OS}" STUB_STATUS_PUT=500 STUB_CURL_POST_BODY="${OPORDER}" urun ../04-larger-files/07.fileOperations_PUT_out_of_order.sh
+expect "07: declares the upload, sends one piece, lists the folder, asks for the MD5" "$(ucalls | tr '\n' ' ')" \
+  "POST ${BASE}/fileOperations PUT ${BASE}/fileOperations/op9 GET ${F} POST ${BASE}/fileOperations "
+expect "07: the piece is the last one, 50000 bytes, first" "$(headers | grep Content-Range)" "Content-Range: bytes 200000-249999/250000"
+has "07: says the file is listed, with its size and what was declared and sent" "example_order.bin is listed, 215985 bytes (declared: 250000, sent: 50000)."
+has "07: and that it is not whole" "and still the file is not whole. Delete it and send it again, in order."
+expect "07: exit 0" "${RC}" "0"
+rm -f "${OS}/.served"
+STUB_CURL_GET_SEQUENCE="${OS}" STUB_STATUS_PUT=200 STUB_CURL_POST_BODY="${OPORDER}" urun ../04-larger-files/07.fileOperations_PUT_out_of_order.sh
+expect "07: a piece out of order that is accepted is not what it shows: exit 1, no listing" "${RC}:$(ucalls | grep -c 'GET')" "1:0"
+echo '{"files":[]}' > "${OS}/2.json"; rm -f "${OS}/.served"
+STUB_CURL_GET_SEQUENCE="${OS}" STUB_STATUS_PUT=500 STUB_CURL_POST_BODY="${OPORDER}" urun ../04-larger-files/07.fileOperations_PUT_out_of_order.sh
+expect "07: nothing listed: it says nothing was stored, and asks no MD5 (exit 0)" "${RC}:$(ucalls | grep -c 'POST')" "0:1"
+has "07: and says so" "is not listed: nothing was stored."
+cp "${LISTORDER}" "${OS}/2.json"; rm -f "${OS}/.served"
+OPSAME=$(body opsame "{\"id\":\"op9\",\"status\":\"DONE\",\"result\":{\"md5Checksum\":\"$(cd "${UC}" && source ./lib.sh >/dev/null 2>&1; f="${WORK}/c7.bin"; st_sample "${f}" 250000; st_md5 "${f}")\",\"fileSize\":250000}}")
+STUB_CURL_GET_SEQUENCE="${OS}" STUB_STATUS_PUT=500 STUB_CURL_POST_BODY="${OPSAME}" urun ../04-larger-files/07.fileOperations_PUT_out_of_order.sh
+has "07: an MD5 that does match is said to be whole" "The MD5 matches: the file is whole."
+STUB_CURL_POST_BODY="$(body opid7 '{"id":"op9"}')" STUB_STATUS_PUT=500 STUB_CURL_GET_BODY="${LISTORDER}" STUB_STATUS_GET=403 urun ../04-larger-files/07.fileOperations_PUT_out_of_order.sh
+expect "07: a listing that is refused is exit 1" "${RC}" "1"
+STUB_CURL_POST_BODY="${WORK}/me.json" urun ../04-larger-files/07.fileOperations_PUT_out_of_order.sh
+expect "07: no operation id: nothing is sent (exit 1)" "$(ucalls | grep -c PUT):${RC}" "0:1"
+# 08: two uploads to operations
+STUB_CURL_POST_BODY="$(body opid '{"id":"op9"}')" STUB_STATUS_GET=200 urun ../04-larger-files/08.fileOperations_POST_multipart.sh
+expect "08: declares it, sends the content to the id, then again with no filename=, then looks for the local name" "$(ucalls | tr '\n' ' ')" \
+  "POST ${BASE}/fileOperations POST ${BASE}/fileOperations/op9 POST ${BASE}/fileOperations POST ${BASE}/fileOperations/op9 GET ${F}/example_localname.bin?metadata=true "
+has "08: the first has the name in the form" "filename=example_multipart.bin"
+hasre "08: the second has the local file's own name and no filename=" "file=@.*/example_localname.bin( |$)"
+has "08: says the name of the operation was not used" "Yes: the name of the operation was not used. Always give filename=."
+expect "08: exit 0" "${RC}" "0"
+STUB_CURL_POST_BODY="$(body opid '{"id":"op9"}')" STUB_STATUS_GET=404 urun ../04-larger-files/08.fileOperations_POST_multipart.sh
+hasnt "08: a local name that was not used is not claimed" "the name of the operation was not used"
+STUB_CURL_POST_BODY="${WORK}/me.json" urun ../04-larger-files/08.fileOperations_POST_multipart.sh
+expect "08: no operation id: nothing is sent (exit 1)" "$(ucalls | grep -c 'fileOperations/')${RC}" "01"
+STUB_STATUS_POST=201 urun ../04-larger-files/09.files_POST_bulk.sh
+expect "09: three uploads into the folder" "$(ucalls | tr '\n' ' ')" "POST ${F} POST ${F} POST ${F} "
+STUB_STATUS_POST_SEQ="201 500" STUB_COUNTER="${WORK}/ctr6" urun ../04-larger-files/09.files_POST_bulk.sh
 rm -f "${WORK}"/ctr6.*
-expect "06: stops at the first refusal, after one file (exit 1)" "$(ucalls | grep -c POST):${RC}" "2:1"
+expect "09: stops at the first refusal, after one file (exit 1)" "$(ucalls | grep -c POST):${RC}" "2:1"
 urun ../04-larger-files/99.cleanup_DELETE.sh
-expect "99: deletes the six file names, then the folder, then logs out" "$(calls | tr '\n' ' ')" \
-  "DELETE ${F}/example_md5.bin DELETE ${F}/example_chunked.bin DELETE ${F}/example_multipart.bin DELETE ${F}/example_bulk_1.txt DELETE ${F}/example_bulk_2.txt DELETE ${F}/example_bulk_3.txt DELETE ${F} DELETE ${BASE}/myself "
+expect "99: deletes the file names, then the folder, then logs out" "$(calls | tr '\n' ' ')" \
+  "DELETE ${F}/example_md5.bin DELETE ${F}/example_md5_wrong.bin DELETE ${F}/example_text_ascii.txt DELETE ${F}/example_text_binary.txt DELETE ${F}/example_chunked.bin DELETE ${F}/example_order.bin DELETE ${F}/example_multipart.bin DELETE ${F}/example_localname.bin DELETE ${F}/example_bulk_1.txt DELETE ${F}/example_bulk_2.txt DELETE ${F}/example_bulk_3.txt DELETE ${F} DELETE ${BASE}/myself "
 
 echo "=== 05-checking-transfers ==="
 T="${BASE}/transfers"

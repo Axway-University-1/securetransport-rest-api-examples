@@ -25,6 +25,7 @@ They are meant to be read in this order, each building on what the one before ta
 | [05-checking-transfers](05-checking-transfers/README.md) | What became of the files: the transfer list, filters, one transfer, a summary. |
 | [06-sharing-a-folder](06-sharing-a-folder/README.md) | Let another user work in a folder: share it with `read`, `write` or `full`, see how, change the type of share, stop sharing. Needs an account with an e-mail address and a user to share with, given as a parameter. |
 | [07-secret-questions](07-secret-questions/README.md) | Choose and set a secret question (the answer is a parameter), read it back, see a refused change, and what can be done about removing one. Needs the service switched on by an administrator. |
+| [08-lists-and-paging](08-lists-and-paging/README.md) | The lists an end user reads: the files of a folder (an object with no count), the transfers (a plain array, a default page of 100 that is not a cap), the address book, the secret questions. Each has its own rules for `limit`, `offset` and `fields=`. Counting a list that has no `totalCount`. |
 
 ## How a use case is organised
 

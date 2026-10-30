@@ -23,3 +23,5 @@ source "${UC_DIR}/../session.sh"
 FOLDER="example_uc_files"
 FILE_NAME="notes.txt"
 RENAMED="notes_renamed.txt"
+# The file that 09 sends with a folder in its name: it lands in the home folder, under its last part
+LANDED="example_uc_landed.txt"

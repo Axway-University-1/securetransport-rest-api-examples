@@ -28,9 +28,9 @@ that empties a home folder.
 
 ## What to take from it
 
-- A **user account** needs a name, a `homeFolder`, a `uid` and `gid`, and a password. The email address is what lets the user share folders (see [Moving files with the End User API](../../../Features/Guidance/moving-files-end-user-api.md)).
+- A **user account** needs a name, a `homeFolder`, a `uid` and `gid`, and a password. The email address is what lets the user share folders (see [the End User use case on sharing a folder](../../../EndUser/UseCases/06-sharing-a-folder/README.md)).
 - The server answers `201` with the address of the new account in `Location`. It never returns the password afterwards.
-- A **PATCH** changes only what it names; `replace` needs the field to exist ([Changing objects without breaking them](../../../Features/Guidance/changing-configuration.md)).
+- A **PATCH** changes only what it names; `replace` needs the field to exist ([Changing an object](../05-changing-an-object/README.md)).
 - Basic authentication works on the End User API without a session ([Authentication and sessions](../../../Features/Guidance/authentication-and-sessions.md)). A wrong password and an unknown user are answered the same way, so
   an attacker cannot tell which. Three wrong passwords lock the account, so step 04 sends one.
 - **A home folder outlives its account.** Deleting the account does not delete `/home/NAME`: it stays on the server with the user id of the account that made it. A new account of the same name with *another* user id cannot create

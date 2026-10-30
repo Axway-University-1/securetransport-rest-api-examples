@@ -21,7 +21,7 @@ source "$(dirname "$(realpath "$0")")/lib.sh"
 
 # Bottom up: a folder with a file in it cannot be deleted. A name that is not there is fine.
 if [ -f "${JAR}" ] || st_session; then
-    for name in "${MD5_FILE}" "${CHUNKED_FILE}" "${MULTIPART_FILE}" ${BULK_FILES}; do
+    for name in "${MD5_FILE}" "${WRONG_FILE}" "${TEXT_ASCII_FILE}" "${TEXT_BINARY_FILE}" "${CHUNKED_FILE}" "${ORDER_FILE}" "${MULTIPART_FILE}" "${LOCALNAME_FILE}" ${BULK_FILES}; do
         curl -k -s -o /dev/null -b "${JAR}" -X DELETE "${ST_URL}/files/$(st_enc "${FOLDER}/${name}")" \
              -H "accept: application/json" -H "Referer: ${REFERER}"
     done

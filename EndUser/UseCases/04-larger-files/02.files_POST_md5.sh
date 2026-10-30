@@ -16,7 +16,7 @@
 # Notes:
 # - Copied from EndUser/API 2.0/bash/02.Files/11.files_filepath_POST_md5.sh.
 # - The checksum is base64 of the 16 raw bytes, not the hex text md5sum prints.
-# - The wrong checksum is refused with an error, not 4xx-specific: any non-201 is a refusal.
+# - The wrong checksum is refused with an error (500 on the lab), and any non-201 counts as a refusal. The refusal does not undo the upload: the file may be stored all the same. 03 shows it.
 # ==============================================================================
 
 source "$(dirname "$(realpath "$0")")/lib.sh"
@@ -38,4 +38,4 @@ code=$(curl -k -s -o /dev/null -w "%{http_code}" -b "${JAR}" -X POST "${URL}" -H
        -H "Content-MD5: ${WRONG}" -F "file=@${LOCAL};filename=${MD5_FILE}")
 echo "With a wrong checksum: HTTP ${code}"
 [[ "${code}" == 201 ]] && { echo "The server accepted a wrong checksum."; exit 1; }
-echo "Refused, as it should be."
+echo "Refused, as it should be. (The refusal is not proof that nothing was stored: 03 looks.)"
