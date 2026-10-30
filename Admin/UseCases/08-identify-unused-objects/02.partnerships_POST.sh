@@ -15,7 +15,7 @@
 # Risk: write
 #
 # Notes:
-# - Copied from Admin/API 2.0/bash/06.TransferSites/02.sites_POST_ssh.sh (an ssh site with a password, here towards 192.0.2.1, an address reserved for examples: nothing ever connects) and
+# - Copied from Admin/API 2.0/bash/06.TransferSites/02.sites_POST_ssh.sh (an ssh site with a password, here towards partner.example.com, an address reserved for examples: nothing ever connects) and
 #   Admin/API 2.0/bash/35.TransferProfiles/02.transferProfiles_POST.sh.
 # - A site names its certificate by id in clientCertificate: the id is read from the name of the certificate that step 01 imported.
 # - A transfer profile is a PeSIT thing: the server refuses one for an account that has no PeSIT site (400 "Account does not contain any PeSIT transfer sites."). So the script makes example_unu_pesit_support first. The use case skips
@@ -39,7 +39,7 @@ done
 
 site_body() {    # NAME CERTIFICATE_ID or "": an ssh site of a1; the certificate only when one is given
     jq -cn --arg name "$1" --arg account "${A1}" --arg cert "$2" \
-      '{type: "ssh", protocol: "ssh", name: $name, account: $account, host: "192.0.2.1", port: "22", userName: "partner", usePassword: true, password: "not-a-real-password",
+      '{type: "ssh", protocol: "ssh", name: $name, account: $account, host: "partner.example.com", port: "22", userName: "partner", usePassword: true, password: "not-a-real-password",
         transferType: "partner", uploadFolder: "/delivered"} + (if $cert != "" then {clientCertificate: $cert} else {} end)'
 }
 echo "Creating the site ${SITE_USED}, with the certificate ${CERT_USED}..."
@@ -49,7 +49,7 @@ for NAME in "${SITE_STEP}" "${SITE_UNUSED}"; do
     uc_post sites "$(site_body "${NAME}" "")" || exit 1
 done
 echo "Creating the PeSIT site ${SITE_PESIT} (a transfer profile needs one)..."
-uc_post sites "$(jq -cn --arg name "${SITE_PESIT}" --arg account "${A1}" '{type: "pesit", protocol: "pesit", name: $name, account: $account, host: "192.0.2.1", port: "17617", transferType: "partner"}')" || exit 1
+uc_post sites "$(jq -cn --arg name "${SITE_PESIT}" --arg account "${A1}" '{type: "pesit", protocol: "pesit", name: $name, account: $account, host: "partner.example.com", port: "17617", transferType: "partner"}')" || exit 1
 for NAME in "${PROFILE_USED}" "${PROFILE_UNUSED}"; do
     echo "Creating the transfer profile ${NAME}..."
     uc_post transferProfiles "$(jq -cn --arg name "${NAME}" --arg account "${A1}" '{name: $name, account: $account, sendMapping: "/*", fileLabelOption: "DONT_SEND"}')" || exit 1

@@ -326,7 +326,7 @@ rm -rf "${UC}"/state.local.*
 CERT_BODY="$(body cert1 "$(list_json 1 '{"id":"c_used","name":"example_unu_cert_used"}')")"
 RULES="$(rules 'certificates?name=' "${CERT_BODY}")" LOCATION=Loc run 02.partnerships_POST.sh
 expect "02: the certificate is looked up by name, the sites and the profiles checked, then 4 sites and 2 profiles posted" "${RC}:$(ucalls | grep -c '^POST'):$(ucalls | grep '^POST' | sed -E "s#.*${BASE}/##" | tr '\n' ' ')" "0:6:sites sites sites sites transferProfiles transferProfiles "
-expect "02: the site that uses the certificate names it by id" "$(payload 1 | jq -c '[.name, .type, .account, .clientCertificate, .host, .port]')" "[\"${P}site_used\",\"ssh\",\"${P}a1\",\"c_used\",\"192.0.2.1\",\"22\"]"
+expect "02: the site that uses the certificate names it by id" "$(payload 1 | jq -c '[.name, .type, .account, .clientCertificate, .host, .port]')" "[\"${P}site_used\",\"ssh\",\"${P}a1\",\"c_used\",\"partner.example.com\",\"22\"]"
 expect "02: the other two have no certificate" "$(payload 2 | jq -r 'has("clientCertificate")'):$(payload 3 | jq -r 'has("clientCertificate")')" "false:false"
 expect "02: the PeSIT site is made before the profiles" "$(payload 4 | jq -c '[.name, .type, .protocol, .port]')" "[\"${P}pesit_support\",\"pesit\",\"pesit\",\"17617\"]"
 expect "02: a profile has a name, the account, a mapping and a label option" "$(payload 5 | jq -c '[.name, .account, .sendMapping, .fileLabelOption]')" "[\"${P}profile_used\",\"${P}a1\",\"/*\",\"DONT_SEND\"]"
