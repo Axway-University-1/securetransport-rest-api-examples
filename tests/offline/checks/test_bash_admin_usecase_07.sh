@@ -241,7 +241,7 @@ expect "06: the first account of the second unit" "$(payload 6 | jq -c '[.name, 
 expect "06: the last account is in the third unit" "$(payload 9 | jq -c '[.name, .uid, .gid, .businessUnit]')" '["example_use_f1","57601","57501","example_use_bu3"]'
 expect "06: one password for the six accounts" "$(for n in 4 5 6 7 8 9; do payload "${n}" | jq -r '.user.passwordCredentials.password'; done | sort -u | wc -l | tr -d ' ')" "1"
 expect "06: the password in state.local.password is the one that was sent" "$(cat "${UC}/state.local.password")" "${PASSWORD_SENT}"
-expect "06: and only the owner can read that file" "$(stat -f %Lp "${UC}/state.local.password" 2>/dev/null || stat -c %a "${UC}/state.local.password")" "600"
+expect "06: and only the owner can read that file" "$(stat -c %a "${UC}/state.local.password" 2>/dev/null || stat -f %Lp "${UC}/state.local.password")" "600"
 expect "06: a POST carries the csrfToken, Referer and Content-Type" "$(hdrs_of POST | grep -c '^Content-Type: application/json')" "1"
 has "06: says where the first unit is" "HTTP 201, it is at ${BASE}/businessUnits/x_1"
 rm -f "${UC}/state.local.password"
