@@ -151,3 +151,4 @@ testsshkey.pub
 # Internal notes for the product team. Never commit or push this file.
 # ------------------------------------------------------------------------------
 KNOWN_ISSUES_RD.md
+TODO_FUTURE_IMPROVEMENTS.md
