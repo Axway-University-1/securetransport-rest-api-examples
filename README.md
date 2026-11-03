@@ -245,7 +245,6 @@ This is what you see at the root of the repository.
 | `README.md` | This file. |
 | `LICENSE` | The Apache License 2.0. |
 | `CLAUDE.md` | The working rules for anyone changing the repository with Claude Code: every change is covered by a test, how to run the suite, the safety rules for a lab. |
-| `IMPROVEMENTS_IN_PROGRESS.md` | What the last review of the repository found, what is done and what is still open. It goes away when nothing is open. |
 | `.gitignore` | What git does not track: your own configuration (`*.local.*`, `config`), passwords, `tests/local`, `tests/offline/output`, `tmp/`. |
 | `.gitattributes` | Line endings: `.sh` and `.py` files use LF, `.bat` files use CRLF, so a checkout works on Linux and on Windows. |
 | `.DS_Store` | A macOS Finder file. It is not tracked; ignore it. |
