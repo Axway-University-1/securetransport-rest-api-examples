@@ -295,7 +295,7 @@ On 60 scripts it found no bug in a script and many holes in the tests. Write tes
 - [ ] for a script that writes or deletes: `python3 tools/mutation_probe.py SCRIPT` lists no survivor that tells a person something
 - [ ] anything the example showed that looks like a product defect is in `KNOWN_ISSUES_RD.md` (git ignores it), with a reproduction you ran:
       see "The internal list of product defects" in the gotchas skill
-- [ ] the README coverage table updated — the per-topic counts in it are meant
+- [ ] the coverage table of Admin/API 2.0/README.md updated — the per-topic counts in it are meant
       to match a live count of the directories
 
 A quick way to check that last point:

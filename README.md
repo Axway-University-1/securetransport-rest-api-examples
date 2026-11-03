@@ -10,23 +10,16 @@
 2. [Disclaimer](#disclaimer)
 3. [Axway University](#axway-university-training)
 4. [Getting Started](#getting-started)
-5. [Repository Layout](#repository-layout)
-6. [Common Terminologies](#common-terminologies)
-7. [OpenAPI](#openapi)
-8. [HTTP Methods](#st-api-20-methods)
-9. [What Is Covered](#what-is-covered)
-10. [Features and Use Cases](#features-and-use-cases)
-11. [Guidance](#guidance)
-12. [License and Support](#license-and-support)
+5. [Where to find things](#where-to-find-things)
+6. [License and Support](#license-and-support)
 
 ## Introduction
 These examples are for REST API 2.0 of SecureTransport 5.5, and were verified on release 5.5-20260924. The older API 1.4 is also served by 5.5 but is not covered here.
 
 This github project looks at use cases from a specific viewpoint. Many clients and Axway themselves have implemented mechanisms to on-board clients and file transfer flows in an automated manner using APIs, rather than the alternative method of manual setups via the admin GUI of ST. Automation brings a reduced risk of introducing errors and also assists in adhering to any standards enforced by the owning institution in naming standards, security profiles etc.
 Many other automation tasks such as certificate expiry monitoring, configuration drift from baseline, etc are all possible via API based scripts or programs.
- 
-The examples here use the `curl` command from bash, the same calls as Windows batch files, and the python scripting language. It should be pointed out that **ANY** language that supports HTTPS Restful APIs can be used. Please also note that the commands shown are not the sole method you might want to use. Feel free to simplify or extend further what is shown as a guideline and starting point.
 
+The examples here use the `curl` command from bash, the same calls as Windows batch files, and the python scripting language. It should be pointed out that **ANY** language that supports HTTPS Restful APIs can be used. Please also note that the commands shown are not the sole method you might want to use. Feel free to simplify or extend further what is shown as a guideline and starting point.
 
 ## Disclaimer
 
@@ -69,9 +62,9 @@ Three short guides save you working this out for yourself:
   the API and in scripting against it, collected from real debugging. Worth
   reading before your first call.
 - **[Adding an example](.claude/skills/st-api-add-example/SKILL.md)** — the house
-  style, if you plan to contribute.
+  style, if you plan to contribute. (The fourth skill in that folder, the procedure for covering a new API resource, is for contributors too: see [CONTRIBUTING.md](CONTRIBUTING.md).)
 
-For how the API behaves when you use it, such as the date formats or sessions, read the [Guidance](#guidance) guides. For doing it step by step (usage reporting, stopping a daemon,
+For how the API behaves when you use it, such as the date formats or sessions, read the [Guidance](Features/Guidance/README.md) guides. For doing it step by step (usage reporting, stopping a daemon,
 changing an object, reading lists, moving files), run the [Admin](Admin/UseCases/README.md) and [End User](EndUser/UseCases/README.md) use cases.
 
 ### Check your clone works
@@ -82,22 +75,7 @@ changing an object, reading lists, moving files), run the [Admin](Admin/UseCases
 
 Takes up to 5 minutes, needs no server and no credentials. See the
 [tests Quick Start](tests/README.md) for what it checks and how to add a test
-with your change.
-
-### Testing your own scripts
-
-A script that calls an API fails in two ways: it sends the wrong call, or it reads the answer wrongly. The first kind needs no server, the second needs a lab. This repository
-tests its own scripts both ways, and you can copy the method.
-
-- **A lab that is not production.** Give everything a test makes a throwaway prefix (`example_`, `ZZTEST_`) and a random tail. Read what you change, keep a copy, change it, look, put it back and compare with the copy.
-  Clean up even when the test fails, and never run what changes the whole server for good (maintenance mode, the keystore password, the database connection).
-- **A stand-in for `curl`, with no server.** `curl` is found by name, so a file named `curl` first on `PATH` runs instead. `tests/offline/lib/stub_curl` prints the method, the URL, the headers and the body instead of sending them, and refuses what the
-  server refuses: a call with no `Referer`, and a JSON body with no `Content-Type`. The python examples run against `tests/offline/lib/fake_requests` in the same way.
-- **What a test checks.** The method, the full path, the body field by field, the headers, the exit code of every answer the script knows, the message a person reads, and that **nothing** was sent after a bad parameter. A test that checks only the exit code passes for a script that sends the wrong method.
-- **Would the test notice a broken script?** `python3 tools/mutation_probe.py SCRIPT` breaks the script in a scratch copy, one small change at a time (another method, a refusal that no longer stops, another status, a dropped header, a wrong path, a renamed key), runs the tests and lists the changes that no test noticed. Each one is a gap in the tests, or a change nobody could see.
-- **What is covered.** `python3 tools/script_coverage.py` lists the scripts that no test ran, and the ones that ran but never made a call. `python3 tools/measure_coverage.py` puts the numbers on one screen.
-
-[tests/README.md](tests/README.md) has the details: how to add a test with a script, the lab checks, and the map from a script to its tests.
+with your change. To test your own scripts the same way, see [Testing your own scripts](tests/README.md#testing-your-own-scripts).
 
 ### Prerequisites
 
@@ -214,325 +192,21 @@ API have no `00` or `99` script.
 If the configuration is missing, the scripts stop with a message telling you
 which file to create rather than failing part way through a request.
 
-## Repository Layout
+## Where to find things
 
-This is what you see at the root of the repository.
-
-### The examples
-
-| Folder | What is in it |
-| ------ | ------------- |
-| `Admin/` | The examples for the **administrator API** (port 444, or 8444 on a non root install): `API 2.0/bash` (curl examples, numbered by topic), `API 2.0/bat` (the same examples for Windows) and `API 2.0/python` (small complete programs for real tasks, and `utils` for tools that work on an exported configuration XML). |
-| `EndUser/` | The examples for the **end user API** (port 443, or 8443): `API 2.0/bash` has one example per call, `UseCases` has complete end user scenarios, a learning path in five steps. |
-| `Features/` | Complete solutions, one folder per feature, grouped by the release that introduced it. Each is a whole scenario you can run from `00.run_all` to the clean-up. See [Features](Features/README.md). `Features/Guidance/` is different: guides to read, with no scripts of their own. See [Guidance](#guidance). |
-
-### Working on the repository
-
-| Folder | What is in it |
-| ------ | ------------- |
-| `tests/` | The checks. `./tests/offline/run_all.sh` runs the offline ones (no server, no credentials); `tests/online` runs checks against a real lab server you name in `tests/local/integration.conf` (or the bundled mock), and `tests/common` holds the Python both sides use. `tests/local` and `tests/offline/output` are yours and git ignores them. See [tests](tests/README.md). |
-| `tools/` | Two small scripts. `list_examples.py` lists every example with the endpoint it calls and its `Risk` line (`--table` for a table). `review_status.py` keeps `review/checked.tsv`. |
-| `review/` | `checked.tsv`, the list of files a person has read and confirmed, each with a hash of its content, so that a file that changed since is easy to find. Kept by `tools/review_status.py`; do not edit it by hand. |
-| `.claude/` | A knowledge pack for people and for AI assistants working here: `skills/` holds the three guides linked under [Start with the guides](#start-with-the-guides) and the procedure for covering a new API resource, `agents/` holds two assistant definitions. See [its README](.claude/README.md). Your own `settings.json` and `settings.local.json` in this folder are git ignored. |
-| `.github/` | `workflows/tests.yml`: runs `./tests/offline/run_all.sh` on Linux for every push and pull request. |
-| `images/` | The screenshots used by this README. |
-| `tmp/` | A scratch folder for the files the helper scripts write while probing a server. It is git ignored, so a fresh clone does not have it, and you can delete what is in it. |
-
-### The files
-
-| File | What it is |
-| ---- | ---------- |
-| `README.md` | This file. |
+| Where | What is in it |
+| ----- | ------------- |
+| [Admin/API 2.0](Admin/API%202.0/README.md) | The **administrator API** examples (port 8444, or 444 on a root install: see [Which port?](#which-port)): `bash` and `bat` examples numbered by topic, `python` programs. Its README has the table of what is covered, the OpenAPI and the HTTP methods. |
+| [Admin/API 2.0/python](Admin/API%202.0/python/README.md) | Small complete programs for real tasks: onboarding, bulk changes, configuration drift, certificate expiry. |
+| [Admin/UseCases](Admin/UseCases/README.md) | Complete administrator scenarios, step by step, a learning path. |
+| [EndUser/API 2.0](EndUser/API%202.0/README.md) | The **end user API** examples (bash, one for each call), and what is covered. |
+| [EndUser/UseCases](EndUser/UseCases/README.md) | Complete end user scenarios, a learning path. |
+| [Features](Features/README.md) | Complete solutions, one folder per feature, grouped by the release that introduced it. Each script checks the server version first and skips itself on a release that is too old. |
+| [Features/Guidance](Features/Guidance/README.md) | Guides to **read**, not examples to run: time formats, reading the answers, sessions, Expression Language escaping, field names between releases. Each says who it is for and which release it was checked on. |
+| [GLOSSARY.md](GLOSSARY.md) | The terms and acronyms. |
+| [tests](tests/README.md) | The checks, and how to test your own scripts. |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Working on the repository: its folders and files (`tools/`, `review/`, `.claude/`, `.github/`, `images/`, `tmp/`, `.gitignore`, `.gitattributes`), and the rules in `CLAUDE.md`. |
 | `LICENSE` | The Apache License 2.0. |
-| `CLAUDE.md` | The working rules for anyone changing the repository with Claude Code: every change is covered by a test, how to run the suite, the safety rules for a lab. |
-| `.gitignore` | What git does not track: your own configuration (`*.local.*`, `config`), passwords, `tests/local`, `tests/offline/output`, `tmp/`. |
-| `.gitattributes` | Line endings: `.sh` and `.py` files use LF, `.bat` files use CRLF, so a checkout works on Linux and on Windows. |
-| `.DS_Store` | A macOS Finder file. It is not tracked; ignore it. |
-
-### Inside the examples
-
-```
-Admin/API 2.0/
-    bash/               curl examples, numbered by topic
-    bat/                the same examples for Windows
-    python/
-        python3/         the python examples
-        utils/           tools that work on an exported configuration XML
-Admin/UseCases/         complete administrator scenarios, a learning path
-EndUser/
-    API 2.0/bash/       end user API, on the user port
-    UseCases/           complete end user scenarios, a learning path
-Features/               complete solutions, one folder per feature
-    Guidance/           guides to read: time formats, usage reports, sessions, daemons ...
-```
-
-The bash and bat examples are numbered by topic and, within a topic, by HTTP
-method, so `04.Applications/02.applications_POST.sh` is the POST example for
-applications. Reading a topic folder in order walks you through the full
-create, read, update and delete cycle for that object.
-
-The python examples are different in character: rather than demonstrating a
-single call, each one is a small complete program for a real task, such as
-baselining the server configuration or bulk updating accounts.
-
-## Common Terminologies
-
-The following table shows a list of terms and acronyms used throughout this project.
-
-| Definition | Description |
-| ---------- | ----------- |
-| Admin API, EndUser API | The administrator's API (port 444, or 8444 on a non root install) and the smaller user level API (port 443, or 8443) |
-| Advanced Routing | The SecureTransport feature that moves and transforms files by routes |
-| Account | A user, service or template account; the owner of a home folder, sites and subscriptions |
-| AS2, PeSIT, SFTP | File transfer protocols the server speaks (as listener and as client through a site) |
-| Business unit | A group of accounts with its own settings and, optionally, a network zone |
-| coreId | The id that ties the transfers of one file's journey through the server together |
-| CSRF token | A header, returned by the login, that a session must send back on writes; see the gotchas |
-| DMZ, zone, edge | A network zone and its edge server that sits between the outside and the core |
-| EL | The Expression Language: `${...}` in route conditions, filters, rename patterns and login rules |
-| ICAP | A protocol for passing files to a virus scanner |
-| Route | A template, a simple or a composite route of Advanced Routing, run by a subscription |
-| Site (transfer site) | A remote partner the server connects to, to pull or push files |
-| Subscription | What links an account's folder to an application: a route or a trigger |
-| ST | SecureTransport |
-| MFT, TLS, JSON | Managed File Transfer, Transport Layer Security, JavaScript Object Notation |
-
-## OpenAPI
-
-SecureTransport provides an OpenAPI description of its APIs, with a Swagger UI on top of it, which allows you to explore them interactively.
-
-In any browser enter as below, substituting your server’s IP and port used for the admin GUI. For example the default for a non root install would be: https://<SERVER>:8444/api/v2.0/docs/index.html for version 2.0 or https://<SERVER>:8444/api/v1.4/docs/index.html for version 1.4.
-
-The above URLs all provide access to the ADMIN level APIS.  There is a smaller set of user level APIs available at the 8443 or 443 port.
-
-You will be required to authenticate with an administrator username and password. Once authenticated, a screen as below will be seen.
-
-![REST API 2.0 Open API](images/swagger_20.jpg "REST API 2.0 Open API")
-
-Expanding any of the arrows will display the respective APIs along with available methods.
-
-Selecting the GET /accounts for example will then open a window as below indicating all the possible parameters that might be used to select accounts from the system. Be careful of any API that is not a read or GET method.  PUTs, POSTs, DELETEs will all work if you enter the correct parameters and input data.
-
-![GET /accounts](images/swagger_get_account.jpg "GET /accounts")
-
-Note the ‘Try it out’ button. Select the button and you will now be able to use this API live.
-
-The Open API provides a curl command equivalent that it is using to fetch the data. Notice also that a server response will be displayed showing the returned JSON data.
-
-The HTTP success code of 200 is shown next to the response assuming all worked correctly. Finally, if you wish to download the response there is an option to download the output json to your PC.
-
-A list answers 100 objects by default (a page, not a cap); ask for more with `limit` and `offset`, or change the default with the Server Configuration Option Webservices.EntriesPerPage.
-
-
-## ST API 2.0 Methods
-
-How the methods behave on SecureTransport. The details, and the surprises, are in the
-[gotchas](.claude/skills/st-api-gotchas/SKILL.md); each was confirmed on a real server.
-
-**GET** reads, and changes nothing. A list answers a page of 100 objects by default, in no fixed order
-unless you ask; page it with `limit` and `offset`.
-
-**POST** creates an object (201, with its URL in the `Location` header: the created object
-is not returned), or performs an operation: `POST .../operations?operation=X`, which
-answers 200 or 202, so read the body, a 200 can carry a failure. `POST /myself` is a login.
-
-**PUT** replaces the whole object (204). A field you leave out is reset, so send back the
-object you read with your change applied. On a mail template a PUT creates it.
-
-**PATCH** changes part of an object (204). The body is a JSON Patch: an array of
-`{"op": "add" | "replace" | "remove", "path": "/field", "value": ...}`. A path addresses
-an array element by its position (`/steps/1/...`), `-` appends, `replace` of a path the
-object does not have is a 400 `Missing field`.
-
-**DELETE** removes an object (204). A missing object may be a 400, not a 404.
-
-**HEAD** is the cheap existence check: 200 or 404, no body (a few resources answer 405).
-
-## What Is Covered
-
-This project is a work in progress. The tables below describe what is in the
-repository today, so that you can see at a glance whether the example you need
-already exists.
-
-### Admin API
-
-| Topic | Endpoints | bash | bat |
-| ----- | --------- | :--: | :-: |
-| 01. Authentication | `/myself`, basic auth and cookie jar (API keys: `21.Administrators`, and `Admin/UseCases`) | 2 | 2 |
-| 02. Introduction | `/version`, `/myself` | 6 | 6 |
-| 03. Connect | `/daemons`, `/servers`, and their operations | 13 | 13 |
-| 04. Applications | `/applications`, flow and maintenance types | 7 | 7 |
-| 05. Accounts | `/accounts`, including PATCH from a file | 9 | 9 |
-| 06. Transfer Sites | `/sites`, HTTP and SSH pull and push sites: list, check, read, replace, change and delete one by id, test a connection (saved or not) and list a remote folder | 11 | 11 |
-| 07. Subscriptions | `/subscriptions`, Advanced Routing, with and without a trigger file, delete by id; check, read, replace and patch one by id; pull, clear the pull history and purge the folder; the other types (Basic, HumanSystem, MBFT, StandardRouter) | 13 | 13 |
-| 08. Route Templates | `/routes`, template type | 2 | 2 |
-| 09. Composite Routes | `/routes`, composite and simple types, Compress and Decompress steps, linked to a subscription, list, check, replace, patch a step, delete by id | 9 | 9 |
-| 11. Certificates | `/certificates`, generate, import, export, signing requests | 14 | 14 |
-| 12. Business Units | `/businessUnits`, units, their nesting, and why a delete is refused | 7 | 7 |
-| 13. Configurations | `/configurations`: options, logging, database, Sentinel, login, archiving, external stores, S3 storage profiles | 47 | 47 |
-| 14. Expression Language | Expression Language in a route condition, a file filter, a rename pattern, a login restriction rule and a site (also as python): which fields carry it and how it is escaped | 8 | 0 |
-| 15. Transfers | `/transfers/operations`, a pull on demand | 1 | 1 |
-| 16. Transfer Logs | `/logs/transfers`, by account and status, billable transfers per day | 5 | 5 |
-| 17. Access Policies | `/accessPolicies`, the embedded database's pg_hba.conf rules | 6 | 6 |
-| 18. Account Setup | `/accountSetup`, an account with its sites, profiles and subscriptions in one call | 4 | 4 |
-| 19. Address Book | `/addressBook/sources`, where end users' address books look people up | 5 | 5 |
-| 20. Administrative Roles | `/administrativeRoles`, the roles and the menus they open | 7 | 7 |
-| 21. Administrators | `/administrators`, administrators, locking them, and their API keys | 10 | 10 |
-| 22. Denied Users | `/deniedUsers`, login names that may not log in, for good or for hours | 3 | 3 |
-| 23. Events | `/events`, the tasks being processed now: list, read, delete a stuck one | 3 | 3 |
-| 24. ICAP Servers | `/icapServers`, antivirus and DLP scan servers: add, change, switch on and off, and what a scan does to a transfer | 7 | 7 |
-| 25. LDAP Domains | `/ldapDomains`, directories users can be looked up in: add, change, remove, and test a connection | 8 | 8 |
-| 26. Login Restriction Policies | `/loginRestrictionPolicies`, rules that allow or deny logins by address: policies, rules, business units | 9 | 9 |
-| 27. Audit Logs | `/logs/audit`, who changed what, and when: list, read, a refused edit, CSV export | 4 | 4 |
-| 28. Server Logs | `/logs/server`, what the servers wrote: search, read, CSV export | 3 | 3 |
-| 29. Mail Templates | `/mailTemplates`, the XHTML files the notification e-mails are built from: list, add, replace, read, delete | 6 | 6 |
-| 30. Route Steps Metadata | `/routeStepsMetadata`, the route step types the server knows, how a step names one and the smallest step of each: list (read only) | 1 | 1 |
-| 31. Route Steps Charsets | `/routeStepsCharsets`, the character sets a route step may name, and a check of a step against them: list (read only) | 1 | 1 |
-| 32. Sessions | `/sessions`, the sessions open now: list, read one, end one (a client is disconnected), and the bandwidth and user class statistics | 5 | 5 |
-| 33. Statistics Summary | `/statisticsSummary`, the usage report: the transfers in and out for each day of a period, the users who have logged in, and a test of the connection to the Amplify Platform it is sent to (read only) | 3 | 3 |
-| 34. Transaction Manager | `/transactionManager`, the status of the Transaction Manager (read only), and `/transactionManager/operations`, the stop: server wide, no start to undo it, needs a confirmation word on the command line (disruptive, written from the reference and not run on a server) | 2 | 2 |
-| 35. Transfer Profiles | `/transferProfiles`, the PeSIT profiles of an account that say which file to send, what to call the file received and how it is labelled: list, create, HEAD, read, replace, patch and delete | 7 | 7 |
-| 36. User Classes | `/userClasses`, the classes that decide which class an account is in when it logs in (a user name pattern, a type, a membership expression, an order): list, create, HEAD, read, replace, patch and delete | 7 | 7 |
-| 37. Zones | `/zones`, the network (DMZ) zones with their edges, protocols and proxies, and the business units that name one: list, create, HEAD, read, replace, patch and delete | 7 | 7 |
-
-Every bash example has a bat equivalent, so Windows users can follow the same
-path through the material, with one exception: `14. Expression Language` has
-bash (and python) only. Where the bash examples use `jq`, the bat examples use
-PowerShell to do the same job. Many bat twins were brought up to date together
-with their bash twins and were checked by reading them and by text tests, not by
-running them on Windows: if one misbehaves, please report it.
-
-### EndUser API
-
-| Topic | Endpoints | bash |
-| ----- | --------- | :--: |
-| 01. Authenticate | `/myself`, login and logout | 2 |
-| 02. Files | `/files` and `/fileOperations`: list, with paging, sorting, metadata and glob patterns; create a folder; upload, with an MD5 check; download; rename; share and unshare; delete | 15 |
-| 03. Myself | `/myself`, `/myself/password`, `/myself/passwordExpired`, `/myself/secretQuestion`, `/myself/addressBook`: the account, password change and reset, the account's own secret question, the address book | 9 |
-| 04. File Operations | `/fileOperations`: MD5 checksum, an operation's state, chunked and multipart uploads, cancel | 5 |
-| 05. Transfers | `/transfers`, `/transfers/operations`, `/transfers/pullSummary`: the user's transfer log, pull, push, folder monitor, pull summary, AS2 receipt check | 7 |
-| 06. Server Time | `/serverTime` | 1 |
-| 07. Secret Questions | `/secretQuestions`: the questions the server offers, a check that one is on the list, the Nth question for a script | 3 |
-
-The EndUser examples are bash only, with no bat twins. Every resource of the EndUser API 2.0 reference has an example. All of them
-were run against a real server except three, which say so in their own header:
-the password reset pair (`03.Myself/04` and `05`), which need a real reset
-email, and `05.Transfers/07`, which needs an AS2 transfer.
-
-Where the EndUser API behaves differently from what you might expect,
-confirmed against a real server:
-
-- **Writes do not need the `csrfToken`.** The login answers with one, but a
-  POST, PUT, PATCH or DELETE succeeds without it: the session cookie is enough.
-- **Changing the password ends the session.** The next call with the same
-  cookie answers 401. Log in again with the new password, as
-  `03.Myself/03.myself_password_POST_change.sh` does.
-- **`/transfers` returns a plain list**, not the `{resultSet, result}` envelope
-  the Admin API uses. So do `/myself/addressBook` and `/secretQuestions`.
-- **A wrong `Content-MD5` gives a bare 500**, "Error while uploading file", with
-  no word about the checksum. File Tracking logs the upload as Failed.
-- **A file operation's status describes the operation, not the file.** An
-  Upload stays `IN_PROGRESS` after its last chunk, though the file is whole.
-  Check the file itself, with `02.Files/10.files_filepath_GET_metadata.sh`.
-- **`/serverTime` writes the offset as `+0300`**, not with the `Z` the API
-  reference shows. Parse the offset, as `06.ServerTime/01.serverTime_GET.sh` does.
-
-### Python
-
-The python examples are whole programs for real maintenance tasks, rather than
-single calls. They are CSRF aware, as required from the 20230525 release onwards:
-each logs in once and sends the `csrfToken` of the login on every later call, the
-logout included. The lab accepts a write without it, which hid a script that
-forgot, so `tests/offline/checks/test_python_scripts_run.py` runs every one of them as a
-whole against a fake server that refuses such a write. The same test checks the
-exit codes: a failure exits 1 (a bad argument 2), never 0, and a connection error
-or a timeout always ends the script.
-
-| Script | What it does |
-| ------ | ------------ |
-| `stBuildFullTestAccount.py` | Onboards one account end to end: account, certificate, transfer site, routes and subscription. The best place to start if you are automating onboarding. |
-| `stBuildTestAccounts.py` | Creates accounts in bulk, using multiprocessing. A dry run unless `--apply`; the prefix and the number are arguments. |
-| `stDeleteTestAccounts.py` | Deletes the user accounts whose name starts with a prefix (`ZZ`, what `stBuildTestAccounts.py` makes), in bulk. Lists them and deletes nothing unless `--apply`. |
-| `stGetAccountsAfterDate.py` | Lists accounts created after a given date. |
-| `stUpdateAllAccounts.py` | Scans every template account and updates a field. Uses certificate based authentication rather than basic auth. |
-| `stUpdateAllRoutes.py` | Scans every simple route and patches a field on the route, or a field inside one of its steps. |
-| `stUpdateRouteWithPut.py` | Reads a route, changes it and writes the whole object back. Inserts steps, links a simple route into a composite, or attaches a route to a subscription. |
-| `stUpdateAllSubscriptions.py` | Scans every subscription and patches a set of fields. |
-| `stUsersPerSharedFolder.py` | Reports which accounts have access to each shared folder, by joining applications and subscriptions. Read only. |
-| `stReplaceSites.py` | Scans SSH transfer sites and updates their cipher suites. |
-| `stCertificateExpiry.py` | Counts the certificates and reports the ones that have expired or are about to. Read only. |
-| `stBillableTransfers.py` | Counts the billable transfers per day, for every account or for one. Needs 5.5-20260924 or later. Read only. |
-| `stGetPrivateCert.py` | Exports a certificate and its private key by ID, as a PKCS#12 file readable by its owner only. The password for the file comes from the environment or a prompt, never from the command line or the URL. |
-| `stAddLoginRestrictionRule.py` | Adds a rule to an existing login restriction policy. |
-| `stConfigScan.py` | Baselines the server configuration (as JSON) and reports drift from the baseline on later runs, in both directions. Useful after a patch. |
-| `stGraceful.py` | Gracefully drains and shuts down a core and edge pair, **the Transaction Manager included, which the API cannot start again**. Stops nothing without `--yes`, and not the Transaction Manager unless every daemon went down in time. |
-
-The scripts that create, change or delete many objects at once —
-`stUpdateAllRoutes.py`, `stUpdateAllSubscriptions.py`, `stUpdateRouteWithPut.py`,
-`stUpdateAllAccounts.py`, `stReplaceSites.py`, `stBuildTestAccounts.py` and
-`stDeleteTestAccounts.py` — are a dry run by default: they say what they would send
-and send nothing. Read that output, then give `--apply` (or set `dryRun` to `False`
-in the configuration section) to let them write. `stGraceful.py` has no dry run to
-fall back on: it needs `--yes` and does nothing without it.
-
-Optional keys of the `config` file (see `config.example`): `st_ca_bundle` or
-`st_verify=yes` turn on the check of the server's certificate, which the examples
-leave off by default so that a lab with a self signed certificate works.
-
-`utils` holds two tools whose input is an exported `systemConfiguration.xml`
-rather than the live API:
-
-| Script | What it does |
-| ------ | ------------ |
-| `stCompareExportedConfigurations.py` | Compares two exported configurations and reports the options whose value differs, and the options present in only one of them. Useful when you have the exports but no access to the system. |
-| `processSystemConfig.py` | Extracts the user classes from an export and converts their membership expressions from the 5.2.1 format to the 5.5 format. Writes the result as XML, and can create the user classes on a target server through the API when `createOnTarget` is set. |
-
-Export the configuration from the GUI, then take the XML out of the zip it
-produces:
-
-```
-unzip -j export_configuration.zip systemConfiguration.xml -d /home/axway/api
-```
-
-### Not yet covered
-
-Every resource of the Admin API reference has examples, except these, which need
-something this project's lab does not have. Contributions are welcome, and the
-list doubles as a rough roadmap.
-
-- **Site Templates** (`/siteTemplates`): they need Connect:Direct; on the lab every create is refused.
-- **Cluster Services** (`/clusterServices`) and the cluster-only configuration operations: the examples are written against a standalone server.
-- Parts of **Configurations**, left out on purpose because they change the whole server and cannot be undone through the API: the Oracle-only `database/{componentType}`, changing the database connection, and the replication operations.
-
-Bulk changes across every route or subscription exist as python programs (`stUpdateAll*.py`), not as bash or bat examples.
-
-
-## Features and Use Cases
-
-New SecureTransport releases add features that are easier to learn as a complete
-solution than as a list of API calls. Those live in [Features](Features/README.md), one
-folder per feature, with the same examples in bash and as Windows batch files. The
-index there lists them, grouped by the release that introduced them, so you can see
-which ones your version supports. Every script also checks the server version with
-`GET /version` before it does anything, and skips itself on a release that is too old.
-
-The end user API has its own folder of complete scenarios,
-[Use Cases](EndUser/UseCases/README.md), and so does the administration API,
-[Admin Use Cases](Admin/UseCases/README.md).
-
-## Guidance
-
-[Features/Guidance](Features/Guidance/README.md) is a folder of short guides to **read**, not examples to run. Each one says how part of the REST API
-behaves when you use it, shows commands that were run on a lab server, and says what was not tried. Each guide says who it is for and which release
-it was checked on (5.5-20260924). They are written in short sentences, so that they can be handed to a customer as they are.
-
-| Guide | What it is about |
-| ----- | ---------------- |
-| [Time formats, and daylight saving time](Features/Guidance/time-formats.md) | The five date formats of the API, which resource takes which, an example of each, and what to do when the clocks change. |
-| [Reading the answers](Features/Guidance/reading-api-answers.md) | A 200 that says no, and the shapes of an error. |
-| [Authentication and sessions](Features/Guidance/authentication-and-sessions.md) | Basic, session and API key, what each answers, and advice on which fits which case. |
-| [Expression Language escaping](Features/Guidance/expression-language-escaping.md) | Where an expression goes and how to escape it in the shell, in JSON and in the expression. |
-| [Field names between releases](Features/Guidance/field-names-between-releases.md) | The same thing under two names, and how to write a client that survives. |
 
 ## License and Support
 

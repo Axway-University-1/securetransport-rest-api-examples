@@ -42,10 +42,18 @@ def count(path, ext):
     return len([f for f in os.listdir(full) if f.endswith(ext)])
 
 
-README = open(os.path.join(REPO, "README.md")).read()
+def read(*parts):
+    return open(os.path.join(REPO, *parts)).read()
+
+
+README = read("README.md")
+ADMIN_README = read("Admin", "API 2.0", "README.md")
+ENDUSER_README = read("EndUser", "API 2.0", "README.md")
+PYTHON_README = read("Admin", "API 2.0", "python", "README.md")
+CONTRIBUTING = read("CONTRIBUTING.md")
 
 # ----------------------------------------------------------- README coverage
-print("=== README coverage tables match the directories ===")
+print("=== the coverage tables (Admin/API 2.0/README.md, EndUser/API 2.0/README.md) match the directories ===")
 
 A, B = "Admin/API 2.0/bash", "Admin/API 2.0/bat"
 rows = [("01. Authentication", "01.Authentication"),
@@ -88,26 +96,26 @@ rows = [("01. Authentication", "01.Authentication"),
 for label, folder in rows:
     sh, bat = count(A + "/" + folder, ".sh"), count(B + "/" + folder, ".bat")
     m = re.search(r"^\| %s \| [^|]*\| *(\S+) *\| *(\S+) *\|" % re.escape(label),
-                  README, re.M)
+                  ADMIN_README, re.M)
     if not m:
         chk("row present: " + label, False)
         continue
     chk("%s  %s/%s" % (label, sh, bat), (m.group(1), m.group(2)) == (str(sh), str(bat)),
-        "%s/%s in README" % (m.group(1), m.group(2)))
+        "%s/%s in the Admin API README" % (m.group(1), m.group(2)))
 
 for label, folder in (("01. Authenticate", "01.Authenticate"), ("02. Files", "02.Files"),
                       ("03. Myself", "03.Myself"), ("04. File Operations", "04.FileOperations"),
                       ("05. Transfers", "05.Transfers"), ("06. Server Time", "06.ServerTime"),
                       ("07. Secret Questions", "07.SecretQuestions")):
     n = str(count("EndUser/API 2.0/bash/" + folder, ".sh"))
-    m = re.search(r"^\| %s \| [^|]*\| *(\S+) *\|" % re.escape(label), README, re.M)
+    m = re.search(r"^\| %s \| [^|]*\| *(\S+) *\|" % re.escape(label), ENDUSER_README, re.M)
     chk("EndUser %s  %s" % (label, n), bool(m) and m.group(1) == n,
         m.group(1) if m else None)
 
 # --------------------------------------------------- every named script exists
 print()
-print("=== every python script the README names exists ===")
-named = set(re.findall(r"`(?:python3/)?(st[A-Za-z]+\.py|processSystemConfig\.py)`", README))
+print("=== every python script the python README names exists ===")
+named = set(re.findall(r"`(?:python3/)?(st[A-Za-z]+\.py|processSystemConfig\.py)`", PYTHON_README))
 have = set(os.path.basename(p) for p in
            glob.glob(os.path.join(REPO, "Admin/API 2.0/python/python3/*.py")) +
            glob.glob(os.path.join(REPO, "Admin/API 2.0/python/utils/*.py")))
@@ -216,12 +224,35 @@ chk("the PeSIT acknowledgment lives under Features, not under the Admin API fold
     and "pesit-end-to-end-acknowledgment" in open(os.path.join(REPO, "Features", "README.md")).read()
     and "90. End To End" not in README)
 
-print("=== the README describes everything at the root ===")
+print("=== the README and CONTRIBUTING describe everything at the root ===")
 import subprocess as _subprocess  # noqa: E402
 root_items = sorted({p.split("/")[0] for p in _subprocess.run(["git", "-C", REPO, "ls-files"], capture_output=True, text=True).stdout.split("\n") if p})
 root_items += ["tmp", ".DS_Store"]  # git ignores these, and a reader still sees them
-undescribed = [i for i in root_items if "`%s" % i not in README]
-chk("every item at the root (files, folders, and the ignored tmp and .DS_Store) is named in the README", not undescribed, ", ".join(undescribed))
+undescribed = [i for i in root_items if "`%s" % i not in README + CONTRIBUTING and "[%s]" % i not in README]
+chk("every item at the root (files, folders, and the ignored tmp and .DS_Store) is named in the README or in CONTRIBUTING.md", not undescribed, ", ".join(undescribed))
+
+print("=== the README is the front page, and the rest has a place of its own ===")
+chk("the README is short (under 250 lines)", len(README.splitlines()) < 250, len(README.splitlines()))
+for gone in ("## What Is Covered", "## Common Terminologies", "## OpenAPI", "## ST API 2.0 Methods", "### Inside the examples", "### Working on the repository", "| `stBuildFullTestAccount.py` |", "| 01. Authentication |"):
+    chk("the README no longer holds: %s" % gone, gone not in README)
+for what, doc, marker in (("the Admin coverage table and the OpenAPI and methods", ADMIN_README, "## What is covered"),
+                          ("the End User coverage table", ENDUSER_README, "## What is covered"),
+                          ("the python programs", PYTHON_README, "| Script | What it does |")):
+    chk("%s are in their folder README" % what, marker in doc)
+chk("the Admin README also holds the OpenAPI and the HTTP methods", "## Exploring the API with OpenAPI" in ADMIN_README and "## HTTP methods" in ADMIN_README)
+chk("the Admin README's images exist", all(os.path.isfile(os.path.normpath(os.path.join(REPO, "Admin", "API 2.0", m))) for m in re.findall(r"\]\((\.\./\.\./images/[^) ]+)", ADMIN_README)) and "../../images/" in ADMIN_README)
+glossary = read("GLOSSARY.md")
+chk("the glossary has the terms, and the README does not keep them", "| coreId |" in glossary and "| coreId |" not in README and "(GLOSSARY.md)" in README)
+for link in ("Admin/API%202.0/README.md", "Admin/API%202.0/python/README.md", "EndUser/API%202.0/README.md", "CONTRIBUTING.md", "Features/Guidance/README.md"):
+    chk("the README links %s, which exists" % link, "(%s)" % link in README and os.path.isfile(os.path.join(REPO, link.replace("%20", " "))))
+chk("the README names the four skills' count right: three guides, and the fourth is for contributors", "Three short guides" in README and "fourth skill" in README
+    and len(glob.glob(os.path.join(REPO, ".claude/skills/*/SKILL.md"))) == 4)
+chk("CONTRIBUTING.md says three guides and the procedure, as the skills folder holds", "three guides" in CONTRIBUTING and "covering a new API resource" in CONTRIBUTING)
+tools_listed = sorted(f for f in os.listdir(os.path.join(REPO, "tools")) if f.endswith(".py") and "`%s`" % f not in CONTRIBUTING)
+chk("CONTRIBUTING.md names every script of tools/", not tools_listed, ", ".join(tools_listed))
+guides = sorted(f for f in os.listdir(os.path.join(REPO, "Features", "Guidance")) if f.endswith(".md") and f != "README.md")
+chk("the tree in CONTRIBUTING.md describes Guidance by guides that exist (no usage reports, no daemons)", "usage reports" not in CONTRIBUTING and "daemons" not in CONTRIBUTING.split("Guidance/", 1)[1].split("\n", 1)[0] and len(guides) == 5, guides)
+chk("the README does not give the ports twice: the layout points at the Which port table", README.count("8444") <= 2 and "### Which port?" in README)
 
 print()
 if failed:

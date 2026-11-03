@@ -31,7 +31,7 @@ Notes as `Confirmed directly: ...`.
 | `coverage.py [TAG]` | Which operations no script seems to call. A heuristic: confirm by reading the folder |
 | `lab.py` | `from lab import admin, show, run`: call the lab, print one line per answer, run real examples on it |
 | `authoring.py` | `write_sh(...)`, then `write_bat(...)`: the house header, set up and MAIN_URL, for both twins |
-| `sync_docs.py` | After adding files: recount the README table, the docs check and the pack totals. `--check` changes nothing |
+| `sync_docs.py` | After adding files: recount the table of Admin/API 2.0/README.md, the docs check and the pack totals. `--check` changes nothing |
 
 `lab.py` needs `tests/local/integration.conf` (copy `tests/local.example/integration.conf`).
 

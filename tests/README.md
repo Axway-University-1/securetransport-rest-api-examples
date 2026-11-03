@@ -106,6 +106,21 @@ server](#against-a-real-server).
 
 ---
 
+## Testing your own scripts
+
+A script that calls an API fails in two ways: it sends the wrong call, or it reads the answer wrongly. The first kind needs no server, the second needs a lab. This repository
+tests its own scripts both ways, and you can copy the method.
+
+- **A lab that is not production.** Give everything a test makes a throwaway prefix (`example_`, `ZZTEST_`) and a random tail. Read what you change, keep a copy, change it, look, put it back and compare with the copy.
+  Clean up even when the test fails, and never run what changes the whole server for good (maintenance mode, the keystore password, the database connection).
+- **A stand-in for `curl`, with no server.** `curl` is found by name, so a file named `curl` first on `PATH` runs instead. `offline/lib/stub_curl` prints the method, the URL, the headers and the body instead of sending them, and refuses what the
+  server refuses: a call with no `Referer`, and a JSON body with no `Content-Type`. The python examples run against `offline/lib/fake_requests` in the same way.
+- **What a test checks.** The method, the full path, the body field by field, the headers, the exit code of every answer the script knows, the message a person reads, and that **nothing** was sent after a bad parameter. A test that checks only the exit code passes for a script that sends the wrong method.
+- **Would the test notice a broken script?** `python3 tools/mutation_probe.py SCRIPT` breaks the script in a scratch copy, one small change at a time (another method, a refusal that no longer stops, another status, a dropped header, a wrong path, a renamed key), runs the tests and lists the changes that no test noticed. Each one is a gap in the tests, or a change nobody could see.
+- **What is covered.** `python3 tools/script_coverage.py` lists the scripts that no test ran, and the ones that ran but never made a call. `python3 tools/measure_coverage.py` puts the numbers on one screen.
+
+The rest of this file has the details: how to add a test with a script, the lab checks, and the map from a script to its tests.
+
 ## Full reference
 
 ### What is checked
@@ -130,7 +145,7 @@ server](#against-a-real-server).
 | `offline/checks/test_known_failures.py` | The known failures of the online checks: a check that fails only on lines of `tests/online/known_failures.tsv` is a known failure and the run stays green, a new failure turns it red, a listed line that no longer fails turns it red too; every list line names an existing check. |
 | `offline/checks/test_script_coverage.py` | The matching in `tools/script_coverage.py`: which script a record of the suite's run belongs to, and a script that ran but never made a call. |
 | `offline/checks/check_script_conventions.py` | The house rules for every bash example (Admin, End User, Use Cases, Features), found in manual review: each optional parameter has its own bracket (`[A] [B]`, never `[A [B]]`); the `Usage:` a script prints is the one in its header; a script run without its required parameters exits 2 with a usage and has sent nothing. |
-| `offline/checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: README coverage tables whose counts differ from the directories, and `.claude` skills that describe a layout, file or variable that no longer exists. |
+| `offline/checks/check_docs_match_repo.py` | Documentation that no longer matches the repository: the coverage tables of `Admin/API 2.0/README.md` and `EndUser/API 2.0/README.md` whose counts differ from the directories, the python programs of `python/README.md`, the front page README kept short with its content in the folder READMEs, `GLOSSARY.md` and `CONTRIBUTING.md`, and `.claude` skills that describe a layout, file or variable that no longer exists. |
 | `offline/checks/test_bash_payloads.sh` | A curl example emitting malformed JSON, or an unexpanded `${VARIABLE}`, by running it against a stub `curl` that prints the payload instead of sending it. |
 | `offline/checks/test_bash_reads_and_deletes.sh` | The examples that look up, read and delete, and the EndUser examples that open their own session: a DELETE going to an id the lookup did not find, or to anything when the lookup found nothing; composite routes not deleted before the simple routes they run; a count read from `returnCount` instead of `totalCount`; an EndUser call without the `csrfToken` its login returned. |
 | `offline/checks/check_risk_headers.py` | An example whose header has no `Risk:` line, an unknown level, a bat twin that says something else, a read that writes (or a write called read), and the list of the disruptive ones changing unnoticed. |
@@ -166,7 +181,7 @@ server](#against-a-real-server).
 | `offline/checks/test_bash_admin_usecase_08.sh` | The Admin use case `08-identify-unused-objects` against the stub `curl`: the rules on a map of fixtures (each relation makes an object used; an unreferenced one is reported; AS2 and PeSIT sites, default profiles, maintenance applications and ownerless certificates are not judged; a disabled route is kept when the log names it and reported when not; an enabled route is never reported), the calls of 07 (the prefix filter, pages of 100, the subscriptions of each account, the whole server) and 08 (one call per route by id, the administrator's own requests not counted), the bodies of 01 to 04 and the PATCH of 06 (by position), the upload and the wait of 05, the exact names of 99 (twice), `00.run_all.sh` failing fast and cleaning up, and the claims of the README against the rules and the expected list. |
 | `offline/checks/test_bash_enduser_usecase_08.sh` | End User use case `08-lists-and-paging` against the stub `curl`: the folder walk, `limit=0`, the sort, the two limits the server cannot use, `/transfers` and its exit 3, the small lists, `fields=` that has no effect, counting by pages, the cleanup, and a whole run for an account that may not use transfers. |
 | `offline/checks/test_no_list_cap_claim.py` | No tracked file says that a list is capped at 100: the default page is 100 and a larger `limit` is honoured. |
-| `offline/checks/test_readme_testing_section.py` | The section "Testing your own scripts" of the main README: it is there, short, and every tool and stand-in it names exists. |
+| `offline/checks/test_readme_testing_section.py` | The section "Testing your own scripts" of this file: it is there, short, every tool and stand-in it names exists, and the main README and CONTRIBUTING.md point to it. |
 | `offline/checks/test_bash_enduser_api.sh` | The EndUser examples: every one that needs a session checks for an active one first and logs in when there is none (no cookie jar, a refused session, an active one, a 500 that is not a lost session, a login that fails), and the examples added from the API reference (`03.Myself`, `04.FileOperations`, `05.Transfers`, `06.ServerTime`, `02.Files` 09 to 15): each one's method, URL and query, body and headers (`Content-MD5`, `Content-Range`), the answers it acts on (an MD5Calc followed until DONE, a 503 from a disabled service, a pull summary still in retry) and its exit code. |
 | `offline/checks/test_bash_pesit_ack.sh` | `Features/pesit-end-to-end-acknowledgment`: `Acknowledgment.sh` sending an ACK when the outbound transfer is there, a NACK or nothing (exit 2) when it is not, only changing `operation=ack` in the link, and logging an ACK answered 200 as sent; `IteratePesitInbounds.sh` running from another folder, carrying on past a transfer that is not ready, and passing its log folder on. The bat twins are read as text for the same bugs. |
 | `offline/checks/test_feature_bat_twins.py` | A `Features/` `.bat` file drifting out of step with its `.sh` twin: every API field name and every feature's own settings must appear in both, since the `.bat` files cannot be run in this repository to check directly. |

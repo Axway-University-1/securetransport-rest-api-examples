@@ -21,9 +21,9 @@ readme = (G / "README.md").read_text()
 guides = sorted(p.name for p in G.glob("*.md") if p.name != "README.md")
 check("every guide is listed in the folder's README", all(g in readme for g in guides), guides)
 main_readme = (ROOT / "README.md").read_text()
-check("the main README has a Guidance section and links every guide", "## Guidance" in main_readme and all("Features/Guidance/" + g in main_readme for g in guides),
-      [g for g in guides if "Features/Guidance/" + g not in main_readme])
-check("... and the table of contents lists it", "[Guidance](#guidance)" in main_readme)
+check("the main README links the Guidance folder, whose README is the one list of the guides (no second list in the front page)",
+      "(Features/Guidance/README.md)" in main_readme and not any("Features/Guidance/" + g in main_readme for g in guides), guides)
+check("... and its 'Where to find things' section is in the table of contents", "[Where to find things](#where-to-find-things)" in main_readme)
 check("Features/README.md points to the folder and to the guide", "Guidance/" in (ROOT / "Features" / "README.md").read_text()
       and "Guidance/time-formats.md" in (ROOT / "Features" / "README.md").read_text())
 for md in [G / "README.md"] + [G / g for g in guides]:

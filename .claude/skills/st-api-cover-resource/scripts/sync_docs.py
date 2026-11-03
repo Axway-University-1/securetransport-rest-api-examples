@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Bring the docs in line with the Admin folders on disk: the per-folder counts in
-the README table, the folder list in tests/offline/checks/check_docs_match_repo.py, and
+the table of Admin/API 2.0/README.md, the folder list in tests/offline/checks/check_docs_match_repo.py, and
 the totals the knowledge pack cites.
 
     sync_docs.py                                       recount every row
@@ -40,7 +40,7 @@ def main(argv):
     new = argv if not check else []
     if new and len(new) != 3:
         sys.exit(__doc__)
-    readme_path = os.path.join(REPO, "README.md")
+    readme_path = os.path.join(REPO, "Admin", "API 2.0", "README.md")
     readme = open(readme_path).read()
     lines = readme.split("\n")
     start = lines.index(HEADER) + 2
@@ -62,7 +62,7 @@ def main(argv):
         i += 1
     changed = []
     if "\n".join(lines) != readme:
-        changed.append("README.md")
+        changed.append("Admin/API 2.0/README.md")
         if not check:
             open(readme_path, "w").write("\n".join(lines))
 
