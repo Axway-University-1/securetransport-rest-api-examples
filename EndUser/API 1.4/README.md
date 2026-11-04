@@ -63,10 +63,13 @@ All of this was tried on 5.5-20260924 with throwaway users.
   list. So 08, 14, 16 and 17 are not confirmed.
 - **A sent message arrives with the same id.** The id of the draft is the id of the message in the Inbox of the recipient. A second send of the same draft also answers 200, and the recipient has it once.
 - **Reading does not mark read.** `isRead` stays false until 10 sets it. After that the message is no longer `unread`, and the history of its first access holds the recipient.
-- **The mailbox survives the account.** It is kept by the user's name. Delete an account and make it again with the same name, and its folders are there, and its folder listing shows the messages of the old account. Those cannot be opened or deleted any more:
-  404 "The message you have requested is not available". **Delete the messages (12) and the folders (13) before you delete the account, and give a test user a name you do not use again.**
+- **The mailbox survives the account.** It is kept by the user's name. Delete an account and make it again with the same name, and the new account has the folders and the messages of the old one, and can open and delete them. Tried three ways, all the same: the recipient
+  deleted and made again, the sender, and both. A user made later with the name of a deleted user reads his mail. **Delete the messages (12) and the folders (13) before you delete the account.** Nothing on the lab removes them later: the application that purges expired packages,
+  "Package Retention Maintenance" (type `PackageRetentionMaint`), has **no schedule**, unlike the audit, log entry and transfer log maintenance applications, and the default expiration of a message is 86400 minutes (60 days, `PackageManager.DefaultExpirationInterval`).
+  Once, a delete of a message in such a mailbox answered 404 "The message you have requested is not available"; two clean tries did not show it again, so it is not explained.
 - **Refused or broken, with no example:** renaming a folder (`PUT /mailbox/folders/{oldName}/name`) answers 403 "Cannot rename folder", "Permission denied"; moving a message to a folder that does not exist answers 500; deleting a folder that
-  holds a message answers 403; a reply (`POST .../reply`) answers 500 "Draft was not saved" and makes an empty draft (the reference lists it as a known issue); a forward answers 403, "a configuration error". Recall, the preferences and the
+  holds a message answers 403; a reply (`POST .../reply`) and a forward (`POST .../forward`) answer 403 "The server was unable to comply with your request ... a configuration error" when they have no body, and 500
+  "Draft was not saved" with a form body, and then they still make a draft, with an empty subject (the reference lists the reply as a known issue). Recall, the preferences and the
   purl calls are marked "Not implemented" in the reference.
 - **Errors have their own shape.** The mailbox answers `{"error": ..., "errorDescription": ..., "errorCode": ...}`. The examples print the first two.
 

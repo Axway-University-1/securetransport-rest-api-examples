@@ -20,7 +20,7 @@
 # - The API 1.4 mailbox is not in the API 2.0. Every call here uses Basic authentication and a Referer header. To act as another user (the recipient of a message), point ST_ENDUSER_LOCAL_VARIABLES at his settings file.
 # - The mailbox answers its errors as {"error": ..., "errorDescription": ...}. The script prints both.
 # - Confirmed directly: the answer is 200 {"info": "Deletion was successful"}. It deletes the message of THIS user only: the copy in the Sent folder of the sender stays until he deletes it.
-# - The mailbox of a user outlives his account (see 02), and the messages of a deleted account cannot be deleted any more (404). A test that sends messages should delete them with this call BEFORE it deletes the account.
+# - The mailbox of a user outlives his account (see 02): a new account of the same name has the messages of the old one. A test that sends messages should delete them with this call before it deletes the account.
 # ==============================================================================
 
 #

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 WRITES TO THE SERVER (two throwaway users with a name that is new on every run, example_mbx_*, which it removes, and the messages and folders they make, which it deletes first: the mailbox of
-a user outlives his account, and the messages of a deleted account cannot be deleted any more). Runs the End User API 1.4 mailbox examples (EndUser/API 1.4/bash/01.Mailbox) for real, one user as
+a user outlives his account, and a new account with the same name has the messages of the old one). Runs the End User API 1.4 mailbox examples (EndUser/API 1.4/bash/01.Mailbox) for real, one user as
 the sender and one as the recipient, each with a settings file of his own (ST_ENDUSER_LOCAL_VARIABLES).
 
 It proves what the README of that folder says, through the examples' own output: a draft is made (the call answers 500 and the draft is saved: the example finds it), a draft is in Drafts with the

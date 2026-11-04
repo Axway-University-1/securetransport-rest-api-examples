@@ -17,7 +17,7 @@
 # - Ensure that `set_variables.local.sh` is filled in (copy set_variables.local.example.sh). It holds the END USER of the mailbox: ST_USER and ST_PASSWORD are his, and ST_PORT is the End User port (8443, or 443 on a root install).
 # - The API 1.4 mailbox is not in the API 2.0. Every call here uses Basic authentication and a Referer header. To act as another user (the recipient of a message), point ST_ENDUSER_LOCAL_VARIABLES at his settings file.
 # - The mailbox answers its errors as {"error": ..., "errorDescription": ...}. The script prints both.
-# - Confirmed directly: a new user has Inbox, Sent and Drafts. A folder made with 03 is listed too. The mailbox of a user is kept by his NAME, and it survives the account: delete an account and make it again with the same name, and its folders are there and its folder listing shows the messages of the old account. Those messages cannot be opened or deleted any more (404 "The message you have requested is not available"). Give a test user a name you do not use again.
+# - Confirmed directly: a new user has Inbox, Sent and Drafts. A folder made with 03 is listed too. The mailbox of a user is kept by his NAME, and it survives the account: delete an account and make it again with the same name, and the new account has the folders and the messages of the old one, and can open and delete them. A test that sends messages should delete them before it deletes the account.
 # ==============================================================================
 
 #
