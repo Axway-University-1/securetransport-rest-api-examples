@@ -23,7 +23,8 @@ fi
 # STUB_CURL_GET_BODY at a file. Its contents are written to stdout for GET.
 #
 # STUB_CURL_POST_BODY does the same for POST, for an example that reads an id
-# out of the response to its first call.
+# out of the response to its first call. STUB_CURL_OTHER_BODY does it for PUT, PATCH
+# and DELETE, for an example that prints what the server says to those.
 #
 # -G turns -d/--data-urlencode into GET query parameters, the same as real curl
 # (used by an example that builds a query with --data-urlencode so curl does the
@@ -191,6 +192,8 @@ if [[ -n "${files_seq_body}" && -f "${files_seq_body}" ]]; then
     serve "${files_seq_body}"
 elif [[ "${method}" == "POST" && -n "${STUB_CURL_POST_BODY}" && -f "${STUB_CURL_POST_BODY}" ]]; then
     serve "${STUB_CURL_POST_BODY}"
+elif [[ "${method}" =~ ^(PUT|PATCH|DELETE)$ && -n "${STUB_CURL_OTHER_BODY}" && -f "${STUB_CURL_OTHER_BODY}" ]]; then
+    serve "${STUB_CURL_OTHER_BODY}"
 fi
 
 # Like real curl, the -w text comes after the response body.

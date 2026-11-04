@@ -27,7 +27,7 @@ def chk(label, condition, detail=""):
 
 
 items = le.examples()
-chk("examples are found in all four trees (Admin 2.0, Admin 1.4, End User, Features)", {e["api"] for e in items} == {"admin", "admin14", "enduser", "feature"} and len(items) > 250, len(items))
+chk("examples are found in all five trees (Admin 2.0, Admin 1.4, End User 2.0, End User 1.4, Features)", {e["api"] for e in items} == {"admin", "admin14", "enduser", "enduser14", "feature"} and len(items) > 250, len(items))
 
 missing = [e["path"] for e in items if e["risk"] is None]
 chk("every example has exactly one Risk line", not missing, missing[:5])

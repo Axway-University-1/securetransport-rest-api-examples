@@ -39,6 +39,7 @@ Admin/API 2.0/          the administrator API, with its own README
         utils/          tools that work on an exported configuration XML
 Admin/UseCases/         complete administrator scenarios, a learning path
 EndUser/
+    API 1.4/bash/       what the older end user API 1.4 has and 2.0 has not (the mailbox), with its own README
     API 2.0/bash/       end user API, on the user port, with its own README
     UseCases/           complete end user scenarios, a learning path
 Features/               complete solutions, one folder per feature

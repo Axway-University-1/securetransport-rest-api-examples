@@ -5,7 +5,7 @@
 > API is on its own port, 8443 (443 on a root install), not the administrator's.
 
 The examples for the user level API: `bash/`, one example for each call. For a task done step by step, with a script for each step,
-see the [End User use cases](../UseCases/README.md).
+see the [End User use cases](../UseCases/README.md). What the older End User API 1.4 does and this one does not (the mailbox) is in [EndUser/API 1.4](../API%201.4/README.md).
 
 ## What is covered
 

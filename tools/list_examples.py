@@ -34,7 +34,7 @@ import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 LEVELS = ("read", "write", "config", "disruptive")
-PATTERNS = (("admin", "Admin/API 2.0/bash/*/*.sh"), ("admin14", "Admin/API 1.4/bash/*/*.sh"), ("enduser", "EndUser/API 2.0/bash/*/*.sh"), ("feature", "Features/*/*.sh"))
+PATTERNS = (("admin", "Admin/API 2.0/bash/*/*.sh"), ("admin14", "Admin/API 1.4/bash/*/*.sh"), ("enduser", "EndUser/API 2.0/bash/*/*.sh"), ("enduser14", "EndUser/API 1.4/bash/*/*.sh"), ("feature", "Features/*/*.sh"))
 NOT_EXAMPLES = ("set_variables", "settings", "state")
 METHOD = re.compile(r"_(GET|HEAD|POST|PUT|PATCH|DELETE)(_|\.|$)")
 RISK = re.compile(r"^(?:#|REM) Risk: (\S+)(?: - (.*))?$", re.M)
