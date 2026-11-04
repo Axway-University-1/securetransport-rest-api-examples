@@ -30,6 +30,8 @@ fi
 # URL-encoding). The stub appends them to the URL it reports, unencoded, since
 # the point here is to let a test read the parameter values back out.
 #
+# Without -G the same options are form fields of the body, echoed as FORM_FIELD: name=value (the API 1.4 takes form data).
+#
 # A request body may contain newlines and quotes, so it is emitted base64
 # encoded on a single line. Decode it with:
 #
@@ -131,6 +133,10 @@ fi
 
 echo "METHOD: ${method}" >&2
 echo "URL: ${url}" >&2
+# Without -G, --data-urlencode is a form field of the body (the Admin API 1.4 takes form data): shown as FORM_FIELD: name=value
+if [[ "${use_g}" -eq 0 ]]; then
+    for p in "${query_params[@]}"; do echo "FORM_FIELD: ${p}" >&2; done
+fi
 
 if [[ -n "${payload}" ]]; then
     # A body read from a file, curl's -d @file form

@@ -243,10 +243,13 @@ chk("the Admin README also holds the OpenAPI and the HTTP methods", "## Explorin
 chk("the Admin README's images exist", all(os.path.isfile(os.path.normpath(os.path.join(REPO, "Admin", "API 2.0", m))) for m in re.findall(r"\]\((\.\./\.\./images/[^) ]+)", ADMIN_README)) and "../../images/" in ADMIN_README)
 glossary = read("GLOSSARY.md")
 chk("the glossary has the terms, and the README does not keep them", "| coreId |" in glossary and "| coreId |" not in README and "(GLOSSARY.md)" in README)
-for link in ("Admin/API%202.0/README.md", "Admin/API%202.0/python/README.md", "EndUser/API%202.0/README.md", "CONTRIBUTING.md", "Features/Guidance/README.md"):
+for link in ("Admin/API%201.4/README.md", "Admin/API%202.0/README.md", "Admin/API%202.0/python/README.md", "EndUser/API%202.0/README.md", "CONTRIBUTING.md", "Features/Guidance/README.md"):
     chk("the README links %s, which exists" % link, "(%s)" % link in README and os.path.isfile(os.path.join(REPO, link.replace("%20", " "))))
 chk("the README names the four skills' count right: three guides, and the fourth is for contributors", "Three short guides" in README and "fourth skill" in README
     and len(glob.glob(os.path.join(REPO, ".claude/skills/*/SKILL.md"))) == 4)
+chk("the Admin API 1.4 README is linked from the Admin API 2.0 README and CONTRIBUTING.md, and its examples are the files of the folder",
+    "../API%201.4/README.md" in ADMIN_README and "Admin/API 1.4/" in CONTRIBUTING
+    and all(os.path.isfile(os.path.join(REPO, "Admin", "API 1.4", "bash", "01.Validation", f)) for f in re.findall(r"\[01\.Validation/0\d\]\(bash/01\.Validation/([^)]+)\)", read("Admin", "API 1.4", "README.md"))))
 chk("CONTRIBUTING.md says three guides and the procedure, as the skills folder holds", "three guides" in CONTRIBUTING and "covering a new API resource" in CONTRIBUTING)
 tools_listed = sorted(f for f in os.listdir(os.path.join(REPO, "tools")) if f.endswith(".py") and "`%s`" % f not in CONTRIBUTING)
 chk("CONTRIBUTING.md names every script of tools/", not tools_listed, ", ".join(tools_listed))

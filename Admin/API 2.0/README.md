@@ -5,7 +5,7 @@
 
 The examples for the administrator API: `bash/` (curl, numbered by topic), `bat/` (the same calls for Windows) and
 `python/` (small complete programs for real tasks, see [its README](python/README.md)). For a task done step by step, with
-a script for each step, see the [Admin use cases](../UseCases/README.md).
+a script for each step, see the [Admin use cases](../UseCases/README.md). What the older API 1.4 does and this one does not is in [Admin/API 1.4](../API%201.4/README.md).
 
 The bash and bat examples are numbered by topic and, within a topic, by HTTP method, so `04.Applications/02.applications_POST.sh`
 is the POST example for applications. Reading a topic folder in order walks you through the whole create, read, update and delete

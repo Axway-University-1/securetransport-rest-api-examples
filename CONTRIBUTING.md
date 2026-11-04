@@ -30,6 +30,7 @@
 ## Inside the examples
 
 ```
+Admin/API 1.4/          what the older API 1.4 has and 2.0 has not, bash only, with its own README
 Admin/API 2.0/          the administrator API, with its own README
     bash/               curl examples, numbered by topic
     bat/                the same examples for Windows

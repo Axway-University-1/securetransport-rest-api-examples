@@ -14,7 +14,7 @@
 6. [License and Support](#license-and-support)
 
 ## Introduction
-These examples are for REST API 2.0 of SecureTransport 5.5, and were verified on release 5.5-20260924. The older API 1.4 is also served by 5.5 but is not covered here.
+These examples are for REST API 2.0 of SecureTransport 5.5, and were verified on release 5.5-20260924. The older API 1.4 is also served by 5.5. Only what it can do and 2.0 cannot is covered, in [Admin/API 1.4](Admin/API%201.4/README.md).
 
 This github project looks at use cases from a specific viewpoint. Many clients and Axway themselves have implemented mechanisms to on-board clients and file transfer flows in an automated manner using APIs, rather than the alternative method of manual setups via the admin GUI of ST. Automation brings a reduced risk of introducing errors and also assists in adhering to any standards enforced by the owning institution in naming standards, security profiles etc.
 Many other automation tasks such as certificate expiry monitoring, configuration drift from baseline, etc are all possible via API based scripts or programs.
@@ -197,6 +197,7 @@ which file to create rather than failing part way through a request.
 | Where | What is in it |
 | ----- | ------------- |
 | [Admin/API 2.0](Admin/API%202.0/README.md) | The **administrator API** examples (port 8444, or 444 on a root install: see [Which port?](#which-port)): `bash` and `bat` examples numbered by topic, `python` programs. Its README has the table of what is covered, the OpenAPI and the HTTP methods. |
+| [Admin/API 1.4](Admin/API%201.4/README.md) | What the older **API 1.4** has and 2.0 has not (path validation, the bulk resubmit of transfers), and where 2.0 has what looked missing. Bash only. |
 | [Admin/API 2.0/python](Admin/API%202.0/python/README.md) | Small complete programs for real tasks: onboarding, bulk changes, configuration drift, certificate expiry. |
 | [Admin/UseCases](Admin/UseCases/README.md) | Complete administrator scenarios, step by step, a learning path. |
 | [EndUser/API 2.0](EndUser/API%202.0/README.md) | The **end user API** examples (bash, one for each call), and what is covered. |
