@@ -63,9 +63,9 @@ else
     pass "no identifying or internal terms"
 fi
 
-# Routable IP literals. 127.0.0.1 and the placeholders are fine.
+# Routable IP literals. 127.0.0.1 and the placeholders are fine, and so are the addresses of 192.0.2.0/24 (RFC 5737, TEST-NET-1): reserved for documentation, never routed.
 HITS=$(scan_files | xargs -0 grep -onE "\b([0-9]{1,3}\.){3}[0-9]{1,3}\b" 2>/dev/null \
-       | grep -vE ":(127\.0\.0\.1|0\.0\.0\.0|255\.255\.255\.255)$" | grep -vE "^tests/")
+       | grep -vE ":(127\.0\.0\.1|0\.0\.0\.0|255\.255\.255\.255|192\.0\.2\.[0-9]{1,3})$" | grep -vE "^tests/")
 if [ -n "${HITS}" ]; then
     fail "IP address literal found"
     echo "${HITS}" | sed 's/^/        /'

@@ -25,3 +25,8 @@ export ST_PASSWORD="change_me"
 # your own. An argument given to an example still wins over these.
 # export ST_EXAMPLE_ACCOUNT="john"
 # export ST_SSH_PORT="8022"
+
+# Optional, only for the use case Admin/UseCases/10-qlt-events-generation. It runs a fake HTTP server on THIS machine, and the SecureTransport server connects to it.
+# ST_CALLBACK_HOST is the address of this machine as the SecureTransport server reaches it (no default). ST_CALLBACK_PORT is the port of the fake server (18081 when not set).
+# export ST_CALLBACK_HOST="192.0.2.10"
+# export ST_CALLBACK_PORT="18081"

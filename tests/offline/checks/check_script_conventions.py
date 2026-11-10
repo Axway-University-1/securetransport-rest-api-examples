@@ -22,7 +22,7 @@ TESTS = ROOT / "tests" / "offline"
 TREES = ["Admin/API 2.0/bash", "Admin/API 1.4/bash", "EndUser/API 2.0/bash", "EndUser/API 1.4/bash", "EndUser/UseCases", "Admin/UseCases", "Features"]
 NESTED = re.compile(r"\[[A-Za-z_]+ \[")
 # scripts that are not examples to run on their own (helpers sourced by others)
-HELPERS = {"lib.sh", "session.sh", "ensure_session.sh", "set_variables.local.sh", "set_variables.local.example.sh"}
+HELPERS = {"lib.sh", "scenario.sh", "session.sh", "ensure_session.sh", "set_variables.local.sh", "set_variables.local.example.sh"}
 
 problems = []
 
