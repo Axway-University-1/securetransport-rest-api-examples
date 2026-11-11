@@ -1,0 +1,11 @@
+{
+  "name": "Get one account",
+  "bash": "05.Accounts/04.accounts_name_GET.sh",
+  "description": "Everything about example_user. The password is never in the answer, only its digest.",
+  "method": "GET",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "expect": 200
+}

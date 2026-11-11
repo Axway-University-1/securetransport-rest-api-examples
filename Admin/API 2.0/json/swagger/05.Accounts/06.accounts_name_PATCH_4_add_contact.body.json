@@ -1,0 +1,10 @@
+[
+  {
+    "op": "add",
+    "path": "/addressBookSettings/contacts/-",
+    "value": {
+      "fullName": "Jane Doe",
+      "primaryEmail": "jane.doe@abc.com"
+    }
+  }
+]

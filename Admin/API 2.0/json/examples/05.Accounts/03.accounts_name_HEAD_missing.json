@@ -1,0 +1,11 @@
+{
+  "name": "Check an account that does not exist",
+  "bash": "05.Accounts/03.accounts_name_HEAD.sh",
+  "description": "The same for a name that is not an account: 404, with no body.",
+  "method": "HEAD",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_missing"
+  },
+  "expect": 404
+}

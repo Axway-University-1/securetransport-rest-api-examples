@@ -1,0 +1,12 @@
+[
+  {
+    "op": "replace",
+    "path": "/addressBookSettings/policy",
+    "value": "default"
+  },
+  {
+    "op": "replace",
+    "path": "/addressBookSettings/nonAddressBookCollaborationAllowed",
+    "value": "true"
+  }
+]

@@ -1,0 +1,45 @@
+meta {
+  name: 05.accounts_name_PUT_user - Replace a user account
+  type: http
+  seq: 16
+}
+
+put {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: json
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "example_user",
+    "type": "user",
+    "homeFolder": "/home/example_user",
+    "uid": "1111",
+    "gid": "41733",
+    "user": {
+      "name": "example_user",
+      "passwordCredentials": {
+        "password": "{{accountPassword}}"
+      }
+    }
+  }
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  PUT replaces the whole object, and a field left out is reset: this changes the uid to 1111 and leaves the rest as created. The password has to be in the body, because the server never returns it. Answers 204.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/05.accounts_name_PUT.sh.
+}

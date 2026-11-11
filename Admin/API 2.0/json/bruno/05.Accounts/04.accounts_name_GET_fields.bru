@@ -1,0 +1,29 @@
+meta {
+  name: 04.accounts_name_GET_fields - Get fields of one account
+  type: http
+  seq: 13
+}
+
+get {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name?fields=name,homeFolder,uid
+  body: none
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+params:query {
+  fields: name,homeFolder,uid
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Only the fields asked for. The type is always in the answer.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/04.accounts_name_GET.sh.
+}

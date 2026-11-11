@@ -1,0 +1,39 @@
+meta {
+  name: 05.accounts_name_PUT_service - Replace a service account
+  type: http
+  seq: 15
+}
+
+put {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: json
+  auth: inherit
+}
+
+params:path {
+  name: example_service
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "example_service",
+    "type": "service",
+    "homeFolder": "/home/example_service",
+    "uid": "1111",
+    "gid": "41733"
+  }
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  The same for a service account, which has no user object: the uid becomes 1111. Answers 204.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/05.accounts_name_PUT.sh.
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Get accounts",
+  "bash": "05.Accounts/01.accounts_GET.sh",
+  "description": "Lists the user accounts, with only their name and home folder, five at a time. Changes nothing. The type is always in the answer, listed or not.",
+  "method": "GET",
+  "path": "/accounts",
+  "query": {
+    "type": "user",
+    "fields": "name,homeFolder",
+    "limit": "5"
+  },
+  "expect": 200
+}

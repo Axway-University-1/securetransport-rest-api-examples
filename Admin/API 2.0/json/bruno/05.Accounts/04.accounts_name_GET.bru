@@ -1,0 +1,25 @@
+meta {
+  name: 04.accounts_name_GET - Get one account
+  type: http
+  seq: 11
+}
+
+get {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: none
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Everything about example_user. The password is never in the answer, only its digest.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/04.accounts_name_GET.sh.
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Replace a service account",
+  "bash": "05.Accounts/05.accounts_name_PUT.sh",
+  "description": "The same for a service account, which has no user object: the uid becomes 1111. Answers 204.",
+  "method": "PUT",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_service"
+  },
+  "body": {
+    "name": "example_service",
+    "type": "service",
+    "homeFolder": "/home/example_service",
+    "uid": "1111",
+    "gid": "41733"
+  },
+  "expect": 204
+}

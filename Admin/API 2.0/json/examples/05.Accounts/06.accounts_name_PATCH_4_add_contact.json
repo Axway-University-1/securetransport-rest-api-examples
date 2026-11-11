@@ -1,0 +1,21 @@
+{
+  "name": "Patch: add to an array",
+  "bash": "05.Accounts/06.accounts_name_PATCH.sh",
+  "description": "Appends a contact to the address book: the path ends in a hyphen, which adds to the end of an array, empty or not. A number as the index only works when the element 0 is there. Answers 204.",
+  "method": "PATCH",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "body": [
+    {
+      "op": "add",
+      "path": "/addressBookSettings/contacts/-",
+      "value": {
+        "fullName": "Jane Doe",
+        "primaryEmail": "jane.doe@abc.com"
+      }
+    }
+  ],
+  "expect": 204
+}

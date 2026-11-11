@@ -1,0 +1,18 @@
+{
+  "name": "Patch: add a field",
+  "bash": "05.Accounts/06.accounts_name_PATCH_with_file.sh",
+  "description": "Sets the notes of the account (the same change as 06.patch_body/stPatchAccountNotes.json of the bash examples). Answers 204.",
+  "method": "PATCH",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "body": [
+    {
+      "op": "add",
+      "path": "/notes",
+      "value": "Created by the JSON examples"
+    }
+  ],
+  "expect": 204
+}

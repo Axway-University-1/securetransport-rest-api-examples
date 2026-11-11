@@ -1,0 +1,6 @@
+{
+  "type": "user",
+  "fields": "name",
+  "limit": "2",
+  "offset": "2"
+}

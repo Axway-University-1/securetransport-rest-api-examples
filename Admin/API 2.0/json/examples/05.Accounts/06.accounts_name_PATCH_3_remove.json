@@ -1,0 +1,17 @@
+{
+  "name": "Patch: remove a field",
+  "bash": "05.Accounts/06.accounts_name_PATCH.sh",
+  "description": "Removes the flag. Answers 204, and the field reads back as null: it stays in the object.",
+  "method": "PATCH",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "body": [
+    {
+      "op": "remove",
+      "path": "/addressBookSettings/nonAddressBookCollaborationAllowed"
+    }
+  ],
+  "expect": 204
+}

@@ -1,0 +1,15 @@
+{
+  "name": "Create a service account",
+  "bash": "05.Accounts/02.accounts_POST.sh",
+  "description": "Creates the service account example_service. A service account has no user object, so no password.",
+  "method": "POST",
+  "path": "/accounts",
+  "body": {
+    "name": "example_service",
+    "type": "service",
+    "homeFolder": "/home/example_service",
+    "uid": "41733",
+    "gid": "41733"
+  },
+  "expect": 201
+}

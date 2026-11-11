@@ -1,0 +1,14 @@
+{
+  "name": "Get fields of one account",
+  "bash": "05.Accounts/04.accounts_name_GET.sh",
+  "description": "Only the fields asked for. The type is always in the answer.",
+  "method": "GET",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "query": {
+    "fields": "name,homeFolder,uid"
+  },
+  "expect": 200
+}

@@ -1,0 +1,27 @@
+meta {
+  name: 01.accounts_GET_by_name - Get accounts by name
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts?name=example_*&type=user&fields=name
+  body: none
+  auth: inherit
+}
+
+params:query {
+  name: example_*
+  type: user
+  fields: name
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists the accounts whose name starts with example_ (the * is a wildcard). Changes nothing.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/01.accounts_GET.sh.
+}

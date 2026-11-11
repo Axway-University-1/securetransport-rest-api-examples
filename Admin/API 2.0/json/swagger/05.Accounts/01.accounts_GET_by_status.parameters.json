@@ -1,0 +1,6 @@
+{
+  "status": "DISABLED",
+  "type": "user",
+  "fields": "name",
+  "limit": "5"
+}

@@ -1,0 +1,36 @@
+meta {
+  name: 02.accounts_POST_template - Create a template account
+  type: http
+  seq: 6
+}
+
+post {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "example_template",
+    "type": "template",
+    "homeFolder": "/home/example_template",
+    "uid": "41733",
+    "gid": "41733",
+    "templateClass": "{{templateClass}}"
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+docs {
+  Creates the template account example_template, in a user class. The server accepts a class that does not exist, so use one of GET /userClasses.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/02.accounts_POST.sh.
+}

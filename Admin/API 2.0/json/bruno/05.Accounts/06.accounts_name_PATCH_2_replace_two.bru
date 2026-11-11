@@ -1,0 +1,44 @@
+meta {
+  name: 06.accounts_name_PATCH_2_replace_two - Patch: replace two fields
+  type: http
+  seq: 18
+}
+
+patch {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: json
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  [
+    {
+      "op": "replace",
+      "path": "/addressBookSettings/policy",
+      "value": "default"
+    },
+    {
+      "op": "replace",
+      "path": "/addressBookSettings/nonAddressBookCollaborationAllowed",
+      "value": "true"
+    }
+  ]
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Two operations in one request: the policy back to default, and the collaboration flag true. Answers 204.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh.
+}

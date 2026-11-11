@@ -1,0 +1,27 @@
+meta {
+  name: 01.accounts_GET - Get accounts
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts?type=user&fields=name,homeFolder&limit=5
+  body: none
+  auth: inherit
+}
+
+params:query {
+  type: user
+  fields: name,homeFolder
+  limit: 5
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists the user accounts, with only their name and home folder, five at a time. Changes nothing. The type is always in the answer, listed or not.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/01.accounts_GET.sh.
+}

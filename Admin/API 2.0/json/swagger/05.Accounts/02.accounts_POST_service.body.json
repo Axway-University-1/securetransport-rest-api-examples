@@ -1,0 +1,7 @@
+{
+  "name": "example_service",
+  "type": "service",
+  "homeFolder": "/home/example_service",
+  "uid": "41733",
+  "gid": "41733"
+}

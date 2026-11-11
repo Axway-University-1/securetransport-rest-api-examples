@@ -1,0 +1,5 @@
+{
+  "type": "user",
+  "fields": "name,homeFolder",
+  "limit": "5"
+}

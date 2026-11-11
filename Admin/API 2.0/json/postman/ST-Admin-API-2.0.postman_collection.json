@@ -1,0 +1,1377 @@
+{
+  "info": {
+    "name": "SecureTransport Admin API 2.0 examples",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Made by tools/build_json_examples.py: do not edit by hand. Choose the environment 'ST lab' and fill in its values."
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "{{user}}",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "{{password}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "05.Accounts",
+      "item": [
+        {
+          "name": "01.accounts_GET - Get accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts?type=user&fields=name,homeFolder&limit=5",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "user"
+                },
+                {
+                  "key": "fields",
+                  "value": "name,homeFolder"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Lists the user accounts, with only their name and home folder, five at a time. Changes nothing. The type is always in the answer, listed or not.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/01.accounts_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "01.accounts_GET_by_name - Get accounts by name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts?name=example_*&type=user&fields=name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "example_*"
+                },
+                {
+                  "key": "type",
+                  "value": "user"
+                },
+                {
+                  "key": "fields",
+                  "value": "name"
+                }
+              ]
+            },
+            "description": "Lists the accounts whose name starts with example_ (the * is a wildcard). Changes nothing.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/01.accounts_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "01.accounts_GET_by_status - Get accounts by status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts?status=DISABLED&type=user&fields=name&limit=5",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "DISABLED"
+                },
+                {
+                  "key": "type",
+                  "value": "user"
+                },
+                {
+                  "key": "fields",
+                  "value": "name"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Lists the disabled user accounts. The status is one of ACTIVE, DISABLED, LOCKED, PENDING, REJECTED. Changes nothing.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/01.accounts_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "01.accounts_GET_page - Get the second page of accounts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts?type=user&fields=name&limit=2&offset=2",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "user"
+                },
+                {
+                  "key": "fields",
+                  "value": "name"
+                },
+                {
+                  "key": "limit",
+                  "value": "2"
+                },
+                {
+                  "key": "offset",
+                  "value": "2"
+                }
+              ]
+            },
+            "description": "Lists accounts two at a time, starting at the third (offset 2). A list answers 100 objects when no limit is given; the resultSet of the answer says how many there are in all (totalCount). Changes nothing.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/01.accounts_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "02.accounts_POST_service - Create a service account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"example_service\",\n  \"type\": \"service\",\n  \"homeFolder\": \"/home/example_service\",\n  \"uid\": \"41733\",\n  \"gid\": \"41733\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates the service account example_service. A service account has no user object, so no password.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/02.accounts_POST.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "02.accounts_POST_template - Create a template account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"example_template\",\n  \"type\": \"template\",\n  \"homeFolder\": \"/home/example_template\",\n  \"uid\": \"41733\",\n  \"gid\": \"41733\",\n  \"templateClass\": \"{{templateClass}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates the template account example_template, in a user class. The server accepts a class that does not exist, so use one of GET /userClasses.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/02.accounts_POST.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "02.accounts_POST_user - Create a user account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 201\", function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"example_user\",\n  \"type\": \"user\",\n  \"homeFolder\": \"/home/example_user\",\n  \"uid\": \"41733\",\n  \"gid\": \"41733\",\n  \"user\": {\n    \"name\": \"example_user\",\n    \"passwordCredentials\": {\n      \"password\": \"{{accountPassword}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates the user account example_user. Answers 201 with no body; the address of the new account is in the Location header. The server accepts any password, the placeholder of the Swagger file too, so put a password of your own in first. Delete the account again with 07.accounts_name_DELETE_user.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/02.accounts_POST.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "02.accounts_POST_user_duplicate - Create a user account that exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 409\", function () { pm.response.to.have.status(409); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"example_user\",\n  \"type\": \"user\",\n  \"homeFolder\": \"/home/example_user\",\n  \"uid\": \"41733\",\n  \"gid\": \"41733\",\n  \"user\": {\n    \"name\": \"example_user\",\n    \"passwordCredentials\": {\n      \"password\": \"{{accountPassword}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sends the same body again: the answer is 409, 'The account name is not unique'. An error answered on purpose, to show it. Needs 02.accounts_POST_user to have run.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/02.accounts_POST.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "03.accounts_name_HEAD - Check that an account exists",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "HEAD",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "description": "HEAD answers the headers only: 200 when the account exists, with no body. A cheap existence check.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/03.accounts_name_HEAD.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "03.accounts_name_HEAD_missing - Check an account that does not exist",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 404\", function () { pm.response.to.have.status(404); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "HEAD",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_missing"
+                }
+              ]
+            },
+            "description": "The same for a name that is not an account: 404, with no body.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/03.accounts_name_HEAD.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "04.accounts_name_GET - Get one account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "description": "Everything about example_user. The password is never in the answer, only its digest.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/04.accounts_name_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "04.accounts_name_GET_addressBookSettings - Get a field of one account type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name?type=user&fields=addressBookSettings",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "user"
+                },
+                {
+                  "key": "fields",
+                  "value": "addressBookSettings"
+                }
+              ]
+            },
+            "description": "A field that exists for one account type only needs the type in the request: with type=user it answers the address book settings.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/04.accounts_name_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "04.accounts_name_GET_fields - Get fields of one account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 200\", function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name?fields=name,homeFolder,uid",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "name,homeFolder,uid"
+                }
+              ]
+            },
+            "description": "Only the fields asked for. The type is always in the answer.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/04.accounts_name_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "04.accounts_name_GET_fields_without_type - Get a field of one account type, without the type",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 400\", function () { pm.response.to.have.status(400); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name?fields=addressBookSettings",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ],
+              "query": [
+                {
+                  "key": "fields",
+                  "value": "addressBookSettings"
+                }
+              ]
+            },
+            "description": "The same without type=user: 400, 'Field addressBookSettings does not exist'. An error answered on purpose, to show it.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/04.accounts_name_GET.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "05.accounts_name_PUT_service - Replace a service account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_service"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"example_service\",\n  \"type\": \"service\",\n  \"homeFolder\": \"/home/example_service\",\n  \"uid\": \"1111\",\n  \"gid\": \"41733\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The same for a service account, which has no user object: the uid becomes 1111. Answers 204.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/05.accounts_name_PUT.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "05.accounts_name_PUT_user - Replace a user account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"example_user\",\n  \"type\": \"user\",\n  \"homeFolder\": \"/home/example_user\",\n  \"uid\": \"1111\",\n  \"gid\": \"41733\",\n  \"user\": {\n    \"name\": \"example_user\",\n    \"passwordCredentials\": {\n      \"password\": \"{{accountPassword}}\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "PUT replaces the whole object, and a field left out is reset: this changes the uid to 1111 and leaves the rest as created. The password has to be in the body, because the server never returns it. Answers 204.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/05.accounts_name_PUT.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "06.accounts_name_PATCH_1_replace_policy - Patch: replace one field",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"op\": \"replace\",\n    \"path\": \"/addressBookSettings/policy\",\n    \"value\": \"custom\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "The body of a PATCH is a JSON Patch, a list of operations. This replaces the address book policy with custom (it needs two address book sources, which a new account has). Answers 204.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "06.accounts_name_PATCH_2_replace_two - Patch: replace two fields",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"op\": \"replace\",\n    \"path\": \"/addressBookSettings/policy\",\n    \"value\": \"default\"\n  },\n  {\n    \"op\": \"replace\",\n    \"path\": \"/addressBookSettings/nonAddressBookCollaborationAllowed\",\n    \"value\": \"true\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Two operations in one request: the policy back to default, and the collaboration flag true. Answers 204.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "06.accounts_name_PATCH_3_remove - Patch: remove a field",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"op\": \"remove\",\n    \"path\": \"/addressBookSettings/nonAddressBookCollaborationAllowed\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Removes the flag. Answers 204, and the field reads back as null: it stays in the object.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "06.accounts_name_PATCH_4_add_contact - Patch: add to an array",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"op\": \"add\",\n    \"path\": \"/addressBookSettings/contacts/-\",\n    \"value\": {\n      \"fullName\": \"Jane Doe\",\n      \"primaryEmail\": \"jane.doe@abc.com\"\n    }\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Appends a contact to the address book: the path ends in a hyphen, which adds to the end of an array, empty or not. A number as the index only works when the element 0 is there. Answers 204.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "06.accounts_name_PATCH_5_remove_contact - Patch: remove an array element",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"op\": \"remove\",\n    \"path\": \"/addressBookSettings/contacts/0\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Takes the contact out again, by its position (0, the first). Answers 204.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "06.accounts_name_PATCH_6_notes - Patch: add a field",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"op\": \"add\",\n    \"path\": \"/notes\",\n    \"value\": \"Created by the JSON examples\"\n  }\n]",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Sets the notes of the account (the same change as 06.patch_body/stPatchAccountNotes.json of the bash examples). Answers 204.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH_with_file.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "07.accounts_name_DELETE_service - Delete the service account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_service"
+                }
+              ]
+            },
+            "description": "Deletes example_service. Answers 204 with no body. Its home folder stays on the disk, with its files.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/07.accounts_name_DELETE.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "07.accounts_name_DELETE_template - Delete the template account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_template"
+                }
+              ]
+            },
+            "description": "Deletes example_template. Answers 204 with no body. Its home folder stays on the disk, with its files.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/07.accounts_name_DELETE.sh."
+          },
+          "response": []
+        },
+        {
+          "name": "07.accounts_name_DELETE_user - Delete the user account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"answers 204\", function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Referer",
+                "value": "THIS_IS_A_RANDOM_TEXT",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "https://{{server}}:{{port}}/api/v2.0/accounts/:name",
+              "protocol": "https",
+              "host": [
+                "{{server}}"
+              ],
+              "port": "{{port}}",
+              "path": [
+                "api",
+                "v2.0",
+                "accounts",
+                ":name"
+              ],
+              "variable": [
+                {
+                  "key": "name",
+                  "value": "example_user"
+                }
+              ]
+            },
+            "description": "Deletes example_user. Answers 204 with no body. Its home folder stays on the disk, with its files.\n\nThe same call as Admin/API 2.0/bash/05.Accounts/07.accounts_name_DELETE.sh."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

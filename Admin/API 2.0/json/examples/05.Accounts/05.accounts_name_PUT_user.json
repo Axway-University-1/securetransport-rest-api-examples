@@ -1,0 +1,27 @@
+{
+  "name": "Replace a user account",
+  "bash": "05.Accounts/05.accounts_name_PUT.sh",
+  "description": "PUT replaces the whole object, and a field left out is reset: this changes the uid to 1111 and leaves the rest as created. The password has to be in the body, because the server never returns it. Answers 204.",
+  "method": "PUT",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "body": {
+    "name": "example_user",
+    "type": "user",
+    "homeFolder": "/home/example_user",
+    "uid": "1111",
+    "gid": "41733",
+    "user": {
+      "name": "example_user",
+      "passwordCredentials": {
+        "password": "{{accountPassword}}"
+      }
+    }
+  },
+  "variables": {
+    "accountPassword": "REPLACE_WITH_A_PASSWORD"
+  },
+  "expect": 204
+}

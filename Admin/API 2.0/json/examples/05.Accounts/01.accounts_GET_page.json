@@ -1,0 +1,14 @@
+{
+  "name": "Get the second page of accounts",
+  "bash": "05.Accounts/01.accounts_GET.sh",
+  "description": "Lists accounts two at a time, starting at the third (offset 2). A list answers 100 objects when no limit is given; the resultSet of the answer says how many there are in all (totalCount). Changes nothing.",
+  "method": "GET",
+  "path": "/accounts",
+  "query": {
+    "type": "user",
+    "fields": "name",
+    "limit": "2",
+    "offset": "2"
+  },
+  "expect": 200
+}

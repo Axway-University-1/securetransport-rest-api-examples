@@ -1,0 +1,25 @@
+meta {
+  name: 07.accounts_name_DELETE_service - Delete the service account
+  type: http
+  seq: 23
+}
+
+delete {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: none
+  auth: inherit
+}
+
+params:path {
+  name: example_service
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Deletes example_service. Answers 204 with no body. Its home folder stays on the disk, with its files.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/07.accounts_name_DELETE.sh.
+}

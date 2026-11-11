@@ -1,0 +1,30 @@
+meta {
+  name: 04.accounts_name_GET_addressBookSettings - Get a field of one account type
+  type: http
+  seq: 12
+}
+
+get {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name?type=user&fields=addressBookSettings
+  body: none
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+params:query {
+  type: user
+  fields: addressBookSettings
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  A field that exists for one account type only needs the type in the request: with type=user it answers the address book settings.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/04.accounts_name_GET.sh.
+}

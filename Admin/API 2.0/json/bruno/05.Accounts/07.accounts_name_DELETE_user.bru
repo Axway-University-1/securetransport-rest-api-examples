@@ -1,0 +1,25 @@
+meta {
+  name: 07.accounts_name_DELETE_user - Delete the user account
+  type: http
+  seq: 25
+}
+
+delete {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: none
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Deletes example_user. Answers 204 with no body. Its home folder stays on the disk, with its files.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/07.accounts_name_DELETE.sh.
+}

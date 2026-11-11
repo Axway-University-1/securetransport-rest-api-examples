@@ -1,0 +1,38 @@
+meta {
+  name: 06.accounts_name_PATCH_3_remove - Patch: remove a field
+  type: http
+  seq: 19
+}
+
+patch {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: json
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  [
+    {
+      "op": "remove",
+      "path": "/addressBookSettings/nonAddressBookCollaborationAllowed"
+    }
+  ]
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Removes the flag. Answers 204, and the field reads back as null: it stays in the object.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh.
+}

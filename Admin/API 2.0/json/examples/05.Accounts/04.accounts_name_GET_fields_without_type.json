@@ -1,0 +1,14 @@
+{
+  "name": "Get a field of one account type, without the type",
+  "bash": "05.Accounts/04.accounts_name_GET.sh",
+  "description": "The same without type=user: 400, 'Field addressBookSettings does not exist'. An error answered on purpose, to show it.",
+  "method": "GET",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "query": {
+    "fields": "addressBookSettings"
+  },
+  "expect": 400
+}

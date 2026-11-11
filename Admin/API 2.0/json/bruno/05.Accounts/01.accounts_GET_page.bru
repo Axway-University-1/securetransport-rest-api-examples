@@ -1,0 +1,28 @@
+meta {
+  name: 01.accounts_GET_page - Get the second page of accounts
+  type: http
+  seq: 4
+}
+
+get {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts?type=user&fields=name&limit=2&offset=2
+  body: none
+  auth: inherit
+}
+
+params:query {
+  type: user
+  fields: name
+  limit: 2
+  offset: 2
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  Lists accounts two at a time, starting at the third (offset 2). A list answers 100 objects when no limit is given; the resultSet of the answer says how many there are in all (totalCount). Changes nothing.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/01.accounts_GET.sh.
+}

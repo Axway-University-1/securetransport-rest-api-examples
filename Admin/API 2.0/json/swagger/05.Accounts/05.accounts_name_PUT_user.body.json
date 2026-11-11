@@ -1,0 +1,13 @@
+{
+  "name": "example_user",
+  "type": "user",
+  "homeFolder": "/home/example_user",
+  "uid": "1111",
+  "gid": "41733",
+  "user": {
+    "name": "example_user",
+    "passwordCredentials": {
+      "password": "REPLACE_WITH_A_PASSWORD"
+    }
+  }
+}

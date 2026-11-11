@@ -1,0 +1,24 @@
+{
+  "name": "Create a user account that exists",
+  "bash": "05.Accounts/02.accounts_POST.sh",
+  "description": "Sends the same body again: the answer is 409, 'The account name is not unique'. An error answered on purpose, to show it. Needs 02.accounts_POST_user to have run.",
+  "method": "POST",
+  "path": "/accounts",
+  "body": {
+    "name": "example_user",
+    "type": "user",
+    "homeFolder": "/home/example_user",
+    "uid": "41733",
+    "gid": "41733",
+    "user": {
+      "name": "example_user",
+      "passwordCredentials": {
+        "password": "{{accountPassword}}"
+      }
+    }
+  },
+  "variables": {
+    "accountPassword": "REPLACE_WITH_A_PASSWORD"
+  },
+  "expect": 409
+}

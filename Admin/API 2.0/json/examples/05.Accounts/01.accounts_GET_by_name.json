@@ -1,0 +1,13 @@
+{
+  "name": "Get accounts by name",
+  "bash": "05.Accounts/01.accounts_GET.sh",
+  "description": "Lists the accounts whose name starts with example_ (the * is a wildcard). Changes nothing.",
+  "method": "GET",
+  "path": "/accounts",
+  "query": {
+    "name": "example_*",
+    "type": "user",
+    "fields": "name"
+  },
+  "expect": 200
+}

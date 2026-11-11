@@ -1,0 +1,19 @@
+{
+  "name": "Create a template account",
+  "bash": "05.Accounts/02.accounts_POST.sh",
+  "description": "Creates the template account example_template, in a user class. The server accepts a class that does not exist, so use one of GET /userClasses.",
+  "method": "POST",
+  "path": "/accounts",
+  "body": {
+    "name": "example_template",
+    "type": "template",
+    "homeFolder": "/home/example_template",
+    "uid": "41733",
+    "gid": "41733",
+    "templateClass": "{{templateClass}}"
+  },
+  "variables": {
+    "templateClass": "REPLACE_WITH_A_USER_CLASS"
+  },
+  "expect": 201
+}

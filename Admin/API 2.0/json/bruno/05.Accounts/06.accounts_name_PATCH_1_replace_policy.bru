@@ -1,0 +1,39 @@
+meta {
+  name: 06.accounts_name_PATCH_1_replace_policy - Patch: replace one field
+  type: http
+  seq: 17
+}
+
+patch {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: json
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  [
+    {
+      "op": "replace",
+      "path": "/addressBookSettings/policy",
+      "value": "custom"
+    }
+  ]
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  The body of a PATCH is a JSON Patch, a list of operations. This replaces the address book policy with custom (it needs two address book sources, which a new account has). Answers 204.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH.sh.
+}

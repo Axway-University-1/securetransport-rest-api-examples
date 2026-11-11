@@ -1,0 +1,11 @@
+{
+  "name": "Delete the user account",
+  "bash": "05.Accounts/07.accounts_name_DELETE.sh",
+  "description": "Deletes example_user. Answers 204 with no body. Its home folder stays on the disk, with its files.",
+  "method": "DELETE",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "expect": 204
+}

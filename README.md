@@ -199,6 +199,7 @@ which file to create rather than failing part way through a request.
 | [Admin/API 2.0](Admin/API%202.0/README.md) | The **administrator API** examples (port 8444, or 444 on a root install: see [Which port?](#which-port)): `bash` and `bat` examples numbered by topic, `python` programs. Its README has the table of what is covered, the OpenAPI and the HTTP methods. |
 | [EndUser/API 1.4](EndUser/API%201.4/README.md) | What the older **End User API 1.4** has and 2.0 has not: the **mailbox** (send a message to another user and read it), and what else is missing. Bash only. |
 | [Admin/API 1.4](Admin/API%201.4/README.md) | What the older **API 1.4** has and 2.0 has not (path validation, the bulk resubmit of transfers), and where 2.0 has what looked missing. Bash only. |
+| [Admin/API 2.0/json](Admin/API%202.0/json/README.md) | The same calls as **JSON** for the tools people already use: bodies to paste into Swagger, a Postman collection, a Bruno collection. A first two examples (accounts), and how it would be laid out for the rest. |
 | [Admin/API 2.0/python](Admin/API%202.0/python/README.md) | Small complete programs for real tasks: onboarding, bulk changes, configuration drift, certificate expiry. |
 | [Admin/UseCases](Admin/UseCases/README.md) | Complete administrator scenarios, step by step, a learning path. |
 | [EndUser/API 2.0](EndUser/API%202.0/README.md) | The **end user API** examples (bash, one for each call), and what is covered. |

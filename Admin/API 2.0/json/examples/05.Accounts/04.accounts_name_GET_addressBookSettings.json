@@ -1,0 +1,15 @@
+{
+  "name": "Get a field of one account type",
+  "bash": "05.Accounts/04.accounts_name_GET.sh",
+  "description": "A field that exists for one account type only needs the type in the request: with type=user it answers the address book settings.",
+  "method": "GET",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "query": {
+    "type": "user",
+    "fields": "addressBookSettings"
+  },
+  "expect": 200
+}

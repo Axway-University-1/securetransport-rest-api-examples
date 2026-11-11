@@ -1,0 +1,8 @@
+{
+  "name": "example_template",
+  "type": "template",
+  "homeFolder": "/home/example_template",
+  "uid": "41733",
+  "gid": "41733",
+  "templateClass": "REPLACE_WITH_A_USER_CLASS"
+}

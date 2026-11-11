@@ -1,0 +1,25 @@
+meta {
+  name: 03.accounts_name_HEAD - Check that an account exists
+  type: http
+  seq: 9
+}
+
+head {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: none
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+assert {
+  res.status: eq 200
+}
+
+docs {
+  HEAD answers the headers only: 200 when the account exists, with no body. A cheap existence check.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/03.accounts_name_HEAD.sh.
+}

@@ -1,0 +1,14 @@
+{
+  "name": "Get accounts by status",
+  "bash": "05.Accounts/01.accounts_GET.sh",
+  "description": "Lists the disabled user accounts. The status is one of ACTIVE, DISABLED, LOCKED, PENDING, REJECTED. Changes nothing.",
+  "method": "GET",
+  "path": "/accounts",
+  "query": {
+    "status": "DISABLED",
+    "type": "user",
+    "fields": "name",
+    "limit": "5"
+  },
+  "expect": 200
+}

@@ -1,0 +1,39 @@
+meta {
+  name: 06.accounts_name_PATCH_6_notes - Patch: add a field
+  type: http
+  seq: 22
+}
+
+patch {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: json
+  auth: inherit
+}
+
+params:path {
+  name: example_user
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  [
+    {
+      "op": "add",
+      "path": "/notes",
+      "value": "Created by the JSON examples"
+    }
+  ]
+}
+
+assert {
+  res.status: eq 204
+}
+
+docs {
+  Sets the notes of the account (the same change as 06.patch_body/stPatchAccountNotes.json of the bash examples). Answers 204.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/06.accounts_name_PATCH_with_file.sh.
+}

@@ -1,0 +1,25 @@
+meta {
+  name: 03.accounts_name_HEAD_missing - Check an account that does not exist
+  type: http
+  seq: 10
+}
+
+head {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts/:name
+  body: none
+  auth: inherit
+}
+
+params:path {
+  name: example_missing
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  The same for a name that is not an account: 404, with no body.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/03.accounts_name_HEAD.sh.
+}

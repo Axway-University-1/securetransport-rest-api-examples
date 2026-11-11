@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "SecureTransport Admin API 2.0 examples",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

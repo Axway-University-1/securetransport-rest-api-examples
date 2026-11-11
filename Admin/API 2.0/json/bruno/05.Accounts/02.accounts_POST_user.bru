@@ -1,0 +1,41 @@
+meta {
+  name: 02.accounts_POST_user - Create a user account
+  type: http
+  seq: 7
+}
+
+post {
+  url: https://{{server}}:{{port}}/api/v2.0/accounts
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "name": "example_user",
+    "type": "user",
+    "homeFolder": "/home/example_user",
+    "uid": "41733",
+    "gid": "41733",
+    "user": {
+      "name": "example_user",
+      "passwordCredentials": {
+        "password": "{{accountPassword}}"
+      }
+    }
+  }
+}
+
+assert {
+  res.status: eq 201
+}
+
+docs {
+  Creates the user account example_user. Answers 201 with no body; the address of the new account is in the Location header. The server accepts any password, the placeholder of the Swagger file too, so put a password of your own in first. Delete the account again with 07.accounts_name_DELETE_user.
+
+  The same call as Admin/API 2.0/bash/05.Accounts/02.accounts_POST.sh.
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Check that an account exists",
+  "bash": "05.Accounts/03.accounts_name_HEAD.sh",
+  "description": "HEAD answers the headers only: 200 when the account exists, with no body. A cheap existence check.",
+  "method": "HEAD",
+  "path": "/accounts/{name}",
+  "pathParams": {
+    "name": "example_user"
+  },
+  "expect": 200
+}
