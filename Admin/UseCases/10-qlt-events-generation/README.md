@@ -48,7 +48,7 @@ SecureTransport server reaches it (and, when 18081 is taken, `ST_CALLBACK_PORT`)
 | The other server | a **Generic HTTP** site (type `http-generic`): `PUT /upload` on the fake server | the same site; Fusion is the fake server too: `POST /fusion` |
 | What the fake server answers | 200 | to Fusion, 200 with the file it was sent (the file "Fusion sent back"); to the site, 200 |
 | The case file | `qlt_1_upload_push.dat` | `qlt_2_upload_fusion_partner.dat` |
-| Events in it (tried) | 15: two logins, the upload (RECEIVING, RECEIVED...), the push (TO_EXECUTE, SENDING, SENT...), two CycleLinks, XFBRouting | 20: the same, and the call to Fusion (a SENDING, a RECEIVING of its answer) and the second push |
+| Events in it (tried) | 13 to 15: the upload (RECEIVING, RECEIVED...), the push (TO_EXECUTE, SENDING, SENT...), two CycleLinks, XFBRouting; a login (two AUDIT events) when the upload opens a new session | 20: the same, and the call to Fusion (a SENDING, a RECEIVING of its answer) and the second push |
 
 "The server pushes to another server" is done here with **Advanced Routing** and a Send To Partner step. The other way tried, a subscription of a Basic application with a transfer configuration
 `PARTNER-OUT` to a site, did not push on an upload (nothing was sent; the log shows the upload only).
@@ -119,7 +119,7 @@ All of it on the lab, release 5.5-20261029, with a Sentinel and an overflow file
 
 - **The server accepts a Sentinel it cannot reach.** The PATCH answers 204; the failure shows only as events going to the file, mostly within a second or two.
 - **The overflow file can be turned while the server runs.** A PATCH of `overflowFilePath` takes effect at once, with no restart; what the server writes from then on goes to the new file, and the old one can be
-  read. That is what keeps the scenarios apart: the case file of scenario 1 held only that flow (15 events), the one of scenario 2 only that one (20), and the events of reading them were in `qlt_reads.dat`.
+  read. That is what keeps the scenarios apart: the case file of scenario 1 held only that flow (13 to 15 events), the one of scenario 2 only that one (about 20), and the events of reading them were in `qlt_reads.dat`.
 - **The file is a circular buffer.** It starts with `Circular buffer file version 3.40.0-1` and four counters, then the events, each after a length and a colon, and the rest is padding. It is as large as the
   size setting (5 MB here), owned by root with mode 644, and the server makes it when it writes the first event, not when the settings change.
 - **The records have no fixed separator.** Between two of them there is a line break, a carriage return, or nothing at all. Cut the file at the closing tag `</TrkDescriptor>`, not at the line breaks: cutting at

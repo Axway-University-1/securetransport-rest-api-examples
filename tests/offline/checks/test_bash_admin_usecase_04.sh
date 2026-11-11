@@ -15,7 +15,7 @@
 # Runs offline, with the Referer and Content-Type rules of the stub on. Exit code 0 means clean.
 # ==============================================================================
 cd "$(dirname "$0")/.." || exit 1
-TESTS_DIR="$(pwd)"
+TESTS_DIR="$(pwd -P)"
 REPO="$(cd ../.. && pwd)"
 UC_ROOT="${REPO}/Admin/UseCases"
 
