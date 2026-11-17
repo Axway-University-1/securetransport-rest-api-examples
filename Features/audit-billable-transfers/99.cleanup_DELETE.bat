@@ -86,7 +86,7 @@ CALL :delete_all sites ""
 REM The test account: its folders, then the account
 CALL :account_state "%BT_TEST_ACCOUNT%"
 IF "%ACCOUNT_STATE%"=="there" (
-    CALL :remove_folders "%BT_TEST_ACCOUNT%" "%BT_SUBSCRIPTION_FOLDER%/s1" "%BT_SUBSCRIPTION_FOLDER%/s2" "%BT_SUBSCRIPTION_FOLDER%/s3" "%BT_SUBSCRIPTION_FOLDER%/s4" "%BT_SUBSCRIPTION_FOLDER%/s5" "%BT_SUBSCRIPTION_FOLDER%/s6" "%BT_SUBSCRIPTION_FOLDER%"
+    CALL :remove_folders "%BT_TEST_ACCOUNT%" "%BT_SUBSCRIPTION_FOLDER%/s1" "%BT_SUBSCRIPTION_FOLDER%/s2" "%BT_SUBSCRIPTION_FOLDER%/s3" "%BT_SUBSCRIPTION_FOLDER%/s4" "%BT_SUBSCRIPTION_FOLDER%/s5" "%BT_SUBSCRIPTION_FOLDER%/s6" "%BT_PUBLISH_SOURCE_FOLDER%" "%BT_SUBSCRIPTION_FOLDER%"
     CALL :delete_account "%BT_TEST_ACCOUNT%"
 )
 IF "%ACCOUNT_STATE%"=="gone" echo The account %BT_TEST_ACCOUNT% does not exist. Nothing to delete.
@@ -98,7 +98,7 @@ IF "%ACCOUNT_STATE%"=="unknown" (
 REM The partners: this test account's folder in each, then the partner itself,
 REM unless another test account's site still logs in as it
 CALL :clean_partner "%BT_PULL_PARTNER%" "%BT_DROP_FOLDER%" "%BT_RUN_FOLDER%"
-CALL :clean_partner "%BT_PUSH_PARTNER%" "%BT_DELIVERED_1_FOLDER%" "%BT_DELIVERED_2_FOLDER%" "%BT_RUN_FOLDER%"
+CALL :clean_partner "%BT_PUSH_PARTNER%" "%BT_DELIVERED_1_FOLDER%" "%BT_DELIVERED_2_FOLDER%" "%BT_PUBLISHED_FOLDER%" "%BT_RUN_FOLDER%"
 
 SET LEFT_SIZE=0
 FOR %%F IN ("%LEFT_FILE%") DO SET LEFT_SIZE=%%~zF

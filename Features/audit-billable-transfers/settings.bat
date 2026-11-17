@@ -86,6 +86,8 @@ SET BT_FILE_ARCHIVE_NAME=archive_with_2_files.zip
 SET BT_FILE_DECOMPRESS2P_1=file_1_inside_archive_for_2_partners.txt
 SET BT_FILE_DECOMPRESS2P_2=file_2_inside_archive_for_2_partners.txt
 SET BT_FILE_ARCHIVE2P_NAME=archive_with_2_files_for_2_partners.zip
+REM Scenario 2.7 (13.publish_to_account.bat): the file published to another account
+SET BT_FILE_PUBLISH=publish_to_account.txt
 
 REM billable_GET_report: how many days back to report, today included
 SET BT_REPORT_DAYS=7
@@ -121,6 +123,10 @@ SET BT_RUN_FOLDER=/%BT_TEST_ACCOUNT%
 SET BT_DROP_FOLDER=%BT_RUN_FOLDER%/outbound-drop
 SET BT_DELIVERED_1_FOLDER=%BT_RUN_FOLDER%/delivered-1
 SET BT_DELIVERED_2_FOLDER=%BT_RUN_FOLDER%/delivered-2
+REM Scenario 2.7: the test account folder that starts the route, and the folder of
+REM partner_to_push_to that the Publish step writes to
+SET BT_PUBLISH_SOURCE_FOLDER=%BT_SUBSCRIPTION_FOLDER%/s7
+SET BT_PUBLISHED_FOLDER=%BT_RUN_FOLDER%/published
 SET BT_PULL_SITE_PREFIX=%BT_TEST_ACCOUNT%PullSite
 SET BT_PUSH_SITE_1=%BT_TEST_ACCOUNT%PushSitePartner1
 SET BT_PUSH_SITE_2=%BT_TEST_ACCOUNT%PushSitePartner2

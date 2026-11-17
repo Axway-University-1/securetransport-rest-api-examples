@@ -126,11 +126,12 @@ BEFORE_TEST=$(today_count "${REPORT_LOG}" "${BT_TEST_ACCOUNT}")
 BEFORE_PUSH=$(today_count "${REPORT_LOG}" "${BT_PUSH_PARTNER}")
 rm -f "${REPORT_LOG}"
 
-# Every numbered setup step, except this script and the cleanup
+# Every numbered setup step, except this script, the cleanup, and 13 (scenario 2.7, the
+# Publish step, which is run on its own after this: its count is not in the predictions below)
 STEPS=()
 for f in "${SCRIPT_DIR}"/[0-9][0-9].*.sh; do
     case "$(basename "${f}")" in
-        00.*|99.*) ;;
+        00.*|13.*|99.*) ;;
         *)         STEPS+=("${f}") ;;
     esac
 done

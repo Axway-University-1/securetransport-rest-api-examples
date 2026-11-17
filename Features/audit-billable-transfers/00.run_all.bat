@@ -114,7 +114,8 @@ CALL :today_count "%BT_TEST_ACCOUNT%" BEFORE_TEST
 CALL :today_count "%BT_PUSH_PARTNER%" BEFORE_PUSH
 IF EXIST "%REPORT_LOG%" DEL "%REPORT_LOG%"
 
-REM Every numbered setup step, except this script and the cleanup
+REM Every numbered setup step, except this script, the cleanup, and 13 (scenario 2.7, the
+REM Publish step, which is run on its own after this: its count is not in the predictions below)
 SET TOTAL=0
 FOR %%S IN ("%~dp0??.*.bat") DO CALL :count %%~nxS
 
@@ -189,6 +190,7 @@ EXIT /B %ERRORLEVEL%
 SET NAME=%1
 IF "%NAME:~0,2%"=="00" EXIT /B 0
 IF "%NAME:~0,2%"=="99" EXIT /B 0
+IF "%NAME:~0,2%"=="13" EXIT /B 0
 SET /A TOTAL=%TOTAL%+1
 EXIT /B 0
 
@@ -197,6 +199,7 @@ IF DEFINED STEP_FAILED EXIT /B 1
 SET NAME=%1
 IF "%NAME:~0,2%"=="00" EXIT /B 0
 IF "%NAME:~0,2%"=="99" EXIT /B 0
+IF "%NAME:~0,2%"=="13" EXIT /B 0
 SET /A N=%N%+1
 echo.
 echo --- %N% of %TOTAL%: %NAME% ---

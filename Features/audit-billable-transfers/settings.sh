@@ -86,6 +86,8 @@ export BT_FILE_ARCHIVE_NAME="archive_with_2_files.zip"
 export BT_FILE_DECOMPRESS2P_1="file_1_inside_archive_for_2_partners.txt"
 export BT_FILE_DECOMPRESS2P_2="file_2_inside_archive_for_2_partners.txt"
 export BT_FILE_ARCHIVE2P_NAME="archive_with_2_files_for_2_partners.zip"
+# Scenario 2.7 (13.publish_to_account.sh): the file published to another account
+export BT_FILE_PUBLISH="publish_to_account.txt"
 
 # billable_GET_report: how many days back to report, today included
 export BT_REPORT_DAYS="7"
@@ -125,6 +127,10 @@ export BT_RUN_FOLDER="/${BT_TEST_ACCOUNT}"
 export BT_DROP_FOLDER="${BT_RUN_FOLDER}/outbound-drop"
 export BT_DELIVERED_1_FOLDER="${BT_RUN_FOLDER}/delivered-1"
 export BT_DELIVERED_2_FOLDER="${BT_RUN_FOLDER}/delivered-2"
+# Scenario 2.7: the test account folder that starts the route, and the folder of
+# partner_to_push_to that the Publish step writes to
+export BT_PUBLISH_SOURCE_FOLDER="${BT_SUBSCRIPTION_FOLDER}/s7"
+export BT_PUBLISHED_FOLDER="${BT_RUN_FOLDER}/published"
 export BT_PULL_SITE_PREFIX="${BT_TEST_ACCOUNT}PullSite"              # ...PullSite1 to 6
 export BT_PUSH_SITE_1="${BT_TEST_ACCOUNT}PushSitePartner1"
 export BT_PUSH_SITE_2="${BT_TEST_ACCOUNT}PushSitePartner2"

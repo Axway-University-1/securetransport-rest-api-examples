@@ -220,6 +220,7 @@ case "${ACCOUNT_STATE}" in
         for n in 1 2 3 4 5 6; do
             folders+=("${BT_SUBSCRIPTION_FOLDER}/s${n}")
         done
+        folders+=("${BT_PUBLISH_SOURCE_FOLDER}")
         remove_folders "${BT_TEST_ACCOUNT}" "${folders[@]}" "${BT_SUBSCRIPTION_FOLDER}"
         delete_account "${BT_TEST_ACCOUNT}"
         ;;
@@ -250,7 +251,7 @@ for partner in "${BT_PULL_PARTNER}" "${BT_PUSH_PARTNER}"; do
     if [ "${partner}" = "${BT_PULL_PARTNER}" ]; then
         remove_folders "${partner}" "${BT_DROP_FOLDER}" "${BT_RUN_FOLDER}"
     else
-        remove_folders "${partner}" "${BT_DELIVERED_1_FOLDER}" "${BT_DELIVERED_2_FOLDER}" "${BT_RUN_FOLDER}"
+        remove_folders "${partner}" "${BT_DELIVERED_1_FOLDER}" "${BT_DELIVERED_2_FOLDER}" "${BT_PUBLISHED_FOLDER}" "${BT_RUN_FOLDER}"
     fi
     if ! in_use=$(sites_logging_in_as "${partner}"); then
         printf "The list of sites could not be read, so the account %s is kept.\n" "${partner}"

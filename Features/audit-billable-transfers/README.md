@@ -77,6 +77,37 @@ transfers by their exact file name in File Tracking.
 4. **Analysis**: for each account, how many billable transfers the run added
    today, next to what the rule predicts, and whether they match.
 
+## Scenario 2.7: one Publish to Account step
+
+`13.publish_to_account.sh` is a seventh scenario, run on its own after
+`00.run_all.sh` (the run's predictions do not include it). One file is uploaded
+to a subscription folder of the test account, and a route with a single
+`Publish` step (the product's "Publish to Account") puts it in a folder of
+`partner_to_push_to`: a move between two accounts of the same server, with no
+partner site and no network. The script prints the billable count of both
+accounts before and after, and the transfers behind it.
+
+What was tried on 5.5-20261029, with the file `publish_to_account.txt`:
+
+- **The test account added 1**: the upload, an inbound, billable. The publish
+  is a second entry for the same file, protocol `routing`, with the **same
+  `coreId`**, and it is **not billable**: it is that chain's first outbound.
+- **`partner_to_push_to` added 0.** The file arrives there as a `routing`
+  entry with the same `coreId` and is not billable. This differs from a push
+  through a site, where the other account sees a new inbound with a `coreId` of
+  its own, billable.
+- **The target account must accept files from another account.** With its home
+  folder access level `PRIVATE` (the default) the step fails, and the route log
+  says `AR0057` ("It can only receive files from itself") and `ARPA0003` ("Not
+  allowed to publish files to home folder of target account"). The transfer shows
+  only `Failed Subtransmission`, without a reason: the reason is in the server log.
+  The script sets `homeFolderAccessLevel` to `PUBLIC` for the run and puts it
+  back.
+- **The target folder is a name inside the target account**
+  (`targetFolderExpressionType` `SIMPLE`, here `<account>/published`), and the
+  step makes it. The account is given by name (`targetAccountExpressionType`
+  `NAME`).
+
 ## What the rule predicts, account by account
 
 With one file each for scenarios 2.1 and 2.2:

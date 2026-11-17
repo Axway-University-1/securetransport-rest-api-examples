@@ -349,7 +349,7 @@ rm -f "${RUN:?}/state.local.sh"
 # account, still logs in as partner_to_pull_from, so that partner must stay.
 run 99.cleanup_DELETE.sh "${WORK}/version_and_objects.json" "" "" 200
 D=$(calls | grep '^DELETE' | sed 's#.*/api/v2.0/##' | tr '\n' ' ')
-[ "${D}" = "routes/comp2 routes/simple2 routes/tmpl1 subscriptions/sub1 applications/btTestAccountApplication sites/site1 sites/push1 sites/push2 files/subscription/s1/f1.txt files/subscription/s1 files/subscription/s2/f1.txt files/subscription/s2 files/subscription/s3/f1.txt files/subscription/s3 files/subscription/s4/f1.txt files/subscription/s4 files/subscription/s5/f1.txt files/subscription/s5 files/subscription/s6/f1.txt files/subscription/s6 files/subscription/f1.txt files/subscription myself accounts/btTestAccount files/btTestAccount/outbound-drop/f1.txt files/btTestAccount/outbound-drop files/btTestAccount/f1.txt files/btTestAccount myself files/btTestAccount/delivered-1/f1.txt files/btTestAccount/delivered-1 files/btTestAccount/delivered-2/f1.txt files/btTestAccount/delivered-2 files/btTestAccount/f1.txt files/btTestAccount myself accounts/partner_to_push_to " ] \
+[ "${D}" = "routes/comp2 routes/simple2 routes/tmpl1 subscriptions/sub1 applications/btTestAccountApplication sites/site1 sites/push1 sites/push2 files/subscription/s1/f1.txt files/subscription/s1 files/subscription/s2/f1.txt files/subscription/s2 files/subscription/s3/f1.txt files/subscription/s3 files/subscription/s4/f1.txt files/subscription/s4 files/subscription/s5/f1.txt files/subscription/s5 files/subscription/s6/f1.txt files/subscription/s6 files/subscription/s7/f1.txt files/subscription/s7 files/subscription/f1.txt files/subscription myself accounts/btTestAccount files/btTestAccount/outbound-drop/f1.txt files/btTestAccount/outbound-drop files/btTestAccount/f1.txt files/btTestAccount myself files/btTestAccount/delivered-1/f1.txt files/btTestAccount/delivered-1 files/btTestAccount/delivered-2/f1.txt files/btTestAccount/delivered-2 files/btTestAccount/published/f1.txt files/btTestAccount/published files/btTestAccount/f1.txt files/btTestAccount myself accounts/partner_to_push_to " ] \
     && pass "deletes the test account's objects, its folders and the account, then its folder in each partner, then a partner no site uses" \
     || fail "order: ${D}"
 [[ "${OUT}" == *"The account partner_to_pull_from is kept: 1 site(s) of another test account still log in as it."* ]] \
@@ -743,10 +743,47 @@ STUB_BIN="${WORK}/bin_by_method" STUB_COUNTER="${WORK}/counter" STUB_STATUS_HEAD
     && pass "a name that is already an account is skipped: btTestAccount_3 is used" || fail "taken name (exit ${RC}): $(echo "${OUT}" | grep -i 'new name')"
 
 echo
+echo "=== 13.publish_to_account.sh ==="
+cat > "${WORK}/publish_server.json" <<JSON
+{"version": "5.5-20260924", "homeFolderAccessLevel": "PRIVATE",
+ "files": [{"fileName": "publish_to_account.txt", "isRegularFile": true}],
+ "resultSet": {"totalCount": 3}, "result": []}
+JSON
+echo '{"id": "op-1"}' > "${WORK}/publish_post.json"
+printf 'export BT_ID_TEMPLATE=tmpl-1\n' > "${RUN}/state.local.sh"
+POST_BODY="${WORK}/publish_post.json" run_by_method 13.publish_to_account.sh "${WORK}/publish_server.json" STUB_CURL_PRINT_CODE=1 STUB_STATUS_PATCH=204 STUB_STATUS_POST=201
+if [ "${RC}" -eq 0 ] && [[ "${OUT}" == *"publish_to_account.txt is in /btTestAccount/published of partner_to_push_to."* ]]; then
+    pass "runs to the end, and finds the file in the other account"
+else
+    fail "13 (exit ${RC}): $(echo "${OUT}" | grep -v "^HEADER\|^PAYLOAD" | tail -n 8)"
+fi
+STEP=$(post_payloads | jq -c 'select(.type == "SIMPLE") | .steps[0]')
+[ "$(echo "${STEP}" | jq -r '[.type, .targetAccountExpression, .targetAccountExpressionType, .targetFolderExpression, .targetFolderExpressionType] | join(" ")')" = "Publish partner_to_push_to NAME btTestAccount/published SIMPLE" ] \
+    && pass "one Publish step: to partner_to_push_to, to the folder btTestAccount/published (a name, not an expression)" || fail "step: ${STEP}"
+[ "$(post_payloads | jq -c 'select(.type == "SIMPLE") | .steps | length')" = "1" ] && pass "the route has that one step and no other" || fail "step count"
+[ "$(post_payloads | jq -r 'select(.type == "COMPOSITE") | .name + " " + .steps[0].type')" = "btTestAccountCompositeRoute7 ExecuteRoute" ] \
+    && pass "a composite route, named for scenario 7, runs the simple route" || fail "composite"
+[ "$(post_payloads | jq -r 'select(.type == "AdvancedRouting") | .folder')" = "/subscription/s7" ] \
+    && pass "the subscription is on /subscription/s7 of the test account" || fail "subscription"
+LEVELS=$(echo "${OUT}" | awk '/^METHOD: PATCH/ {p=1} /^URL:/ {u=$2} /^PAYLOAD_B64:/ {if (p && u ~ /accounts\/partner_to_push_to/) print substr($0, 14)}' | while read -r b; do echo "$b" | base64 -d | jq -r '.[0].value'; done | tr '\n' ' ')
+[ "${LEVELS}" = "PUBLIC PRIVATE " ] && pass "the other account is set to PUBLIC for the run, and put back to PRIVATE (what it was)" || fail "access levels: ${LEVELS}"
+# An account that is PUBLIC already is left as it is: no change, nothing to put back
+sed 's/"PRIVATE"/"PUBLIC"/' "${WORK}/publish_server.json" > "${WORK}/publish_server_public.json"
+POST_BODY="${WORK}/publish_post.json" run_by_method 13.publish_to_account.sh "${WORK}/publish_server_public.json" STUB_CURL_PRINT_CODE=1 STUB_STATUS_PATCH=204 STUB_STATUS_POST=201
+[ "${RC}" -eq 0 ] && ! calls | grep -q '^PATCH .*accounts/partner_to_push_to' && pass "an account that is PUBLIC already is not touched" || fail "public account: $(calls | grep PATCH)"
+# The step does not arrive: exit 1, and the access level is still put back
+POST_BODY="${WORK}/publish_post.json" run_by_method 13.publish_to_account.sh "${WORK}/version_no_objects.json" STUB_CURL_PRINT_CODE=1 STUB_STATUS_PATCH=204 STUB_STATUS_POST=201
+if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *"did not arrive"* ]]; then pass "a file that does not arrive: exit 1, with the reason"; else fail "no file (exit ${RC}): $(echo "${OUT}" | tail -n 3)"; fi
+rm -f "${RUN:?}/state.local.sh"
+run 13.publish_to_account.sh "${SERVER_NEW}"
+[ "${RC}" -eq 1 ] && [[ "${OUT}" == *"Run 00.run_all.sh first"* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|PUT|PATCH)' \
+    && pass "without the objects of 00.run_all.sh: says so, and sends nothing" || fail "no template (exit ${RC})"
+
+echo
 echo "=== Guard rails ==="
 rm -f "${RUN:?}/state.local.sh"
 for s in 00.run_all.sh 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh \
-         10.files_upload_POST.sh 11.transfers_pull_POST.sh 12.files_GET_result.sh billable_GET_report.sh 99.cleanup_DELETE.sh; do
+         10.files_upload_POST.sh 11.transfers_pull_POST.sh 12.files_GET_result.sh 13.publish_to_account.sh billable_GET_report.sh 99.cleanup_DELETE.sh; do
     run "${s}" "${SERVER_OLD}"
     if [ "${RC}" -eq 0 ] && [[ "${OUT}" == *SKIPPED* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|DELETE|PUT)'; then
         pass "${s}: skipped, and sends nothing, on an older server"
@@ -756,7 +793,7 @@ for s in 00.run_all.sh 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_p
 done
 
 mv "${RUN}/settings.local.sh" "${RUN}/settings.local.sh.off"
-for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh 10.files_upload_POST.sh; do
+for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh 10.files_upload_POST.sh 13.publish_to_account.sh; do
     run "${s}" "${SERVER_NEW}"
     if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *BT_ACCOUNT_PASSWORD* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|PUT)'; then
         pass "${s}: stops and sends nothing when no password is set"
