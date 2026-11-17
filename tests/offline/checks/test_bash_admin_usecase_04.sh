@@ -22,6 +22,9 @@ UC_ROOT="${REPO}/Admin/UseCases"
 WORK="${ST_TEST_OUTPUT:-${TESTS_DIR}/output}/bash_admin_usecase_04"
 rm -rf "${WORK}"
 mkdir -p "${WORK}/bin" "${WORK}/tree/API 2.0/bash" "${WORK}/tree/UseCases"
+# The scripts name their own folder by its physical path, so the test names it that way too: a temp
+# folder under a symlink (macOS /var is /private/var) would otherwise differ in the paths it compares
+WORK="$(cd "${WORK}" && pwd -P)"
 
 FAILED=0
 pass() { printf "  PASS  %s\n" "$1"; }
