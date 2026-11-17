@@ -61,7 +61,7 @@ def main():
         for key, why in NO_ONLINE.items():
             if key in f and not on:
                 on = ["(by design: %s)" % why]
-        if f.endswith(("lib.sh", "session.sh", "ensure_session.sh")) or "example" in name and "set_variables" in name:
+        if f.endswith(("lib.sh", "scenario.sh", "session.sh", "ensure_session.sh")) or "example" in name and "set_variables" in name:
             off = off or ["(helper, used by the scripts)"]; on = on or ["(helper, used by the scripts)"]
         rows.append((f, off, on))
     for f, off, on in rows:

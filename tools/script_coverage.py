@@ -17,7 +17,7 @@ import os, subprocess, sys, tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-HELPERS = {"lib.sh", "session.sh", "ensure_session.sh", "settings.sh"}
+HELPERS = {"lib.sh", "scenario.sh", "session.sh", "ensure_session.sh", "settings.sh"}
 # imported by the examples, never run on its own: the checks that run the examples run it
 LIBRARIES = {"el_client.py"}
 
