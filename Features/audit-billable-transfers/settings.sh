@@ -89,6 +89,15 @@ export BT_FILE_ARCHIVE2P_NAME="archive_with_2_files_for_2_partners.zip"
 # Scenario 2.7 (13.publish_to_account.sh): the file published to another account
 export BT_FILE_PUBLISH="publish_to_account.txt"
 
+# The business-unit run (run_business_units.sh): two business units, each with
+# its own users (test accounts). Every user runs the whole set of scenarios once, so
+# the unit with more users does more transfers. Each unit's base folder is
+# <BT_HOME_ROOT>/<unit>, and its users' home folders are inside it.
+export BT_BU_1="btBusinessUnit1"
+export BT_BU_2="btBusinessUnit2"
+export BT_BU_1_USERS="3"
+export BT_BU_2_USERS="1"
+
 # billable_GET_report: how many days back to report, today included
 export BT_REPORT_DAYS="7"
 
@@ -117,7 +126,10 @@ fi
 # Everything below is derived from the account name, so two runs with different
 # account names never collide on the server, and the cleanup of one never
 # touches the other's objects
+# BT_RUN_BUSINESS_UNIT (set by run_business_units.sh): the test account belongs to that
+# business unit, and its home folder is inside the unit's base folder
 export BT_HOME_FOLDER="${BT_HOME_ROOT}/${BT_TEST_ACCOUNT}"
+[ -n "${BT_RUN_BUSINESS_UNIT}" ] && export BT_HOME_FOLDER="${BT_HOME_ROOT}/${BT_RUN_BUSINESS_UNIT}/${BT_TEST_ACCOUNT}"
 export BT_PULL_PARTNER_HOME="${BT_HOME_ROOT}/${BT_PULL_PARTNER}"
 export BT_PUSH_PARTNER_HOME="${BT_HOME_ROOT}/${BT_PUSH_PARTNER}"
 # This test account's own folder in each partner: the sample files wait in

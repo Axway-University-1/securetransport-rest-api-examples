@@ -24,6 +24,9 @@
 # - Requires `jq`, which builds the JSON body.
 # - transfersWebServiceAllowed is on. Without it the account cannot log in to the
 #   End User API, and that login fails with a 401.
+# - With BT_RUN_BUSINESS_UNIT set (run_business_units.sh does), the test account is
+#   created in that business unit, with its home folder inside the unit's base folder.
+#   The partners stay in the default unit.
 # - Exits 1 as soon as the server refuses an account.
 # - The partners are shared by every test account. One that already exists, from
 #   another test account's run, is reused and not created again.
@@ -51,6 +54,10 @@ create_account() {
       '{name: $name, type: "user", homeFolder: $home, uid: "41733", gid: "41733",
         transfersWebServiceAllowed: true,
         user: {name: $name, passwordCredentials: {password: $password}}}')
+    # The test account only (not a partner): into its business unit, when the run has one
+    if [ -n "$3" ]; then
+        body=$(printf '%s' "${body}" | jq --arg unit "$3" '. + {businessUnit: $unit}')
+    fi
     printf "Creating the account %s...\n" "${name}"
     ar_admin_post "accounts" "${body}"
 }
@@ -64,6 +71,6 @@ create_partner() {
     create_account "$1" "$2"
 }
 
-create_account "${BT_TEST_ACCOUNT}" "${BT_HOME_FOLDER}" || exit 1
+create_account "${BT_TEST_ACCOUNT}" "${BT_HOME_FOLDER}" "${BT_RUN_BUSINESS_UNIT}" || exit 1
 create_partner "${BT_PULL_PARTNER}" "${BT_PULL_PARTNER_HOME}" || exit 1
 create_partner "${BT_PUSH_PARTNER}" "${BT_PUSH_PARTNER_HOME}" || exit 1

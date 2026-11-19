@@ -780,10 +780,59 @@ run 13.publish_to_account.sh "${SERVER_NEW}"
     && pass "without the objects of 00.run_all.sh: says so, and sends nothing" || fail "no template (exit ${RC})"
 
 echo
+echo "=== Business units: 01.accounts_POST.sh and run_business_units.sh ==="
+# The test account is created in its unit, with its home folder inside the unit's base folder; the partners stay out of it
+HEAD_STATUS=404 BT_RUN_BUSINESS_UNIT=btBusinessUnit1 run 01.accounts_POST.sh "${SERVER_NEW}"
+ACCOUNTS=$(payloads | jq -r '.name + " " + .homeFolder + " " + (.businessUnit // "-")' | tr '\n' '|')
+[ "${ACCOUNTS}" = "btTestAccount /home/btBusinessUnit1/btTestAccount btBusinessUnit1|partner_to_pull_from /home/partner_to_pull_from -|partner_to_push_to /home/partner_to_push_to -|" ] \
+    && pass "with a business unit: the test account is in it, its home is inside the unit's base folder, the partners are not" || fail "accounts in a unit: ${ACCOUNTS}"
+HEAD_STATUS=404 run 01.accounts_POST.sh "${SERVER_NEW}"
+[ "$(payloads | jq -r '.businessUnit // "-"' | tr '\n' ' ')" = "- - - " ] \
+    && pass "without one: no account carries a businessUnit" || fail "businessUnit without a unit"
+
+# Every call answers with a count of 12: what the rule predicts for one user with the default files
+echo '{"version":"5.5-20260924","id":"op-1","files":[],"result":[],"resultSet":{"returnCount":0,"totalCount":12}}' > "${WORK}/twelve.json"
+units() {
+    OUT=$(cd "${RUN}" && PATH="${WORK}/bin:${PATH}" STUB_CURL_GET_BODY="${ALL_BODY:-${WORK}/twelve.json}" STUB_CURL_POST_BODY="${WORK}/twelve.json" \
+          STUB_CURL_LOCATION_ID="new-id" STUB_CURL_STATUS="201" STUB_CURL_STATUS_HEAD="${HEAD_STATUS-404}" \
+          STUB_CURL_STATUS_DELETE="${DELETE_STATUS:-}" STUB_CURL_CSRF="csrf-abc" bash ./run_business_units.sh "$@" 2>&1)
+    RC=$?
+}
+rm -f "${RUN:?}/state.local.sh"
+units
+[ "${RC}" -eq 0 ] && pass "run_business_units.sh runs and exits 0 when the units add what the rule predicts" || fail "exit ${RC}: $(echo "${OUT}" | tail -8)"
+UNITS_POSTED=$(post_payloads | jq -r 'select(.baseFolder) | .name + " " + .baseFolder' | tr '\n' '|')
+[ "${UNITS_POSTED}" = "btBusinessUnit1 /home/btBusinessUnit1|btBusinessUnit2 /home/btBusinessUnit2|" ] \
+    && pass "creates the two business units, each with its base folder" || fail "units: ${UNITS_POSTED}"
+# The runs of the users are not shown (only their analysis), so what is checked is who ran, in which unit
+USERS=$(echo "${OUT}" | sed -n 's/^--- \(.*\), in \(.*\) ---$/\1 \2/p' | tr '\n' '|')
+[ "${USERS}" = "btBusinessUnit1User1 btBusinessUnit1|btBusinessUnit1User2 btBusinessUnit1|btBusinessUnit1User3 btBusinessUnit1|btBusinessUnit2User1 btBusinessUnit2|" ] \
+    && pass "three users in the first unit, one in the second" || fail "users: ${USERS}"
+ROWS=$(echo "${OUT}" | sed -n '/=== Step 3/,$p' | grep -E '^  btBusinessUnit[12] ' | awk '{print $1, $2, $3, $4, $5}' | tr '\n' '|')
+[ "${ROWS}" = "btBusinessUnit1 3 36 36 36|btBusinessUnit2 1 12 12 12|" ] \
+    && pass "the table: the first unit has three times the transfers of the second" || fail "table: ${ROWS}"
+[[ "${OUT}" != *"=== Cleanup"* ]] && pass "without --cleanup, nothing is removed" || fail "cleaned up without being asked"
+echo '{"version":"5.5-20260924","id":"op-1","files":[],"result":[],"resultSet":{"returnCount":0,"totalCount":0}}' > "${WORK}/zero.json"
+rm -f "${RUN:?}/state.local.sh"
+ALL_BODY="${WORK}/zero.json" units
+[ "${RC}" -eq 1 ] && [[ "${OUT}" == *"differs"* ]] && pass "a unit that does not add what the rule predicts: says differs, and exits 1" || fail "no counts (exit ${RC})"
+rm -f "${RUN:?}/state.local.sh"
+HEAD_STATUS=404 units --remove
+[ "${RC}" -eq 0 ] && [[ "${OUT}" == *"The business unit btBusinessUnit1 is not there."* ]] && ! echo "${OUT}" | grep -q "^METHOD: POST" \
+    && pass "--remove with nothing there: says so, creates nothing" || fail "--remove (exit ${RC}): $(echo "${OUT}" | tail -5)"
+rm -f "${RUN:?}/state.local.sh"
+HEAD_STATUS=200 units --remove
+LAST_DELETES=$(calls | grep '^DELETE' | tail -2 | sed 's|.*/api/v2.0/||' | tr '\n' ' ')
+[ "${RC}" -eq 0 ] && [ "${LAST_DELETES}" = "businessUnits/btBusinessUnit1 businessUnits/btBusinessUnit2 " ] \
+    && pass "--remove deletes the two units last, after the users" || fail "--remove (exit ${RC}), last deletes: ${LAST_DELETES}"
+units --bogus
+[ "${RC}" -eq 2 ] && [[ "${OUT}" == *"Usage: ./run_business_units.sh"* ]] && pass "an unknown option: usage, exit 2" || fail "bogus option (exit ${RC})"
+
+echo
 echo "=== Guard rails ==="
 rm -f "${RUN:?}/state.local.sh"
 for s in 00.run_all.sh 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh \
-         10.files_upload_POST.sh 11.transfers_pull_POST.sh 12.files_GET_result.sh 13.publish_to_account.sh billable_GET_report.sh 99.cleanup_DELETE.sh; do
+         10.files_upload_POST.sh 11.transfers_pull_POST.sh 12.files_GET_result.sh 13.publish_to_account.sh run_business_units.sh billable_GET_report.sh 99.cleanup_DELETE.sh; do
     run "${s}" "${SERVER_OLD}"
     if [ "${RC}" -eq 0 ] && [[ "${OUT}" == *SKIPPED* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|DELETE|PUT)'; then
         pass "${s}: skipped, and sends nothing, on an older server"
@@ -793,7 +842,7 @@ for s in 00.run_all.sh 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_p
 done
 
 mv "${RUN}/settings.local.sh" "${RUN}/settings.local.sh.off"
-for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh 10.files_upload_POST.sh 13.publish_to_account.sh; do
+for s in 01.accounts_POST.sh 02.sites_POST_pull.sh 03.sites_POST_push.sh 04.files_POST_folders.sh 10.files_upload_POST.sh 13.publish_to_account.sh run_business_units.sh; do
     run "${s}" "${SERVER_NEW}"
     if [ "${RC}" -eq 1 ] && [[ "${OUT}" == *BT_ACCOUNT_PASSWORD* ]] && ! echo "${OUT}" | grep -qE '^METHOD: (POST|PUT)'; then
         pass "${s}: stops and sends nothing when no password is set"

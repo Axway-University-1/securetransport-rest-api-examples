@@ -108,6 +108,46 @@ What was tried on 5.5-20261029, with the file `publish_to_account.txt`:
   step makes it. The account is given by name (`targetAccountExpressionType`
   `NAME`).
 
+## Two business units, with a different number of transfers
+
+`run_business_units.sh` (and `.bat`) runs the same transfers for the users of two
+business units, so that the units end with different totals:
+
+| Business unit | Users (test accounts) | Transfers |
+| ------------- | --------------------- | --------- |
+| `btBusinessUnit1` | `btBusinessUnit1User1` to `User3` | three times one run |
+| `btBusinessUnit2` | `btBusinessUnit2User1` | one run |
+
+It creates the two units with `POST /businessUnits` (each with the base folder
+`/home/<unit>`), then runs `00.run_all` once for each user. A user is a test account
+created in its unit (`businessUnit` in the body of `01.accounts_POST`, with its home
+folder inside the unit's base folder), so everything else is the one run described
+above, per user. The partners are shared and stay in the default unit. The names and
+the number of users per unit are in `settings.sh` (`BT_BU_1`, `BT_BU_2`,
+`BT_BU_1_USERS`, `BT_BU_2_USERS`).
+
+Then it adds up each unit's transfers since the run began. `GET /logs/transfers` has no
+business unit filter, so a unit's count is the sum over its users (`account=` filter). A
+real run on 5.5-20261029:
+
+```
+  business unit         users  all transfers       billable  the rule predicts (billable)
+  btBusinessUnit1           3             54             36  36
+  btBusinessUnit2           1             18             12  12
+```
+
+"All transfers" is every transfer of the users' accounts, inbound and outbound,
+billable or not (18 per user here); "billable" is what the rule predicts: 12 per user
+with the default files, so 36 against 12.
+
+```
+./run_business_units.sh              create, run and report; leaves everything in place
+./run_business_units.sh --cleanup    the same, then removes it all
+./run_business_units.sh --remove     removes what an earlier run left: the users, then the units
+```
+
+A unit can be deleted only when it has no account left, so the users go first.
+
 ## What the rule predicts, account by account
 
 With one file each for scenarios 2.1 and 2.2:

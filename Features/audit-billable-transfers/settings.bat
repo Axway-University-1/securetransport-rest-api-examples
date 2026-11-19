@@ -89,6 +89,15 @@ SET BT_FILE_ARCHIVE2P_NAME=archive_with_2_files_for_2_partners.zip
 REM Scenario 2.7 (13.publish_to_account.bat): the file published to another account
 SET BT_FILE_PUBLISH=publish_to_account.txt
 
+REM The business-unit run (run_business_units.bat): two business units, each with
+REM its own users (test accounts). Every user runs the whole set of scenarios once, so
+REM the unit with more users does more transfers. Each unit's base folder is
+REM <BT_HOME_ROOT>/<unit>, and its users' home folders are inside it.
+SET BT_BU_1=btBusinessUnit1
+SET BT_BU_2=btBusinessUnit2
+SET BT_BU_1_USERS=3
+SET BT_BU_2_USERS=1
+
 REM billable_GET_report: how many days back to report, today included
 SET BT_REPORT_DAYS=7
 
@@ -113,7 +122,10 @@ IF DEFINED BT_RUN_IN_AND_OUT SET BT_IN_AND_OUT_COUNT=%BT_RUN_IN_AND_OUT%
 REM Everything below is derived from the account name, so two runs with different
 REM account names never collide on the server, and the cleanup of one never
 REM touches the other's objects
+REM BT_RUN_BUSINESS_UNIT (set by run_business_units.bat): the test account belongs to that
+REM business unit, and its home folder is inside the unit's base folder
 SET BT_HOME_FOLDER=%BT_HOME_ROOT%/%BT_TEST_ACCOUNT%
+IF DEFINED BT_RUN_BUSINESS_UNIT SET BT_HOME_FOLDER=%BT_HOME_ROOT%/%BT_RUN_BUSINESS_UNIT%/%BT_TEST_ACCOUNT%
 SET BT_PULL_PARTNER_HOME=%BT_HOME_ROOT%/%BT_PULL_PARTNER%
 SET BT_PUSH_PARTNER_HOME=%BT_HOME_ROOT%/%BT_PUSH_PARTNER%
 REM This test account's own folder in each partner: the sample files wait in

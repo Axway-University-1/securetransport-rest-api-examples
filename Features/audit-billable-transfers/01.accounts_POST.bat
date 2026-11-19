@@ -24,6 +24,9 @@ REM - Needs settings.local.bat with BT_ACCOUNT_PASSWORD. See settings.bat.
 REM - Uses PowerShell to build the JSON body.
 REM - transfersWebServiceAllowed is on. Without it the account cannot log in to the
 REM   End User API, and that login fails with a 401.
+REM - With BT_RUN_BUSINESS_UNIT set (run_business_units.bat does), the test account is
+REM   created in that business unit, with its home folder inside the unit's base folder.
+REM   The partners stay in the default unit.
 REM - Exits 1 as soon as the server refuses an account.
 REM - The partners are shared by every test account. One that already exists, from
 REM   another test account's run, is reused and not created again.
@@ -42,7 +45,7 @@ IF "%BT_ACCOUNT_PASSWORD%"=="" (
     EXIT /B 1
 )
 
-CALL :create_account "%BT_TEST_ACCOUNT%" "%BT_HOME_FOLDER%"
+CALL :create_account "%BT_TEST_ACCOUNT%" "%BT_HOME_FOLDER%" "%BT_RUN_BUSINESS_UNIT%"
 IF ERRORLEVEL 1 EXIT /B 1
 CALL :create_partner "%BT_PULL_PARTNER%" "%BT_PULL_PARTNER_HOME%"
 IF ERRORLEVEL 1 EXIT /B 1
@@ -53,8 +56,9 @@ EXIT /B 0
 :create_account
 SET ACCOUNT_NAME=%~1
 SET ACCOUNT_HOME=%~2
+SET ACCOUNT_UNIT=%~3
 SET BODY_FILE=%TEMP%\bt_body_%RANDOM%.json
-powershell -NoProfile -Command "@{ name=$env:ACCOUNT_NAME; type='user'; homeFolder=$env:ACCOUNT_HOME; uid='41733'; gid='41733'; transfersWebServiceAllowed=$true; user=@{ name=$env:ACCOUNT_NAME; passwordCredentials=@{ password=$env:BT_ACCOUNT_PASSWORD } } } | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
+powershell -NoProfile -Command "$b=@{ name=$env:ACCOUNT_NAME; type='user'; homeFolder=$env:ACCOUNT_HOME; uid='41733'; gid='41733'; transfersWebServiceAllowed=$true; user=@{ name=$env:ACCOUNT_NAME; passwordCredentials=@{ password=$env:BT_ACCOUNT_PASSWORD } } }; if ($env:ACCOUNT_UNIT) { $b.businessUnit=$env:ACCOUNT_UNIT }; $b | ConvertTo-Json -Depth 10 -Compress" > "%BODY_FILE%"
 
 echo Creating the account %ACCOUNT_NAME%...
 CALL "%~dp0..\lib\post_admin.bat" accounts "%BODY_FILE%"
