@@ -81,7 +81,7 @@ BU_NAMES=("${BT_BU_1}" "${BT_BU_2}")
 BU_COUNTS=("${BT_BU_1_USERS}" "${BT_BU_2_USERS}")
 unit_users() {
     local unit="$1" count="$2" i
-    for i in $(seq 1 "${count}"); do printf "%sUser%s\n" "${unit}" "${i}"; done
+    for i in $(seq 1 "${count}"); do printf "%s\n" "${unit}User${i}"; done
 }
 
 # remove_all: each user with everything it owns, then the two business units
