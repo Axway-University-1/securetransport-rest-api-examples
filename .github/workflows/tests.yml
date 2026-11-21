@@ -1,11 +1,16 @@
 name: tests
 
+# The job names (offline-checks, script-coverage) are what a branch ruleset lists as required checks: keep them.
 on:
   push:
+    branches: [main]
   pull_request:
   schedule:
     - cron: "0 5 * * 1"      # Mondays: a script nobody tests is found within a week, even with no push
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   offline-checks:
