@@ -2,6 +2,18 @@
 
 [Back to the README](README.md). Read the rules in [CLAUDE.md](CLAUDE.md) first: every new script and every change is covered by a test.
 
+## Making a change: branch and pull request
+
+Nothing is committed straight to `main`. Every change goes through a pull request.
+
+1. Branch from an up-to-date `main`, named by what the change is: `feature/<short-name>` for a new example or feature, `fix/<short-name>` for a bug, `docs/<short-name>` for documentation only.
+2. Run `./tests/offline/run_all.sh` before you push. It needs no server and no credentials, and it is what CI runs. A new script or a changed behaviour comes with its test (see [CLAUDE.md](CLAUDE.md)).
+3. Push the branch and open a pull request to `main`. Fill in the checklist the template gives you.
+4. Keep real hostnames, credentials, tokens and customer data out of code, logs, fixtures and screenshots. Everything in this repository is public.
+5. Every example here is for **test environments only**: some change server configuration or stop and restart servers. Say so in the header of one that does, and never point an example at production.
+
+If you do not have write access, fork the repository and open the pull request from your fork.
+
 ## Folders you work in
 
 | Folder | What is in it |
@@ -10,7 +22,7 @@
 | `tools/` | The helper scripts. `list_examples.py` lists every example with the endpoint it calls and its `Risk` line (`--table` for a table). `test_map.py` maps a script to the checks that mention it, `script_coverage.py` and `measure_coverage.py` say how well the examples are tested, `mutation_probe.py` (and `mutation_progress.py`) break a script on purpose to see whether a test notices. `build_json_examples.py` makes the Swagger, Postman and Bruno files of [Admin/API 2.0/json](Admin/API%202.0/json/README.md) from one source, `guide_examples.py` and `guide_review_sheet.py` serve the guides, and `review_status.py` keeps `review/checked.tsv`. Each says what it does with `--help`. |
 | `review/` | `checked.tsv`, the list of files a person has read and confirmed, each with a hash of its content, so that a file that changed since is easy to find. Kept by `tools/review_status.py`; do not edit it by hand. |
 | `.claude/` | A knowledge pack for people and for AI assistants working here: `skills/` holds three guides (orientation, gotchas, adding an example) and the procedure for covering a new API resource, `agents/` holds two assistant definitions. See [its README](.claude/README.md). Your own `settings.json` and `settings.local.json` in this folder are git ignored. |
-| `.github/` | `workflows/tests.yml`: runs `./tests/offline/run_all.sh` on Linux for every push and pull request. |
+| `.github/` | `workflows/tests.yml`: runs `./tests/offline/run_all.sh` on Linux for every pull request and every push to `main`, with read-only permissions. `pull_request_template.md` is the checklist a pull request starts with, and `CODEOWNERS` names who reviews. |
 | `images/` | The screenshots used by the [Admin API README](Admin/API%202.0/README.md). |
 | `tmp/` | A scratch folder for the files the helper scripts write while probing a server. It is git ignored, so a fresh clone does not have it, and you can delete what is in it. |
 
